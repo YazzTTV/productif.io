@@ -24,6 +24,8 @@ const nextConfig = {
     };
     return config;
   },
+  // Activer à la fois le dossier app et pages
+  reactStrictMode: true
 }
 
 export default nextConfig 
