@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && prisma migrate deploy && next build",
+    "build": "prisma generate --schema=./prisma/schema.prisma && prisma migrate deploy --schema=./prisma/schema.prisma && next build",
     "start": "next start",
     "lint": "next lint",
     "vercel-build": "pnpm prisma generate && pnpm prisma migrate deploy && pnpm next build"
