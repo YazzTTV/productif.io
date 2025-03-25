@@ -4,10 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate --schema=/vercel/path0/prisma/schema.prisma && prisma migrate deploy --schema=/vercel/path0/prisma/schema.prisma && next build",
+    "build": "next build",
     "start": "next start",
-    "lint": "next lint",
-    "vercel-build": "pnpm prisma generate && pnpm prisma migrate deploy && pnpm next build"
+    "lint": "next lint"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
