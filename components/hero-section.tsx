@@ -28,10 +28,6 @@ export default function HeroSection() {
             <div className="flex items-center space-x-4 text-sm">
               <div className="flex items-center space-x-1">
                 <CheckCircle className="h-4 w-4 text-brand-green" />
-                <span>Sans carte bancaire</span>
-              </div>
-              <div className="flex items-center space-x-1">
-                <CheckCircle className="h-4 w-4 text-brand-green" />
                 <span>Annulation facile</span>
               </div>
               <div className="flex items-center space-x-1">

@@ -23,8 +23,7 @@ export default function FaqSection() {
               <AccordionTrigger>Comment fonctionne l'essai gratuit de 7 jours ?</AccordionTrigger>
               <AccordionContent>
                 Notre essai gratuit vous donne un accès complet à toutes les fonctionnalités premium pendant 7 jours,
-                sans aucune restriction. Vous n'avez pas besoin de fournir vos informations de carte bancaire pour
-                commencer. À la fin de la période d'essai, vous pouvez choisir de vous abonner ou votre compte sera
+                sans aucune restriction. À la fin de la période d'essai, vous pouvez choisir de vous abonner ou votre compte sera
                 automatiquement rétrogradé.
               </AccordionContent>
             </AccordionItem>
