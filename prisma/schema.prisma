@@ -32,6 +32,12 @@ model User {
   companies       UserCompany[]  // Relation avec les entreprises
   managedCompany  Company?       @relation("CompanyAdmin", fields: [managedCompanyId], references: [id])
   managedCompanyId String?
+  
+  // Champs Stripe
+  stripeCustomerId     String?    @unique
+  stripeSubscriptionId String?    @unique
+  subscriptionStatus   String?
+  trialEndsAt         DateTime?
 }
 
 model Company {

@@ -292,105 +292,111 @@ export function DashboardNav({ viewAsMode = false, viewAsUserId }: DashboardNavP
           <>
             <div className="h-px bg-border my-2" />
             
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Link
-                  href="/dashboard/admin/companies"
-                  className={cn(
-                    buttonVariants({
-                      variant: isActive("/dashboard/admin/companies") ? "secondary" : "ghost",
-                      size: "default",
-                    }),
-                    "justify-start w-full"
-                  )}
-                >
-                  <Building2 className="mr-2 h-4 w-4" />
-                  {t('companies')}
-                </Link>
-              </TooltipTrigger>
-              <TooltipContent side="right">{t('companies')}</TooltipContent>
-            </Tooltip>
-            
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Link
-                  href="/dashboard/admin/users"
-                  className={cn(
-                    buttonVariants({
-                      variant: isActive("/dashboard/admin/users") ? "secondary" : "ghost",
-                      size: "default",
-                    }),
-                    "justify-start w-full"
-                  )}
-                >
-                  <Users className="mr-2 h-4 w-4" />
-                  {t('users')}
-                </Link>
-              </TooltipTrigger>
-              <TooltipContent side="right">{t('users')}</TooltipContent>
-            </Tooltip>
-            
+            {/* Menu Super Admin */}
             {isSuperAdmin && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Link
-                    href="/dashboard/admin/super-dashboard"
-                    className={cn(
-                      buttonVariants({
-                        variant: isActive("/dashboard/admin/super-dashboard") ? "secondary" : "ghost",
-                        size: "default",
-                      }),
-                      "justify-start w-full"
-                    )}
-                  >
-                    <LineChart className="mr-2 h-4 w-4" />
-                    {t('adminDashboard')}
-                  </Link>
-                </TooltipTrigger>
-                <TooltipContent side="right">{t('adminDashboard')}</TooltipContent>
-              </Tooltip>
+              <>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Link
+                      href="/dashboard/admin/companies"
+                      className={cn(
+                        buttonVariants({
+                          variant: isActive("/dashboard/admin/companies") ? "secondary" : "ghost",
+                          size: "default",
+                        }),
+                        "justify-start w-full"
+                      )}
+                    >
+                      <Building2 className="mr-2 h-4 w-4" />
+                      {t('companies')}
+                    </Link>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">{t('companies')}</TooltipContent>
+                </Tooltip>
+
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Link
+                      href="/dashboard/admin/users"
+                      className={cn(
+                        buttonVariants({
+                          variant: isActive("/dashboard/admin/users") ? "secondary" : "ghost",
+                          size: "default",
+                        }),
+                        "justify-start w-full"
+                      )}
+                    >
+                      <Users className="mr-2 h-4 w-4" />
+                      {t('users')}
+                    </Link>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">{t('users')}</TooltipContent>
+                </Tooltip>
+
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Link
+                      href="/dashboard/admin/super-dashboard"
+                      className={cn(
+                        buttonVariants({
+                          variant: isActive("/dashboard/admin/super-dashboard") ? "secondary" : "ghost",
+                          size: "default",
+                        }),
+                        "justify-start w-full"
+                      )}
+                    >
+                      <LineChart className="mr-2 h-4 w-4" />
+                      {t('adminDashboard')}
+                    </Link>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">{t('adminDashboard')}</TooltipContent>
+                </Tooltip>
+              </>
             )}
-            
-            {!isSuperAdmin && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Link
-                    href="/dashboard/admin/tasks"
-                    className={cn(
-                      buttonVariants({
-                        variant: isActive("/dashboard/admin/tasks") ? "secondary" : "ghost",
-                        size: "default",
-                      }),
-                      "justify-start w-full"
-                    )}
-                  >
-                    <CheckSquare className="mr-2 h-4 w-4" />
-                    {t('memberTasks')}
-                  </Link>
-                </TooltipTrigger>
-                <TooltipContent side="right">{t('memberTasks')}</TooltipContent>
-              </Tooltip>
-            )}
-            
-            {!isSuperAdmin && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Link
-                    href="/dashboard/admin/analytics"
-                    className={cn(
-                      buttonVariants({
-                        variant: isActive("/dashboard/admin/analytics") ? "secondary" : "ghost",
-                        size: "default",
-                      }),
-                      "justify-start w-full"
-                    )}
-                  >
-                    <LineChart className="mr-2 h-4 w-4" />
-                    {t('teamPerformance')}
-                  </Link>
-                </TooltipTrigger>
-                <TooltipContent side="right">{t('teamPerformance')}</TooltipContent>
-              </Tooltip>
+
+            {/* Menu Admin d'entreprise */}
+            {(isAdmin || (isSuperAdmin && companyName)) && (
+              <>
+                {isSuperAdmin && <div className="h-px bg-border my-2" />}
+                
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Link
+                      href="/dashboard/admin/tasks"
+                      className={cn(
+                        buttonVariants({
+                          variant: isActive("/dashboard/admin/tasks") ? "secondary" : "ghost",
+                          size: "default",
+                        }),
+                        "justify-start w-full"
+                      )}
+                    >
+                      <CheckSquare className="mr-2 h-4 w-4" />
+                      {t('memberTasks')}
+                    </Link>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">{t('memberTasks')}</TooltipContent>
+                </Tooltip>
+
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Link
+                      href="/dashboard/admin/analytics"
+                      className={cn(
+                        buttonVariants({
+                          variant: isActive("/dashboard/admin/analytics") ? "secondary" : "ghost",
+                          size: "default",
+                        }),
+                        "justify-start w-full"
+                      )}
+                    >
+                      <LineChart className="mr-2 h-4 w-4" />
+                      {t('teamPerformance')}
+                    </Link>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">{t('teamPerformance')}</TooltipContent>
+                </Tooltip>
+              </>
             )}
           </>
         )}

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -48,13 +48,24 @@ const energyLabels: Record<number, { label: string, color: string }> = {
   3: { label: "Faible", color: "bg-green-100 text-green-800" }
 }
 
-export function TaskList({ tasks = [], onTaskUpdate, onTaskDelete }: TaskListProps) {
+export function TaskList({ tasks: initialTasks = [], onTaskUpdate, onTaskDelete }: TaskListProps) {
   const router = useRouter()
   const { toast } = useToast()
+  const [tasks, setTasks] = useState<Task[]>(initialTasks)
+
+  useEffect(() => {
+    setTasks(initialTasks)
+  }, [initialTasks])
 
   const handleTaskUpdate = async (taskId: string, data: Partial<Task>) => {
     try {
       await onTaskUpdate(taskId, data)
+      
+      // Si la tâche est marquée comme complétée, la supprimer de la liste locale
+      if (data.completed === true) {
+        setTasks(prev => prev.filter(task => task.id !== taskId))
+      }
+      
       toast({
         title: "Succès",
         description: "La tâche a été mise à jour",

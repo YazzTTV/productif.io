@@ -1,30 +1,21 @@
-import { cookies } from "next/headers"
-import { verify } from "jsonwebtoken"
 import { redirect } from "next/navigation"
 import Link from "next/link"
 import { prisma } from "@/lib/prisma"
 import { Button } from "@/components/ui/button"
 import { PlusCircle } from "lucide-react"
 import { ProjectsGrid } from "@/components/projects/projects-grid"
+import { getAuthUser } from "@/lib/auth"
 
 export default async function ProjectsPage() {
   // Vérifier l'authentification côté serveur
-  const cookieStore = await cookies()
-  const token = cookieStore.get("auth_token")?.value
-
-  if (!token) {
-    redirect("/login")
-  }
-
-  let user
-  try {
-    user = verify(token, process.env.JWT_SECRET || "fallback_secret")
-  } catch (error) {
+  const user = await getAuthUser()
+  
+  if (!user) {
     redirect("/login")
   }
 
   // Récupérer les projets de l'utilisateur
-  const userId = (user as any).id
+  const userId = user.id
 
   const projects = await prisma.project.findMany({
     where: {

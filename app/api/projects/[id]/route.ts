@@ -1,23 +1,6 @@
 import { NextResponse } from "next/server"
-import { cookies } from "next/headers"
-import { verify } from "jsonwebtoken"
+import { getAuthUser } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
-
-// Fonction utilitaire pour vérifier l'authentification
-async function getAuthUser() {
-  const token = cookies().get("auth_token")?.value
-
-  if (!token) {
-    return null
-  }
-
-  try {
-    const decoded = verify(token, process.env.JWT_SECRET || "fallback_secret")
-    return { id: (decoded as any).id }
-  } catch (error) {
-    return null
-  }
-}
 
 // GET /api/projects/[id] - Récupérer un projet spécifique
 export async function GET(req: Request, { params }: { params: { id: string } }) {

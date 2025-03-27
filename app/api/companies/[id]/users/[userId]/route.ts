@@ -61,7 +61,7 @@ export async function DELETE(
     // Vérifier que l'utilisateur appartient à l'entreprise
     const userCompany = await prisma.$queryRaw`
       SELECT * FROM "UserCompany" 
-      WHERE user_id = ${userId}::uuid AND company_id = ${companyId}::uuid
+      WHERE "userId" = ${userId}::uuid AND "companyId" = ${companyId}::uuid
     `
     if (!Array.isArray(userCompany) || userCompany.length === 0) {
       return NextResponse.json(
@@ -73,20 +73,20 @@ export async function DELETE(
     // Retirer l'utilisateur de l'entreprise
     await prisma.$executeRaw`
       DELETE FROM "UserCompany" 
-      WHERE user_id = ${userId}::uuid AND company_id = ${companyId}::uuid
+      WHERE "userId" = ${userId}::uuid AND "companyId" = ${companyId}::uuid
     `
 
     // Vérifier si l'utilisateur a cette entreprise comme entreprise gérée
     const managedCompanyUsers = await prisma.$queryRaw`
       SELECT * FROM "User" 
-      WHERE id = ${userId}::uuid AND managed_company_id = ${companyId}::uuid
+      WHERE id = ${userId}::uuid AND "managedCompanyId" = ${companyId}::uuid
     `
     
     // Si c'est le cas, mettre à jour son entreprise gérée à null
     if (Array.isArray(managedCompanyUsers) && managedCompanyUsers.length > 0) {
       await prisma.$executeRaw`
         UPDATE "User" 
-        SET managed_company_id = NULL 
+        SET "managedCompanyId" = NULL 
         WHERE id = ${userId}::uuid
       `
     }

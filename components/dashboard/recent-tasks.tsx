@@ -5,9 +5,10 @@ import Link from "next/link"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { CheckCircle, Clock, ArrowRight, Edit } from "lucide-react"
+import { CheckCircle, Circle, Clock, ArrowRight, Edit, RefreshCcw } from "lucide-react"
 import { format, formatDistanceToNow } from "date-fns"
 import { fr } from "date-fns/locale"
+import { cn } from "@/lib/utils"
 
 interface TaskWithProject {
   id: string
@@ -41,24 +42,69 @@ const energyLabels: Record<number, { label: string, color: string }> = {
 export function RecentTasks() {
   const [tasks, setTasks] = useState<TaskWithProject[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [isUpdating, setIsUpdating] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    async function fetchTasks() {
-      try {
-        const response = await fetch("/api/tasks/today")
-        if (!response.ok) {
-          throw new Error("Erreur lors de la récupération des tâches")
-        }
-        const data = await response.json()
-        setTasks(data)
-      } catch (error) {
-        console.error("Erreur:", error)
-        setError("Impossible de charger les tâches. Veuillez réessayer plus tard.")
-      } finally {
-        setIsLoading(false)
+  const fetchTasks = async () => {
+    setIsLoading(true)
+    setError("")
+    
+    try {
+      const response = await fetch("/api/tasks/today")
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: "Erreur inconnue" }))
+        throw new Error(errorData.error || `Erreur: ${response.status}`)
       }
+      
+      const data = await response.json()
+      setTasks(Array.isArray(data) ? data : [])
+      setIsLoading(false)
+    } catch (error) {
+      console.error("Erreur lors du chargement des tâches:", error)
+      setError("Impossible de charger les tâches. Veuillez réessayer plus tard.")
+      setIsLoading(false)
     }
+  }
+
+  const toggleTaskCompletion = async (taskId: string, completed: boolean) => {
+    setIsUpdating(taskId)
+    try {
+      const response = await fetch("/api/tasks", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          id: taskId,
+          completed: !completed
+        })
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Erreur lors de la mise à jour de la tâche")
+      }
+
+      // Mise à jour locale de l'état pour un rendu immédiat
+      setTasks(prev => 
+        prev.map(task => 
+          task.id === taskId ? { ...task, completed: !completed } : task
+        )
+      )
+      
+      // Rafraîchir les données après un court délai
+      setTimeout(() => {
+        fetchTasks()
+      }, 500)
+    } catch (error) {
+      console.error("Erreur lors de la mise à jour de la tâche:", error)
+    } finally {
+      setIsUpdating(null)
+    }
+  }
+
+  useEffect(() => {
     fetchTasks()
   }, [])
 
@@ -69,7 +115,7 @@ export function RecentTasks() {
   if (isLoading) {
     return (
       <Card>
-        <CardHeader className="pb-3">
+        <CardHeader className="pb-3 flex flex-row items-center justify-between">
           <CardTitle>Tâches d'aujourd'hui</CardTitle>
         </CardHeader>
         <CardContent>
@@ -89,8 +135,11 @@ export function RecentTasks() {
   if (error) {
     return (
       <Card>
-        <CardHeader className="pb-3">
+        <CardHeader className="pb-3 flex flex-row items-center justify-between">
           <CardTitle>Tâches d'aujourd'hui</CardTitle>
+          <Button variant="ghost" size="icon" onClick={fetchTasks}>
+            <RefreshCcw className="h-4 w-4" />
+          </Button>
         </CardHeader>
         <CardContent>
           <div className="text-center text-red-600">{error}</div>
@@ -102,8 +151,11 @@ export function RecentTasks() {
   if (tasks.length === 0) {
     return (
       <Card>
-        <CardHeader className="pb-3">
+        <CardHeader className="pb-3 flex flex-row items-center justify-between">
           <CardTitle>Tâches d'aujourd'hui</CardTitle>
+          <Button variant="ghost" size="icon" onClick={fetchTasks}>
+            <RefreshCcw className="h-4 w-4" />
+          </Button>
         </CardHeader>
         <CardContent>
           <div className="text-center py-8">
@@ -114,27 +166,51 @@ export function RecentTasks() {
     )
   }
 
+  const completedCount = tasks.filter(task => task.completed).length;
+  const pendingCount = tasks.length - completedCount;
+
   return (
     <Card>
-      <CardHeader className="pb-3">
-        <CardTitle>Tâches d'aujourd'hui ({tasks.length})</CardTitle>
+      <CardHeader className="pb-3 flex flex-row items-center justify-between">
+        <CardTitle>
+          Tâches d'aujourd'hui ({pendingCount} en attente, {completedCount} terminées)
+        </CardTitle>
+        <Button variant="ghost" size="icon" onClick={fetchTasks}>
+          <RefreshCcw className="h-4 w-4" />
+        </Button>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
           {tasks.map((task) => (
             <div 
               key={task.id} 
-              className={`bg-white rounded-lg shadow p-4 ${task.completed ? 'opacity-60' : ''}`}
+              className={cn(
+                "bg-white rounded-lg shadow p-4 transition-opacity", 
+                task.completed ? 'opacity-60' : ''
+              )}
             >
               <div className="flex items-start justify-between">
-                <div className="flex items-center gap-2">
-                  {task.completed ? (
-                    <CheckCircle className="h-5 w-5 text-green-500" />
-                  ) : (
-                    <Clock className="h-5 w-5 text-gray-500" />
-                  )}
+                <div className="flex items-start gap-2">
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="p-0 h-auto mt-0.5"
+                    onClick={() => toggleTaskCompletion(task.id, task.completed)}
+                    disabled={isUpdating === task.id}
+                  >
+                    {isUpdating === task.id ? (
+                      <RefreshCcw className="h-5 w-5 text-gray-400 animate-spin" />
+                    ) : task.completed ? (
+                      <CheckCircle className="h-5 w-5 text-green-500" />
+                    ) : (
+                      <Circle className="h-5 w-5 text-gray-300" />
+                    )}
+                  </Button>
                   <div>
-                    <h3 className={`font-medium ${task.completed ? 'line-through text-gray-500' : ''}`}>
+                    <h3 className={cn(
+                      "font-medium", 
+                      task.completed ? 'line-through text-gray-500' : ''
+                    )}>
                       {task.title}
                     </h3>
                     {task.description && (
@@ -144,13 +220,13 @@ export function RecentTasks() {
                     )}
                   </div>
                 </div>
-                <div className="flex items-start gap-4">
+                <div className="flex flex-col items-end gap-2">
                   <Link href={`/dashboard/tasks/${task.id}/edit`}>
-                    <Button variant="ghost" size="icon">
+                    <Button variant="ghost" size="icon" className="h-8 w-8">
                       <Edit className="h-4 w-4" />
                     </Button>
                   </Link>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 flex-wrap justify-end">
                     {task.priority !== null && priorityLabels[task.priority] && (
                       <Badge className={priorityLabels[task.priority].color}>
                         {priorityLabels[task.priority].label}

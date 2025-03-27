@@ -7,7 +7,7 @@ import { fr } from "date-fns/locale"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
-import { Layers, Pencil, Save, X } from "lucide-react"
+import { Layers, Pencil, Save, X, Calendar } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
@@ -37,10 +37,25 @@ interface Process {
   updatedAt: string
 }
 
+interface CompletedTask {
+  id: string
+  title: string
+  description: string | null
+  completed: boolean
+  dueDate: string | null
+  priority: number | null
+  energyLevel: number | null
+  createdAt: string
+  updatedAt: string
+  projectId: string | null
+  projectName: string | null
+}
+
 export default function MonEspacePage() {
   const [learningEntries, setLearningEntries] = useState<HabitEntry[]>([])
   const [ratingEntries, setRatingEntries] = useState<HabitEntry[]>([])
   const [processes, setProcesses] = useState<Process[]>([])
+  const [completedTasks, setCompletedTasks] = useState<CompletedTask[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [editingProcess, setEditingProcess] = useState<string | null>(null)
   const [editForm, setEditForm] = useState<{name: string, description: string}>({
@@ -63,6 +78,13 @@ export default function MonEspacePage() {
         throw new Error('Erreur lors de la récupération des processus')
       }
       const processesData = await processesResponse.json()
+
+      // Récupérer les tâches terminées
+      const tasksResponse = await fetch("/api/tasks/completed")
+      if (!tasksResponse.ok) {
+        throw new Error("Erreur lors de la récupération des tâches terminées")
+      }
+      const tasksData = await tasksResponse.json()
       
       // Filtrer les entrées par type d'habitude
       const learning = habitsData.filter((entry: HabitEntry) => 
@@ -75,6 +97,7 @@ export default function MonEspacePage() {
       setLearningEntries(learning)
       setRatingEntries(ratings)
       setProcesses(processesData)
+      setCompletedTasks(tasksData.tasks)
     } catch (error) {
       console.error('Erreur:', error)
       toast.error("Erreur lors du chargement des données")
@@ -136,6 +159,28 @@ export default function MonEspacePage() {
     }
   }
 
+  const getPriorityLabel = (priority: number | null) => {
+    if (priority === null) return null
+    switch(priority) {
+      case 0: return "P0 - Critique"
+      case 1: return "P1 - Haute"
+      case 2: return "P2 - Moyenne"
+      case 3: return "P3 - Basse"
+      default: return `P${priority}`
+    }
+  }
+
+  const getPriorityColor = (priority: number | null) => {
+    if (priority === null) return "bg-gray-100 text-gray-800"
+    switch(priority) {
+      case 0: return "bg-red-100 text-red-800"
+      case 1: return "bg-orange-100 text-orange-800"
+      case 2: return "bg-blue-100 text-blue-800"
+      case 3: return "bg-green-100 text-green-800"
+      default: return "bg-gray-100 text-gray-800"
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="container mx-auto py-6">
@@ -157,6 +202,7 @@ export default function MonEspacePage() {
           <TabsTrigger value="learning">Apprentissages</TabsTrigger>
           <TabsTrigger value="ratings">Notes de journée</TabsTrigger>
           <TabsTrigger value="processes">Mes process</TabsTrigger>
+          <TabsTrigger value="tasks">Tâches terminées</TabsTrigger>
         </TabsList>
         
         <TabsContent value="learning">
@@ -290,6 +336,61 @@ export default function MonEspacePage() {
               </div>
             )}
           </div>
+        </TabsContent>
+
+        <TabsContent value="tasks">
+          <Card>
+            <CardHeader>
+              <CardTitle>Tâches terminées</CardTitle>
+              <CardDescription>
+                Historique de vos tâches complétées
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isLoading ? (
+                <div className="flex items-center justify-center h-64">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                </div>
+              ) : completedTasks.length === 0 ? (
+                <div className="text-center text-muted-foreground py-8">
+                  Aucune tâche terminée pour le moment
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {completedTasks.map((task) => (
+                    <div
+                      key={task.id}
+                      className="flex items-start justify-between p-4 rounded-lg border bg-card"
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-medium line-through text-muted-foreground">
+                            {task.title}
+                          </h3>
+                          {task.priority !== null && (
+                            <Badge className={getPriorityColor(task.priority)}>
+                              {getPriorityLabel(task.priority)}
+                            </Badge>
+                          )}
+                        </div>
+                        {task.description && (
+                          <p className="text-sm text-muted-foreground">
+                            {task.description}
+                          </p>
+                        )}
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <Calendar className="h-3 w-3" />
+                          <span>
+                            Terminée le {format(parseISO(task.updatedAt), "d MMMM yyyy", { locale: fr })}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>
