@@ -1,287 +1,198 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useParams, useRouter } from "next/navigation"
+import { useRouter } from "next/navigation"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { ChevronLeft, Building2, UserPlus, Search } from "lucide-react"
-import Link from "next/link"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { AdminRequiredPage } from "@/components/auth/admin-required"
 import { useToast } from "@/components/ui/use-toast"
-import { Input } from "@/components/ui/input"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { Label } from "@/components/ui/label"
+import { ArrowLeft, Search, UserPlus } from "lucide-react"
+import Link from "next/link"
+import { format } from "date-fns"
+import { fr } from "date-fns/locale"
 
-export default function AddUsersToCompanyPage() {
-  const params = useParams()
-  const companyId = params.id as string
+interface User {
+  id: string
+  name: string
+  email: string
+  createdAt: string
+}
+
+export default function AddUsersPage({ params }: { params: { id: string } }) {
   const router = useRouter()
   const { toast } = useToast()
-  
+  const [searchTerm, setSearchTerm] = useState("")
+  const [users, setUsers] = useState<User[]>([])
+  const [isLoading, setIsLoading] = useState(false)
   const [company, setCompany] = useState<any>(null)
-  const [users, setUsers] = useState<any[]>([])
-  const [filteredUsers, setFilteredUsers] = useState<any[]>([])
-  const [searchQuery, setSearchQuery] = useState("")
-  const [selectedUserId, setSelectedUserId] = useState<string | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [isSubmitting, setIsSubmitting] = useState(false)
 
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchCompanyDetails = async () => {
       try {
-        // Récupérer les détails de l'entreprise
-        const companyResponse = await fetch(`/api/companies/${companyId}`)
-        if (!companyResponse.ok) {
+        const response = await fetch(`/api/companies/${params.id}`)
+        if (!response.ok) {
           throw new Error("Impossible de récupérer les détails de l'entreprise")
         }
-        const companyData = await companyResponse.json()
-        setCompany(companyData.company)
-        
-        // Récupérer les utilisateurs existants de l'entreprise
-        const companyUsersResponse = await fetch(`/api/companies/${companyId}/users`)
-        let companyUsers: any[] = []
-        if (companyUsersResponse.ok) {
-          const companyUsersData = await companyUsersResponse.json()
-          companyUsers = companyUsersData.users || []
-        }
-        
-        // Récupérer tous les utilisateurs pour sélection
-        const usersResponse = await fetch(`/api/users`)
-        if (!usersResponse.ok) {
-          throw new Error("Impossible de récupérer la liste des utilisateurs")
-        }
-        const usersData = await usersResponse.json()
-        
-        // Filtrer pour n'afficher que les utilisateurs qui ne sont pas déjà dans l'entreprise
-        const companyUserIds = new Set(companyUsers.map((u: any) => u.id))
-        const availableUsers = usersData.users.filter((u: any) => !companyUserIds.has(u.id))
-        
-        setUsers(availableUsers)
-        setFilteredUsers(availableUsers)
+        const data = await response.json()
+        setCompany(data.company)
       } catch (error) {
-        console.error("Erreur lors de la récupération des données:", error)
+        console.error("Erreur:", error)
         toast({
           title: "Erreur",
-          description: "Impossible de récupérer les données nécessaires",
+          description: "Impossible de récupérer les détails de l'entreprise",
           variant: "destructive"
         })
-      } finally {
-        setIsLoading(false)
       }
     }
 
-    if (companyId) {
-      fetchData()
-    }
-  }, [companyId, toast])
+    fetchCompanyDetails()
+  }, [params.id, toast])
 
-  useEffect(() => {
-    // Filtrer les utilisateurs basés sur la recherche
-    if (searchQuery.trim() === "") {
-      setFilteredUsers(users)
-    } else {
-      const lowerQuery = searchQuery.toLowerCase()
-      setFilteredUsers(
-        users.filter(
-          user => 
-            (user.name && user.name.toLowerCase().includes(lowerQuery)) || 
-            user.email.toLowerCase().includes(lowerQuery)
-        )
-      )
-    }
-  }, [searchQuery, users])
+  const searchUsers = async () => {
+    if (!searchTerm.trim()) return
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    
-    if (!selectedUserId) {
-      toast({
-        title: "Sélection requise",
-        description: "Veuillez sélectionner un utilisateur à ajouter",
-        variant: "destructive"
-      })
-      return
-    }
-    
-    setIsSubmitting(true)
-
+    setIsLoading(true)
     try {
-      const response = await fetch(`/api/companies/${companyId}/users`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          userId: selectedUserId
-        })
-      })
-
-      if (response.ok) {
-        toast({
-          title: "Utilisateur ajouté",
-          description: "L'utilisateur a été ajouté à l'entreprise avec succès",
-          variant: "default"
-        })
-        router.push(`/dashboard/admin/companies/${companyId}`)
-        router.refresh()
-      } else {
-        const error = await response.json()
-        throw new Error(error.error || "Une erreur est survenue")
+      const response = await fetch(`/api/users/search?q=${encodeURIComponent(searchTerm)}`)
+      if (!response.ok) {
+        throw new Error("Impossible de rechercher les utilisateurs")
       }
-    } catch (error: any) {
+      const data = await response.json()
+      setUsers(data.users)
+    } catch (error) {
+      console.error("Erreur:", error)
       toast({
         title: "Erreur",
-        description: error.message || "Une erreur est survenue lors de l'ajout de l'utilisateur",
+        description: "Impossible de rechercher les utilisateurs",
         variant: "destructive"
       })
     } finally {
-      setIsSubmitting(false)
+      setIsLoading(false)
     }
   }
 
-  if (isLoading) {
-    return (
-      <AdminRequiredPage>
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-        </div>
-      </AdminRequiredPage>
-    )
-  }
+  const handleAddUser = async (userId: string) => {
+    try {
+      const response = await fetch(`/api/companies/${params.id}/users`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ userId }),
+      })
 
-  if (!company) {
-    return (
-      <AdminRequiredPage>
-        <div className="flex flex-col items-center justify-center h-64">
-          <h2 className="text-xl font-semibold">Entreprise non trouvée</h2>
-          <p className="mt-2 text-muted-foreground">
-            L'entreprise demandée n'existe pas ou vous n'avez pas les permissions nécessaires.
-          </p>
-          <Button asChild className="mt-4">
-            <Link href="/dashboard/admin/companies">
-              <ChevronLeft className="mr-2 h-4 w-4" />
-              Retour à la liste des entreprises
-            </Link>
-          </Button>
-        </div>
-      </AdminRequiredPage>
-    )
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Impossible d'ajouter l'utilisateur")
+      }
+
+      toast({
+        title: "Succès",
+        description: "L'utilisateur a été ajouté à l'entreprise",
+      })
+
+      // Retirer l'utilisateur de la liste
+      setUsers(users.filter(user => user.id !== userId))
+    } catch (error) {
+      console.error("Erreur:", error)
+      toast({
+        title: "Erreur",
+        description: error instanceof Error ? error.message : "Impossible d'ajouter l'utilisateur",
+        variant: "destructive"
+      })
+    }
   }
 
   return (
     <AdminRequiredPage>
-      <div className="mb-6">
-        <Link href={`/dashboard/admin/companies/${companyId}`} className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-2">
-          <ChevronLeft className="mr-1 h-4 w-4" />
-          Retour aux détails de l'entreprise
-        </Link>
-        <div className="flex items-center">
-          <div className="mr-2">
-            {company.logo ? (
-              <img 
-                src={company.logo} 
-                alt={company.name} 
-                className="h-8 w-8 rounded-md object-cover" 
-              />
-            ) : (
-              <Building2 className="h-6 w-6 text-muted-foreground" />
-            )}
-          </div>
-          <div>
-            <h1 className="text-3xl font-bold flex items-center">
-              Ajouter des membres à {company.name}
-            </h1>
-            <p className="text-muted-foreground">Sélectionnez les utilisateurs à ajouter à cette entreprise</p>
-          </div>
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <Button
+            variant="ghost"
+            onClick={() => router.back()}
+            className="mb-2"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Retour
+          </Button>
+          <h1 className="text-3xl font-bold">Ajouter des utilisateurs</h1>
+          <p className="text-muted-foreground">
+            {company ? `Ajouter des utilisateurs à ${company.name}` : 'Chargement...'}
+          </p>
         </div>
       </div>
 
-      <Card>
+      <Card className="mb-6">
         <CardHeader>
-          <div className="flex items-center gap-2">
-            <UserPlus className="h-5 w-5" />
-            <CardTitle>Ajouter un utilisateur</CardTitle>
-          </div>
+          <CardTitle>Rechercher des utilisateurs</CardTitle>
           <CardDescription>
-            Recherchez et sélectionnez un utilisateur à ajouter à cette entreprise
+            Recherchez des utilisateurs par nom ou email pour les ajouter à l'entreprise
           </CardDescription>
         </CardHeader>
-        <form onSubmit={handleSubmit}>
-          <CardContent className="space-y-4">
-            <div className="relative">
-              <Search className="absolute left-2.5 top-3 h-4 w-4 text-muted-foreground" />
+        <CardContent>
+          <div className="flex gap-4">
+            <div className="flex-1">
+              <Label htmlFor="search">Recherche</Label>
               <Input
-                placeholder="Rechercher un utilisateur par nom ou email"
-                className="pl-8"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                id="search"
+                placeholder="Nom ou email de l'utilisateur"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && searchUsers()}
               />
             </div>
-            
-            {filteredUsers.length === 0 ? (
-              <div className="bg-muted/50 rounded-md p-6 text-center">
-                <p className="text-muted-foreground">Aucun utilisateur trouvé. Tous les utilisateurs ont déjà été ajoutés ou votre recherche ne correspond à aucun utilisateur.</p>
-              </div>
-            ) : (
-              <div className="border rounded-md overflow-hidden">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-[50px]">Sélection</TableHead>
-                      <TableHead>Nom</TableHead>
-                      <TableHead>Email</TableHead>
-                      <TableHead>Rôle</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    <RadioGroup value={selectedUserId || ""} onValueChange={setSelectedUserId}>
-                      {filteredUsers.map((user) => (
-                        <TableRow key={user.id}>
-                          <TableCell>
-                            <RadioGroupItem value={user.id} id={`user-${user.id}`} className="mx-auto" />
-                          </TableCell>
-                          <TableCell>
-                            <Label htmlFor={`user-${user.id}`} className="cursor-pointer font-medium">
-                              {user.name || <span className="text-muted-foreground italic">Sans nom</span>}
-                            </Label>
-                          </TableCell>
-                          <TableCell>
-                            <Label htmlFor={`user-${user.id}`} className="cursor-pointer">
-                              {user.email}
-                            </Label>
-                          </TableCell>
-                          <TableCell>
-                            <Label htmlFor={`user-${user.id}`} className="cursor-pointer">
-                              {user.role === "SUPER_ADMIN" ? "Super Admin" : 
-                               user.role === "ADMIN" ? "Administrateur" : "Utilisateur"}
-                            </Label>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </RadioGroup>
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </CardContent>
-          
-          <CardFooter className="flex justify-between">
-            <Button 
-              variant="outline" 
-              type="button" 
-              onClick={() => router.push(`/dashboard/admin/companies/${companyId}`)}
-            >
-              Annuler
-            </Button>
-            <Button 
-              type="submit" 
-              disabled={isSubmitting || !selectedUserId || filteredUsers.length === 0}
-            >
-              {isSubmitting ? "Ajout en cours..." : "Ajouter à l'entreprise"}
-            </Button>
-          </CardFooter>
-        </form>
+            <div className="flex items-end">
+              <Button onClick={searchUsers} disabled={isLoading}>
+                <Search className="h-4 w-4 mr-2" />
+                Rechercher
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Résultats de la recherche</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="flex items-center justify-center h-32">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            </div>
+          ) : users.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              Aucun utilisateur trouvé
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {users.map((user) => (
+                <div
+                  key={user.id}
+                  className="flex items-center justify-between p-4 rounded-lg border"
+                >
+                  <div>
+                    <h3 className="font-medium">{user.name}</h3>
+                    <p className="text-sm text-muted-foreground">{user.email}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Inscrit le {format(new Date(user.createdAt), "d MMMM yyyy", { locale: fr })}
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleAddUser(user.id)}
+                  >
+                    <UserPlus className="h-4 w-4 mr-2" />
+                    Ajouter
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
       </Card>
     </AdminRequiredPage>
   )

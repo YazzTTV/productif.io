@@ -54,10 +54,21 @@ export async function POST(req: Request) {
       }
     )
 
-    // Définir le cookie avec les bonnes options
+    // Définir le cookie avec les bonnes options pour l'environnement de production
+    const isProduction = process.env.NODE_ENV === "production"
+    
     response.cookies.set("auth_token", token, {
       httpOnly: true,
-      secure: false, // Désactivé en développement
+      secure: isProduction, // Sécurisé en production
+      sameSite: "lax",
+      path: "/",
+      maxAge: 60 * 60 * 24 * 7, // 7 jours
+    })
+
+    // Ajouter un second cookie non-httpOnly pour vérification côté client
+    response.cookies.set("auth_status", "logged_in", {
+      httpOnly: false, 
+      secure: isProduction,
       sameSite: "lax",
       path: "/",
       maxAge: 60 * 60 * 24 * 7, // 7 jours

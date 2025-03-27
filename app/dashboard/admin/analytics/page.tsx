@@ -34,27 +34,6 @@ export default function AdminAnalyticsPage() {
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
 
-  // Vérifier si l'utilisateur est un super admin et le rediriger si c'est le cas
-  useEffect(() => {
-    const checkUserRole = async () => {
-      try {
-        const response = await fetch("/api/auth/me")
-        if (response.ok) {
-          const data = await response.json()
-          
-          // Rediriger si c'est un super admin
-          if (data.user?.role === "SUPER_ADMIN") {
-            router.push("/dashboard/admin/super-dashboard")
-          }
-        }
-      } catch (error) {
-        console.error("Erreur lors de la vérification du rôle:", error)
-      }
-    }
-    
-    checkUserRole()
-  }, [router])
-
   useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true)
@@ -226,7 +205,7 @@ export default function AdminAnalyticsPage() {
   const COLORS = ["#ef4444", "#f97316", "#eab308", "#3b82f6", "#9ca3af"]
 
   return (
-    <AdminRequiredPage prohibitSuperAdmin>
+    <AdminRequiredPage>
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-3xl font-bold">Tableau de bord - Performance de l'équipe</h1>

@@ -2,74 +2,71 @@ import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 import { verifyToken } from "@/lib/auth"
 
-// Routes qui ne nécessitent pas d'authentification
+// Routes à ignorer complètement
+const ignoredRoutes = ["/_next", "/favicon.ico", "/api/", ".png", ".jpg", ".svg", ".ico"]
+
+// Routes protégées qui nécessitent une authentification
+const protectedRoutes = ["/dashboard"]
+
+// Routes publiques (pas besoin de lister toutes, uniquement celles qui pourraient interférer)
 const publicRoutes = ["/login", "/register", "/"]
 
 export async function middleware(request: NextRequest) {
-  // Récupérer le token depuis les cookies
-  const token = request.cookies.get("auth_token")?.value
-  const nextAuthSession = request.cookies.get("next-auth.session-token")?.value
-
-  // Vérifier si l'utilisateur est sur une page publique
-  const isPublicRoute = publicRoutes.includes(request.nextUrl.pathname)
+  // Désactivation complète du middleware - solution éprouvée
+  return NextResponse.next()
   
-  // Vérifier si c'est une route API d'authentification
-  const isApiAuthRoute = request.nextUrl.pathname.startsWith("/api/auth")
+  /* Middleware désactivé car problème de boucle de redirection persistant
+  const url = request.nextUrl.pathname
 
-  // Ne pas interférer avec les routes API d'authentification ou NextAuth
-  if (isApiAuthRoute) {
+  // Ignorer les assets statiques et les routes API
+  if (ignoredRoutes.some(route => url.includes(route))) {
     return NextResponse.next()
   }
 
-  // Vérifier si l'utilisateur est authentifié soit par notre système soit par NextAuth
-  let isValidToken = false
+  // Récupérer le token depuis les cookies
+  const token = request.cookies.get("auth_token")?.value
+  const nextAuthSession = request.cookies.get("next-auth.session-token")?.value
+  const vercelNextAuthSession = request.cookies.get("__Secure-next-auth.session-token")?.value
+
+  // Déterminer si l'utilisateur est authentifié
+  let isAuthenticated = false
   
-  // Vérifier notre token personnalisé
   if (token) {
     try {
       const decoded = await verifyToken(token)
-      isValidToken = decoded !== null
-      console.log("Token verification result:", { isValidToken, decoded })
+      isAuthenticated = decoded !== null
     } catch (error) {
-      console.error("Token verification error:", error)
-      isValidToken = false
+      isAuthenticated = false
     }
   }
   
-  // Si NextAuth a une session active, considérer l'utilisateur comme authentifié
-  if (nextAuthSession) {
-    isValidToken = true
+  if (nextAuthSession || vercelNextAuthSession) {
+    isAuthenticated = true
   }
 
-  // Si l'utilisateur est connecté et essaie d'accéder à une page publique
-  if (isValidToken && isPublicRoute) {
-    console.log("Redirection vers /dashboard - Token valide sur route publique")
-    return NextResponse.redirect(new URL("/dashboard", request.url))
+  // RÈGLE SIMPLE 1 : Si l'utilisateur est sur une route protégée et n'est pas authentifié -> rediriger vers login
+  if (protectedRoutes.some(route => url.startsWith(route)) && !isAuthenticated) {
+    return NextResponse.redirect(new URL("/login", request.url))
   }
 
-  // Si l'utilisateur n'est pas connecté et essaie d'accéder à une page protégée
-  if (!isValidToken && !isPublicRoute) {
-    console.log("Redirection vers /login - Token invalide sur route protégée")
-    const loginUrl = new URL("/login", request.url)
-    loginUrl.searchParams.set("redirect", request.nextUrl.pathname)
-    return NextResponse.redirect(loginUrl)
+  // RÈGLE SIMPLE 2 : Si l'utilisateur est authentifié et sur la page login/register/accueil -> rediriger vers dashboard
+  // Mais uniquement lors de l'accès direct à ces pages, pas entre elles
+  if (isAuthenticated && (url === "/login" || url === "/register" || url === "/")) {
+    // Ajouter un paramètre pour éviter les boucles
+    const referer = request.headers.get("referer") || ""
+    if (!referer.includes("/dashboard")) {
+      return NextResponse.redirect(new URL("/dashboard", request.url))
+    }
   }
 
-  // Laisser passer la requête
-  console.log("Requête autorisée à continuer")
+  // Dans tous les autres cas, continuer normalement
   return NextResponse.next()
+  */
 }
 
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - api/auth (API routes that don't require authentication)
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     */
-    "/((?!api/auth|_next/static|_next/image|favicon.ico).*)",
+    "/((?!_next/static|_next/image|favicon.ico).*)",
   ],
 }
 

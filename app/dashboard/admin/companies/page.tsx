@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { AdminRequiredPage } from "@/components/auth/admin-required"
 import { useToast } from "@/components/ui/use-toast"
-import { Building2, PlusCircle, User, Users } from "lucide-react"
+import { Building2, PlusCircle, User, Users, Trash2, UserPlus } from "lucide-react"
 import Link from "next/link"
 import { format } from "date-fns"
 import { fr } from "date-fns/locale"
@@ -67,6 +67,35 @@ export default function CompaniesAdminPage() {
     
     fetchCompanies()
   }, [toast])
+
+  const handleDeleteCompany = async (companyId: string) => {
+    try {
+      const response = await fetch(`/api/companies/${companyId}`, {
+        method: 'DELETE'
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Erreur lors de la suppression de l'entreprise")
+      }
+
+      toast({
+        title: "Succès",
+        description: "L'entreprise a été supprimée",
+      })
+
+      // Rafraîchir la liste des entreprises
+      const updatedCompanies = companies.filter(company => company.id !== companyId)
+      setCompanies(updatedCompanies)
+    } catch (error) {
+      console.error("Erreur:", error)
+      toast({
+        title: "Erreur",
+        description: error instanceof Error ? error.message : "Impossible de supprimer l'entreprise",
+        variant: "destructive"
+      })
+    }
+  }
 
   return (
     <AdminRequiredPage>
@@ -160,13 +189,29 @@ export default function CompaniesAdminPage() {
                         </div>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => router.push(`/dashboard/admin/companies/${company.id}`)}
-                        >
-                          Détails
-                        </Button>
+                        <div className="flex items-center justify-end gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => router.push(`/dashboard/admin/companies/${company.id}`)}
+                          >
+                            Détails
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => router.push(`/dashboard/admin/companies/${company.id}/users/add`)}
+                          >
+                            <UserPlus className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => handleDeleteCompany(company.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}

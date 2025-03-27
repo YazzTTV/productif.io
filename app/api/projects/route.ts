@@ -1,31 +1,20 @@
 import { NextResponse } from "next/server"
-import { cookies } from "next/headers"
-import { verifyToken } from "@/lib/auth"
+import { getAuthUser } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 
 // GET /api/projects - Récupérer tous les projets de l'utilisateur
 export async function GET(request: Request) {
   try {
     // Vérifier l'authentification
-    const cookieStore = await cookies()
-    const token = cookieStore.get("auth_token")?.value
-
-    if (!token) {
+    const user = await getAuthUser()
+    if (!user) {
       return NextResponse.json(
         { error: "Non authentifié" },
         { status: 401 }
       )
     }
 
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json(
-        { error: "Non authentifié" },
-        { status: 401 }
-      )
-    }
-
-    const userId = decoded.userId
+    const userId = user.id
 
     // Récupérer le paramètre limit de l'URL
     const { searchParams } = new URL(request.url)
@@ -66,25 +55,15 @@ export async function GET(request: Request) {
 export async function POST(req: Request) {
   try {
     // Vérifier l'authentification
-    const cookieStore = await cookies()
-    const token = cookieStore.get("auth_token")?.value
-
-    if (!token) {
+    const user = await getAuthUser()
+    if (!user) {
       return NextResponse.json(
         { error: "Non authentifié" },
         { status: 401 }
       )
     }
 
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json(
-        { error: "Non authentifié" },
-        { status: 401 }
-      )
-    }
-
-    const userId = decoded.userId
+    const userId = user.id
 
     const body = await req.json()
     const { name, description, color } = body

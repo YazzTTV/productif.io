@@ -1,0 +1,17 @@
+# Variables d'environnement à ajouter dans Vercel
+
+DATABASE_URL="postgres://neondb_owner:npg_M2SBfgs0hdWu@ep-young-pond-a2xccicl-pooler.eu-central-1.aws.neon.tech/neondb?sslmode=require"
+NEXTAUTH_SECRET="productif_io_secret_key_for_nextauth"
+NEXTAUTH_URL="https://productif-io-1.vercel.app"  # Remplacez par l'URL de votre déploiement
+JWT_SECRET="un_secret_tres_securise_pour_jwt_tokens"
+GOOGLE_CLIENT_ID="1024769827714-fd4aclog3ui0krb47v0av9bbacu6o727.apps.googleusercontent.com"
+GOOGLE_CLIENT_SECRET="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"
+
+# Instructions :
+# 1. Connectez-vous à Vercel : https://vercel.com/
+# 2. Accédez à votre projet "productif-io-1"
+# 3. Allez dans "Settings" > "Environment Variables"
+# 4. Ajoutez chaque variable ci-dessus
+# 5. Assurez-vous qu'elles sont configurées pour l'environnement "Production"
+# 6. Cliquez sur "Save" pour enregistrer les modifications
+# 7. Redéployez ensuite votre projet 

@@ -1,52 +1,116 @@
 import { NextResponse } from "next/server"
 import { getAuthUser } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
-import { format } from "date-fns"
+import { format, startOfDay as dateStartOfDay, endOfDay as dateEndOfDay, isSameDay } from "date-fns"
 
 export async function GET() {
   try {
     const user = await getAuthUser()
     
     if (!user) {
-      return new NextResponse(
-        JSON.stringify({ error: "Non authentifié" }),
+      return NextResponse.json(
+        { error: "Non authentifié" },
         { status: 401 }
       )
     }
 
+    console.log("[METRICS] Récupération des métriques pour l'utilisateur:", user.id)
+
     // Récupération des tâches du jour
     const today = new Date()
-    const todayStr = format(today, "yyyy-MM-dd")
-    const startOfDay = new Date(todayStr)
-    startOfDay.setHours(0, 0, 0, 0)
-    const endOfDay = new Date(todayStr)
-    endOfDay.setHours(23, 59, 59, 999)
+    const startOfDay = dateStartOfDay(today)
+    const endOfDay = dateEndOfDay(today)
 
-    const todayTasks = await prisma.task.findMany({
+    console.log("[METRICS] Date aujourd'hui:", today.toISOString())
+    console.log("[METRICS] Début de la journée:", startOfDay.toISOString())
+    console.log("[METRICS] Fin de la journée:", endOfDay.toISOString())
+    console.log("[METRICS] Fuseau horaire serveur:", Intl.DateTimeFormat().resolvedOptions().timeZone)
+
+    // Récupérer TOUTES les tâches récentes
+    const recentTasks = await prisma.task.findMany({
       where: {
         userId: user.id,
-        OR: [
-          {
-            dueDate: {
-              gte: startOfDay,
-              lte: endOfDay,
-            }
-          },
-          {
-            createdAt: {
-              gte: startOfDay,
-              lte: endOfDay,
-            },
-            dueDate: null,
-          }
-        ]
       }
     })
 
-    const completedTodayTasks = todayTasks.filter(task => task.completed)
-    const tasksCompletionRate = todayTasks.length > 0 
-      ? Math.round((completedTodayTasks.length / todayTasks.length) * 100) 
+    console.log("[METRICS] TOUTES les tâches non filtrées:", 
+      JSON.stringify(recentTasks.map(task => ({
+        id: task.id,
+        title: task.title,
+        createdAt: task.createdAt,
+        dueDate: task.dueDate,
+        scheduledFor: task.scheduledFor,
+        completed: task.completed
+      })), null, 2))
+
+    // Récupérer les tâches créées aujourd'hui (pour débogage)
+    const tasksCreatedToday = recentTasks.filter(task => 
+      isSameDay(new Date(task.createdAt), today)
+    )
+
+    console.log("[METRICS] Tâches créées aujourd'hui après filtrage:", 
+      JSON.stringify(tasksCreatedToday.map(task => ({
+        id: task.id,
+        title: task.title,
+        createdAt: task.createdAt,
+        dueDate: task.dueDate,
+        scheduledFor: task.scheduledFor,
+        completed: task.completed
+      })), null, 2))
+    console.log("[METRICS] Nombre de tâches créées aujourd'hui:", tasksCreatedToday.length)
+    
+    // Récupérer les tâches PLANIFIÉES pour aujourd'hui 
+    // 1. Tâches avec dueDate aujourd'hui
+    // 2. Tâches avec scheduledFor aujourd'hui
+    // 3. Tâches créées aujourd'hui sans date d'échéance ou date de planification
+    const plannedTodayTasks = recentTasks.filter(task => {
+      // Si la tâche a une date d'échéance aujourd'hui
+      if (task.dueDate && isSameDay(new Date(task.dueDate), today)) {
+        return true
+      }
+      
+      // Si la tâche est planifiée pour aujourd'hui
+      if (task.scheduledFor && isSameDay(new Date(task.scheduledFor), today)) {
+        return true
+      }
+      
+      // Si la tâche a été créée aujourd'hui et n'a pas de date d'échéance ou date de planification
+      if (isSameDay(new Date(task.createdAt), today) && !task.dueDate && !task.scheduledFor) {
+        return true
+      }
+      
+      return false
+    })
+
+    // SIMPLIFICATION DU CALCUL
+    // Considérer que toutes les tâches créées aujourd'hui font partie des tâches planifiées pour aujourd'hui
+    const simplifiedPlannedTasks = tasksCreatedToday;
+    console.log("[METRICS] SOLUTION SIMPLIFIÉE - Toutes les tâches créées aujourd'hui:", simplifiedPlannedTasks.length)
+    
+    // Récupérer les tâches complétées aujourd'hui
+    const completedToday = recentTasks.filter(task => {
+      return task.completed && task.updatedAt && isSameDay(new Date(task.updatedAt), today)
+    })
+
+    console.log("[METRICS] Tâches complétées aujourd'hui après filtrage:", 
+      JSON.stringify(completedToday.map(task => ({
+        id: task.id,
+        title: task.title,
+        createdAt: task.createdAt,
+        updatedAt: task.updatedAt,
+        completed: task.completed
+      })), null, 2))
+    console.log("[METRICS] Nombre de tâches complétées aujourd'hui:", completedToday.length)
+
+    // Calculer le taux de complétion uniquement pour les tâches PLANIFIÉES SIMPLIFIÉES
+    const simplifiedCompletedTasks = simplifiedPlannedTasks.filter(task => task.completed)
+    const simplifiedCompletionRate = simplifiedPlannedTasks.length > 0 
+      ? Math.round((simplifiedCompletedTasks.length / simplifiedPlannedTasks.length) * 100) 
       : 0
+
+    console.log("[METRICS] Tâches simplifiées planifiées:", simplifiedPlannedTasks.length)
+    console.log("[METRICS] Tâches simplifiées complétées:", simplifiedCompletedTasks.length)
+    console.log("[METRICS] Taux de complétion simplifié:", simplifiedCompletionRate)
 
     // Récupération des habitudes du jour
     // Obtenir le jour en anglais car les jours sont stockés en anglais dans la base de données
@@ -100,7 +164,7 @@ export async function GET() {
     // Calcul du score de productivité basé sur les tâches et habitudes
     // C'est un calcul simplifié qui pourrait être amélioré avec plus de données
     const productivityFactors = [
-      tasksCompletionRate * 0.6, // 60% du score basé sur les tâches
+      simplifiedCompletionRate * 0.6, // 60% du score basé sur les tâches
       habitsCompletionRate * 0.4  // 40% du score basé sur les habitudes
     ]
 
@@ -113,11 +177,13 @@ export async function GET() {
     const randomChange = Math.floor(Math.random() * 20) - 10
     const trend = randomChange > 0 ? "up" : randomChange < 0 ? "down" : "neutral"
 
-    return NextResponse.json({
+    const response = {
       tasks: {
-        today: todayTasks.length,
-        completed: completedTodayTasks.length,
-        completionRate: tasksCompletionRate
+        today: simplifiedPlannedTasks.length, // Utiliser la solution simplifiée
+        completed: simplifiedCompletedTasks.length, // Utiliser la solution simplifiée
+        completionRate: simplifiedCompletionRate, // Utiliser la solution simplifiée
+        totalCompletedToday: completedToday.length,
+        createdToday: tasksCreatedToday.length // Ajout pour débogage
       },
       habits: {
         today: todayHabits.length,
@@ -133,12 +199,20 @@ export async function GET() {
         score: productivityScore,
         trend,
         change: Math.abs(randomChange)
+      },
+      debug: {
+        serverTime: today.toISOString(),
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
       }
-    })
+    }
+
+    console.log("[METRICS] Réponse finale:", JSON.stringify(response, null, 2))
+
+    return NextResponse.json(response)
   } catch (error) {
-    console.error("Erreur lors de la récupération des métriques:", error)
-    return new NextResponse(
-      JSON.stringify({ error: "Erreur interne du serveur" }),
+    console.error("[METRICS_ERROR] Erreur lors de la récupération des métriques:", error)
+    return NextResponse.json(
+      { error: "Erreur interne du serveur" },
       { status: 500 }
     )
   }
