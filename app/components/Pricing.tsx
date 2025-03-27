@@ -26,7 +26,7 @@ export default function Pricing() {
       <div className="text-center">
         <h2 className="text-3xl font-bold">Tarification simple et transparente</h2>
         <p className="mt-4 text-lg text-gray-600">
-          Commencez gratuitement avec un essai de 14 jours. Pas de carte de crédit requise.
+          Commencez gratuitement avec un essai de 14 jours.
         </p>
       </div>
 

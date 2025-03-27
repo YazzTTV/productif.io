@@ -35,7 +35,7 @@ export default function PricingSection() {
                 <span className="text-gray-500 dark:text-gray-400 ml-2">/mois</span>
               </div>
               <p className="text-center text-gray-500 dark:text-gray-400 mt-2">
-                Essai gratuit de 7 jours sans carte bancaire
+                Essai gratuit de 7 jours
               </p>
             </CardHeader>
             <CardContent className="grid gap-4">
