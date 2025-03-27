@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge"
 import { format } from "date-fns"
 import { fr } from "date-fns/locale"
-import { UserPlus, Users, ClipboardList, Plus, Calendar, CalendarIcon, Eye } from "lucide-react"
+import { UserPlus, Users, ClipboardList, Plus, Calendar, CalendarIcon, Eye, Trash } from "lucide-react"
 import Link from "next/link"
 import { useToast } from "@/components/ui/use-toast"
 import { AdminRequiredPage } from "@/components/auth/admin-required"
@@ -35,6 +35,17 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar as CalendarComponent } from "@/components/ui/calendar"
 import { cn } from "@/lib/utils"
 import { useLocale } from "@/lib/i18n"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 
 interface User {
   id: string
@@ -66,39 +77,42 @@ export default function UsersAdminPage() {
     dueDate: null as Date | null
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const [userToDelete, setUserToDelete] = useState<User | null>(null)
+
+  // Déplacer la fonction fetchUsers en dehors du useEffect
+  const fetchUsers = async () => {
+    try {
+      setIsLoading(true)
+      
+      // Récupérer les informations de l'utilisateur connecté
+      const meResponse = await fetch("/api/auth/me")
+      if (meResponse.ok) {
+        const meData = await meResponse.json()
+        setUserInfo(meData.user)
+      }
+      
+      // Récupérer la liste des utilisateurs
+      const response = await fetch("/api/users")
+      if (!response.ok) {
+        throw new Error("Impossible de récupérer la liste des utilisateurs")
+      }
+      
+      const data = await response.json()
+      setUsers(data.users || [])
+    } catch (error) {
+      console.error("Erreur lors de la récupération des utilisateurs:", error)
+      toast({
+        title: "Erreur",
+        description: "Impossible de récupérer la liste des utilisateurs",
+        variant: "destructive"
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   useEffect(() => {
-    const fetchUsers = async () => {
-      try {
-        setIsLoading(true)
-        
-        // Récupérer les informations de l'utilisateur connecté
-        const meResponse = await fetch("/api/auth/me")
-        if (meResponse.ok) {
-          const meData = await meResponse.json()
-          setUserInfo(meData.user)
-        }
-        
-        // Récupérer la liste des utilisateurs
-        const response = await fetch("/api/users")
-        if (!response.ok) {
-          throw new Error("Impossible de récupérer la liste des utilisateurs")
-        }
-        
-        const data = await response.json()
-        setUsers(data.users || [])
-      } catch (error) {
-        console.error("Erreur lors de la récupération des utilisateurs:", error)
-        toast({
-          title: "Erreur",
-          description: "Impossible de récupérer la liste des utilisateurs",
-          variant: "destructive"
-        })
-      } finally {
-        setIsLoading(false)
-      }
-    }
-    
     fetchUsers()
   }, [toast])
 
@@ -215,6 +229,60 @@ export default function UsersAdminPage() {
     } finally {
       setIsSubmitting(false)
     }
+  }
+
+  // Ajouter la fonction pour gérer la suppression d'un utilisateur
+  const handleDeleteUser = async () => {
+    if (!userToDelete) return
+    
+    try {
+      setIsLoading(true)
+      
+      const response = await fetch(`/api/users/${userToDelete.id}`, {
+        method: 'DELETE'
+      })
+      
+      const data = await response.json()
+      
+      if (!response.ok) {
+        throw new Error(data.error || "Erreur lors de la suppression de l'utilisateur")
+      }
+      
+      // Rafraîchir la liste des utilisateurs directement
+      try {
+        // Récupérer la liste des utilisateurs
+        const usersResponse = await fetch("/api/users")
+        if (usersResponse.ok) {
+          const usersData = await usersResponse.json()
+          setUsers(usersData.users || [])
+        }
+      } catch (error) {
+        console.error("Erreur lors de l'actualisation de la liste:", error)
+      }
+      
+      toast({
+        title: "Succès",
+        description: "L'utilisateur a été supprimé avec succès",
+      })
+      
+      // Fermer le dialogue
+      setIsDeleteDialogOpen(false)
+      setUserToDelete(null)
+    } catch (error) {
+      console.error("Erreur lors de la suppression:", error)
+      toast({
+        title: "Erreur",
+        description: error instanceof Error ? error.message : "Erreur lors de la suppression de l'utilisateur",
+        variant: "destructive"
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+  
+  const openDeleteDialog = (user: User) => {
+    setUserToDelete(user)
+    setIsDeleteDialogOpen(true)
   }
 
   return (
@@ -340,6 +408,28 @@ export default function UsersAdminPage() {
         </DialogContent>
       </Dialog>
 
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Êtes-vous sûr de vouloir supprimer cet utilisateur ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Cette action ne peut pas être annulée. Cela supprimera définitivement l'utilisateur
+              {userToDelete && <span className="font-semibold"> {userToDelete.name || userToDelete.email}</span>} et toutes ses données.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isLoading}>Annuler</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDeleteUser}
+              disabled={isLoading}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isLoading ? "Suppression..." : "Supprimer"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center">
@@ -397,40 +487,53 @@ export default function UsersAdminPage() {
                     <TableCell>
                       {format(new Date(user.createdAt), "dd/MM/yyyy", { locale: fr })}
                     </TableCell>
-                    <TableCell className="text-right space-x-2">
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        asChild
-                      >
-                        <Link href={`/dashboard/admin/users/${user.id}/edit`}>
-                          Modifier
-                        </Link>
-                      </Button>
-                      
-                      {canAssignTasks() && (
+                    <TableCell className="text-right">
+                      <div className="flex justify-end space-x-2">
                         <Button 
-                          variant="secondary" 
-                          size="sm"
-                          onClick={() => openAssignTaskDialog(user.id, user.name)}
-                        >
-                          <ClipboardList className="mr-1 h-3 w-3" />
-                          Tâche
-                        </Button>
-                      )}
-                      
-                      {userInfo?.role === "SUPER_ADMIN" && (
-                        <Button 
-                          variant="default" 
+                          variant="outline" 
                           size="sm"
                           asChild
                         >
-                          <Link href={`/dashboard/admin/view-as/${user.id}`}>
-                            <Eye className="mr-1 h-3 w-3" />
-                            Voir les données
+                          <Link href={`/dashboard/admin/users/${user.id}/edit`}>
+                            Modifier
                           </Link>
                         </Button>
-                      )}
+                        
+                        {canAssignTasks() && (
+                          <Button 
+                            variant="secondary" 
+                            size="sm"
+                            onClick={() => openAssignTaskDialog(user.id, user.name)}
+                          >
+                            <ClipboardList className="mr-1 h-3 w-3" />
+                            Tâche
+                          </Button>
+                        )}
+                        
+                        {userInfo?.role === "SUPER_ADMIN" && (
+                          <>
+                            <Button 
+                              variant="default" 
+                              size="sm"
+                              asChild
+                            >
+                              <Link href={`/dashboard/admin/view-as/${user.id}`}>
+                                <Eye className="mr-1 h-3 w-3" />
+                                Voir les données
+                              </Link>
+                            </Button>
+                            
+                            <Button 
+                              variant="destructive" 
+                              size="sm"
+                              onClick={() => openDeleteDialog(user)}
+                            >
+                              <Trash className="mr-1 h-3 w-3" />
+                              Supprimer
+                            </Button>
+                          </>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
