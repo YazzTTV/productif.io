@@ -153,4 +153,104 @@ export async function PUT(
     console.error("Erreur lors de la mise à jour de l'utilisateur:", error)
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 })
   }
+}
+
+// DELETE - Supprimer un utilisateur (réservé aux super admins)
+export async function DELETE(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const currentUser = await getAuthUser()
+
+    if (!currentUser) {
+      return NextResponse.json({ error: "Non authentifié" }, { status: 401 })
+    }
+
+    // Vérifier si l'utilisateur est un super admin
+    const userRole = await prisma.$queryRaw`
+      SELECT "role" FROM "User" WHERE "id" = ${currentUser.id}
+    `
+
+    if (!Array.isArray(userRole) || userRole.length === 0 || userRole[0].role !== "SUPER_ADMIN") {
+      return NextResponse.json({ error: "Seul un super administrateur peut supprimer un utilisateur" }, { status: 403 })
+    }
+
+    const userId = params.id
+
+    // Empêcher un super admin de se supprimer lui-même
+    if (currentUser.id === userId) {
+      return NextResponse.json({ 
+        error: "Vous ne pouvez pas supprimer votre propre compte" 
+      }, { status: 403 })
+    }
+
+    // Vérifier si l'utilisateur à supprimer existe
+    const userExists = await prisma.$queryRaw`
+      SELECT EXISTS(SELECT 1 FROM "User" WHERE "id" = ${userId})
+    `
+
+    if (!userExists || !Array.isArray(userExists) || !userExists[0].exists) {
+      return NextResponse.json({ error: "Utilisateur non trouvé" }, { status: 404 })
+    }
+
+    // Vérifier si l'utilisateur est admin d'une entreprise
+    const isCompanyAdmin = await prisma.$queryRaw`
+      SELECT EXISTS(
+        SELECT 1 FROM "User" 
+        WHERE "id" = ${userId} 
+        AND "managedCompanyId" IS NOT NULL
+      ) as "isAdmin"
+    `
+
+    if (isCompanyAdmin && Array.isArray(isCompanyAdmin) && isCompanyAdmin.length > 0 && isCompanyAdmin[0].exists) {
+      // Récupérer le nom de l'entreprise pour un message d'erreur plus informatif
+      const companyInfo = await prisma.$queryRaw`
+        SELECT c.name FROM "Company" c
+        JOIN "User" u ON u."managedCompanyId" = c.id
+        WHERE u.id = ${userId}
+      `
+      
+      const companyName = Array.isArray(companyInfo) && companyInfo.length > 0 
+        ? companyInfo[0].name 
+        : "une entreprise";
+
+      return NextResponse.json({ 
+        error: `Cet utilisateur est administrateur de ${companyName}. Veuillez d'abord transférer ses droits d'administration.` 
+      }, { status: 403 })
+    }
+
+    // Supprimer l'utilisateur des entreprises (UserCompany)
+    await prisma.$queryRaw`
+      DELETE FROM "UserCompany" WHERE "userId" = ${userId}
+    `
+
+    // Supprimer les tâches associées à l'utilisateur
+    await prisma.$queryRaw`
+      DELETE FROM "Task" WHERE "userId" = ${userId}
+    `
+
+    // Supprimer les habitudes associées à l'utilisateur
+    await prisma.$queryRaw`
+      DELETE FROM "habits" WHERE "userId" = ${userId}
+    `
+
+    // Supprimer les entrées de temps associées à l'utilisateur
+    await prisma.$queryRaw`
+      DELETE FROM "TimeEntry" WHERE "userId" = ${userId}
+    `
+
+    // Finalement, supprimer l'utilisateur
+    await prisma.$queryRaw`
+      DELETE FROM "User" WHERE "id" = ${userId}
+    `
+
+    return NextResponse.json({ 
+      success: true, 
+      message: "Utilisateur supprimé avec succès" 
+    })
+  } catch (error) {
+    console.error("Erreur lors de la suppression de l'utilisateur:", error)
+    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 })
+  }
 } 
