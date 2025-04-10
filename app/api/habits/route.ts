@@ -11,6 +11,7 @@ const DEFAULT_HABITS = [
     color: "#4338CA", // Indigo
     frequency: "daily",
     daysOfWeek: ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"],
+    order: 0, // L'apprentissage est toujours en premier
   },
   {
     name: "Note de sa journée",
@@ -18,6 +19,7 @@ const DEFAULT_HABITS = [
     color: "#0EA5E9", // Sky
     frequency: "daily",
     daysOfWeek: ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"],
+    order: 1, // La note de journée est en deuxième
   },
 ]
 
@@ -61,9 +63,14 @@ export async function GET() {
           take: 30,
         },
       },
-      orderBy: {
-        createdAt: "desc",
-      },
+      orderBy: [
+        {
+          order: "asc" // Tri principal par le champ order
+        },
+        {
+          createdAt: "desc" // Tri secondaire par date de création
+        }
+      ],
     });
 
     // 2. Pour chaque habitude, récupérer les entrées avec note et rating
@@ -85,8 +92,7 @@ export async function GET() {
         LIMIT 30
       `;
 
-      // Remplacer les entrées récupérées par Prisma par celles récupérées par SQL brut
-      // @ts-ignore - Ignorer l'erreur TypeScript pour les propriétés note et rating
+      // @ts-expect-error - Ignorer l'erreur TypeScript pour les propriétés note et rating
       habit.entries = entries;
     }
 
@@ -108,13 +114,14 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json()
-    const { name, description, daysOfWeek, frequency } = body
+    const { name, description, daysOfWeek, frequency, color } = body
 
     console.log("Données reçues pour la création d'habitude:", {
       name,
       description,
       daysOfWeek,
-      frequency
+      frequency,
+      color
     })
 
     // Validation
@@ -150,6 +157,15 @@ export async function POST(req: Request) {
       )
     }
 
+    // Trouver l'ordre maximum actuel pour placer la nouvelle habitude en dernier
+    const maxOrderHabit = await prisma.habit.findFirst({
+      where: { userId: user.id },
+      orderBy: { order: 'desc' },
+      select: { order: true }
+    });
+
+    const maxOrder = maxOrderHabit ? maxOrderHabit.order + 1 : 2; // +1 pour le placer après, ou 2 si aucune habitude (après les 2 par défaut)
+
     // Créer l'habitude
     const habit = await prisma.habit.create({
       data: {
@@ -157,6 +173,8 @@ export async function POST(req: Request) {
         description,
         frequency,
         daysOfWeek,
+        color,
+        order: maxOrder,
         userId: user.id,
       },
     })
@@ -166,6 +184,60 @@ export async function POST(req: Request) {
     console.error("Erreur lors de la création de l'habitude:", error)
     return NextResponse.json(
       { error: "Erreur lors de la création de l'habitude" },
+      { status: 500 }
+    )
+  }
+}
+
+export async function PATCH(req: Request) {
+  try {
+    const user = await getAuthUser()
+    if (!user) {
+      return NextResponse.json({ error: "Non authentifié" }, { status: 401 })
+    }
+
+    const body = await req.json()
+    const { habits } = body
+
+    // Validation
+    if (!habits || !Array.isArray(habits)) {
+      return NextResponse.json(
+        { error: "Format de données invalide" },
+        { status: 400 }
+      )
+    }
+
+    // Vérifier que toutes les habitudes appartiennent à l'utilisateur
+    const habitIds = habits.map(h => h.id)
+    const userHabits = await prisma.habit.findMany({
+      where: {
+        id: { in: habitIds },
+        userId: user.id
+      }
+    })
+
+    if (userHabits.length !== habitIds.length) {
+      return NextResponse.json(
+        { error: "Certaines habitudes n'appartiennent pas à l'utilisateur" },
+        { status: 403 }
+      )
+    }
+
+    // Mise à jour en masse des ordres
+    const updates = habits.map((habit, index) => 
+      prisma.habit.update({
+        where: { id: habit.id },
+        data: { order: index }
+      })
+    )
+
+    await prisma.$transaction(updates)
+
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error("Erreur lors de la mise à jour de l'ordre des habitudes:", error)
+    return NextResponse.json(
+      { error: "Erreur lors de la mise à jour de l'ordre des habitudes" },
       { status: 500 }
     )
   }

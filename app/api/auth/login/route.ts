@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { compare } from "bcrypt"
+import { compare } from "bcryptjs"
 import { prisma } from "@/lib/prisma"
 import { createToken, createSession } from "@/lib/auth"
 

@@ -47,6 +47,16 @@ export function CreateHabitForm() {
     )
   }
 
+  const selectAllDays = () => {
+    if (selectedDays.length === DAYS_OF_WEEK.length) {
+      // Si tous les jours sont déjà sélectionnés, on les désélectionne tous
+      setSelectedDays([])
+    } else {
+      // Sinon on sélectionne tous les jours
+      setSelectedDays(DAYS_OF_WEEK.map(day => day.id))
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (selectedDays.length === 0) {
@@ -115,7 +125,17 @@ export function CreateHabitForm() {
             />
           </div>
           <div className="space-y-4">
-            <Label>Jours de la semaine</Label>
+            <div className="flex justify-between items-center">
+              <Label>Jours de la semaine</Label>
+              <Button 
+                type="button" 
+                variant="outline" 
+                size="sm" 
+                onClick={selectAllDays}
+              >
+                {selectedDays.length === DAYS_OF_WEEK.length ? "Désélectionner tout" : "Sélectionner tout"}
+              </Button>
+            </div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {DAYS_OF_WEEK.map((day) => (
                 <div key={day.id} className="flex items-center space-x-2">

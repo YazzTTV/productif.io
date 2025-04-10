@@ -40,10 +40,10 @@ export default async function DashboardPage() {
     })
 
     return (
-      <div className="space-y-8">
+      <div className="space-y-6 sm:space-y-8">
         <div>
-          <h1 className="text-2xl font-bold mb-2">Tableau de bord</h1>
-          <p className="text-gray-600">
+          <h1 className="text-xl sm:text-2xl font-bold mb-2">Tableau de bord</h1>
+          <p className="text-sm sm:text-base text-gray-600">
             Bienvenue sur votre espace personnel. Retrouvez ici une vue d'ensemble de vos activités.
           </p>
         </div>
@@ -52,19 +52,19 @@ export default async function DashboardPage() {
         <OverviewMetrics />
 
         {/* Graphiques et suivi */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
           <TaskCompletionChart />
-          <HabitStats />
+          <HabitStats className="lg:col-span-1" />
         </div>
 
         {/* Contenu principal */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
+          <div className="md:col-span-2 space-y-4 sm:space-y-6">
             <RecentTasks />
             <ProjectsList projects={projects} />
           </div>
 
-          <div className="space-y-6">
+          <div className="space-y-4 sm:space-y-6">
             <ObjectivesProgress />
             <RecentHabits />
             <HabitHeatmap />

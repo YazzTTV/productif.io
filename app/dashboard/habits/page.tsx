@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useState, useCallback, useRef } from "react"
 import { Habit, HabitEntry } from "@prisma/client"
 import { WeeklyHabitsTable } from "@/components/habits/weekly-habits-table"
 import { Button } from "@/components/ui/button"
@@ -13,9 +13,21 @@ type HabitWithEntries = Habit & {
   entries: HabitEntry[]
 }
 
+// Interface pour les actions en attente
+interface PendingAction {
+  habitId: string;
+  date: Date;
+  completed: boolean;
+  retry?: number;
+}
+
 export default function HabitsPage() {
   const [habits, setHabits] = useState<HabitWithEntries[]>([])
   const [loading, setLoading] = useState(true)
+  // File d'attente pour les actions en attente
+  const [pendingActions, setPendingActions] = useState<PendingAction[]>([])
+  // Référence pour suivre si le traitement est déjà en cours
+  const isProcessingRef = useRef(false)
   const router = useRouter()
 
   const fetchHabits = async () => {
@@ -36,63 +48,21 @@ export default function HabitsPage() {
     fetchHabits()
   }, [])
 
-  const handleToggleHabit = useCallback(async (habitId: string, date: Date, currentCompleted: boolean) => {
-    const newCompleted = !currentCompleted
+  // Fonction qui traite la file d'attente des actions
+  const processQueue = useCallback(async () => {
+    // Si déjà en train de traiter ou pas d'actions en attente, on sort
+    if (isProcessingRef.current || pendingActions.length === 0) return;
     
-    // Normaliser la date: définir à midi pour éviter les problèmes de fuseau horaire
-    const targetDate = new Date(date)
-    targetDate.setHours(12, 0, 0, 0)
+    // Marquer comme en cours de traitement
+    isProcessingRef.current = true;
     
-    console.log('Date à envoyer:', targetDate.toISOString())
-
     try {
-      // Mise à jour optimiste
-      setHabits((prevHabits) =>
-        prevHabits.map((habit) => {
-          if (habit.id !== habitId) return habit
-
-          // Utiliser une fonction plus robuste pour comparer les dates
-          const isSameDate = (date1: Date, date2: Date) => {
-            const d1 = new Date(date1)
-            const d2 = new Date(date2)
-            return d1.getFullYear() === d2.getFullYear() && 
-                   d1.getMonth() === d2.getMonth() && 
-                   d1.getDate() === d2.getDate()
-          }
-
-          const existingEntryIndex = habit.entries.findIndex((e) =>
-            isSameDate(new Date(e.date), targetDate)
-          )
-
-          const now = new Date()
-          if (existingEntryIndex >= 0) {
-            // Mettre à jour l'entrée existante
-            const updatedEntries = [...habit.entries]
-            updatedEntries[existingEntryIndex] = {
-              ...updatedEntries[existingEntryIndex],
-              completed: newCompleted,
-              updatedAt: now,
-            }
-            return { ...habit, entries: updatedEntries }
-          } else {
-            // Ajouter une nouvelle entrée
-            return {
-              ...habit,
-              entries: [
-                ...habit.entries,
-                {
-                  id: `temp-${Date.now()}`,
-                  habitId,
-                  date: targetDate,
-                  completed: newCompleted,
-                  createdAt: now,
-                  updatedAt: now,
-                },
-              ],
-            }
-          }
-        })
-      )
+      // Prendre la première action de la file
+      const action = pendingActions[0];
+      
+      // Normaliser la date: définir à midi pour éviter les problèmes de fuseau horaire
+      const targetDate = new Date(action.date);
+      targetDate.setHours(12, 0, 0, 0);
 
       // Envoyer la requête au serveur
       const response = await fetch("/api/habits/entries", {
@@ -101,57 +71,121 @@ export default function HabitsPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          habitId,
+          habitId: action.habitId,
           date: targetDate.toISOString(),
-          completed: newCompleted,
+          completed: action.completed,
         }),
-      })
+      });
 
       if (!response.ok) {
-        throw new Error("Erreur lors de la mise à jour de l'habitude")
+        throw new Error("Erreur lors de la mise à jour de l'habitude");
       }
 
-      const updatedEntry = await response.json()
-      
-      // Mettre à jour l'état avec l'entrée retournée par le serveur
-      setHabits((prevHabits) =>
-        prevHabits.map((habit) => {
-          if (habit.id !== habitId) return habit
-
-          // Utiliser la même fonction de comparaison de dates
-          const isSameDate = (date1: Date, date2: Date) => {
-            const d1 = new Date(date1)
-            const d2 = new Date(date2)
-            return d1.getFullYear() === d2.getFullYear() && 
-                   d1.getMonth() === d2.getMonth() && 
-                   d1.getDate() === d2.getDate()
-          }
-
-          const existingEntryIndex = habit.entries.findIndex((e) =>
-            isSameDate(new Date(e.date), targetDate)
-          )
-
-          if (existingEntryIndex >= 0) {
-            // Mettre à jour l'entrée existante
-            const updatedEntries = [...habit.entries]
-            updatedEntries[existingEntryIndex] = updatedEntry
-            return { ...habit, entries: updatedEntries }
-          } else {
-            // Ajouter la nouvelle entrée
-            return {
-              ...habit,
-              entries: [...habit.entries, updatedEntry],
-            }
-          }
-        })
-      )
+      // Retirer l'action traitée de la file
+      setPendingActions(prev => prev.slice(1));
     } catch (error) {
-      console.error("Error toggling habit:", error)
-      toast.error("Erreur lors de la mise à jour de l'habitude")
-      // En cas d'erreur, recharger les données pour revenir à l'état correct
-      await fetchHabits()
+      console.error("Error processing action:", error);
+      
+      // Si échec, on déplace l'action à la fin de la file avec un compteur de tentatives
+      setPendingActions(prev => {
+        const failedAction = prev[0];
+        const retry = (failedAction.retry || 0) + 1;
+        
+        // Si trop de tentatives (3), on abandonne cette action
+        if (retry > 3) {
+          toast.error(`Échec de la mise à jour d'une habitude après plusieurs tentatives`);
+          return prev.slice(1);
+        }
+        
+        return [...prev.slice(1), {...failedAction, retry}];
+      });
+    } finally {
+      // Marquer comme plus en traitement
+      isProcessingRef.current = false;
+      
+      // Planifier le traitement de la prochaine action
+      setTimeout(() => {
+        if (pendingActions.length > 0) {
+          processQueue();
+        }
+      }, 100);
     }
-  }, [])
+  }, [pendingActions]);
+
+  // Traiter la file d'attente quand elle change
+  useEffect(() => {
+    if (pendingActions.length > 0 && !isProcessingRef.current) {
+      processQueue();
+    }
+  }, [pendingActions, processQueue]);
+
+  const handleToggleHabit = useCallback(async (habitId: string, date: Date, currentCompleted: boolean) => {
+    const newCompleted = !currentCompleted;
+    
+    // Normaliser la date: définir à midi pour éviter les problèmes de fuseau horaire
+    const targetDate = new Date(date);
+    targetDate.setHours(12, 0, 0, 0);
+
+    // Mise à jour optimiste immédiate
+    setHabits((prevHabits) =>
+      prevHabits.map((habit) => {
+        if (habit.id !== habitId) return habit;
+
+        // Utiliser une fonction plus robuste pour comparer les dates
+        const isSameDate = (date1: Date, date2: Date) => {
+          const d1 = new Date(date1);
+          const d2 = new Date(date2);
+          return d1.getFullYear() === d2.getFullYear() && 
+                 d1.getMonth() === d2.getMonth() && 
+                 d1.getDate() === d2.getDate();
+        };
+
+        const existingEntryIndex = habit.entries.findIndex((e) =>
+          isSameDate(new Date(e.date), targetDate)
+        );
+
+        const now = new Date();
+        if (existingEntryIndex >= 0) {
+          // Mettre à jour l'entrée existante
+          const updatedEntries = [...habit.entries];
+          updatedEntries[existingEntryIndex] = {
+            ...updatedEntries[existingEntryIndex],
+            completed: newCompleted,
+            updatedAt: now,
+          };
+          return { ...habit, entries: updatedEntries };
+        } else {
+          // Ajouter une nouvelle entrée
+          return {
+            ...habit,
+            entries: [
+              ...habit.entries,
+              {
+                id: `temp-${Date.now()}`,
+                habitId,
+                date: targetDate,
+                completed: newCompleted,
+                createdAt: now,
+                updatedAt: now,
+                note: null,
+                rating: null
+              },
+            ],
+          };
+        }
+      })
+    );
+
+    // Ajouter l'action à la file d'attente
+    setPendingActions(prev => [...prev, {
+      habitId,
+      date: targetDate,
+      completed: newCompleted
+    }]);
+    
+    // Retourner immédiatement pour ne pas bloquer l'interface
+    return Promise.resolve();
+  }, []);
 
   if (loading) {
     return <div>Chargement...</div>

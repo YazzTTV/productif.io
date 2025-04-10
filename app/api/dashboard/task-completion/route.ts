@@ -30,23 +30,37 @@ export async function GET() {
       const dayName = format(date, "EEE", { locale: fr }).charAt(0).toUpperCase() + 
                      format(date, "EEE", { locale: fr }).slice(1)
       
+      // Date de fin de la journée pour les requêtes
+      const endOfDay = new Date(startOfDay)
+      endOfDay.setHours(23, 59, 59, 999)
+      
       // Nombre total de tâches pour ce jour
       const totalTasks = await prisma.task.count({
         where: {
           userId: user.id,
           OR: [
             {
+              // Tâches avec une date d'échéance ce jour-là
               dueDate: {
                 gte: startOfDay,
-                lt: new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000),
+                lte: endOfDay,
               }
             },
             {
+              // Tâches planifiées pour ce jour-là
+              scheduledFor: {
+                gte: startOfDay,
+                lte: endOfDay,
+              }
+            },
+            {
+              // Tâches créées ce jour-là sans date d'échéance ni planification
               createdAt: {
                 gte: startOfDay,
-                lt: new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000),
+                lte: endOfDay,
               },
               dueDate: null,
+              scheduledFor: null
             }
           ]
         }
@@ -59,17 +73,27 @@ export async function GET() {
           completed: true,
           OR: [
             {
+              // Tâches avec une date d'échéance ce jour-là
               dueDate: {
                 gte: startOfDay,
-                lt: new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000),
+                lte: endOfDay,
               }
             },
             {
+              // Tâches planifiées pour ce jour-là
+              scheduledFor: {
+                gte: startOfDay,
+                lte: endOfDay,
+              }
+            },
+            {
+              // Tâches créées ce jour-là sans date d'échéance ni planification
               createdAt: {
                 gte: startOfDay,
-                lt: new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000),
+                lte: endOfDay,
               },
               dueDate: null,
+              scheduledFor: null
             }
           ]
         }

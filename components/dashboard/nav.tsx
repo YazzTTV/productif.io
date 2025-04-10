@@ -33,10 +33,11 @@ interface UserCompany {
 interface DashboardNavProps {
   viewAsMode?: boolean;
   viewAsUserId?: string;
+  onNavItemClick?: () => void;
 }
 
-export function DashboardNav({ viewAsMode = false, viewAsUserId }: DashboardNavProps) {
-  const pathname = usePathname()
+export function DashboardNav({ viewAsMode = false, viewAsUserId, onNavItemClick }: DashboardNavProps) {
+  const pathname = usePathname() || ""
   const [userRole, setUserRole] = useState<UserRole | null>(null)
   const [userCompanies, setUserCompanies] = useState<UserCompany[]>([])
   const [companyName, setCompanyName] = useState<string | null>(null)
@@ -103,9 +104,16 @@ export function DashboardNav({ viewAsMode = false, viewAsUserId }: DashboardNavP
   const showAdminMenu = hasAdminAccess && !viewAsMode
   const showSettings = !viewAsMode
 
+  // Fonction pour gérer le clic sur un élément de navigation
+  const handleNavClick = () => {
+    if (onNavItemClick) {
+      onNavItemClick();
+    }
+  };
+
   return (
     <TooltipProvider>
-      <div className="w-full flex flex-col gap-2">
+      <div className="w-full flex flex-col gap-2 p-4 pt-2">
         {viewAsMode && viewAsUserId && (
           <div className="mb-4 p-3 bg-muted rounded-lg">
             <div className="flex items-center gap-3">
@@ -129,7 +137,7 @@ export function DashboardNav({ viewAsMode = false, viewAsUserId }: DashboardNavP
             </div>
           </div>
         )}
-      
+        
         <Tooltip>
           <TooltipTrigger asChild>
             <Link
@@ -139,11 +147,13 @@ export function DashboardNav({ viewAsMode = false, viewAsUserId }: DashboardNavP
                   variant: isActive("/dashboard") ? "secondary" : "ghost",
                   size: "default",
                 }),
-                "justify-start w-full"
+                "justify-start w-full",
+                "mt-6 md:mt-0"
               )}
+              onClick={handleNavClick}
             >
               <LayoutDashboard className="mr-2 h-4 w-4" />
-              {t('dashboard')}
+              <span className="truncate">{t('dashboard')}</span>
             </Link>
           </TooltipTrigger>
           <TooltipContent side="right">{t('dashboard')}</TooltipContent>
@@ -160,9 +170,10 @@ export function DashboardNav({ viewAsMode = false, viewAsUserId }: DashboardNavP
                 }),
                 "justify-start w-full"
               )}
+              onClick={handleNavClick}
             >
               <CheckSquare className="mr-2 h-4 w-4" />
-              {t('tasks')}
+              <span className="truncate">{t('tasks')}</span>
             </Link>
           </TooltipTrigger>
           <TooltipContent side="right">{t('tasks')}</TooltipContent>
@@ -179,9 +190,10 @@ export function DashboardNav({ viewAsMode = false, viewAsUserId }: DashboardNavP
                 }),
                 "justify-start w-full"
               )}
+              onClick={handleNavClick}
             >
               <FolderKanban className="mr-2 h-4 w-4" />
-              {t('projects')}
+              <span className="truncate">{t('projects')}</span>
             </Link>
           </TooltipTrigger>
           <TooltipContent side="right">{t('projects')}</TooltipContent>
@@ -198,9 +210,10 @@ export function DashboardNav({ viewAsMode = false, viewAsUserId }: DashboardNavP
                 }),
                 "justify-start w-full"
               )}
+              onClick={handleNavClick}
             >
               <Heart className="mr-2 h-4 w-4" />
-              {t('habits')}
+              <span className="truncate">{t('habits')}</span>
             </Link>
           </TooltipTrigger>
           <TooltipContent side="right">{t('habits')}</TooltipContent>
@@ -218,9 +231,10 @@ export function DashboardNav({ viewAsMode = false, viewAsUserId }: DashboardNavP
                   }),
                   "justify-start w-full"
                 )}
+                onClick={handleNavClick}
               >
                 <Book className="mr-2 h-4 w-4" />
-                {t('monEspace')}
+                <span className="truncate">{t('monEspace')}</span>
               </Link>
             </TooltipTrigger>
             <TooltipContent side="right">{t('monEspace')}</TooltipContent>
@@ -239,9 +253,10 @@ export function DashboardNav({ viewAsMode = false, viewAsUserId }: DashboardNavP
                   }),
                   "justify-start w-full"
                 )}
+                onClick={handleNavClick}
               >
                 <Clock className="mr-2 h-4 w-4" />
-                {t('time')}
+                <span className="truncate">{t('time')}</span>
               </Link>
             </TooltipTrigger>
             <TooltipContent side="right">{t('time')}</TooltipContent>
@@ -259,9 +274,10 @@ export function DashboardNav({ viewAsMode = false, viewAsUserId }: DashboardNavP
                 }),
                 "justify-start w-full"
               )}
+              onClick={handleNavClick}
             >
               <Target className="mr-2 h-4 w-4" />
-              {t('objectives')}
+              <span className="truncate">{t('objectives')}</span>
             </Link>
           </TooltipTrigger>
           <TooltipContent side="right">{t('objectives')}</TooltipContent>
@@ -279,9 +295,10 @@ export function DashboardNav({ viewAsMode = false, viewAsUserId }: DashboardNavP
                   }),
                   "justify-start w-full"
                 )}
+                onClick={handleNavClick}
               >
                 <LineChart className="mr-2 h-4 w-4" />
-                {t('analytics')}
+                <span className="truncate">{t('analytics')}</span>
               </Link>
             </TooltipTrigger>
             <TooltipContent side="right">{t('analytics')}</TooltipContent>
@@ -306,9 +323,10 @@ export function DashboardNav({ viewAsMode = false, viewAsUserId }: DashboardNavP
                         }),
                         "justify-start w-full"
                       )}
+                      onClick={handleNavClick}
                     >
                       <Building2 className="mr-2 h-4 w-4" />
-                      {t('companies')}
+                      <span className="truncate">{t('companies')}</span>
                     </Link>
                   </TooltipTrigger>
                   <TooltipContent side="right">{t('companies')}</TooltipContent>
@@ -325,9 +343,10 @@ export function DashboardNav({ viewAsMode = false, viewAsUserId }: DashboardNavP
                         }),
                         "justify-start w-full"
                       )}
+                      onClick={handleNavClick}
                     >
                       <Users className="mr-2 h-4 w-4" />
-                      {t('users')}
+                      <span className="truncate">{t('users')}</span>
                     </Link>
                   </TooltipTrigger>
                   <TooltipContent side="right">{t('users')}</TooltipContent>
@@ -344,9 +363,10 @@ export function DashboardNav({ viewAsMode = false, viewAsUserId }: DashboardNavP
                         }),
                         "justify-start w-full"
                       )}
+                      onClick={handleNavClick}
                     >
                       <LineChart className="mr-2 h-4 w-4" />
-                      {t('adminDashboard')}
+                      <span className="truncate">{t('adminDashboard')}</span>
                     </Link>
                   </TooltipTrigger>
                   <TooltipContent side="right">{t('adminDashboard')}</TooltipContent>
@@ -370,9 +390,10 @@ export function DashboardNav({ viewAsMode = false, viewAsUserId }: DashboardNavP
                         }),
                         "justify-start w-full"
                       )}
+                      onClick={handleNavClick}
                     >
                       <CheckSquare className="mr-2 h-4 w-4" />
-                      {t('memberTasks')}
+                      <span className="truncate">{t('memberTasks')}</span>
                     </Link>
                   </TooltipTrigger>
                   <TooltipContent side="right">{t('memberTasks')}</TooltipContent>
@@ -389,9 +410,10 @@ export function DashboardNav({ viewAsMode = false, viewAsUserId }: DashboardNavP
                         }),
                         "justify-start w-full"
                       )}
+                      onClick={handleNavClick}
                     >
                       <LineChart className="mr-2 h-4 w-4" />
-                      {t('teamPerformance')}
+                      <span className="truncate">{t('teamPerformance')}</span>
                     </Link>
                   </TooltipTrigger>
                   <TooltipContent side="right">{t('teamPerformance')}</TooltipContent>
@@ -413,9 +435,10 @@ export function DashboardNav({ viewAsMode = false, viewAsUserId }: DashboardNavP
                   }),
                   "justify-start w-full"
                 )}
+                onClick={handleNavClick}
               >
                 <Settings className="mr-2 h-4 w-4" />
-                {t('settings')}
+                <span className="truncate">{t('settings')}</span>
               </Link>
             </TooltipTrigger>
             <TooltipContent side="right">{t('settings')}</TooltipContent>

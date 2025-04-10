@@ -5,6 +5,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import { cn } from "@/lib/utils"
+import { format } from "date-fns"
+import { fr } from "date-fns/locale"
+import { RefreshCw } from "lucide-react"
+import { Button } from "@/components/ui/button"
 
 interface DailyStats {
   date: string
@@ -21,7 +26,11 @@ interface HabitStats {
   dailyStats: DailyStats[]
 }
 
-export default function HabitStats() {
+interface HabitStatsProps {
+  className?: string
+}
+
+export default function HabitStats({ className }: HabitStatsProps) {
   const [stats, setStats] = useState<HabitStats>({
     totalHabits: 0,
     completedHabits: 0,
@@ -29,36 +38,68 @@ export default function HabitStats() {
     dailyStats: []
   })
   const [isLoading, setIsLoading] = useState(true)
+  const [isRefreshing, setIsRefreshing] = useState(false)
+  const [lastUpdated, setLastUpdated] = useState<string>("")
+
+  const fetchStats = async () => {
+    setIsRefreshing(true)
+    try {
+      const response = await fetch(`/api/habits/stats?t=${new Date().getTime()}`, {
+        cache: 'no-store'
+      })
+      if (!response.ok) {
+        throw new Error("Erreur lors de la récupération des statistiques")
+      }
+      const data = await response.json()
+      setStats(data)
+      setLastUpdated(format(new Date(), 'HH:mm:ss', { locale: fr }))
+    } catch (error) {
+      console.error("Erreur:", error)
+    } finally {
+      setIsLoading(false)
+      setIsRefreshing(false)
+    }
+  }
 
   useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const response = await fetch("/api/habits/stats")
-        if (!response.ok) {
-          throw new Error("Erreur lors de la récupération des statistiques")
-        }
-        const data = await response.json()
-        setStats(data)
-      } catch (error) {
-        console.error("Erreur:", error)
-      } finally {
-        setIsLoading(false)
+    fetchStats()
+    
+    // Rafraîchir toutes les 5 minutes au lieu de chaque minute
+    // pour éviter les requêtes trop fréquentes
+    const interval = setInterval(() => {
+      // Vérifier si l'onglet est actif avant de rafraîchir
+      if (document.visibilityState === 'visible') {
+        console.log("Rafraîchissement automatique des statistiques d'habitudes")
+        fetchStats()
+      }
+    }, 5 * 60 * 1000) // 5 minutes en millisecondes
+    
+    // Ajouter un écouteur d'événement pour rafraîchir lorsque l'onglet devient visible
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        console.log("Onglet visible, rafraîchissement des statistiques")
+        fetchStats()
       }
     }
-
-    fetchStats()
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    
+    return () => {
+      clearInterval(interval)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
   }, [])
 
   if (isLoading) {
     return (
-      <Card className="col-span-1 md:col-span-2">
-        <CardHeader>
+      <Card className={cn("col-span-1 md:col-span-2", className)}>
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
           <CardTitle className="text-sm font-medium">Suivi des habitudes</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="animate-pulse space-y-2">
+          <div className="animate-pulse space-y-4">
             <div className="h-8 w-16 bg-gray-200 rounded" />
-            <div className="h-80 bg-gray-200 rounded" />
+            <div className="h-[400px] bg-gray-200 rounded" />
           </div>
         </CardContent>
       </Card>
@@ -66,14 +107,31 @@ export default function HabitStats() {
   }
 
   return (
-    <Card className="col-span-1 md:col-span-2">
-      <CardHeader>
+    <Card className={cn("col-span-1 md:col-span-2", className)}>
+      <CardHeader className="flex flex-row items-center justify-between pb-2">
         <CardTitle className="text-sm font-medium">
           Suivi des habitudes
         </CardTitle>
+        <div className="flex items-center gap-2">
+          {lastUpdated && (
+            <span className="text-xs text-muted-foreground">
+              Mis à jour à {lastUpdated}
+            </span>
+          )}
+          <Button 
+            size="sm" 
+            variant="outline" 
+            onClick={fetchStats}
+            disabled={isRefreshing}
+            className="h-8"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 mr-1 ${isRefreshing ? 'animate-spin' : ''}`} />
+            Rafraîchir
+          </Button>
+        </div>
       </CardHeader>
       <CardContent>
-        <Tabs defaultValue="today">
+        <Tabs defaultValue="last30days">
           <TabsList className="mb-4">
             <TabsTrigger value="today">Aujourd'hui</TabsTrigger>
             <TabsTrigger value="last30days">30 derniers jours</TabsTrigger>
@@ -105,7 +163,7 @@ export default function HabitStats() {
           </TabsContent>
           
           <TabsContent value="last30days">
-            <div className="h-80 w-full mt-4">
+            <div className="h-[400px] w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
                   data={stats.dailyStats}
@@ -120,7 +178,7 @@ export default function HabitStats() {
                   <XAxis 
                     dataKey="formattedDate" 
                     tick={{ fontSize: 12 }}
-                    interval={2}
+                    interval={1}
                   />
                   <YAxis 
                     domain={[0, 100]}

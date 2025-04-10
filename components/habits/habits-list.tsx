@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Trash2, Check, X } from "lucide-react"
@@ -23,6 +23,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { useToast } from "@/components/ui/use-toast"
 
 interface HabitEntry {
   id: string
@@ -41,40 +42,143 @@ interface Habit {
   entries: HabitEntry[]
 }
 
+// File d'attente pour les actions d'habitudes
+interface QueuedAction {
+  habitId: string
+  date: Date
+  completed: boolean
+}
+
 interface HabitsListProps {
   habits: Habit[]
 }
 
-export function HabitsList({ habits }: HabitsListProps) {
-  const [isLoading, setIsLoading] = useState<string | null>(null)
+export function HabitsList({ habits: initialHabits }: HabitsListProps) {
+  const [habits, setHabits] = useState<Habit[]>(initialHabits)
+  const [actionsQueue, setActionsQueue] = useState<QueuedAction[]>([])
+  const [processingQueue, setProcessingQueue] = useState(false)
+  const [isDeleting, setIsDeleting] = useState<string | null>(null)
+  const { toast } = useToast()
 
-  const handleToggleHabit = async (habitId: string, date: Date, completed: boolean) => {
-    try {
-      setIsLoading(habitId)
-      const response = await fetch("/api/habits/entries", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ habitId, date, completed }),
-      })
+  // Traiter la file d'attente d'actions
+  useEffect(() => {
+    const processQueue = async () => {
+      if (actionsQueue.length === 0 || processingQueue) return
+      
+      setProcessingQueue(true)
+      
+      try {
+        // Prendre les 10 premières actions pour traitement par lot
+        const batch = actionsQueue.slice(0, 10)
+        
+        // Appeler l'API batch avec le lot d'actions
+        const response = await fetch("/api/habits/entries/batch", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ actions: batch }),
+        })
 
-      if (!response.ok) {
-        throw new Error("Erreur lors de la mise à jour de l'habitude")
+        if (!response.ok) {
+          throw new Error("Erreur lors du traitement du lot d'habitudes")
+        }
+        
+        // Récupérer la réponse
+        const result = await response.json()
+        console.log("Résultat du traitement par lot:", result)
+        
+        // Supprimer les actions traitées de la file
+        setActionsQueue(prev => prev.slice(batch.length))
+        
+        // Rafraîchir les métriques du dashboard seulement à la fin du traitement complet
+        // et seulement si nous avons effectivement terminé tous les traitements
+        if (actionsQueue.length <= batch.length) {
+          try {
+            // Utilisation d'un timestamp pour éviter la mise en cache
+            const timestamp = new Date().getTime()
+            await fetch(`/api/dashboard/metrics?t=${timestamp}`, { 
+              method: "GET",
+              headers: { "Cache-Control": "no-cache" },
+              // Ne pas attendre la réponse pour éviter de bloquer
+              cache: "no-store"
+            })
+            
+            // Laisser un délai avant d'autoriser de nouvelles requêtes
+            setTimeout(() => {
+              console.log("Métriques du dashboard rafraîchies")
+            }, 500)
+          } catch (refreshError) {
+            console.error("Erreur lors du rafraîchissement des métriques:", refreshError)
+          }
+        }
+        
+      } catch (error) {
+        console.error("Error processing habit queue:", error)
+        toast({
+          title: "Erreur",
+          description: "Certaines actions n'ont pas pu être sauvegardées. Réessayez plus tard.",
+          variant: "destructive"
+        })
+      } finally {
+        // Ajouter un délai avant de réinitialiser l'état pour éviter les traitements trop rapides
+        setTimeout(() => {
+          setProcessingQueue(false)
+        }, 500)
       }
-
-      // Recharger la page pour mettre à jour les données
-      window.location.reload()
-    } catch (error) {
-      console.error("Error toggling habit:", error)
-    } finally {
-      setIsLoading(null)
     }
+    
+    // Traiter la file d'attente avec un délai pour éviter les boucles infinies
+    const timerId = setTimeout(processQueue, 300)
+    
+    // Nettoyer le timer pour éviter les fuites de mémoire
+    return () => clearTimeout(timerId)
+  }, [actionsQueue, processingQueue, toast])
+
+  // Ajouter une action à la file d'attente et mettre à jour l'UI de manière optimiste
+  const handleToggleHabit = (habitId: string, date: Date, completed: boolean) => {
+    // Mise à jour optimiste de l'interface
+    setHabits(prevHabits => 
+      prevHabits.map(habit => {
+        if (habit.id !== habitId) return habit
+        
+        const dateTime = new Date(date).setHours(0, 0, 0, 0)
+        
+        const updatedEntries = [...habit.entries]
+        const entryIndex = updatedEntries.findIndex(
+          e => new Date(e.date).setHours(0, 0, 0, 0) === dateTime
+        )
+        
+        if (entryIndex >= 0) {
+          // Mettre à jour l'entrée existante
+          updatedEntries[entryIndex] = {
+            ...updatedEntries[entryIndex],
+            completed
+          }
+        } else {
+          // Créer une nouvelle entrée
+          updatedEntries.push({
+            id: `temp-${Date.now()}`, // ID temporaire
+            date: new Date(date),
+            completed,
+            habitId
+          })
+        }
+        
+        return {
+          ...habit,
+          entries: updatedEntries
+        }
+      })
+    )
+    
+    // Ajouter l'action à la file d'attente
+    setActionsQueue(prev => [...prev, { habitId, date, completed }])
   }
 
   const handleDeleteHabit = async (habitId: string) => {
     try {
-      setIsLoading(habitId)
+      setIsDeleting(habitId)
       const response = await fetch(`/api/habits/${habitId}`, {
         method: "DELETE",
       })
@@ -83,12 +187,22 @@ export function HabitsList({ habits }: HabitsListProps) {
         throw new Error("Erreur lors de la suppression de l'habitude")
       }
 
-      // Recharger la page pour mettre à jour les données
-      window.location.reload()
+      // Mise à jour optimiste de l'interface
+      setHabits(prevHabits => prevHabits.filter(h => h.id !== habitId))
+      
+      toast({
+        title: "Succès",
+        description: "Habitude supprimée avec succès",
+      })
     } catch (error) {
       console.error("Error deleting habit:", error)
+      toast({
+        title: "Erreur",
+        description: "Impossible de supprimer l'habitude",
+        variant: "destructive"
+      })
     } finally {
-      setIsLoading(null)
+      setIsDeleting(null)
     }
   }
 
@@ -134,7 +248,7 @@ export function HabitsList({ habits }: HabitsListProps) {
                   variant="ghost"
                   size="icon"
                   className="text-gray-500 hover:text-red-500"
-                  disabled={isLoading === habit.id}
+                  disabled={isDeleting === habit.id}
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>
@@ -182,6 +296,13 @@ export function HabitsList({ habits }: HabitsListProps) {
                   )
                   const dayName = date.toLocaleDateString("en-US", { weekday: "long" }).toLowerCase()
                   const isScheduledDay = habit.daysOfWeek?.includes(dayName)
+                  
+                  // Vérifier si l'action est dans la file d'attente
+                  const isInQueue = actionsQueue.some(
+                    action => 
+                      action.habitId === habit.id && 
+                      new Date(action.date).setHours(0, 0, 0, 0) === date.getTime()
+                  )
 
                   return (
                     <TableCell key={date.toISOString()} className="text-center p-4">
@@ -190,10 +311,11 @@ export function HabitsList({ habits }: HabitsListProps) {
                         size="icon"
                         className={`
                           ${entry?.completed ? "bg-green-500 hover:bg-green-600 text-white border-green-500" : ""}
+                          ${isInQueue ? "animate-pulse" : ""}
                           ${!isScheduledDay ? "opacity-50" : ""}
                         `}
                         onClick={() => handleToggleHabit(habit.id, date, !entry?.completed)}
-                        disabled={isLoading === habit.id || !isScheduledDay}
+                        disabled={!isScheduledDay}
                       >
                         {entry?.completed ? (
                           <Check className="h-4 w-4" />
@@ -213,6 +335,15 @@ export function HabitsList({ habits }: HabitsListProps) {
       {habits.length === 0 && (
         <div className="text-center py-8 text-gray-500">
           Aucune habitude enregistrée. Commencez par en créer une !
+        </div>
+      )}
+      
+      {actionsQueue.length > 0 && (
+        <div className="fixed bottom-4 right-4 bg-primary text-white px-4 py-2 rounded-md shadow-lg">
+          {processingQueue ? 
+            "Synchronisation en cours..." : 
+            `${actionsQueue.length} modification${actionsQueue.length > 1 ? 's' : ''} en attente`
+          }
         </div>
       )}
     </div>

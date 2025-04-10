@@ -35,13 +35,13 @@ export default async function ProjectsPage() {
 
   return (
     <div className="max-w-7xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Projets</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Projets</h1>
           <p className="text-gray-600 mt-1">Gérez tous vos projets</p>
         </div>
         <Link href="/dashboard/projects/new">
-          <Button>
+          <Button className="w-full sm:w-auto">
             <PlusCircle className="h-4 w-4 mr-2" />
             Nouveau projet
           </Button>

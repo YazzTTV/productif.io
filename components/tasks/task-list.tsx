@@ -154,62 +154,64 @@ export function TaskList({ tasks: initialTasks = [], onTaskUpdate, onTaskDelete 
     if (tasks.length === 0) return null
 
     return (
-      <div className="mb-8">
-        <h2 className="text-lg font-semibold mb-4">{title}</h2>
+      <div className="mb-6 sm:mb-8">
+        <h2 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4">{title}</h2>
         <div className="space-y-3">
           {tasks.map((task) => (
             <div
               key={task.id}
-              className={`flex items-start justify-between p-4 rounded-lg border ${
+              className={`flex items-start justify-between p-3 sm:p-4 rounded-lg border ${
                 task.completed ? "bg-gray-50" : "bg-white"
               }`}
             >
-              <div className="flex items-start gap-4 flex-1">
+              <div className="flex items-start gap-3 sm:gap-4 flex-1">
                 <Checkbox
                   checked={task.completed}
                   onCheckedChange={(checked) => {
                     handleTaskUpdate(task.id, { completed: checked as boolean })
                   }}
+                  className="mt-0.5"
                 />
-                <div className="flex-1">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <h3 className={`font-medium ${task.completed ? "line-through text-gray-500" : ""}`}>
+                <div className="flex-1 min-w-0">
+                  <div className="flex flex-col sm:flex-row sm:items-start justify-between">
+                    <div className="flex-1 min-w-0">
+                      <h3 className={`font-medium truncate ${task.completed ? "line-through text-gray-500" : ""}`}>
                         {task.title}
                       </h3>
                       {task.description && (
-                        <p className={`text-sm mt-1 ${task.completed ? "text-gray-400" : "text-gray-600"}`}>
+                        <p className={`text-sm mt-1 line-clamp-2 ${task.completed ? "text-gray-400" : "text-gray-600"}`}>
                           {task.description}
                         </p>
                       )}
-                      <div className="flex items-center gap-2 mt-2">
+                      <div className="flex flex-wrap items-center gap-2 mt-2">
                         {task.priority !== null && (
-                          <Badge variant="outline" className={priorityLabels[task.priority]?.color}>
+                          <Badge variant="outline" className={`text-xs ${priorityLabels[task.priority]?.color}`}>
                             {priorityLabels[task.priority]?.label}
                           </Badge>
                         )}
                         {task.energyLevel !== null && (
-                          <Badge variant="outline" className={energyLabels[task.energyLevel]?.color}>
+                          <Badge variant="outline" className={`text-xs ${energyLabels[task.energyLevel]?.color}`}>
                             {energyLabels[task.energyLevel]?.label}
                           </Badge>
                         )}
                         {task.project && (
-                          <Badge variant="outline">
+                          <Badge variant="outline" className="text-xs">
                             {task.project.name}
                           </Badge>
                         )}
                         {showDate && task.dueDate && (
-                          <div className="flex items-center text-sm text-gray-500">
-                            <Calendar className="h-4 w-4 mr-1" />
+                          <div className="flex items-center text-xs sm:text-sm text-gray-500">
+                            <Calendar className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
                             {formatDueDate(task.dueDate)}
                           </div>
                         )}
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1 sm:gap-2 mt-3 sm:mt-0 ml-auto">
                       <Button
                         variant="ghost"
                         size="icon"
+                        className="h-8 w-8"
                         onClick={() => router.push(`/dashboard/time?taskId=${task.id}&title=${encodeURIComponent(task.title)}`)}
                       >
                         <PlayCircle className="h-4 w-4" />
@@ -217,6 +219,7 @@ export function TaskList({ tasks: initialTasks = [], onTaskUpdate, onTaskDelete 
                       <Button
                         variant="ghost"
                         size="icon"
+                        className="h-8 w-8"
                         onClick={() => router.push(`/dashboard/tasks/${task.id}/edit`)}
                       >
                         <Edit className="h-4 w-4" />
@@ -224,6 +227,7 @@ export function TaskList({ tasks: initialTasks = [], onTaskUpdate, onTaskDelete 
                       <Button
                         variant="ghost"
                         size="icon"
+                        className="h-8 w-8"
                         onClick={() => handleTaskDelete(task.id)}
                       >
                         <Trash2 className="h-4 w-4" />

@@ -19,6 +19,7 @@ import { Badge } from "@/components/ui/badge"
 import { TaskSelector } from "@/components/time/task-selector"
 import { ProcessSelector } from "@/components/time/process-selector"
 import { CheckCircle, Save } from "lucide-react"
+import { ProcessSteps } from "./process-steps"
 
 interface Task {
   id: string
@@ -187,7 +188,63 @@ export function TimePageClient({ taskId, taskTitle }: TimePageClientProps) {
 
   const handleProcessSelect = (selectedProcess: Process | null) => {
     if (selectedProcess) {
-      setProcess(selectedProcess.description)
+      console.log("Process sélectionné:", selectedProcess.description)
+      try {
+        // Essayer de parser le process comme JSON
+        const parsed = JSON.parse(selectedProcess.description)
+        
+        // Si c'est un tableau et que les éléments ont la structure attendue
+        if (Array.isArray(parsed) && parsed.some(item => 
+          typeof item === 'object' && 
+          'title' in item && 
+          'subSteps' in item
+        )) {
+          console.log("Format détecté: Nouveau format avec étapes")
+          console.log("Setting process value to:", selectedProcess.description) // Debug
+          setProcess(selectedProcess.description)
+        } else {
+          console.log("Format détecté: Ancien format ou format invalide")
+          // Convertir en nouveau format
+          const simpleStep = [{
+            id: Math.random().toString(36).substr(2, 9),
+            title: selectedProcess.name,
+            completed: false,
+            isExpanded: true,
+            subSteps: [{
+              id: Math.random().toString(36).substr(2, 9),
+              title: selectedProcess.description,
+              completed: false,
+              isExpanded: true,
+              subSteps: []
+            }]
+          }]
+          const newValue = JSON.stringify(simpleStep)
+          console.log("Setting process value to:", newValue) // Debug
+          setProcess(newValue)
+        }
+      } catch (error) {
+        console.log("Erreur de parsing:", error)
+        // Si ce n'est pas du JSON du tout
+        const simpleStep = [{
+          id: Math.random().toString(36).substr(2, 9),
+          title: selectedProcess.name,
+          completed: false,
+          isExpanded: true,
+          subSteps: [{
+            id: Math.random().toString(36).substr(2, 9),
+            title: selectedProcess.description,
+            completed: false,
+            isExpanded: true,
+            subSteps: []
+          }]
+        }]
+        const newValue = JSON.stringify(simpleStep)
+        console.log("Setting process value to:", newValue) // Debug
+        setProcess(newValue)
+      }
+    } else {
+      console.log("Setting process value to empty string") // Debug
+      setProcess("")
     }
   }
 
@@ -233,24 +290,24 @@ export function TimePageClient({ taskId, taskTitle }: TimePageClientProps) {
   }
 
   return (
-    <div className="container mx-auto py-6">
-      <div className="grid gap-6">
+    <div className="container mx-auto px-4 py-4 sm:py-6">
+      <div className="grid gap-4 sm:gap-6">
         <div>
-          <h1 className="text-3xl font-bold mb-6">Time Tracking</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold mb-4 sm:mb-6">Time Tracking</h1>
           
           {!taskId && (
-            <div className="mb-8">
+            <div className="mb-6">
               <TaskSelector />
             </div>
           )}
 
           {task && (
-            <div className="mb-6">
-              <div className="flex items-center justify-between">
+            <div className="mb-4 sm:mb-6">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
-                  <h2 className="text-xl font-semibold mb-2">{task.title}</h2>
+                  <h2 className="text-lg sm:text-xl font-semibold mb-2">{task.title}</h2>
                   {task.description && (
-                    <p className="text-muted-foreground mb-2">{task.description}</p>
+                    <p className="text-sm text-muted-foreground mb-2">{task.description}</p>
                   )}
                   {task.project && (
                     <Badge style={{ backgroundColor: task.project.color }}>
@@ -259,18 +316,19 @@ export function TimePageClient({ taskId, taskTitle }: TimePageClientProps) {
                   )}
                 </div>
                 
-                <div className="flex items-center gap-2">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
                   <Button
                     variant="outline"
                     onClick={handleTaskComplete}
-                    className="flex items-center gap-2"
+                    className="flex items-center gap-2 w-full sm:w-auto"
                   >
                     <CheckCircle className="h-4 w-4" />
-                    Marquer comme terminée
+                    <span className="truncate">Marquer comme terminée</span>
                   </Button>
                   <Button
                     variant="outline"
                     onClick={() => router.push("/dashboard/tasks")}
+                    className="w-full sm:w-auto"
                   >
                     Retour aux tâches
                   </Button>
@@ -287,12 +345,12 @@ export function TimePageClient({ taskId, taskTitle }: TimePageClientProps) {
               />
             </div>
             <div>
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-semibold">Process</h2>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
+                <h2 className="text-lg sm:text-xl font-semibold">Process</h2>
                 <Button
                   variant="outline"
                   onClick={() => setShowSaveProcessDialog(true)}
-                  className="flex items-center gap-2"
+                  className="flex items-center gap-2 w-full sm:w-auto"
                 >
                   <Save className="h-4 w-4" />
                   Sauvegarder le process
@@ -300,11 +358,13 @@ export function TimePageClient({ taskId, taskTitle }: TimePageClientProps) {
               </div>
               <div className="space-y-4">
                 <ProcessSelector onSelect={handleProcessSelect} />
-                <Textarea
-                  placeholder="Décrivez le process pour réaliser cette tâche..."
-                  className="min-h-[200px]"
+                <ProcessSteps
+                  key={process} // Force re-render when process changes
                   value={process}
-                  onChange={(e) => setProcess(e.target.value)}
+                  onChange={(newValue) => {
+                    console.log("ProcessSteps onChange called with:", newValue) // Debug
+                    setProcess(newValue)
+                  }}
                 />
               </div>
             </div>
@@ -313,7 +373,7 @@ export function TimePageClient({ taskId, taskTitle }: TimePageClientProps) {
       </div>
 
       <Dialog open={showCompleteDialog} onOpenChange={setShowCompleteDialog}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Session terminée</DialogTitle>
             <DialogDescription>
@@ -329,7 +389,7 @@ export function TimePageClient({ taskId, taskTitle }: TimePageClientProps) {
                 checked={saveAsTemplate}
                 onChange={(e) => setSaveAsTemplate(e.target.checked)}
               />
-              <label htmlFor="saveTemplate">
+              <label htmlFor="saveTemplate" className="text-sm">
                 Sauvegarder ce process comme template
               </label>
             </div>
@@ -343,13 +403,17 @@ export function TimePageClient({ taskId, taskTitle }: TimePageClientProps) {
             )}
           </div>
 
-          <DialogFooter className="flex space-x-2">
-            <Button onClick={() => handleComplete(true)}>
+          <DialogFooter className="flex flex-col sm:flex-row gap-2 sm:space-x-2">
+            <Button 
+              onClick={() => handleComplete(true)}
+              className="w-full sm:w-auto"
+            >
               Continuer une nouvelle session
             </Button>
             <Button
               variant="default"
               onClick={() => handleComplete(false)}
+              className="w-full sm:w-auto"
             >
               Terminer la tâche
             </Button>
@@ -358,7 +422,7 @@ export function TimePageClient({ taskId, taskTitle }: TimePageClientProps) {
       </Dialog>
 
       <Dialog open={showSaveProcessDialog} onOpenChange={setShowSaveProcessDialog}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Sauvegarder le process</DialogTitle>
             <DialogDescription>
@@ -374,11 +438,18 @@ export function TimePageClient({ taskId, taskTitle }: TimePageClientProps) {
             />
           </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowSaveProcessDialog(false)}>
+          <DialogFooter className="flex flex-col sm:flex-row gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => setShowSaveProcessDialog(false)}
+              className="w-full sm:w-auto"
+            >
               Annuler
             </Button>
-            <Button onClick={handleSaveProcess}>
+            <Button 
+              onClick={handleSaveProcess}
+              className="w-full sm:w-auto"
+            >
               Sauvegarder
             </Button>
           </DialogFooter>
