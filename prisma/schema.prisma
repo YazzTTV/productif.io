@@ -154,6 +154,7 @@ model Habit {
   frequency   String       @db.VarChar(10) // 'daily', 'weekly', 'monthly'
   daysOfWeek  String[]     @default([])    // ["monday", "wednesday", "friday"]
   userId      String
+  order       Int          @default(0)     // Nouvel attribut pour l'ordre d'affichage
   user        User         @relation(fields: [userId], references: [id])
   entries     HabitEntry[]
   createdAt   DateTime     @default(now())

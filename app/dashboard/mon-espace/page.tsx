@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
 import { toast } from "sonner"
+import { ProcessViewer } from "@/components/process/process-viewer"
 
 interface HabitEntry {
   id: string
@@ -325,7 +326,7 @@ export default function MonEspacePage() {
                         className="min-h-[100px]"
                       />
                     ) : (
-                      <p className="whitespace-pre-wrap">{process.description}</p>
+                      <ProcessViewer value={process.description} />
                     )}
                   </CardContent>
                 </Card>

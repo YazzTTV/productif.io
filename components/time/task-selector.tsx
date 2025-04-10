@@ -20,6 +20,9 @@ interface Task {
   id: string
   title: string
   projectId: string | null
+  userId: string
+  userName: string | null
+  userEmail: string
 }
 
 export function TaskSelector() {
@@ -43,7 +46,9 @@ export function TaskSelector() {
       .then((data) => {
         // Extraire le tableau tasks de la réponse API
         const tasksArray = data.tasks || [];
-        setTasks(tasksArray);
+        // Filtrer pour n'avoir que les tâches de l'utilisateur connecté
+        const userTasks = tasksArray.filter((task: Task) => !task.userName || task.userName === null);
+        setTasks(userTasks);
       })
       .catch(console.error)
   }, [])

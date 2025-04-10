@@ -11,6 +11,7 @@ import { useToast } from "@/components/ui/use-toast"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { AdminRequiredPage } from "@/components/auth/admin-required"
 import { Separator } from "@/components/ui/separator"
+import Link from "next/link"
 
 interface User {
   id: string
@@ -134,10 +135,10 @@ export default function EditUserPage() {
             L'utilisateur demandé n'existe pas ou vous n'avez pas les permissions nécessaires.
           </p>
           <Button asChild className="mt-4">
-            <a href="/dashboard/admin/users">
+            <Link href="/dashboard/admin/users">
               <ArrowLeft className="mr-2 h-4 w-4" />
               Retour à la liste des utilisateurs
-            </a>
+            </Link>
           </Button>
         </div>
       </AdminRequiredPage>

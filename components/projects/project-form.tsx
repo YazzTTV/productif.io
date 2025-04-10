@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -23,13 +23,33 @@ const COLORS = [
   "#3B82F6", // Blue
 ]
 
-export function ProjectForm() {
+interface Project {
+  id: string
+  name: string
+  description: string | null
+  color: string | null
+}
+
+interface ProjectFormProps {
+  project?: Project
+}
+
+export function ProjectForm({ project }: ProjectFormProps) {
   const router = useRouter()
-  const [name, setName] = useState("")
-  const [description, setDescription] = useState("")
-  const [color, setColor] = useState(COLORS[0])
+  const [name, setName] = useState(project?.name || "")
+  const [description, setDescription] = useState(project?.description || "")
+  const [color, setColor] = useState(project?.color || COLORS[0])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Mettre à jour les champs si un projet est fourni
+  useEffect(() => {
+    if (project) {
+      setName(project.name)
+      setDescription(project.description || "")
+      setColor(project.color || COLORS[0])
+    }
+  }, [project])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -37,8 +57,14 @@ export function ProjectForm() {
     setError(null)
 
     try {
-      const response = await fetch("/api/projects", {
-        method: "POST",
+      const url = project 
+        ? `/api/projects/${project.id}` 
+        : "/api/projects"
+
+      const method = project ? "PATCH" : "POST"
+
+      const response = await fetch(url, {
+        method,
         headers: {
           "Content-Type": "application/json",
         },
@@ -51,7 +77,7 @@ export function ProjectForm() {
 
       if (!response.ok) {
         const data = await response.json()
-        throw new Error(data.error || "Erreur lors de la création du projet")
+        throw new Error(data.error || `Erreur lors de la ${project ? 'modification' : 'création'} du projet`)
       }
 
       // Rediriger vers la liste des projets
@@ -68,7 +94,7 @@ export function ProjectForm() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Nouveau projet</CardTitle>
+        <CardTitle>{project ? "Modifier le projet" : "Nouveau projet"}</CardTitle>
       </CardHeader>
       <form onSubmit={handleSubmit}>
         <CardContent className="space-y-4">
@@ -105,7 +131,10 @@ export function ProjectForm() {
         </CardContent>
         <CardFooter>
           <Button type="submit" className="w-full" disabled={isLoading}>
-            {isLoading ? "Création en cours..." : "Créer le projet"}
+            {isLoading 
+              ? (project ? "Modification en cours..." : "Création en cours...") 
+              : (project ? "Modifier le projet" : "Créer le projet")
+            }
           </Button>
         </CardFooter>
       </form>

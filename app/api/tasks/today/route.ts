@@ -18,21 +18,21 @@ export async function GET() {
         userId: user.id,
         OR: [
           {
-            // Tâches dues aujourd'hui (complétées ou non)
+            // Tâches dues aujourd'hui (avec date d'échéance explicite pour aujourd'hui)
             dueDate: {
               lte: endToday,
               gte: today
             }
           },
           {
-            // Tâches planifiées pour aujourd'hui (complétées ou non)
+            // Tâches planifiées explicitement pour aujourd'hui
             scheduledFor: {
               lte: endToday,
               gte: today
             }
           },
           {
-            // Tâches complétées aujourd'hui
+            // Tâches complétées aujourd'hui (pour pouvoir les afficher même si elles n'étaient pas prévues aujourd'hui)
             updatedAt: {
               lte: endToday,
               gte: today
@@ -40,7 +40,7 @@ export async function GET() {
             completed: true
           },
           {
-            // Tâches en retard
+            // Tâches en retard (date d'échéance passée mais non complétées)
             dueDate: {
               lt: today
             },

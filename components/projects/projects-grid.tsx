@@ -44,11 +44,11 @@ export function ProjectsGrid({ projects: initialProjects }: ProjectsGridProps) {
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
       {projects.length === 0 ? (
-        <div className="col-span-full text-center py-12 bg-white rounded-lg border">
-          <div className="mx-auto w-24 h-24 rounded-full bg-gray-100 flex items-center justify-center mb-4">
-            <FolderKanban className="h-12 w-12 text-gray-400" />
+        <div className="col-span-full text-center py-10 sm:py-12 bg-white rounded-lg border">
+          <div className="mx-auto w-16 h-16 sm:w-24 sm:h-24 rounded-full bg-gray-100 flex items-center justify-center mb-4">
+            <FolderKanban className="h-8 w-8 sm:h-12 sm:w-12 text-gray-400" />
           </div>
           <h3 className="text-lg font-medium text-gray-900">Aucun projet</h3>
           <p className="mt-2 text-sm text-gray-500 max-w-md mx-auto">
@@ -65,16 +65,16 @@ export function ProjectsGrid({ projects: initialProjects }: ProjectsGridProps) {
         </div>
       ) : (
         projects.map((project) => (
-          <Card key={project.id}>
+          <Card key={project.id} className="flex flex-col">
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <div className="w-3 h-3 rounded-full mr-2" style={{ backgroundColor: project.color || "#6366F1" }} />
-                  <CardTitle>{project.name}</CardTitle>
+                <div className="flex items-center min-w-0">
+                  <div className="w-3 h-3 rounded-full mr-2 flex-shrink-0" style={{ backgroundColor: project.color || "#6366F1" }} />
+                  <CardTitle className="truncate">{project.name}</CardTitle>
                 </div>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon">
+                    <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0">
                       <MoreHorizontal className="h-4 w-4" />
                       <span className="sr-only">Menu</span>
                     </Button>
@@ -91,9 +91,11 @@ export function ProjectsGrid({ projects: initialProjects }: ProjectsGridProps) {
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
-              {project.description && <p className="text-sm text-gray-500 mt-1">{project.description}</p>}
+              {project.description && (
+                <p className="text-sm text-gray-500 mt-1 line-clamp-2">{project.description}</p>
+              )}
             </CardHeader>
-            <CardContent className="pb-3">
+            <CardContent className="pb-3 flex-grow">
               <div className="flex items-center justify-between mb-2">
                 <div className="text-sm text-gray-500">{project._count.tasks} tâches</div>
               </div>

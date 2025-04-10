@@ -9,8 +9,8 @@ export const metadata: Metadata = {
 
 export default function LoginPage() {
   return (
-    <div className="container flex h-screen w-screen flex-col items-center justify-center">
-      <div className="mx-auto flex w-full flex-col justify-center space-y-6 sm:w-[350px]">
+    <div className="w-full max-w-md mx-auto px-4">
+      <div className="flex flex-col space-y-6">
         <div className="flex flex-col space-y-2 text-center">
           <h1 className="text-2xl font-semibold tracking-tight">Connexion</h1>
           <p className="text-sm text-muted-foreground">
@@ -18,7 +18,7 @@ export default function LoginPage() {
           </p>
         </div>
         <LoginForm />
-        <p className="px-8 text-center text-sm text-muted-foreground">
+        <p className="text-center text-sm text-muted-foreground">
           <Link 
             href="/signup"
             className="hover:text-brand-green underline underline-offset-4"

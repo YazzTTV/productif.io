@@ -58,12 +58,12 @@ async function updateTask(taskId: string, data: any) {
 
     // Pour les autres mises à jour
     const priorityString = data.priority !== null ? `P${data.priority}` : "P3"
-    const energyString = data.energyLevel !== null ? {
-      0: "Extrême",
-      1: "Élevé",
-      2: "Moyen",
-      3: "Faible"
-    }[data.energyLevel] : "Moyen"
+    
+    let energyString = "Moyen";
+    if (data.energyLevel === 0) energyString = "Extrême";
+    else if (data.energyLevel === 1) energyString = "Élevé";
+    else if (data.energyLevel === 2) energyString = "Moyen";
+    else if (data.energyLevel === 3) energyString = "Faible";
 
     const order = calculateTaskOrder(priorityString, energyString)
 
@@ -145,21 +145,21 @@ export default async function TasksPage() {
   })
 
   return (
-    <div className="container mx-auto py-6 max-w-7xl">
-      <div className="flex items-center justify-between mb-8">
+    <div className="max-w-7xl mx-auto">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Tâches</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Tâches</h1>
           <p className="text-gray-600 mt-1">Gérez et organisez vos tâches efficacement</p>
         </div>
         <Link href="/dashboard/tasks/new">
-          <Button className="shadow-sm">
+          <Button className="shadow-sm w-full sm:w-auto">
             <PlusCircle className="h-4 w-4 mr-2" />
             Nouvelle tâche
           </Button>
         </Link>
       </div>
 
-      <div className="bg-gray-50 rounded-xl p-6">
+      <div className="bg-gray-50 rounded-xl p-4 sm:p-6">
         <TaskList 
           tasks={tasks} 
           onTaskUpdate={updateTask}

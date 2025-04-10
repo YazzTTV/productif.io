@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { getAuthUser } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
-import { format, startOfDay as dateStartOfDay, endOfDay as dateEndOfDay, isSameDay } from "date-fns"
+import { format, startOfDay, endOfDay, isSameDay } from "date-fns"
 
 export async function GET() {
   try {
@@ -18,12 +18,17 @@ export async function GET() {
 
     // Récupération des tâches du jour
     const today = new Date()
-    const startOfDay = dateStartOfDay(today)
-    const endOfDay = dateEndOfDay(today)
+    const startOfDayTime = startOfDay(today)
+    const endOfDayTime = endOfDay(today)
+    
+    // Normalisation de la date pour les habitudes (midi pour éviter les problèmes de fuseau horaire)
+    const normalizedDate = startOfDay(today)
+    normalizedDate.setHours(12, 0, 0, 0)
 
     console.log("[METRICS] Date aujourd'hui:", today.toISOString())
-    console.log("[METRICS] Début de la journée:", startOfDay.toISOString())
-    console.log("[METRICS] Fin de la journée:", endOfDay.toISOString())
+    console.log("[METRICS] Début de la journée:", startOfDayTime.toISOString())
+    console.log("[METRICS] Fin de la journée:", endOfDayTime.toISOString())
+    console.log("[METRICS] Date normalisée pour habitudes:", normalizedDate.toISOString())
     console.log("[METRICS] Fuseau horaire serveur:", Intl.DateTimeFormat().resolvedOptions().timeZone)
 
     // Récupérer TOUTES les tâches récentes
@@ -82,10 +87,7 @@ export async function GET() {
       return false
     })
 
-    // SIMPLIFICATION DU CALCUL
-    // Considérer que toutes les tâches créées aujourd'hui font partie des tâches planifiées pour aujourd'hui
-    const simplifiedPlannedTasks = tasksCreatedToday;
-    console.log("[METRICS] SOLUTION SIMPLIFIÉE - Toutes les tâches créées aujourd'hui:", simplifiedPlannedTasks.length)
+    console.log("[METRICS] Tâches planifiées pour aujourd'hui:", plannedTodayTasks.length)
     
     // Récupérer les tâches complétées aujourd'hui
     const completedToday = recentTasks.filter(task => {
@@ -102,46 +104,55 @@ export async function GET() {
       })), null, 2))
     console.log("[METRICS] Nombre de tâches complétées aujourd'hui:", completedToday.length)
 
-    // Calculer le taux de complétion uniquement pour les tâches PLANIFIÉES SIMPLIFIÉES
-    const simplifiedCompletedTasks = simplifiedPlannedTasks.filter(task => task.completed)
-    const simplifiedCompletionRate = simplifiedPlannedTasks.length > 0 
-      ? Math.round((simplifiedCompletedTasks.length / simplifiedPlannedTasks.length) * 100) 
+    // Calculer le taux de complétion pour les tâches planifiées pour aujourd'hui
+    const completedPlannedTasks = plannedTodayTasks.filter(task => task.completed)
+    const completionRate = plannedTodayTasks.length > 0 
+      ? Math.round((completedPlannedTasks.length / plannedTodayTasks.length) * 100) 
       : 0
 
-    console.log("[METRICS] Tâches simplifiées planifiées:", simplifiedPlannedTasks.length)
-    console.log("[METRICS] Tâches simplifiées complétées:", simplifiedCompletedTasks.length)
-    console.log("[METRICS] Taux de complétion simplifié:", simplifiedCompletionRate)
+    console.log("[METRICS] Tâches planifiées pour aujourd'hui:", plannedTodayTasks.length)
+    console.log("[METRICS] Tâches planifiées et complétées:", completedPlannedTasks.length)
+    console.log("[METRICS] Taux de complétion des tâches planifiées:", completionRate)
 
     // Récupération des habitudes du jour
     // Obtenir le jour en anglais car les jours sont stockés en anglais dans la base de données
     const currentDayOfWeek = today.toLocaleDateString("en-US", { weekday: "long" }).toLowerCase()
+    console.log("[METRICS] Jour de la semaine actuel:", currentDayOfWeek)
     
+    // Récupérer toutes les habitudes de l'utilisateur avec leurs entrées pour aujourd'hui
     const habits = await prisma.habit.findMany({
       where: {
         userId: user.id,
+        // Filtrer pour ne garder que les habitudes pour ce jour de la semaine
+        daysOfWeek: {
+          has: currentDayOfWeek
+        }
       },
       include: {
         entries: {
           where: {
-            date: {
-              gte: startOfDay,
-              lte: endOfDay
-            }
+            // Utiliser la date normalisée pour la cohérence avec l'API habits/today
+            date: normalizedDate
           }
         }
+      },
+      orderBy: {
+        order: 'asc'
       }
     })
 
-    // Filtrer pour ne garder que les habitudes assignées au jour actuel
-    const todayHabits = habits.filter(habit => habit.daysOfWeek.includes(currentDayOfWeek))
-
-    const completedTodayHabits = todayHabits.filter(habit => 
+    console.log("[METRICS] Nombre d'habitudes trouvées pour", currentDayOfWeek, ":", habits.length)
+    
+    // Filtrer les habitudes complétées (celles qui ont une entrée avec completed=true)
+    const completedTodayHabits = habits.filter(habit => 
       habit.entries.some(entry => entry.completed)
     )
 
+    console.log("[METRICS] Habitudes complétées aujourd'hui:", completedTodayHabits.length)
+
     // Calculer le taux de complétion uniquement pour les habitudes du jour
-    const habitsCompletionRate = todayHabits.length > 0 
-      ? Math.round((completedTodayHabits.length / todayHabits.length) * 100) 
+    const habitsCompletionRate = habits.length > 0 
+      ? Math.round((completedTodayHabits.length / habits.length) * 100) 
       : 0
 
     // Calcul du streak (séries) d'habitudes - à implémenter plus tard
@@ -164,7 +175,7 @@ export async function GET() {
     // Calcul du score de productivité basé sur les tâches et habitudes
     // C'est un calcul simplifié qui pourrait être amélioré avec plus de données
     const productivityFactors = [
-      simplifiedCompletionRate * 0.6, // 60% du score basé sur les tâches
+      completionRate * 0.6, // 60% du score basé sur les tâches
       habitsCompletionRate * 0.4  // 40% du score basé sur les habitudes
     ]
 
@@ -179,14 +190,14 @@ export async function GET() {
 
     const response = {
       tasks: {
-        today: simplifiedPlannedTasks.length, // Utiliser la solution simplifiée
-        completed: simplifiedCompletedTasks.length, // Utiliser la solution simplifiée
-        completionRate: simplifiedCompletionRate, // Utiliser la solution simplifiée
+        today: plannedTodayTasks.length,
+        completed: completedPlannedTasks.length,
+        completionRate: completionRate,
         totalCompletedToday: completedToday.length,
-        createdToday: tasksCreatedToday.length // Ajout pour débogage
+        createdToday: tasksCreatedToday.length
       },
       habits: {
-        today: todayHabits.length,
+        today: habits.length,
         completed: completedTodayHabits.length,
         completionRate: habitsCompletionRate,
         streak: longestStreak
@@ -202,6 +213,7 @@ export async function GET() {
       },
       debug: {
         serverTime: today.toISOString(),
+        normalizedDate: normalizedDate.toISOString(),
         timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
       }
     }

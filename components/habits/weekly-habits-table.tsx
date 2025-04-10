@@ -1,9 +1,9 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { ChevronLeft, ChevronRight, Pencil, Trash2 } from "lucide-react"
+import { ChevronLeft, ChevronRight, GripVertical, Pencil, Trash2 } from "lucide-react"
 import Link from "next/link"
 import {
   AlertDialog,
@@ -31,6 +31,23 @@ import { Habit, HabitEntry } from "@prisma/client"
 import { Checkbox } from "@/components/ui/checkbox"
 import { CustomHabitEntry } from "./custom-habit-entry"
 import { toast } from "sonner"
+import {
+  DndContext,
+  closestCenter,
+  MouseSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core"
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable"
+import { CSS } from "@dnd-kit/utilities"
 
 interface WeeklyHabitsTableProps {
   habits: (Habit & {
@@ -45,6 +62,26 @@ export function WeeklyHabitsTable({
 }: WeeklyHabitsTableProps) {
   const [currentWeek, setCurrentWeek] = useState(() => startOfWeek(new Date(), { weekStartsOn: 1 }))
   const [loading, setLoading] = useState<string | null>(null)
+  const [sortedHabits, setSortedHabits] = useState(habits)
+
+  const sensors = useSensors(
+    useSensor(MouseSensor, {
+      activationConstraint: {
+        distance: 5, // Distance minimale de déplacement pour activer le drag
+      },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 250, // Délai en ms pour activer le drag sur mobile
+        tolerance: 5,
+      },
+    })
+  )
+
+  // Mettre à jour les habitudes triées lorsque props.habits change
+  useEffect(() => {
+    setSortedHabits(habits)
+  }, [habits])
 
   const handlePreviousWeek = () => {
     setCurrentWeek(prev => addWeeks(prev, -1))
@@ -144,6 +181,50 @@ export function WeeklyHabitsTable({
     }
   }
 
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event
+    
+    if (!over || active.id === over.id) {
+      return
+    }
+    
+    // Réorganiser les habitudes localement
+    const oldIndex = sortedHabits.findIndex(habit => habit.id === active.id)
+    const newIndex = sortedHabits.findIndex(habit => habit.id === over.id)
+    
+    if (oldIndex !== -1 && newIndex !== -1) {
+      const newSortedHabits = arrayMove(sortedHabits, oldIndex, newIndex)
+      setSortedHabits(newSortedHabits)
+      
+      try {
+        // Envoyer la mise à jour au serveur
+        const response = await fetch("/api/habits", {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            habits: newSortedHabits.map((habit, index) => ({
+              id: habit.id,
+              order: index
+            }))
+          }),
+        })
+        
+        if (!response.ok) {
+          throw new Error("Erreur lors de la mise à jour de l'ordre")
+        }
+        
+        toast.success("Ordre des habitudes mis à jour")
+      } catch (error) {
+        console.error("Error updating habit order:", error)
+        toast.error("Erreur lors de la mise à jour de l'ordre")
+        // Revenir à l'ordre précédent en cas d'erreur
+        setSortedHabits(habits)
+      }
+    }
+  }
+
   const DAYS_OF_WEEK = {
     "monday": "L",
     "tuesday": "M",
@@ -191,129 +272,207 @@ export function WeeklyHabitsTable({
       </div>
 
       <Card>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-[200px]">Habitude</TableHead>
-              <TableHead className="w-[100px]">Jours</TableHead>
-              {weekDays.map((date) => (
-                <TableHead key={date.toISOString()} className="text-center">
-                  <div className="font-medium">
-                    {format(date, "EEE", { locale: fr })}
-                  </div>
-                  <div className="text-xs text-gray-500">
-                    {format(date, "d MMM", { locale: fr })}
-                  </div>
-                </TableHead>
-              ))}
-              <TableHead className="w-[100px]"></TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {habits.map((habit) => (
-              <TableRow key={habit.id}>
-                <TableCell className="font-medium">{habit.name}</TableCell>
-                <TableCell>
-                  <div className="flex gap-1">
-                    {habit.daysOfWeek.map((day) => (
-                      <span key={day} className="text-xs bg-gray-100 px-1 rounded">
-                        {DAYS_OF_WEEK[day as keyof typeof DAYS_OF_WEEK]}
-                      </span>
-                    ))}
-                  </div>
-                </TableCell>
-                {weekDays.map((date) => {
-                  const entry = habit.entries.find((e) =>
-                    isSameDay(new Date(e.date), date)
-                  )
-                  const isCompleted = entry?.completed ?? false
-                  const dayName = date.toLocaleDateString("en-US", { weekday: "long" }).toLowerCase()
-                  const isScheduledDay = habit.daysOfWeek.includes(dayName)
-
-                  return (
-                    <TableCell key={date.toISOString()} className="text-center">
-                      {isSpecialHabit(habit.name) ? (
-                        <CustomHabitEntry 
-                          habit={habit} 
-                          date={date} 
-                          onUpdate={handleCustomUpdate} 
-                        />
-                      ) : (
-                        <Checkbox
-                          checked={isCompleted}
-                          disabled={loading === habit.id || !isScheduledDay}
-                          onCheckedChange={() =>
-                            handleToggle(habit.id, date, isCompleted)
-                          }
-                          className={cn(
-                            "h-5 w-5",
-                            isCompleted && "bg-primary border-primary",
-                            !isScheduledDay && "opacity-50"
-                          )}
-                        />
-                      )}
-                    </TableCell>
-                  )
-                })}
-                <TableCell>
-                  <div className="flex justify-end gap-2">
-                    {!isDefaultHabit(habit.name) && (
-                      <>
-                        <Link href={`/dashboard/habits/${habit.id}/edit`}>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="text-gray-500 hover:text-gray-700"
-                            disabled={loading === habit.id}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                        </Link>
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="text-gray-500 hover:text-red-500"
-                              disabled={loading === habit.id}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Supprimer l'habitude</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Êtes-vous sûr de vouloir supprimer cette habitude ? Cette action est irréversible.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Annuler</AlertDialogCancel>
-                              <AlertDialogAction
-                                onClick={() => handleDeleteHabit(habit.id)}
-                                className="bg-red-500 hover:bg-red-600"
-                              >
-                                Supprimer
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </>
-                    )}
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
-            {habits.length === 0 && (
+        <DndContext 
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          <Table>
+            <TableHeader>
               <TableRow>
-                <TableCell colSpan={10} className="text-center py-8 text-gray-500">
-                  Aucune habitude enregistrée. Commencez par en créer une !
-                </TableCell>
+                <TableHead className="w-[40px]"></TableHead>
+                <TableHead className="w-[200px]">Habitude</TableHead>
+                <TableHead className="w-[100px]">Jours</TableHead>
+                {weekDays.map((date) => (
+                  <TableHead key={date.toISOString()} className="text-center">
+                    <div className="font-medium">
+                      {format(date, "EEE", { locale: fr })}
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      {format(date, "d MMM", { locale: fr })}
+                    </div>
+                  </TableHead>
+                ))}
+                <TableHead className="w-[100px]"></TableHead>
               </TableRow>
-            )}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <SortableContext 
+              items={sortedHabits.map(habit => habit.id)}
+              strategy={verticalListSortingStrategy}
+            >
+              <TableBody>
+                {sortedHabits.map((habit) => (
+                  <SortableTableRow 
+                    key={habit.id} 
+                    habit={habit}
+                    weekDays={weekDays}
+                    isSpecialHabit={isSpecialHabit}
+                    isDefaultHabit={isDefaultHabit}
+                    loading={loading}
+                    handleToggle={handleToggle}
+                    handleCustomUpdate={handleCustomUpdate}
+                    handleDeleteHabit={handleDeleteHabit}
+                    DAYS_OF_WEEK={DAYS_OF_WEEK}
+                  />
+                ))}
+                {sortedHabits.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={11} className="text-center py-8 text-gray-500">
+                      Aucune habitude enregistrée. Commencez par en créer une !
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </SortableContext>
+          </Table>
+        </DndContext>
       </Card>
     </div>
+  )
+}
+
+interface SortableTableRowProps {
+  habit: Habit & { entries: HabitEntry[] }
+  weekDays: Date[]
+  isSpecialHabit: (name: string) => boolean
+  isDefaultHabit: (name: string) => boolean
+  loading: string | null
+  handleToggle: (habitId: string, date: Date, completed: boolean) => Promise<void>
+  handleCustomUpdate: (
+    habitId: string,
+    date: Date,
+    data: { completed?: boolean; note?: string; rating?: number }
+  ) => Promise<void>
+  handleDeleteHabit: (habitId: string) => Promise<void>
+  DAYS_OF_WEEK: Record<string, string>
+}
+
+function SortableTableRow({
+  habit,
+  weekDays,
+  isSpecialHabit,
+  isDefaultHabit,
+  loading,
+  handleToggle,
+  handleCustomUpdate,
+  handleDeleteHabit,
+  DAYS_OF_WEEK
+}: SortableTableRowProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging
+  } = useSortable({ id: habit.id })
+  
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 1 : 0,
+  }
+  
+  return (
+    <TableRow ref={setNodeRef} style={style} className={cn(isDragging && "bg-gray-50")}>
+      <TableCell className="w-[40px] cursor-grab">
+        <GripVertical 
+          className="h-4 w-4 text-gray-400" 
+          {...attributes} 
+          {...listeners} 
+        />
+      </TableCell>
+      <TableCell className="font-medium">{habit.name}</TableCell>
+      <TableCell>
+        <div className="flex gap-1">
+          {habit.daysOfWeek.map((day) => (
+            <span key={day} className="text-xs bg-gray-100 px-1 rounded">
+              {DAYS_OF_WEEK[day as keyof typeof DAYS_OF_WEEK]}
+            </span>
+          ))}
+        </div>
+      </TableCell>
+      {weekDays.map((date) => {
+        const entry = habit.entries.find((e) =>
+          isSameDay(new Date(e.date), date)
+        )
+        const isCompleted = entry?.completed ?? false
+        const dayName = date.toLocaleDateString("en-US", { weekday: "long" }).toLowerCase()
+        const isScheduledDay = habit.daysOfWeek.includes(dayName)
+
+        return (
+          <TableCell key={date.toISOString()} className="text-center">
+            {isSpecialHabit(habit.name) ? (
+              <CustomHabitEntry 
+                habit={habit} 
+                date={date} 
+                onUpdate={handleCustomUpdate} 
+              />
+            ) : (
+              <Checkbox
+                checked={isCompleted}
+                disabled={loading === habit.id || !isScheduledDay}
+                onCheckedChange={() =>
+                  handleToggle(habit.id, date, isCompleted)
+                }
+                className={cn(
+                  "h-5 w-5",
+                  isCompleted && "bg-primary border-primary",
+                  !isScheduledDay && "opacity-50"
+                )}
+              />
+            )}
+          </TableCell>
+        )
+      })}
+      <TableCell>
+        <div className="flex justify-end gap-2">
+          {!isDefaultHabit(habit.name) && (
+            <>
+              <Link href={`/dashboard/habits/${habit.id}/edit`}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="text-gray-500 hover:text-gray-700"
+                  disabled={loading === habit.id}
+                >
+                  <Pencil className="h-4 w-4" />
+                </Button>
+              </Link>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-gray-500 hover:text-red-500"
+                    disabled={loading === habit.id}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Supprimer l'habitude</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Êtes-vous sûr de vouloir supprimer cette habitude ? Cette action est irréversible.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Annuler</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={() => handleDeleteHabit(habit.id)}
+                      className="bg-red-500 hover:bg-red-600"
+                    >
+                      Supprimer
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </>
+          )}
+        </div>
+      </TableCell>
+    </TableRow>
   )
 } 
