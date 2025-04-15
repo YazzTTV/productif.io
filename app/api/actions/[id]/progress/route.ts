@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma"
 
 export async function PATCH(
   request: Request,
-  { params }: { params: { actionId: string } }
+  { params }: { params: { id: string } }
 ) {
   try {
     const user = await getAuthUser()
@@ -12,8 +12,8 @@ export async function PATCH(
       return new NextResponse("Non autorisé", { status: 401 })
     }
 
-    const { actionId } = params
-    if (!actionId) {
+    const { id } = params
+    if (!id) {
       return new NextResponse("ID de l'action manquant", { status: 400 })
     }
 
@@ -38,7 +38,7 @@ export async function PATCH(
     // Vérifier que l'action existe et appartient à l'utilisateur
     const action = await prisma.objectiveAction.findFirst({
       where: {
-        id: actionId,
+        id,
         objective: {
           mission: {
             userId: user.id,
@@ -51,7 +51,7 @@ export async function PATCH(
     })
 
     if (!action) {
-      console.log("[ACTIONS_PROGRESS_PATCH] Action non trouvée:", actionId)
+      console.log("[ACTIONS_PROGRESS_PATCH] Action non trouvée:", id)
       return new NextResponse("Action non trouvée", { status: 404 })
     }
 
@@ -64,7 +64,7 @@ export async function PATCH(
       // Mettre à jour l'action
       const updatedAction = await prisma.objectiveAction.update({
         where: {
-          id: actionId,
+          id,
         },
         data: {
           target: targetNum,

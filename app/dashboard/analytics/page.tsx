@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma"
 import { TimeByProjectChart } from "@/components/analytics/time-by-project-chart"
 import { TimeByDayChart } from "@/components/analytics/time-by-day-chart"
 import { AnalyticsSummary } from "@/components/analytics/analytics-summary"
+import { USER_TIMEZONE } from "@/lib/date-utils"
 
 export default async function AnalyticsPage() {
   // Vérifier l'authentification côté serveur
@@ -23,6 +24,9 @@ export default async function AnalyticsPage() {
   }
 
   const userId = (user as any).id
+
+  // Log du fuseau horaire pour débogage
+  console.log(`[ANALYTICS] Utilisation du fuseau horaire: ${USER_TIMEZONE}`)
 
   // Récupérer les données pour les graphiques
 
@@ -45,7 +49,7 @@ export default async function AnalyticsPage() {
   // 2. Temps par jour de la semaine
   const timeByDay = await prisma.$queryRaw`
     SELECT 
-      EXTRACT(DOW FROM te."startTime") as day_of_week,
+      EXTRACT(DOW FROM te."startTime" AT TIME ZONE ${USER_TIMEZONE}) as day_of_week,
       SUM(EXTRACT(EPOCH FROM (te."endTime" - te."startTime"))/3600) as total_duration
     FROM "TimeEntry" te
     JOIN "Task" t ON t.id = te."taskId"
@@ -59,7 +63,8 @@ export default async function AnalyticsPage() {
   const totalTimeTracked = await prisma.$queryRaw`
     SELECT COALESCE(SUM(EXTRACT(EPOCH FROM (te."endTime" - te."startTime"))/3600), 0) as total_duration
     FROM "TimeEntry" te
-    WHERE te."userId" = ${userId}
+    JOIN "Task" t ON t.id = te."taskId"
+    WHERE t."userId" = ${userId}
       AND te."endTime" IS NOT NULL
   `
 
@@ -83,12 +88,15 @@ export default async function AnalyticsPage() {
   })
 
   const stats = {
-    totalTimeTracked: (totalTimeTracked as any)[0].total_duration || 0,
+    totalTimeTracked: (totalTimeTracked as any)[0]?.total_duration || 0,
     totalProjects,
     totalTasks,
     completedTasks,
     completionRate: totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0,
   }
+
+  // Log des statistiques pour débogage
+  console.log(`[ANALYTICS] Statistiques calculées:`, JSON.stringify(stats))
 
   return (
     <div className="max-w-7xl mx-auto">

@@ -2,13 +2,11 @@ import { redirect } from "next/navigation"
 import { prisma } from "@/lib/prisma"
 import { RecentTasks } from "@/components/dashboard/recent-tasks"
 import { ProjectsList } from "@/components/dashboard/projects-list"
-import { RecentHabits } from "@/components/dashboard/recent-habits"
 import { getAuthUser } from "@/lib/auth"
 import { OverviewMetrics } from "@/components/dashboard/overview-metrics"
-import { TaskCompletionChart } from "@/components/dashboard/task-completion-chart"
 import { HabitHeatmap } from "@/components/dashboard/habit-heatmap"
-import { ObjectivesProgress } from "@/components/dashboard/objectives-progress"
 import HabitStats from "@/components/dashboard/habit-stats"
+import { LeastTrackedHabits } from "@/components/dashboard/least-tracked-habits"
 
 export default async function DashboardPage() {
   const user = await getAuthUser()
@@ -52,23 +50,19 @@ export default async function DashboardPage() {
         <OverviewMetrics />
 
         {/* Graphiques et suivi */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-          <TaskCompletionChart />
+        <div className="grid grid-cols-1 md:grid-cols-1 gap-4 sm:gap-6">
           <HabitStats className="lg:col-span-1" />
         </div>
 
-        {/* Contenu principal */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
-          <div className="md:col-span-2 space-y-4 sm:space-y-6">
-            <RecentTasks />
-            <ProjectsList projects={projects} />
-          </div>
-
-          <div className="space-y-4 sm:space-y-6">
-            <ObjectivesProgress />
-            <RecentHabits />
-            <HabitHeatmap />
-          </div>
+        {/* Grille 2x2 pour que les modules aient la même taille */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+          {/* Première rangée */}
+          <RecentTasks />
+          <LeastTrackedHabits />
+          
+          {/* Deuxième rangée */}
+          <ProjectsList projects={projects} />
+          <HabitHeatmap />
         </div>
       </div>
     )

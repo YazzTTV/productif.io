@@ -87,7 +87,10 @@ export async function GET() {
       return false
     })
 
-    console.log("[METRICS] Tâches planifiées pour aujourd'hui:", plannedTodayTasks.length)
+    // SIMPLIFICATION DU CALCUL
+    // Considérer que toutes les tâches créées aujourd'hui font partie des tâches planifiées pour aujourd'hui
+    const simplifiedPlannedTasks = tasksCreatedToday;
+    console.log("[METRICS] SOLUTION SIMPLIFIÉE - Toutes les tâches créées aujourd'hui:", simplifiedPlannedTasks.length)
     
     // Récupérer les tâches complétées aujourd'hui
     const completedToday = recentTasks.filter(task => {
@@ -104,15 +107,15 @@ export async function GET() {
       })), null, 2))
     console.log("[METRICS] Nombre de tâches complétées aujourd'hui:", completedToday.length)
 
-    // Calculer le taux de complétion pour les tâches planifiées pour aujourd'hui
-    const completedPlannedTasks = plannedTodayTasks.filter(task => task.completed)
-    const completionRate = plannedTodayTasks.length > 0 
-      ? Math.round((completedPlannedTasks.length / plannedTodayTasks.length) * 100) 
+    // Calculer le taux de complétion uniquement pour les tâches PLANIFIÉES SIMPLIFIÉES
+    const simplifiedCompletedTasks = simplifiedPlannedTasks.filter(task => task.completed)
+    const simplifiedCompletionRate = simplifiedPlannedTasks.length > 0 
+      ? Math.round((simplifiedCompletedTasks.length / simplifiedPlannedTasks.length) * 100) 
       : 0
 
-    console.log("[METRICS] Tâches planifiées pour aujourd'hui:", plannedTodayTasks.length)
-    console.log("[METRICS] Tâches planifiées et complétées:", completedPlannedTasks.length)
-    console.log("[METRICS] Taux de complétion des tâches planifiées:", completionRate)
+    console.log("[METRICS] Tâches simplifiées planifiées:", simplifiedPlannedTasks.length)
+    console.log("[METRICS] Tâches simplifiées complétées:", simplifiedCompletedTasks.length)
+    console.log("[METRICS] Taux de complétion simplifié:", simplifiedCompletionRate)
 
     // Récupération des habitudes du jour
     // Obtenir le jour en anglais car les jours sont stockés en anglais dans la base de données
@@ -175,7 +178,7 @@ export async function GET() {
     // Calcul du score de productivité basé sur les tâches et habitudes
     // C'est un calcul simplifié qui pourrait être amélioré avec plus de données
     const productivityFactors = [
-      completionRate * 0.6, // 60% du score basé sur les tâches
+      simplifiedCompletionRate * 0.6, // 60% du score basé sur les tâches
       habitsCompletionRate * 0.4  // 40% du score basé sur les habitudes
     ]
 
@@ -190,9 +193,9 @@ export async function GET() {
 
     const response = {
       tasks: {
-        today: plannedTodayTasks.length,
-        completed: completedPlannedTasks.length,
-        completionRate: completionRate,
+        today: simplifiedPlannedTasks.length,
+        completed: simplifiedCompletedTasks.length,
+        completionRate: simplifiedCompletionRate,
         totalCompletedToday: completedToday.length,
         createdToday: tasksCreatedToday.length
       },

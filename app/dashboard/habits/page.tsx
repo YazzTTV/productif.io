@@ -1,11 +1,11 @@
 "use client"
 
-import { useEffect, useState, useCallback, useRef } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { Habit, HabitEntry } from "@prisma/client"
 import { WeeklyHabitsTable } from "@/components/habits/weekly-habits-table"
 import { Button } from "@/components/ui/button"
 import { Plus } from "lucide-react"
-import { useRouter } from "next/navigation"
+import { useRouter, usePathname } from "next/navigation"
 import { toast } from "sonner"
 import { startOfDay, parseISO } from "date-fns"
 
@@ -13,22 +13,12 @@ type HabitWithEntries = Habit & {
   entries: HabitEntry[]
 }
 
-// Interface pour les actions en attente
-interface PendingAction {
-  habitId: string;
-  date: Date;
-  completed: boolean;
-  retry?: number;
-}
-
 export default function HabitsPage() {
   const [habits, setHabits] = useState<HabitWithEntries[]>([])
   const [loading, setLoading] = useState(true)
-  // File d'attente pour les actions en attente
-  const [pendingActions, setPendingActions] = useState<PendingAction[]>([])
-  // Référence pour suivre si le traitement est déjà en cours
-  const isProcessingRef = useRef(false)
+  const [isSaving, setIsSaving] = useState(false)
   const router = useRouter()
+  const pathname = usePathname()
 
   const fetchHabits = async () => {
     try {
@@ -48,22 +38,15 @@ export default function HabitsPage() {
     fetchHabits()
   }, [])
 
-  // Fonction qui traite la file d'attente des actions
-  const processQueue = useCallback(async () => {
-    // Si déjà en train de traiter ou pas d'actions en attente, on sort
-    if (isProcessingRef.current || pendingActions.length === 0) return;
-    
-    // Marquer comme en cours de traitement
-    isProcessingRef.current = true;
-    
+  // Fonction pour sauvegarder immédiatement une habitude
+  const saveHabitStatus = async (habitId: string, date: Date, completed: boolean): Promise<boolean> => {
     try {
-      // Prendre la première action de la file
-      const action = pendingActions[0];
-      
       // Normaliser la date: définir à midi pour éviter les problèmes de fuseau horaire
-      const targetDate = new Date(action.date);
+      const targetDate = new Date(date);
       targetDate.setHours(12, 0, 0, 0);
 
+      setIsSaving(true);
+      
       // Envoyer la requête au serveur
       const response = await fetch("/api/habits/entries", {
         method: "POST",
@@ -71,55 +54,32 @@ export default function HabitsPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          habitId: action.habitId,
+          habitId: habitId,
           date: targetDate.toISOString(),
-          completed: action.completed,
+          completed: completed,
+          skipDayValidation: true
         }),
       });
 
       if (!response.ok) {
-        throw new Error("Erreur lors de la mise à jour de l'habitude");
+        const errorText = await response.text().catch(() => "Pas de détails");
+        console.error(`Erreur HTTP ${response.status} lors de la sauvegarde: ${response.statusText}`);
+        console.error("Détails:", errorText);
+        toast.error("Échec de la sauvegarde");
+        return false;
       }
-
-      // Retirer l'action traitée de la file
-      setPendingActions(prev => prev.slice(1));
+      
+      return true;
     } catch (error) {
-      console.error("Error processing action:", error);
-      
-      // Si échec, on déplace l'action à la fin de la file avec un compteur de tentatives
-      setPendingActions(prev => {
-        const failedAction = prev[0];
-        const retry = (failedAction.retry || 0) + 1;
-        
-        // Si trop de tentatives (3), on abandonne cette action
-        if (retry > 3) {
-          toast.error(`Échec de la mise à jour d'une habitude après plusieurs tentatives`);
-          return prev.slice(1);
-        }
-        
-        return [...prev.slice(1), {...failedAction, retry}];
-      });
+      console.error("Erreur lors de la sauvegarde:", error);
+      toast.error("Erreur lors de la sauvegarde");
+      return false;
     } finally {
-      // Marquer comme plus en traitement
-      isProcessingRef.current = false;
-      
-      // Planifier le traitement de la prochaine action
-      setTimeout(() => {
-        if (pendingActions.length > 0) {
-          processQueue();
-        }
-      }, 100);
+      setIsSaving(false);
     }
-  }, [pendingActions]);
+  };
 
-  // Traiter la file d'attente quand elle change
-  useEffect(() => {
-    if (pendingActions.length > 0 && !isProcessingRef.current) {
-      processQueue();
-    }
-  }, [pendingActions, processQueue]);
-
-  const handleToggleHabit = useCallback(async (habitId: string, date: Date, currentCompleted: boolean) => {
+  const handleToggleHabit = useCallback(async (habitId: string, date: Date, currentCompleted: boolean): Promise<void> => {
     const newCompleted = !currentCompleted;
     
     // Normaliser la date: définir à midi pour éviter les problèmes de fuseau horaire
@@ -176,15 +136,46 @@ export default function HabitsPage() {
       })
     );
 
-    // Ajouter l'action à la file d'attente
-    setPendingActions(prev => [...prev, {
-      habitId,
-      date: targetDate,
-      completed: newCompleted
-    }]);
+    // Sauvegarder immédiatement, sans file d'attente
+    const success = await saveHabitStatus(habitId, targetDate, newCompleted);
     
-    // Retourner immédiatement pour ne pas bloquer l'interface
-    return Promise.resolve();
+    // Si la sauvegarde échoue, revenir à l'état précédent
+    if (!success) {
+      setHabits((prevHabits) =>
+        prevHabits.map((habit) => {
+          if (habit.id !== habitId) return habit;
+
+          // Utiliser une fonction plus robuste pour comparer les dates
+          const isSameDate = (date1: Date, date2: Date) => {
+            const d1 = new Date(date1);
+            const d2 = new Date(date2);
+            return d1.getFullYear() === d2.getFullYear() && 
+                  d1.getMonth() === d2.getMonth() && 
+                  d1.getDate() === d2.getDate();
+          };
+
+          const existingEntryIndex = habit.entries.findIndex((e) =>
+            isSameDate(new Date(e.date), targetDate)
+          );
+
+          if (existingEntryIndex >= 0) {
+            // Remettre l'ancienne valeur
+            const updatedEntries = [...habit.entries];
+            updatedEntries[existingEntryIndex] = {
+              ...updatedEntries[existingEntryIndex],
+              completed: currentCompleted,
+            };
+            return { ...habit, entries: updatedEntries };
+          } else {
+            // Supprimer l'entrée temporaire si elle avait été ajoutée
+            return {
+              ...habit,
+              entries: habit.entries.filter(entry => !entry.id.startsWith('temp-'))
+            };
+          }
+        })
+      );
+    }
   }, []);
 
   if (loading) {
@@ -200,6 +191,11 @@ export default function HabitsPage() {
           Nouvelle Habitude
         </Button>
       </div>
+      {isSaving && (
+        <div className="mb-4 text-xs text-slate-500 italic">
+          Sauvegarde en cours...
+        </div>
+      )}
       <WeeklyHabitsTable habits={habits} onToggleHabit={handleToggleHabit} />
     </div>
   )
