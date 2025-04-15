@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Plus, ChevronRight } from "lucide-react"
+import { Plus, ChevronRight, Trash2 } from "lucide-react"
 import { MissionDialog } from "./mission-dialog"
 import { ObjectiveDialog } from "./objective-dialog"
 import { ActionDialog } from "./action-dialog"
@@ -12,6 +12,8 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { ObjectiveProgress } from "./objective-progress"
 import { ActionProgressDialog } from "./action-progress-dialog"
 import { ObjectiveTable } from "./objective-table"
+import { useToast } from "@/components/ui/use-toast"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 
 interface Mission {
   id: string
@@ -52,6 +54,8 @@ export function OKRSection() {
   const [isMissionDialogOpen, setIsMissionDialogOpen] = useState(false)
   const [isObjectiveDialogOpen, setIsObjectiveDialogOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const { toast } = useToast()
 
   const fetchMission = async () => {
     try {
@@ -77,6 +81,36 @@ export function OKRSection() {
       console.error("[OKRSection] Erreur détaillée:", error)
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const handleDeleteMission = async () => {
+    if (!mission) return
+    
+    try {
+      const response = await fetch(`/api/missions/${mission.id}`, {
+        method: "DELETE",
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`Erreur lors de la suppression: ${errorText}`)
+      }
+
+      toast({
+        title: "Mission supprimée",
+        description: "La mission a été supprimée avec succès",
+      })
+      
+      setMission(null)
+      setIsDeleteDialogOpen(false)
+    } catch (error) {
+      console.error("[DeleteMission] Erreur:", error)
+      toast({
+        title: "Erreur",
+        description: error instanceof Error ? error.message : "Une erreur est survenue",
+        variant: "destructive",
+      })
     }
   }
 
@@ -126,16 +160,26 @@ export function OKRSection() {
                         </span>
                       </div>
                     </div>
-                    <ObjectiveDialog
-                      missionId={mission.id}
-                      onObjectiveCreated={fetchMission}
-                      trigger={
-                        <Button variant="outline" size="sm">
-                          <Plus className="w-4 h-4 mr-2" />
-                          Ajouter un objectif
-                        </Button>
-                      }
-                    />
+                    <div className="flex items-center gap-2">
+                      <ObjectiveDialog
+                        missionId={mission.id}
+                        onObjectiveCreated={fetchMission}
+                        trigger={
+                          <Button variant="outline" size="sm">
+                            <Plus className="w-4 h-4 mr-2" />
+                            Ajouter un objectif
+                          </Button>
+                        }
+                      />
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setIsDeleteDialogOpen(true)}
+                        className="text-red-500 hover:text-red-600"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -192,6 +236,26 @@ export function OKRSection() {
         quarter={currentQuarter}
         year={currentYear}
       />
+
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer la mission</AlertDialogTitle>
+            <AlertDialogDescription>
+              Êtes-vous sûr de vouloir supprimer cette mission ? Cette action est irréversible et supprimera également tous les objectifs et actions associés.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteMission}
+              className="bg-red-500 hover:bg-red-600"
+            >
+              Supprimer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 } 

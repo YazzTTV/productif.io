@@ -257,7 +257,7 @@ export function OverviewMetrics({ className }: OverviewMetricsProps) {
             <Clock className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{metrics.productivity.score}/100</div>
+            <div className="text-2xl font-bold">{metrics.productivity.score}%</div>
             <Progress
               value={metrics.productivity.score}
               className="h-2 mt-2"

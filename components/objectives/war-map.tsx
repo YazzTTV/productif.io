@@ -160,9 +160,9 @@ export function WarMap() {
               head_cell: {
                 width: "100%",
                 textAlign: "center",
-                padding: "8px",
+                padding: "4px",
                 fontWeight: 500,
-                fontSize: "0.875rem",
+                fontSize: "0.8rem",
                 color: "rgb(107 114 128)",
               },
               cell: {
@@ -171,14 +171,15 @@ export function WarMap() {
                 padding: "0",
               },
               day: {
-                margin: "2px",
+                margin: "1px",
                 width: "100%",
-                height: "80px",
+                height: "42px",
                 display: "flex",
                 flexDirection: "column",
                 justifyContent: "space-between",
-                padding: "8px",
-                borderRadius: "8px",
+                padding: "2px 4px",
+                borderRadius: "4px",
+                fontSize: "0.8rem",
               },
             }}
             components={{
@@ -187,10 +188,10 @@ export function WarMap() {
                 const dayEvents = eventDates[dateStr] || []
                 return (
                   <div className="relative w-full h-full flex flex-col justify-between">
-                    <div className="text-right text-sm">{date.getDate()}</div>
+                    <div className="text-right text-xs">{date.getDate()}</div>
                     {dayEvents.length > 0 && (
                       <div className="flex gap-1 justify-center mt-auto">
-                        {dayEvents.map((event, index) => (
+                        {dayEvents.slice(0, 3).map((event, index) => (
                           <div
                             key={index}
                             className="w-2 h-2 rounded-full"
@@ -198,6 +199,9 @@ export function WarMap() {
                             title={event.title}
                           />
                         ))}
+                        {dayEvents.length > 3 && (
+                          <div className="text-xs text-gray-500 ml-1">+{dayEvents.length - 3}</div>
+                        )}
                       </div>
                     )}
                   </div>

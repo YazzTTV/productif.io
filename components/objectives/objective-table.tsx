@@ -3,8 +3,9 @@
 import { useState } from "react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { Pencil, Check, X } from "lucide-react"
+import { Pencil, Check, X, Trash2 } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 
 interface ObjectiveTableProps {
   objective: {
@@ -34,6 +35,7 @@ export function ObjectiveTable({ objective, onUpdate }: ObjectiveTableProps) {
     target: 0,
     current: 0,
   })
+  const [deleteTarget, setDeleteTarget] = useState<{ type: 'objective' | 'action', id: string } | null>(null)
   const { toast } = useToast()
 
   const startEditing = (actionId: string, target: number, current: number) => {
@@ -109,6 +111,62 @@ export function ObjectiveTable({ objective, onUpdate }: ObjectiveTableProps) {
     }
   }
 
+  const handleDeleteAction = async (actionId: string) => {
+    try {
+      const response = await fetch(`/api/actions/${actionId}`, {
+        method: "DELETE",
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`Erreur lors de la suppression: ${errorText}`)
+      }
+
+      toast({
+        title: "Action supprimée",
+        description: "L'action a été supprimée avec succès",
+      })
+      
+      setDeleteTarget(null)
+      onUpdate()
+    } catch (error) {
+      console.error("[DeleteAction] Erreur:", error)
+      toast({
+        title: "Erreur",
+        description: error instanceof Error ? error.message : "Une erreur est survenue",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleDeleteObjective = async () => {
+    try {
+      const response = await fetch(`/api/objectives/${objective.id}`, {
+        method: "DELETE",
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`Erreur lors de la suppression: ${errorText}`)
+      }
+
+      toast({
+        title: "Objectif supprimé",
+        description: "L'objectif a été supprimé avec succès",
+      })
+      
+      setDeleteTarget(null)
+      onUpdate()
+    } catch (error) {
+      console.error("[DeleteObjective] Erreur:", error)
+      toast({
+        title: "Erreur",
+        description: error instanceof Error ? error.message : "Une erreur est survenue",
+        variant: "destructive",
+      })
+    }
+  }
+
   // Calculer le pourcentage total de l'objectif
   const totalProgress = objective.target > 0 
     ? Math.min(100, (objective.current / objective.target) * 100)
@@ -116,15 +174,26 @@ export function ObjectiveTable({ objective, onUpdate }: ObjectiveTableProps) {
 
   return (
     <div className="space-y-4 w-full">
-      <div className="text-lg font-semibold">{objective.title}</div>
-      <div className="grid grid-cols-4 gap-4 py-2 font-medium bg-muted px-4">
+      <div className="flex justify-between items-center">
+        <div className="text-lg font-semibold">{objective.title}</div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setDeleteTarget({ type: 'objective', id: objective.id })}
+          className="text-red-500 hover:text-red-600"
+        >
+          <Trash2 className="w-4 h-4" />
+        </Button>
+      </div>
+      <div className="grid grid-cols-5 gap-4 py-2 font-medium bg-muted px-4">
         <div>Action</div>
         <div>Target</div>
         <div>Actual</div>
         <div>Progrès</div>
+        <div></div>
       </div>
       {objective.actions.map((action) => (
-        <div key={action.id} className="grid grid-cols-4 gap-4 items-center px-4 py-2 border-b">
+        <div key={action.id} className="grid grid-cols-5 gap-4 items-center px-4 py-2 border-b">
           <div>{action.title}</div>
           {isEditing === action.id ? (
             <>
@@ -166,6 +235,7 @@ export function ObjectiveTable({ objective, onUpdate }: ObjectiveTableProps) {
                   <X className="h-4 w-4" />
                 </Button>
               </div>
+              <div></div>
             </>
           ) : (
             <>
@@ -183,18 +253,62 @@ export function ObjectiveTable({ objective, onUpdate }: ObjectiveTableProps) {
                   <Pencil className="h-4 w-4" />
                 </Button>
               </div>
+              <div>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setDeleteTarget({ type: 'action', id: action.id })}
+                  className="text-red-500 hover:text-red-600"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
             </>
           )}
         </div>
       ))}
-      <div className="grid grid-cols-4 gap-4 items-center px-4 py-2 bg-muted/50 font-medium">
+      <div className="grid grid-cols-5 gap-4 items-center px-4 py-2 bg-muted/50 font-medium">
         <div>Total</div>
         <div>{objective.target}</div>
         <div>{objective.current}</div>
         <div className={totalProgress === 100 ? "text-green-600" : "text-red-500"}>
           {totalProgress.toFixed(2)}%
         </div>
+        <div></div>
       </div>
+
+      <AlertDialog 
+        open={!!deleteTarget} 
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {deleteTarget?.type === 'objective' ? 'Supprimer l\'objectif' : 'Supprimer l\'action'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteTarget?.type === 'objective' 
+                ? 'Êtes-vous sûr de vouloir supprimer cet objectif ? Cette action est irréversible et supprimera également toutes les actions associées.'
+                : 'Êtes-vous sûr de vouloir supprimer cette action ? Cette action est irréversible.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (deleteTarget?.type === 'objective') {
+                  handleDeleteObjective();
+                } else if (deleteTarget?.type === 'action') {
+                  handleDeleteAction(deleteTarget.id);
+                }
+              }}
+              className="bg-red-500 hover:bg-red-600"
+            >
+              Supprimer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 } 

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { cn } from "@/lib/utils"
 import { format } from "date-fns"
 import { fr } from "date-fns/locale"
@@ -148,11 +148,6 @@ export default function HabitStats({ className }: HabitStatsProps) {
                       Aucune habitude programmée pour aujourd'hui
                     </span>
                   )}
-                  {stats.totalHabits > 0 && (
-                    <span className="block mt-1 text-xs">
-                      Seules les habitudes programmées pour aujourd'hui sont comptabilisées
-                    </span>
-                  )}
                 </div>
               </div>
               <Progress
@@ -165,7 +160,7 @@ export default function HabitStats({ className }: HabitStatsProps) {
           <TabsContent value="last30days">
             <div className="h-[400px] w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart
+                <LineChart
                   data={stats.dailyStats}
                   margin={{
                     top: 5,
@@ -191,9 +186,14 @@ export default function HabitStats({ className }: HabitStatsProps) {
                     content={({ active, payload, label }) => {
                       if (active && payload && payload.length) {
                         const data = payload[0].payload as DailyStats;
+                        // Get day of week from the date string
+                        const dateObj = new Date(data.date);
+                        const dayOfWeek = format(dateObj, 'EEEE', { locale: fr });
+                        const capitalizedDay = dayOfWeek.charAt(0).toUpperCase() + dayOfWeek.slice(1);
+                        
                         return (
                           <div className="bg-white p-2 border rounded shadow-sm">
-                            <p className="font-bold">{label}</p>
+                            <p className="font-bold">{capitalizedDay} {label}</p>
                             <p>Complétion: {data.completionRate}%</p>
                             <p className="text-xs">{data.completed} / {data.total} habitudes</p>
                             {data.total === 0 && (
@@ -205,13 +205,16 @@ export default function HabitStats({ className }: HabitStatsProps) {
                       return null;
                     }}
                   />
-                  <Bar 
+                  <Line 
+                    type="monotone"
                     dataKey="completionRate" 
-                    fill="#4f46e5" 
+                    stroke="#4f46e5" 
                     name="Habitudes complétées"
-                    radius={[4, 4, 0, 0]}
+                    strokeWidth={2}
+                    dot={{ r: 4 }}
+                    activeDot={{ r: 6 }}
                   />
-                </BarChart>
+                </LineChart>
               </ResponsiveContainer>
             </div>
           </TabsContent>

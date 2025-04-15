@@ -10,7 +10,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Non authentifié' }, { status: 401 });
     }
 
-    const { habitId, date, completed, note, rating } = await req.json();
+    const { habitId, date, completed, note, rating, skipDayValidation = false } = await req.json();
     
     // Correction du problème de fuseau horaire
     const parsedDate = parseISO(date);
@@ -35,13 +35,14 @@ export async function POST(req: Request) {
       );
     }
 
-    // Vérifier si le jour est dans les jours sélectionnés
-    const dayName = localDate.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
-    if (!habit.daysOfWeek.includes(dayName)) {
-      return NextResponse.json(
-        { error: 'Ce jour n\'est pas sélectionné pour cette habitude' },
-        { status: 400 }
-      );
+    // Vérifier si le jour est dans les jours sélectionnés (sauf si skipDayValidation est true)
+    if (!skipDayValidation) {
+      const dayName = localDate.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+      if (!habit.daysOfWeek.includes(dayName)) {
+        console.warn(`Jour ${dayName} non sélectionné pour l'habitude ${habit.name} (${habitId})`);
+        console.warn('Jours configurés:', habit.daysOfWeek);
+        // On continue quand même, mais on enregistre cette information
+      }
     }
 
     // Valider la note si fournie
@@ -52,60 +53,95 @@ export async function POST(req: Request) {
       );
     }
 
-    // Solution simplifiée : Supprimer les entrées existantes pour cette date et habitude, puis créer une nouvelle
-    // Cela évite les problèmes de schéma avec les champs note et rating
     try {
-      // 1. Vérifier si l'entrée existe déjà
-      const existingEntry = await prisma.$queryRaw`
-        SELECT id FROM "habit_entries" 
-        WHERE "habitId" = ${habitId} AND date = ${localDate}::date
-      `;
+      // Utiliser la méthode upsert de Prisma pour éviter les erreurs de clé dupliquée
+      const entry = await prisma.habitEntry.upsert({
+        where: {
+          habitId_date: {
+            habitId: habitId,
+            date: localDate,
+          },
+        },
+        update: {
+          completed: completed,
+          note: note || null,
+          rating: rating === undefined ? null : Number(rating),
+          updatedAt: new Date(),
+        },
+        create: {
+          habitId: habitId,
+          date: localDate,
+          completed: completed,
+          note: note || null,
+          rating: rating === undefined ? null : Number(rating),
+        },
+      });
 
-      // 2. Si elle existe, la supprimer
-      if (existingEntry && Array.isArray(existingEntry) && existingEntry.length > 0) {
-        await prisma.$executeRaw`
-          DELETE FROM "habit_entries" 
-          WHERE "habitId" = ${habitId} AND date = ${localDate}::date
-        `;
-      }
-
-      // 3. Créer une nouvelle entrée avec tous les champs
-      await prisma.$executeRaw`
-        INSERT INTO "habit_entries" (
-          id, "habitId", date, completed, note, rating, "createdAt", "updatedAt"
-        ) VALUES (
-          ${crypto.randomUUID()}, 
-          ${habitId}, 
-          ${localDate}::date, 
-          ${completed}, 
-          ${note || null}, 
-          ${rating === undefined ? null : Number(rating)}, 
-          now(), 
-          now()
-        )
-      `;
-
-      // 4. Récupérer l'entrée créée pour la renvoyer
-      const newEntry = await prisma.$queryRaw`
-        SELECT * FROM "habit_entries" 
-        WHERE "habitId" = ${habitId} AND date = ${localDate}::date
-      `;
-
-      // Prendre le premier résultat si c'est un tableau
-      const entryData = Array.isArray(newEntry) ? newEntry[0] : newEntry;
-
-      return NextResponse.json(entryData);
+      return NextResponse.json(entry);
     } catch (dbError) {
-      console.error("Erreur SQL:", dbError);
-      return NextResponse.json(
-        { error: 'Erreur lors de l\'opération en base de données' },
-        { status: 500 }
-      );
+      console.error("Erreur lors de l'upsert:", dbError);
+      
+      // Essayer avec une approche alternative en cas d'échec
+      try {
+        console.log("Tentative alternative pour sauvegarder l'entrée...");
+        // 1. Vérifier si l'entrée existe déjà
+        const existingEntry = await prisma.habitEntry.findUnique({
+          where: {
+            habitId_date: {
+              habitId: habitId,
+              date: localDate,
+            },
+          }
+        });
+
+        let entry;
+        if (existingEntry) {
+          // 2. Mettre à jour si elle existe
+          entry = await prisma.habitEntry.update({
+            where: {
+              id: existingEntry.id
+            },
+            data: {
+              completed: completed,
+              note: note || null,
+              rating: rating === undefined ? null : Number(rating),
+              updatedAt: new Date(),
+            }
+          });
+        } else {
+          // 3. Créer une nouvelle entrée sinon
+          entry = await prisma.habitEntry.create({
+            data: {
+              habitId: habitId,
+              date: localDate,
+              completed: completed,
+              note: note || null,
+              rating: rating === undefined ? null : Number(rating),
+            }
+          });
+        }
+        
+        return NextResponse.json(entry);
+      } catch (fallbackError) {
+        console.error("Échec de la tentative alternative:", fallbackError);
+        // Fournir plus de détails sur l'erreur pour le débogage
+        const errorDetails = typeof dbError === 'object' && dbError !== null ? 
+          JSON.stringify(dbError, Object.getOwnPropertyNames(dbError)) : String(dbError);
+        
+        return NextResponse.json(
+          { error: 'Erreur lors de l\'opération en base de données', details: errorDetails },
+          { status: 500 }
+        );
+      }
     }
   } catch (error) {
     console.error('Erreur lors de la mise à jour de l\'habitude:', error);
+    // Fournir plus de détails sur l'erreur pour le débogage
+    const errorDetails = typeof error === 'object' && error !== null ? 
+      JSON.stringify(error, Object.getOwnPropertyNames(error)) : String(error);
+    
     return NextResponse.json(
-      { error: 'Erreur lors de la mise à jour de l\'habitude' },
+      { error: 'Erreur lors de la mise à jour de l\'habitude', details: errorDetails },
       { status: 500 }
     );
   }
