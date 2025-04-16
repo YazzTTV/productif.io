@@ -64,6 +64,7 @@ export function OverviewMetrics({ className }: OverviewMetricsProps) {
     setClientTime(new Date().toISOString())
     
     try {
+      // Récupérer les métriques générales
       const response = await fetch("/api/dashboard/metrics")
       
       if (!response.ok) {
@@ -71,7 +72,32 @@ export function OverviewMetrics({ className }: OverviewMetricsProps) {
       }
       
       const data = await response.json()
-      setMetrics(data)
+      
+      // Récupérer les tâches du jour directement depuis l'API tâches du jour
+      // pour assurer la cohérence avec le composant TodayStats
+      const tasksResponse = await fetch("/api/tasks/today")
+      if (!tasksResponse.ok) {
+        throw new Error("Erreur lors du chargement des tâches du jour")
+      }
+      const tasksData = await tasksResponse.json()
+      
+      // Calculer les métriques des tâches du jour
+      const todayTasks = {
+        today: tasksData.length,
+        completed: tasksData.filter((t: any) => t.completed).length,
+        completionRate: tasksData.length > 0 
+          ? Math.round((tasksData.filter((t: any) => t.completed).length / tasksData.length) * 100)
+          : 0,
+        totalCompletedToday: data.tasks.totalCompletedToday,
+        createdToday: data.tasks.createdToday
+      }
+      
+      // Mettre à jour les métriques en remplaçant celles des tâches
+      setMetrics({
+        ...data,
+        tasks: todayTasks
+      })
+      
       setLastUpdated(new Date().toLocaleTimeString())
     } catch (error) {
       console.error("Erreur:", error)
