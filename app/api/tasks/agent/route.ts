@@ -98,6 +98,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Titre requis' }, { status: 400 })
     }
     
+    // Validation des nouvelles valeurs de priorité et d'énergie
+    if (priority !== undefined && (typeof priority !== 'number' || priority < 0 || priority > 4)) {
+      return NextResponse.json({ error: 'Priorité invalide. Doit être entre 0 et 4.' }, { status: 400 })
+    }
+    
+    if (energyLevel !== undefined && (typeof energyLevel !== 'number' || energyLevel < 0 || energyLevel > 3)) {
+      return NextResponse.json({ error: 'Niveau d\'énergie invalide. Doit être entre 0 et 3.' }, { status: 400 })
+    }
+    
     // Vérifier que le projet appartient à l'utilisateur (si fourni)
     if (projectId) {
       const project = await prisma.project.findFirst({
