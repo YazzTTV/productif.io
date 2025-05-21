@@ -197,10 +197,10 @@ export function CreateTaskForm() {
         ...data,
         priority: data.priority ? parseInt(data.priority.replace('P', '')) : null,
         energyLevel: data.energyLevel ? {
-          'Extrême': 0,
-          'Élevé': 1,
-          'Moyen': 2,
-          'Faible': 3
+          'Faible': 0,
+          'Moyen': 1,
+          'Élevé': 2,
+          'Extrême': 3
         }[data.energyLevel] : null,
         dueDate: data.dueDate ? new Date(data.dueDate) : null,
         projectId: data.projectId || null
@@ -286,11 +286,11 @@ export function CreateTaskForm() {
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    <SelectItem value="P0">Quick Win</SelectItem>
-                    <SelectItem value="P1">Urgent</SelectItem>
+                    <SelectItem value="P4">Quick Win</SelectItem>
+                    <SelectItem value="P3">Urgent</SelectItem>
                     <SelectItem value="P2">Important</SelectItem>
-                    <SelectItem value="P3">A faire</SelectItem>
-                    <SelectItem value="P4">Optionnel</SelectItem>
+                    <SelectItem value="P1">A faire</SelectItem>
+                    <SelectItem value="P0">Optionnel</SelectItem>
                   </SelectContent>
                 </Select>
                 <FormMessage />

@@ -1,44 +1,46 @@
 import { prisma } from "@/lib/prisma";
 
-// Définition des poids pour les priorités
-const priorityWeights = {
-  "P0": 100, // Quick Win
-  "P1": 80,  // Urgent
-  "P2": 60,  // Important
-  "P3": 40,  // A faire
-  "P4": 20   // Optionnel
+// Définition des mappings pour les priorités (INVERSÉS)
+// Plus la valeur est élevée, plus la priorité est importante
+const priorityMappings = {
+  "P0": "Optionnel",
+  "P1": "À faire",
+  "P2": "Important", 
+  "P3": "Urgent",
+  "P4": "Quick Win"
 };
 
-// Définition des poids pour les niveaux d'énergie
-const energyWeights = {
-  "Extrême": 100,
-  "Élevé": 75,
-  "Moyen": 50,
-  "Faible": 25
+// Définition des mappings pour les niveaux d'énergie (INVERSÉS)
+// Plus la valeur est élevée, plus le niveau d'énergie est élevé
+const energyMappings = {
+  "0": "Faible",
+  "1": "Moyen",
+  "2": "Élevé",
+  "3": "Extrême"
 };
 
 // Fonction pour calculer l'ordre des tâches
 export function calculateTaskOrder(priority: string, energyLevel: string): number {
   const priorityScores = {
-    "P0": 5000, // Quick Win
-    "P1": 4000, // Urgent
+    "P0": 1000, // Optionnel
+    "P1": 2000, // À faire
     "P2": 3000, // Important
-    "P3": 2000, // A faire
-    "P4": 1000  // Optionnel
+    "P3": 4000, // Urgent
+    "P4": 5000  // Quick Win
   }
 
   const energyScores = {
-    "Extrême": 400,
-    "Élevé": 300,
+    "Faible": 100,
     "Moyen": 200,
-    "Faible": 100
+    "Élevé": 300,
+    "Extrême": 400
   }
 
   // Calculer le score total en combinant priorité et niveau d'énergie
   const priorityScore = priorityScores[priority as keyof typeof priorityScores] || 0
   const energyScore = energyScores[energyLevel as keyof typeof energyScores] || 0
 
-  // Le score final favorise les tâches P0 (Quick Win) avec un niveau d'énergie élevé
+  // Le score final favorise les tâches P4 (Quick Win) avec un niveau d'énergie extrême
   return priorityScore + energyScore
 }
 
@@ -57,7 +59,16 @@ export async function updateTasksOrder(userId: string) {
 
   // Mise à jour de l'ordre pour chaque tâche
   for (const task of tasks) {
-    const order = calculateTaskOrder(task.priority, task.energyLevel);
+    // Convertir les valeurs numériques en chaînes selon les nouveaux mappings
+    const priorityString = task.priority !== null ? `P${task.priority}` : "P2"
+    
+    let energyString = "Moyen";
+    if (task.energyLevel === 0) energyString = "Faible";
+    if (task.energyLevel === 1) energyString = "Moyen";
+    if (task.energyLevel === 2) energyString = "Élevé";
+    if (task.energyLevel === 3) energyString = "Extrême";
+    
+    const order = calculateTaskOrder(priorityString, energyString);
     await prisma.task.update({
       where: { id: task.id },
       data: { order }
@@ -109,9 +120,10 @@ export async function scheduleTasksForDeepWork(userId: string, date: Date) {
   });
 
   // Planifier les tâches en commençant par celles qui demandent le plus d'énergie
-  const highEnergyTasks = tasks.filter(task => task.energyLevel === "Extrême" || task.energyLevel === "Élevé");
-  const mediumEnergyTasks = tasks.filter(task => task.energyLevel === "Moyen");
-  const lowEnergyTasks = tasks.filter(task => task.energyLevel === "Faible");
+  // Nouvelles valeurs: 3=Extrême, 2=Élevé, 1=Moyen, 0=Faible
+  const highEnergyTasks = tasks.filter(task => task.energyLevel === 3 || task.energyLevel === 2);
+  const mediumEnergyTasks = tasks.filter(task => task.energyLevel === 1);
+  const lowEnergyTasks = tasks.filter(task => task.energyLevel === 0);
 
   // Planifier les tâches en fonction de leur niveau d'énergie
   for (const task of [...highEnergyTasks, ...mediumEnergyTasks, ...lowEnergyTasks]) {

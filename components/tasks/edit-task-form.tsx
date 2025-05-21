@@ -86,16 +86,26 @@ export function EditTaskForm({ taskId }: EditTaskFormProps) {
         
         const task = await response.json()
         
+        // Mappage pour convertir les valeurs priorité en chaînes
+        let priorityString = 'P2'; // Valeur par défaut
+        if (task.priority === 0) priorityString = 'P0';
+        else if (task.priority === 1) priorityString = 'P1';
+        else if (task.priority === 2) priorityString = 'P2';
+        else if (task.priority === 3) priorityString = 'P3';
+        else if (task.priority === 4) priorityString = 'P4';
+        
+        // Mappage pour convertir les valeurs niveau d'énergie en chaînes
+        let energyLevelString = 'Moyen'; // Valeur par défaut
+        if (task.energyLevel === 0) energyLevelString = 'Faible';
+        else if (task.energyLevel === 1) energyLevelString = 'Moyen';
+        else if (task.energyLevel === 2) energyLevelString = 'Élevé';
+        else if (task.energyLevel === 3) energyLevelString = 'Extrême';
+        
         form.reset({
           title: task.title,
           description: task.description || "",
-          priority: task.priority !== null ? `P${task.priority}` : "P3",
-          energyLevel: task.energyLevel !== null ? {
-            0: "Extrême",
-            1: "Élevé",
-            2: "Moyen",
-            3: "Faible"
-          }[task.energyLevel] : "Moyen",
+          priority: priorityString,
+          energyLevel: energyLevelString,
           dueDate: task.dueDate ? new Date(task.dueDate) : undefined,
           projectId: task.projectId || "",
         })
@@ -120,10 +130,10 @@ export function EditTaskForm({ taskId }: EditTaskFormProps) {
     try {
       // Convertir le niveau d'énergie en valeur numérique
       let energyLevelValue: number | null = null;
-      if (data.energyLevel === 'Extrême') energyLevelValue = 0;
-      else if (data.energyLevel === 'Élevé') energyLevelValue = 1;
-      else if (data.energyLevel === 'Moyen') energyLevelValue = 2;
-      else if (data.energyLevel === 'Faible') energyLevelValue = 3;
+      if (data.energyLevel === 'Faible') energyLevelValue = 0;
+      else if (data.energyLevel === 'Moyen') energyLevelValue = 1;
+      else if (data.energyLevel === 'Élevé') energyLevelValue = 2;
+      else if (data.energyLevel === 'Extrême') energyLevelValue = 3;
       
       const formData = {
         ...data,
@@ -264,11 +274,11 @@ export function EditTaskForm({ taskId }: EditTaskFormProps) {
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    <SelectItem value="P0">Quick Win</SelectItem>
-                    <SelectItem value="P1">Urgent</SelectItem>
+                    <SelectItem value="P4">Quick Win</SelectItem>
+                    <SelectItem value="P3">Urgent</SelectItem>
                     <SelectItem value="P2">Important</SelectItem>
-                    <SelectItem value="P3">A faire</SelectItem>
-                    <SelectItem value="P4">Optionnel</SelectItem>
+                    <SelectItem value="P1">A faire</SelectItem>
+                    <SelectItem value="P0">Optionnel</SelectItem>
                   </SelectContent>
                 </Select>
                 <FormMessage />

@@ -142,14 +142,14 @@ export async function PATCH(
     }
 
     // Convertir les valeurs numériques en chaînes pour le calcul de l'ordre
-    const priorityString = priority !== null ? `P${4 - priority}` : "P2"
+    const priorityString = priority !== null ? `P${priority}` : "P2"
     
     // Définir les niveaux d'énergie pour le mapping
     const energyLevels: { [key: number]: string } = {
-      0: "Extrême",
-      1: "Élevé",
-      2: "Moyen",
-      3: "Faible"
+      0: "Faible",
+      1: "Moyen",
+      2: "Élevé",
+      3: "Extrême"
     }
     
     const energyString = energyLevel !== null && typeof energyLevel === 'number' 

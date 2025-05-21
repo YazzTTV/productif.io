@@ -322,15 +322,18 @@ export async function POST(request: Request) {
     }
 
     // Convertir les valeurs numériques en chaînes pour le calcul de l'ordre
-    const priorityString = priority !== null ? `P${4 - priority}` : "P2"
-    const energyLevels: Record<number, string> = {
-      0: "Extrême",
-      1: "Élevé",
-      2: "Moyen",
-      3: "Faible"
+    const priorityString = priority !== null ? `P${priority}` : "P2"
+    
+    // Définir les niveaux d'énergie pour le mapping
+    const energyLevels: { [key: number]: string } = {
+      0: "Faible",
+      1: "Moyen",
+      2: "Élevé",
+      3: "Extrême"
     }
-    const energyString = energyLevel !== null && energyLevel in energyLevels 
-      ? energyLevels[energyLevel] 
+    
+    const energyString = energyLevel !== null && typeof energyLevel === 'number' 
+      ? energyLevels[energyLevel] || "Moyen" 
       : "Moyen"
 
     // Calculer l'ordre
@@ -431,26 +434,23 @@ export async function PATCH(req: Request) {
       }
     }
     
-    // Recalculer l'ordre si la priorité ou le niveau d'énergie a changé
-    let order = task.order
-    if ((priority !== undefined && priority !== task.priority) || 
-        (energyLevel !== undefined && energyLevel !== task.energyLevel)) {
-      const priorityString = priority !== undefined ? `P${4 - priority}` : task.priority !== null ? `P${4 - task.priority}` : "P2"
-      
-      const energyLevels: Record<number, string> = {
-        0: "Extrême",
-        1: "Élevé",
-        2: "Moyen",
-        3: "Faible"
-      }
-      
-      const newEnergyLevel = energyLevel !== undefined ? energyLevel : task.energyLevel
-      const energyString = newEnergyLevel !== null && typeof newEnergyLevel === 'number' && newEnergyLevel in energyLevels
-        ? energyLevels[newEnergyLevel]
-        : "Moyen"
-      
-      order = calculateTaskOrder(priorityString, energyString)
+    // Convertir les valeurs numériques en chaînes pour le calcul de l'ordre
+    const priorityString = priority !== null ? `P${priority}` : "P2"
+    
+    // Définir les niveaux d'énergie pour le mapping
+    const energyLevels: { [key: number]: string } = {
+      0: "Faible",
+      1: "Moyen",
+      2: "Élevé",
+      3: "Extrême"
     }
+    
+    const energyString = energyLevel !== null && typeof energyLevel === 'number' 
+      ? energyLevels[energyLevel] || "Moyen" 
+      : "Moyen"
+
+    // Calculer l'ordre
+    const order = calculateTaskOrder(priorityString, energyString)
     
     // Mettre à jour la tâche
     const updatedTask = await prisma.task.update({
