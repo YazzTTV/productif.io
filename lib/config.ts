@@ -7,4 +7,15 @@ export const AUTH_COOKIE_OPTIONS = {
   path: "/",
   secure: process.env.NODE_ENV === "production",
   maxAge: 60 * 60 * 24 * 7, // 7 jours
+}
+
+/**
+ * Configuration de l'application
+ */
+
+export const appConfig = {
+  // Déconnexion automatique lors de la fermeture de la page
+  autoLogoutEnabled: true,
+  
+  // Autres configurations globales de l'application peuvent être ajoutées ici
 } 

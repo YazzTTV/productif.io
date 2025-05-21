@@ -1,12 +1,15 @@
-import PricingSection from "@/components/pricing-section"
+import { Metadata } from "next"
+import { Pricing } from "@/components/pricing"
 
-export default function PricingPage() {
+export const metadata: Metadata = {
+  title: "Tarifs | productif.io",
+  description: "Découvrez nos offres et tarifs pour accéder à toutes les fonctionnalités de productif.io.",
+}
+
+export default function TarifsPage() {
   return (
-    <main className="flex-1 py-16">
-      <div className="container">
-        <h1 className="text-4xl font-bold mb-8 text-center">Nos Tarifs</h1>
-        <PricingSection />
-      </div>
-    </main>
+    <div>
+      <Pricing />
+    </div>
   )
 } 

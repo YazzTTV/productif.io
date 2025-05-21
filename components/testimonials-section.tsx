@@ -27,7 +27,7 @@ export default function TestimonialsSection() {
             quote="Cette plateforme a complètement transformé ma façon de gérer mes tâches quotidiennes. Le suivi du temps m'a permis d'identifier où je perdais des heures précieuses."
           />
           <TestimonialCard
-            name="Thomas Dubois"
+            name="Benjamin Courdrais"
             role="Directeur Marketing"
             image="/placeholder.svg?height=100&width=100"
             quote="En tant que manager d'équipe, les fonctionnalités de suivi de productivité et les rapports de performance sont inestimables. Nous avons augmenté notre efficacité de 30% en trois mois."

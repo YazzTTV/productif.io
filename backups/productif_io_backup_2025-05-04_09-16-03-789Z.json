@@ -1,0 +1,1643 @@
+{
+  "User": [
+    {
+      "id": "cma6l91ly00009be190ibylhc",
+      "name": "Super Admin",
+      "email": "admin@productif.io",
+      "password": "$2b$10$XX42zraUlqB6hCMmIbSTl.SgZcFkgJ8OiRjCxXoRlQ7Rt682aHa0y",
+      "role": "SUPER_ADMIN",
+      "createdAt": "2025-05-02T09:25:24.454Z",
+      "updatedAt": "2025-05-02T09:25:24.454Z",
+      "managedCompanyId": null,
+      "stripeCustomerId": null,
+      "stripeSubscriptionId": null,
+      "subscriptionStatus": null,
+      "trialEndsAt": null
+    },
+    {
+      "id": "cma6li3j1000ca64sisjbjyfs",
+      "name": "Noah Lugagne",
+      "email": "noah.lugagne@free.fr",
+      "password": "$2b$10$tGmWN2X6tqkG4J3mD1LM.e3.a4.Won3fgp3Pipxlv7KdDCdWVsTxy",
+      "role": "ADMIN",
+      "createdAt": "2025-05-02T09:32:26.845Z",
+      "updatedAt": "2025-05-02T09:32:27.114Z",
+      "managedCompanyId": "cma6li3ki000da64sh38oco0c",
+      "stripeCustomerId": null,
+      "stripeSubscriptionId": null,
+      "subscriptionStatus": null,
+      "trialEndsAt": null
+    },
+    {
+      "id": "8a697112-7bf2-4500-a4ee-d13f85c61e38",
+      "name": "Arthur",
+      "email": "arthur.balerna@gmail.com",
+      "password": "$2b$10$mgPSK04yz0P53UZRtmqpWuskoAvY8/xt6zog32P28gl4LEYSZbK8.",
+      "role": "USER",
+      "createdAt": "2025-05-02T09:36:43.916Z",
+      "updatedAt": "2025-05-02T09:36:43.916Z",
+      "managedCompanyId": null,
+      "stripeCustomerId": null,
+      "stripeSubscriptionId": null,
+      "subscriptionStatus": null,
+      "trialEndsAt": null
+    },
+    {
+      "id": "cma6nsnfv0000cv71ay9udi0h",
+      "name": "Benjamin Coudrais",
+      "email": "benjamin.coudrais07@gmail.com",
+      "password": "$2b$10$rUgfnxkX8029rRbGQNQAs.cCkyCLCff154QPV3JztFmyf78ze8REO",
+      "role": "USER",
+      "createdAt": "2025-05-02T10:36:38.443Z",
+      "updatedAt": "2025-05-02T10:36:38.443Z",
+      "managedCompanyId": null,
+      "stripeCustomerId": null,
+      "stripeSubscriptionId": null,
+      "subscriptionStatus": null,
+      "trialEndsAt": null
+    },
+    {
+      "id": "cma6xe1er0000cmq0ik2cbsn5",
+      "name": "Gaëtan",
+      "email": "silgadogaetan@gmail.com",
+      "password": "$2b$10$QTN2eqyIKm1S1AMV57EccuRM3lQy6D3i514A9YtJJG5eiNJjXjueW",
+      "role": "USER",
+      "createdAt": "2025-05-02T15:05:12.868Z",
+      "updatedAt": "2025-05-02T15:05:12.868Z",
+      "managedCompanyId": null,
+      "stripeCustomerId": null,
+      "stripeSubscriptionId": null,
+      "subscriptionStatus": null,
+      "trialEndsAt": null
+    }
+  ],
+  "Company": [
+    {
+      "id": "cma6li3ki000da64sh38oco0c",
+      "name": "Productif.io",
+      "description": null,
+      "logo": null,
+      "createdAt": "2025-05-02T09:32:26.899Z",
+      "updatedAt": "2025-05-02T09:32:26.899Z"
+    }
+  ],
+  "UserCompany": [
+    {
+      "id": "cma6li3ki000fa64sbc7rklpw",
+      "userId": "cma6li3j1000ca64sisjbjyfs",
+      "companyId": "cma6li3ki000da64sh38oco0c",
+      "isActive": true,
+      "createdAt": "2025-05-02T09:32:26.899Z",
+      "updatedAt": "2025-05-02T09:32:26.899Z"
+    },
+    {
+      "id": "366586b6-cb9b-45f9-b36b-f30219541b6e",
+      "userId": "8a697112-7bf2-4500-a4ee-d13f85c61e38",
+      "companyId": "cma6li3ki000da64sh38oco0c",
+      "isActive": true,
+      "createdAt": "2025-05-02T09:36:43.982Z",
+      "updatedAt": "2025-05-02T09:36:43.982Z"
+    },
+    {
+      "id": "2dba9619-a75d-4801-9866-544eccdde759",
+      "userId": "cma6xe1er0000cmq0ik2cbsn5",
+      "companyId": "cma6li3ki000da64sh38oco0c",
+      "isActive": true,
+      "createdAt": "2025-05-02T15:05:34.431Z",
+      "updatedAt": "2025-05-02T15:05:34.431Z"
+    }
+  ],
+  "Session": [
+    {
+      "id": "cma6nj3ol0001yotu7pu437da",
+      "userId": "8a697112-7bf2-4500-a4ee-d13f85c61e38",
+      "token": "eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOiI4YTY5NzExMi03YmYyLTQ1MDAtYTRlZS1kMTNmODVjNjFlMzgiLCJlbWFpbCI6ImFydGh1ci5iYWxlcm5hQGdtYWlsLmNvbSIsImV4cCI6MTc0Njc4NjU1Mn0.rT1ESABOi4tWg8IJT1LJFz7l5_EvCXF3_O-OqlKtlwM",
+      "expiresAt": "2025-05-09T10:29:12.746Z",
+      "createdAt": "2025-05-02T10:29:12.934Z"
+    },
+    {
+      "id": "cma6nspvc0002cv71tjnwh1ga",
+      "userId": "cma6nsnfv0000cv71ay9udi0h",
+      "token": "eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOiJjbWE2bnNuZnYwMDAwY3Y3MWF5OXVkaTBoIiwiZW1haWwiOiJiZW5qYW1pbi5jb3VkcmFpczA3QGdtYWlsLmNvbSIsImV4cCI6MTc0Njc4NzAwMX0.yhovNWJybZEEF2GBpAixdovzDUaNm028Q0pH6HnRv_w",
+      "expiresAt": "2025-05-09T10:36:41.406Z",
+      "createdAt": "2025-05-02T10:36:41.593Z"
+    },
+    {
+      "id": "cma6xe5xn0002cmq09ej076fm",
+      "userId": "cma6xe1er0000cmq0ik2cbsn5",
+      "token": "eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOiJjbWE2eGUxZXIwMDAwY21xMGlrMmNic241IiwiZW1haWwiOiJzaWxnYWRvZ2FldGFuQGdtYWlsLmNvbSIsImV4cCI6MTc0NjgwMzExOH0.hNywhkXMnKCLbfeEbmtaVQpfhl1R_N6fP11EOYZe3iU",
+      "expiresAt": "2025-05-09T15:05:18.529Z",
+      "createdAt": "2025-05-02T15:05:18.732Z"
+    },
+    {
+      "id": "cma9ej92u000111heddatdhwc",
+      "userId": "cma6l91ly00009be190ibylhc",
+      "token": "eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOiJjbWE2bDkxbHkwMDAwOWJlMTkwaWJ5bGhjIiwiZW1haWwiOiJhZG1pbkBwcm9kdWN0aWYuaW8iLCJleHAiOjE3NDY5NTI4NDF9.2FuRnDeX-7lzSbdXQBi9kp9gJrTx5k2vs5wsna8RtSs",
+      "expiresAt": "2025-05-11T08:40:41.721Z",
+      "createdAt": "2025-05-04T08:40:41.910Z"
+    },
+    {
+      "id": "cma9f2cjg00034vk66o13l251",
+      "userId": "cma6li3j1000ca64sisjbjyfs",
+      "token": "eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOiJjbWE2bGkzajEwMDBjYTY0c2lzamJqeWZzIiwiZW1haWwiOiJub2FoLmx1Z2FnbmVAZnJlZS5mciIsImV4cCI6MTc0Njk1MzczMn0.mkzJSayki_e3GM_2o1aXAA-0NLGPSG3quCBv3SckhPE",
+      "expiresAt": "2025-05-11T08:55:32.674Z",
+      "createdAt": "2025-05-04T08:55:32.861Z"
+    }
+  ],
+  "Project": [
+    {
+      "id": "cma6xov0j0001y1bydnisim8h",
+      "name": "MHR",
+      "description": "",
+      "color": "#3B82F6",
+      "userId": "cma6li3j1000ca64sisjbjyfs",
+      "createdAt": "2025-05-02T15:13:37.795Z",
+      "updatedAt": "2025-05-02T15:13:37.795Z"
+    },
+    {
+      "id": "cma6xp0wn0003y1bytrh6l7i4",
+      "name": "Productif.io",
+      "description": "",
+      "color": "#10B981",
+      "userId": "cma6li3j1000ca64sisjbjyfs",
+      "createdAt": "2025-05-02T15:13:45.432Z",
+      "updatedAt": "2025-05-02T15:13:45.432Z"
+    },
+    {
+      "id": "cma6xp6880005y1bycexjmzi0",
+      "name": "SaaS",
+      "description": "",
+      "color": "#F59E0B",
+      "userId": "cma6li3j1000ca64sisjbjyfs",
+      "createdAt": "2025-05-02T15:13:52.328Z",
+      "updatedAt": "2025-05-02T15:13:52.328Z"
+    }
+  ],
+  "Process": [],
+  "Task": [
+    {
+      "id": "cma6xq2ac0003ohjqqjt6x52u",
+      "createdAt": "2025-05-02T15:14:33.876Z",
+      "updatedAt": "2025-05-02T15:14:33.876Z",
+      "title": "Faire contenu",
+      "description": "",
+      "dueDate": "2025-05-02T22:00:00.000Z",
+      "userId": "cma6li3j1000ca64sisjbjyfs",
+      "projectId": "cma6xp6880005y1bycexjmzi0",
+      "completed": false,
+      "order": 1100,
+      "scheduledFor": null,
+      "processId": null,
+      "priority": 4,
+      "energyLevel": 3
+    },
+    {
+      "id": "cma6xqqzm0007ohjqn5y4agky",
+      "createdAt": "2025-05-02T15:15:05.890Z",
+      "updatedAt": "2025-05-02T15:15:05.890Z",
+      "title": "Faire message Axerl Quantique",
+      "description": "",
+      "dueDate": "2025-05-01T22:00:00.000Z",
+      "userId": "cma6li3j1000ca64sisjbjyfs",
+      "projectId": "cma6xp0wn0003y1bytrh6l7i4",
+      "completed": false,
+      "order": 3100,
+      "scheduledFor": null,
+      "processId": null,
+      "priority": 2,
+      "energyLevel": 3
+    },
+    {
+      "id": "cma6xpllf0001ohjqye8t4k0n",
+      "createdAt": "2025-05-02T15:14:12.244Z",
+      "updatedAt": "2025-05-02T15:31:20.428Z",
+      "title": "Carrousel",
+      "description": "",
+      "dueDate": "2025-05-01T22:00:00.000Z",
+      "userId": "cma6li3j1000ca64sisjbjyfs",
+      "projectId": "cma6xp0wn0003y1bytrh6l7i4",
+      "completed": true,
+      "order": 4100,
+      "scheduledFor": null,
+      "processId": null,
+      "priority": 1,
+      "energyLevel": 3
+    },
+    {
+      "id": "cma6xqb790005ohjqr7gehdd4",
+      "createdAt": "2025-05-02T15:14:45.430Z",
+      "updatedAt": "2025-05-02T16:40:24.219Z",
+      "title": "Prospection",
+      "description": "",
+      "dueDate": "2025-05-01T22:00:00.000Z",
+      "userId": "cma6li3j1000ca64sisjbjyfs",
+      "projectId": "cma6xp0wn0003y1bytrh6l7i4",
+      "completed": true,
+      "order": 4200,
+      "scheduledFor": null,
+      "processId": null,
+      "priority": 1,
+      "energyLevel": 2
+    },
+    {
+      "id": "cma84kbyg0001134mfht2hjug",
+      "createdAt": "2025-05-03T11:13:49.961Z",
+      "updatedAt": "2025-05-03T11:13:49.961Z",
+      "title": "Demander parente marseil 18-24 juillet ",
+      "description": "",
+      "dueDate": "2025-05-02T22:00:00.000Z",
+      "userId": "cma6li3j1000ca64sisjbjyfs",
+      "projectId": null,
+      "completed": false,
+      "order": 2100,
+      "scheduledFor": null,
+      "processId": null,
+      "priority": 3,
+      "energyLevel": 3
+    },
+    {
+      "id": "cma6wzvkl000114aon91jqcfy",
+      "createdAt": "2025-05-02T14:54:12.117Z",
+      "updatedAt": "2025-05-04T08:26:56.506Z",
+      "title": "Faire pitch ou loom pour lucas Podevin",
+      "description": "Faire un pitch ou loom sur sales navigator",
+      "dueDate": "2025-05-02T22:00:00.000Z",
+      "userId": "8a697112-7bf2-4500-a4ee-d13f85c61e38",
+      "projectId": null,
+      "completed": true,
+      "order": 4100,
+      "scheduledFor": null,
+      "processId": null,
+      "priority": 1,
+      "energyLevel": 3
+    },
+    {
+      "id": "cma9e69ge000110ta93vr7kvo",
+      "createdAt": "2025-05-04T08:30:35.870Z",
+      "updatedAt": "2025-05-04T08:30:35.870Z",
+      "title": "Faire une video ytb ",
+      "description": "",
+      "dueDate": "2025-05-04T22:00:00.000Z",
+      "userId": "8a697112-7bf2-4500-a4ee-d13f85c61e38",
+      "projectId": null,
+      "completed": false,
+      "order": 5400,
+      "scheduledFor": null,
+      "processId": null,
+      "priority": 0,
+      "energyLevel": 0
+    }
+  ],
+  "TimeEntry": [
+    {
+      "id": "cma6tnf5j0001arad76enqgux",
+      "startTime": "2025-05-02T11:11:44.175Z",
+      "endTime": "2025-05-02T13:20:31.278Z",
+      "userId": "cma6nsnfv0000cv71ay9udi0h",
+      "taskId": null,
+      "projectId": null,
+      "createdAt": "2025-05-02T13:20:31.143Z",
+      "updatedAt": "2025-05-02T13:20:31.143Z",
+      "description": ""
+    }
+  ],
+  "Habit": [
+    {
+      "id": "cma6lc72q0005a64snq87lpmq",
+      "name": "Apprentissage",
+      "description": "Notez ce que vous avez appris aujourd'hui",
+      "color": "#4338CA",
+      "frequency": "daily",
+      "daysOfWeek": [
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday",
+        "sunday"
+      ],
+      "userId": "cma6l91ly00009be190ibylhc",
+      "order": 0,
+      "createdAt": "2025-05-02T09:27:51.507Z",
+      "updatedAt": "2025-05-02T09:27:51.507Z"
+    },
+    {
+      "id": "cma6lc75a0007a64s2lsk7q9y",
+      "name": "Note de sa journée",
+      "description": "Évaluez votre journée sur 10 et expliquez pourquoi",
+      "color": "#0EA5E9",
+      "frequency": "daily",
+      "daysOfWeek": [
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday",
+        "sunday"
+      ],
+      "userId": "cma6l91ly00009be190ibylhc",
+      "order": 1,
+      "createdAt": "2025-05-02T09:27:51.598Z",
+      "updatedAt": "2025-05-02T09:27:51.598Z"
+    },
+    {
+      "id": "cma6ntpzx0009nxex4qi3wtgm",
+      "name": "30 min sans téléphones le matin",
+      "description": "",
+      "color": "#3B82F6",
+      "frequency": "daily",
+      "daysOfWeek": [
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday",
+        "sunday"
+      ],
+      "userId": "cma6nsnfv0000cv71ay9udi0h",
+      "order": 2,
+      "createdAt": "2025-05-02T10:37:28.413Z",
+      "updatedAt": "2025-05-02T10:44:35.691Z"
+    },
+    {
+      "id": "cma6nu4sp000bnxexdwfnmj7s",
+      "name": "Deep work ",
+      "description": "",
+      "color": "#3B82F6",
+      "frequency": "daily",
+      "daysOfWeek": [
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday",
+        "sunday"
+      ],
+      "userId": "cma6nsnfv0000cv71ay9udi0h",
+      "order": 3,
+      "createdAt": "2025-05-02T10:37:47.593Z",
+      "updatedAt": "2025-05-02T10:44:35.691Z"
+    },
+    {
+      "id": "cma6nu9wf000dnxexu24iax29",
+      "name": "Sport ",
+      "description": "",
+      "color": "#3B82F6",
+      "frequency": "daily",
+      "daysOfWeek": [
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday",
+        "sunday"
+      ],
+      "userId": "cma6nsnfv0000cv71ay9udi0h",
+      "order": 4,
+      "createdAt": "2025-05-02T10:37:54.208Z",
+      "updatedAt": "2025-05-02T10:44:35.691Z"
+    },
+    {
+      "id": "cma6nswnd0001nxex7osuw1nk",
+      "name": "Apprentissage",
+      "description": "Notez ce que vous avez appris aujourd'hui",
+      "color": "#4338CA",
+      "frequency": "daily",
+      "daysOfWeek": [
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday",
+        "sunday"
+      ],
+      "userId": "cma6nsnfv0000cv71ay9udi0h",
+      "order": 5,
+      "createdAt": "2025-05-02T10:36:50.377Z",
+      "updatedAt": "2025-05-02T10:44:35.691Z"
+    },
+    {
+      "id": "cma6nv29u000hnxexbwxteaih",
+      "name": "Lecture",
+      "description": "",
+      "color": "#3B82F6",
+      "frequency": "daily",
+      "daysOfWeek": [
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday",
+        "sunday"
+      ],
+      "userId": "cma6nsnfv0000cv71ay9udi0h",
+      "order": 6,
+      "createdAt": "2025-05-02T10:38:30.979Z",
+      "updatedAt": "2025-05-02T10:44:35.691Z"
+    },
+    {
+      "id": "cma6o0eba0007u8peqtr21392",
+      "name": "Manger sans écran ",
+      "description": "",
+      "color": "#3B82F6",
+      "frequency": "daily",
+      "daysOfWeek": [
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday",
+        "sunday"
+      ],
+      "userId": "cma6nsnfv0000cv71ay9udi0h",
+      "order": 7,
+      "createdAt": "2025-05-02T10:42:39.863Z",
+      "updatedAt": "2025-05-02T10:44:35.691Z"
+    },
+    {
+      "id": "cma6nux83000fnxexvnzws39t",
+      "name": "Etirements le soir",
+      "description": "",
+      "color": "#3B82F6",
+      "frequency": "daily",
+      "daysOfWeek": [
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday",
+        "sunday"
+      ],
+      "userId": "cma6nsnfv0000cv71ay9udi0h",
+      "order": 8,
+      "createdAt": "2025-05-02T10:38:24.435Z",
+      "updatedAt": "2025-05-02T10:44:35.691Z"
+    },
+    {
+      "id": "cma6o289q0001joekijz1wc8p",
+      "name": "Tracker ",
+      "description": "",
+      "color": "#3B82F6",
+      "frequency": "daily",
+      "daysOfWeek": [
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday",
+        "sunday"
+      ],
+      "userId": "cma6nsnfv0000cv71ay9udi0h",
+      "order": 9,
+      "createdAt": "2025-05-02T10:44:05.342Z",
+      "updatedAt": "2025-05-02T10:44:35.691Z"
+    },
+    {
+      "id": "cma6nswvg0003nxexrheilptw",
+      "name": "Note de sa journée",
+      "description": "Évaluez votre journée sur 10 et expliquez pourquoi",
+      "color": "#0EA5E9",
+      "frequency": "daily",
+      "daysOfWeek": [
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday",
+        "sunday"
+      ],
+      "userId": "cma6nsnfv0000cv71ay9udi0h",
+      "order": 14,
+      "createdAt": "2025-05-02T10:36:50.668Z",
+      "updatedAt": "2025-05-02T10:44:35.691Z"
+    },
+    {
+      "id": "cma6njc2000019q1gu9axm5ig",
+      "name": "Apprentissage",
+      "description": "Notez ce que vous avez appris aujourd'hui",
+      "color": "#4338CA",
+      "frequency": "daily",
+      "daysOfWeek": [
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday",
+        "sunday"
+      ],
+      "userId": "8a697112-7bf2-4500-a4ee-d13f85c61e38",
+      "order": 14,
+      "createdAt": "2025-05-02T10:29:23.784Z",
+      "updatedAt": "2025-05-03T13:13:08.175Z"
+    },
+    {
+      "id": "cma6njcfy00039q1gm7533y4k",
+      "name": "Note de sa journée",
+      "description": "Évaluez votre journée sur 10 et expliquez pourquoi",
+      "color": "#0EA5E9",
+      "frequency": "daily",
+      "daysOfWeek": [
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday",
+        "sunday"
+      ],
+      "userId": "8a697112-7bf2-4500-a4ee-d13f85c61e38",
+      "order": 18,
+      "createdAt": "2025-05-02T10:29:24.287Z",
+      "updatedAt": "2025-05-03T13:13:08.175Z"
+    },
+    {
+      "id": "cma6ntd750007nxexhhhll2op",
+      "name": "Coucher 00h00",
+      "description": "",
+      "color": "#3B82F6",
+      "frequency": "daily",
+      "daysOfWeek": [
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday",
+        "sunday"
+      ],
+      "userId": "cma6nsnfv0000cv71ay9udi0h",
+      "order": 0,
+      "createdAt": "2025-05-02T10:37:11.826Z",
+      "updatedAt": "2025-05-02T10:44:35.691Z"
+    },
+    {
+      "id": "cma6nt60z0005nxexuziv0as3",
+      "name": "Lever 8h",
+      "description": "",
+      "color": "#3B82F6",
+      "frequency": "daily",
+      "daysOfWeek": [
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday",
+        "sunday"
+      ],
+      "userId": "cma6nsnfv0000cv71ay9udi0h",
+      "order": 1,
+      "createdAt": "2025-05-02T10:37:02.532Z",
+      "updatedAt": "2025-05-02T10:44:35.691Z"
+    },
+    {
+      "id": "cma87vuh8000312it0h3lvcot",
+      "name": "Coucher 22h30",
+      "description": "",
+      "color": "#3B82F6",
+      "frequency": "daily",
+      "daysOfWeek": [
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday",
+        "sunday"
+      ],
+      "userId": "8a697112-7bf2-4500-a4ee-d13f85c61e38",
+      "order": 0,
+      "createdAt": "2025-05-03T12:46:46.028Z",
+      "updatedAt": "2025-05-03T13:13:08.175Z"
+    },
+    {
+      "id": "cma87vdxh000112itqxb1w6hc",
+      "name": "Lever à 7h30 ",
+      "description": "",
+      "color": "#3B82F6",
+      "frequency": "daily",
+      "daysOfWeek": [
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday",
+        "sunday"
+      ],
+      "userId": "8a697112-7bf2-4500-a4ee-d13f85c61e38",
+      "order": 1,
+      "createdAt": "2025-05-03T12:46:24.581Z",
+      "updatedAt": "2025-05-03T13:13:08.175Z"
+    },
+    {
+      "id": "cma6o2er50003joek0osbi4aj",
+      "name": "Planifier ",
+      "description": "",
+      "color": "#3B82F6",
+      "frequency": "daily",
+      "daysOfWeek": [
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday",
+        "sunday"
+      ],
+      "userId": "cma6nsnfv0000cv71ay9udi0h",
+      "order": 10,
+      "createdAt": "2025-05-02T10:44:13.745Z",
+      "updatedAt": "2025-05-02T10:44:35.691Z"
+    },
+    {
+      "id": "cma6nzlee0001u8periyn059d",
+      "name": "Tâche 1 ",
+      "description": "",
+      "color": "#3B82F6",
+      "frequency": "daily",
+      "daysOfWeek": [
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday",
+        "sunday"
+      ],
+      "userId": "cma6nsnfv0000cv71ay9udi0h",
+      "order": 11,
+      "createdAt": "2025-05-02T10:42:02.391Z",
+      "updatedAt": "2025-05-02T10:44:35.691Z"
+    },
+    {
+      "id": "cma6nzsa00003u8pe6m2xlt4r",
+      "name": "Tâche 2 ",
+      "description": "",
+      "color": "#3B82F6",
+      "frequency": "daily",
+      "daysOfWeek": [
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday",
+        "sunday"
+      ],
+      "userId": "cma6nsnfv0000cv71ay9udi0h",
+      "order": 12,
+      "createdAt": "2025-05-02T10:42:11.305Z",
+      "updatedAt": "2025-05-02T10:44:35.691Z"
+    },
+    {
+      "id": "cma6nzxpj0005u8pem11uvc5b",
+      "name": "Tâches 3 ",
+      "description": "",
+      "color": "#3B82F6",
+      "frequency": "daily",
+      "daysOfWeek": [
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday",
+        "sunday"
+      ],
+      "userId": "cma6nsnfv0000cv71ay9udi0h",
+      "order": 13,
+      "createdAt": "2025-05-02T10:42:18.343Z",
+      "updatedAt": "2025-05-02T10:44:35.691Z"
+    },
+    {
+      "id": "cma87wpmp000512itngiqdzvg",
+      "name": "Boire verre d'eau (+vitD) ",
+      "description": "",
+      "color": "#3B82F6",
+      "frequency": "daily",
+      "daysOfWeek": [
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday",
+        "sunday"
+      ],
+      "userId": "8a697112-7bf2-4500-a4ee-d13f85c61e38",
+      "order": 2,
+      "createdAt": "2025-05-03T12:47:26.402Z",
+      "updatedAt": "2025-05-03T13:13:08.175Z"
+    },
+    {
+      "id": "cma8830uv000l12itgk7lsvwk",
+      "name": "DEEPWORK 8h30/11h30 ",
+      "description": "",
+      "color": "#3B82F6",
+      "frequency": "daily",
+      "daysOfWeek": [
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday"
+      ],
+      "userId": "8a697112-7bf2-4500-a4ee-d13f85c61e38",
+      "order": 7,
+      "createdAt": "2025-05-03T12:52:20.887Z",
+      "updatedAt": "2025-05-04T08:05:06.952Z"
+    },
+    {
+      "id": "cma87zz2s000d12it2hr05w07",
+      "name": "Tâche 1 ",
+      "description": "",
+      "color": "#3B82F6",
+      "frequency": "daily",
+      "daysOfWeek": [
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday"
+      ],
+      "userId": "8a697112-7bf2-4500-a4ee-d13f85c61e38",
+      "order": 8,
+      "createdAt": "2025-05-03T12:49:58.612Z",
+      "updatedAt": "2025-05-04T08:05:23.037Z"
+    },
+    {
+      "id": "cma8805mm000f12it4nkkhio9",
+      "name": "Tâche 2 ",
+      "description": "",
+      "color": "#3B82F6",
+      "frequency": "daily",
+      "daysOfWeek": [
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday"
+      ],
+      "userId": "8a697112-7bf2-4500-a4ee-d13f85c61e38",
+      "order": 9,
+      "createdAt": "2025-05-03T12:50:07.102Z",
+      "updatedAt": "2025-05-04T08:05:33.045Z"
+    },
+    {
+      "id": "cma880cvf000h12it6jy2vpr8",
+      "name": "Tâche 3 ",
+      "description": "",
+      "color": "#3B82F6",
+      "frequency": "daily",
+      "daysOfWeek": [
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday"
+      ],
+      "userId": "8a697112-7bf2-4500-a4ee-d13f85c61e38",
+      "order": 10,
+      "createdAt": "2025-05-03T12:50:16.491Z",
+      "updatedAt": "2025-05-04T08:05:43.501Z"
+    },
+    {
+      "id": "cma87y0v0000912it8ks39dwe",
+      "name": "20 Pompes + 20 sauts ",
+      "description": "",
+      "color": "#3B82F6",
+      "frequency": "daily",
+      "daysOfWeek": [
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday",
+        "sunday"
+      ],
+      "userId": "8a697112-7bf2-4500-a4ee-d13f85c61e38",
+      "order": 3,
+      "createdAt": "2025-05-03T12:48:27.613Z",
+      "updatedAt": "2025-05-03T13:13:08.175Z"
+    },
+    {
+      "id": "cma87xa7x000712it8xly05qa",
+      "name": "Petit dej équilibré ",
+      "description": "",
+      "color": "#3B82F6",
+      "frequency": "daily",
+      "daysOfWeek": [
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday",
+        "sunday"
+      ],
+      "userId": "8a697112-7bf2-4500-a4ee-d13f85c61e38",
+      "order": 4,
+      "createdAt": "2025-05-03T12:47:53.085Z",
+      "updatedAt": "2025-05-03T13:13:08.175Z"
+    },
+    {
+      "id": "cma6wwvzz0001htemyxhuz5tr",
+      "name": "Apprentissage",
+      "description": "Notez ce que vous avez appris aujourd'hui",
+      "color": "#4338CA",
+      "frequency": "daily",
+      "daysOfWeek": [
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday",
+        "sunday"
+      ],
+      "userId": "cma6li3j1000ca64sisjbjyfs",
+      "order": 12,
+      "createdAt": "2025-05-02T14:51:52.703Z",
+      "updatedAt": "2025-05-04T08:51:41.778Z"
+    },
+    {
+      "id": "cma6www890003htemcd7jzi4r",
+      "name": "Note de sa journée",
+      "description": "Évaluez votre journée sur 10 et expliquez pourquoi",
+      "color": "#0EA5E9",
+      "frequency": "daily",
+      "daysOfWeek": [
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday",
+        "sunday"
+      ],
+      "userId": "cma6li3j1000ca64sisjbjyfs",
+      "order": 13,
+      "createdAt": "2025-05-02T14:51:53.001Z",
+      "updatedAt": "2025-05-04T08:51:41.778Z"
+    },
+    {
+      "id": "cma87z3xy000b12ity3jvmwzf",
+      "name": "Douche/prep matin ",
+      "description": "",
+      "color": "#3B82F6",
+      "frequency": "daily",
+      "daysOfWeek": [
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday",
+        "sunday"
+      ],
+      "userId": "8a697112-7bf2-4500-a4ee-d13f85c61e38",
+      "order": 5,
+      "createdAt": "2025-05-03T12:49:18.262Z",
+      "updatedAt": "2025-05-03T13:13:08.175Z"
+    },
+    {
+      "id": "cma881rpq000j12it3ltda3wm",
+      "name": "Café 9h ",
+      "description": "",
+      "color": "#3B82F6",
+      "frequency": "daily",
+      "daysOfWeek": [
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday",
+        "sunday"
+      ],
+      "userId": "8a697112-7bf2-4500-a4ee-d13f85c61e38",
+      "order": 6,
+      "createdAt": "2025-05-03T12:51:22.382Z",
+      "updatedAt": "2025-05-03T13:13:08.175Z"
+    },
+    {
+      "id": "cma889gri000r12it2qrqwn5k",
+      "name": "DEEPWORK 13h/15h45",
+      "description": "",
+      "color": "#3B82F6",
+      "frequency": "daily",
+      "daysOfWeek": [
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday"
+      ],
+      "userId": "8a697112-7bf2-4500-a4ee-d13f85c61e38",
+      "order": 13,
+      "createdAt": "2025-05-03T12:57:21.438Z",
+      "updatedAt": "2025-05-03T13:13:08.175Z"
+    },
+    {
+      "id": "cma88q8q00001qv5qem1ebsv6",
+      "name": "SPORT ",
+      "description": "",
+      "color": "#3B82F6",
+      "frequency": "daily",
+      "daysOfWeek": [
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday",
+        "sunday"
+      ],
+      "userId": "8a697112-7bf2-4500-a4ee-d13f85c61e38",
+      "order": 15,
+      "createdAt": "2025-05-03T13:10:24.168Z",
+      "updatedAt": "2025-05-03T13:13:08.175Z"
+    },
+    {
+      "id": "cma88qx110003qv5qj2npo3xu",
+      "name": "Diner 18h ",
+      "description": "",
+      "color": "#3B82F6",
+      "frequency": "daily",
+      "daysOfWeek": [
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday"
+      ],
+      "userId": "8a697112-7bf2-4500-a4ee-d13f85c61e38",
+      "order": 16,
+      "createdAt": "2025-05-03T13:10:55.669Z",
+      "updatedAt": "2025-05-03T13:13:08.175Z"
+    },
+    {
+      "id": "cma88rzr60005qv5qnd63npw8",
+      "name": "Compléments ",
+      "description": "",
+      "color": "#3B82F6",
+      "frequency": "daily",
+      "daysOfWeek": [
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday",
+        "sunday"
+      ],
+      "userId": "8a697112-7bf2-4500-a4ee-d13f85c61e38",
+      "order": 17,
+      "createdAt": "2025-05-03T13:11:45.859Z",
+      "updatedAt": "2025-05-03T13:13:08.175Z"
+    },
+    {
+      "id": "cma88tefi0009qv5qksr79w8p",
+      "name": "Pas de réseaux avant 14h ",
+      "description": "",
+      "color": "#3B82F6",
+      "frequency": "daily",
+      "daysOfWeek": [
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday",
+        "sunday"
+      ],
+      "userId": "8a697112-7bf2-4500-a4ee-d13f85c61e38",
+      "order": 19,
+      "createdAt": "2025-05-03T13:12:51.535Z",
+      "updatedAt": "2025-05-03T13:13:08.175Z"
+    },
+    {
+      "id": "cma88srvi0007qv5qpoy46v2v",
+      "name": "NoP",
+      "description": "",
+      "color": "#3B82F6",
+      "frequency": "daily",
+      "daysOfWeek": [
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday",
+        "sunday"
+      ],
+      "userId": "8a697112-7bf2-4500-a4ee-d13f85c61e38",
+      "order": 20,
+      "createdAt": "2025-05-03T13:12:22.303Z",
+      "updatedAt": "2025-05-03T13:13:08.175Z"
+    },
+    {
+      "id": "cma88uanp000bqv5q2kl84taq",
+      "name": "Pas d'alcool",
+      "description": "",
+      "color": "#3B82F6",
+      "frequency": "daily",
+      "daysOfWeek": [
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday",
+        "sunday"
+      ],
+      "userId": "8a697112-7bf2-4500-a4ee-d13f85c61e38",
+      "order": 21,
+      "createdAt": "2025-05-03T13:13:33.301Z",
+      "updatedAt": "2025-05-03T13:13:33.301Z"
+    },
+    {
+      "id": "cma88ukwx000dqv5qvrpzfdrt",
+      "name": "Pas fumer ",
+      "description": "",
+      "color": "#3B82F6",
+      "frequency": "daily",
+      "daysOfWeek": [
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday",
+        "sunday"
+      ],
+      "userId": "8a697112-7bf2-4500-a4ee-d13f85c61e38",
+      "order": 22,
+      "createdAt": "2025-05-03T13:13:46.593Z",
+      "updatedAt": "2025-05-03T13:13:46.593Z"
+    },
+    {
+      "id": "cma9es6u70001f5tnsrcec7st",
+      "name": "Dormir 00h",
+      "description": "",
+      "color": "#3B82F6",
+      "frequency": "daily",
+      "daysOfWeek": [
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday",
+        "sunday"
+      ],
+      "userId": "cma6li3j1000ca64sisjbjyfs",
+      "order": 0,
+      "createdAt": "2025-05-04T08:47:38.912Z",
+      "updatedAt": "2025-05-04T08:51:41.778Z"
+    },
+    {
+      "id": "cma9esgaw0003f5tnt242k7yp",
+      "name": "Réveil 8h",
+      "description": "",
+      "color": "#3B82F6",
+      "frequency": "daily",
+      "daysOfWeek": [
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday",
+        "sunday"
+      ],
+      "userId": "cma6li3j1000ca64sisjbjyfs",
+      "order": 1,
+      "createdAt": "2025-05-04T08:47:51.176Z",
+      "updatedAt": "2025-05-04T08:51:41.778Z"
+    },
+    {
+      "id": "cma9eso3s0005f5tnqb5nnhu7",
+      "name": "Deep Work",
+      "description": "",
+      "color": "#3B82F6",
+      "frequency": "daily",
+      "daysOfWeek": [
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday",
+        "sunday"
+      ],
+      "userId": "cma6li3j1000ca64sisjbjyfs",
+      "order": 2,
+      "createdAt": "2025-05-04T08:48:01.288Z",
+      "updatedAt": "2025-05-04T08:51:41.778Z"
+    },
+    {
+      "id": "cma9esu560007f5tnr7ggqh2a",
+      "name": "Sport",
+      "description": "",
+      "color": "#3B82F6",
+      "frequency": "daily",
+      "daysOfWeek": [
+        "monday",
+        "saturday",
+        "wednesday"
+      ],
+      "userId": "cma6li3j1000ca64sisjbjyfs",
+      "order": 3,
+      "createdAt": "2025-05-04T08:48:09.115Z",
+      "updatedAt": "2025-05-04T08:51:41.778Z"
+    },
+    {
+      "id": "cma884ewe000n12it3biqz3ei",
+      "name": "Déjeuner 11h30 ",
+      "description": "",
+      "color": "#3B82F6",
+      "frequency": "daily",
+      "daysOfWeek": [
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday"
+      ],
+      "userId": "8a697112-7bf2-4500-a4ee-d13f85c61e38",
+      "order": 11,
+      "createdAt": "2025-05-03T12:53:25.742Z",
+      "updatedAt": "2025-05-03T13:13:08.175Z"
+    },
+    {
+      "id": "cma8864ax000p12it9e253d21",
+      "name": "Marche 12h30",
+      "description": "",
+      "color": "#3B82F6",
+      "frequency": "daily",
+      "daysOfWeek": [
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday"
+      ],
+      "userId": "8a697112-7bf2-4500-a4ee-d13f85c61e38",
+      "order": 12,
+      "createdAt": "2025-05-03T12:54:45.321Z",
+      "updatedAt": "2025-05-03T13:13:08.175Z"
+    },
+    {
+      "id": "cma9etajs0009f5tnbgq11ck2",
+      "name": "Apprendre (lire/cour)",
+      "description": "",
+      "color": "#3B82F6",
+      "frequency": "daily",
+      "daysOfWeek": [
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday",
+        "sunday"
+      ],
+      "userId": "cma6li3j1000ca64sisjbjyfs",
+      "order": 4,
+      "createdAt": "2025-05-04T08:48:30.377Z",
+      "updatedAt": "2025-05-04T08:51:41.778Z"
+    },
+    {
+      "id": "cma9evnt1000nf5tnx7umx4er",
+      "name": "Tracking",
+      "description": "",
+      "color": "#3B82F6",
+      "frequency": "daily",
+      "daysOfWeek": [
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday",
+        "sunday"
+      ],
+      "userId": "cma6li3j1000ca64sisjbjyfs",
+      "order": 5,
+      "createdAt": "2025-05-04T08:50:20.869Z",
+      "updatedAt": "2025-05-04T08:51:41.778Z"
+    },
+    {
+      "id": "cma9etsn2000bf5tnws0lg4i0",
+      "name": "Planifier Journée",
+      "description": "",
+      "color": "#3B82F6",
+      "frequency": "daily",
+      "daysOfWeek": [
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday",
+        "sunday"
+      ],
+      "userId": "cma6li3j1000ca64sisjbjyfs",
+      "order": 6,
+      "createdAt": "2025-05-04T08:48:53.823Z",
+      "updatedAt": "2025-05-04T08:51:41.778Z"
+    },
+    {
+      "id": "cma9eu0mw000df5tni2y00e16",
+      "name": "Tâche 1",
+      "description": "",
+      "color": "#3B82F6",
+      "frequency": "daily",
+      "daysOfWeek": [
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday",
+        "sunday"
+      ],
+      "userId": "cma6li3j1000ca64sisjbjyfs",
+      "order": 7,
+      "createdAt": "2025-05-04T08:49:04.184Z",
+      "updatedAt": "2025-05-04T08:51:41.778Z"
+    },
+    {
+      "id": "cma9eu5sv000ff5tn36x8tave",
+      "name": "Tâche 2",
+      "description": "",
+      "color": "#3B82F6",
+      "frequency": "daily",
+      "daysOfWeek": [
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday",
+        "sunday"
+      ],
+      "userId": "cma6li3j1000ca64sisjbjyfs",
+      "order": 8,
+      "createdAt": "2025-05-04T08:49:10.879Z",
+      "updatedAt": "2025-05-04T08:51:41.778Z"
+    },
+    {
+      "id": "cma9eubtl000hf5tnnzfcn6lf",
+      "name": "Tâche 3",
+      "description": "",
+      "color": "#3B82F6",
+      "frequency": "daily",
+      "daysOfWeek": [
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday",
+        "sunday"
+      ],
+      "userId": "cma6li3j1000ca64sisjbjyfs",
+      "order": 9,
+      "createdAt": "2025-05-04T08:49:18.681Z",
+      "updatedAt": "2025-05-04T08:51:41.778Z"
+    },
+    {
+      "id": "cma9eukow000jf5tn3rmnh9fb",
+      "name": "Routine du soir",
+      "description": "",
+      "color": "#3B82F6",
+      "frequency": "daily",
+      "daysOfWeek": [
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday",
+        "sunday"
+      ],
+      "userId": "cma6li3j1000ca64sisjbjyfs",
+      "order": 10,
+      "createdAt": "2025-05-04T08:49:30.177Z",
+      "updatedAt": "2025-05-04T08:51:41.778Z"
+    },
+    {
+      "id": "cma9euukz000lf5tnr9kx32fq",
+      "name": "Routine du matin",
+      "description": "",
+      "color": "#3B82F6",
+      "frequency": "daily",
+      "daysOfWeek": [
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday",
+        "sunday"
+      ],
+      "userId": "cma6li3j1000ca64sisjbjyfs",
+      "order": 11,
+      "createdAt": "2025-05-04T08:49:42.995Z",
+      "updatedAt": "2025-05-04T08:51:41.778Z"
+    }
+  ],
+  "HabitEntry": [
+    {
+      "id": "cma6ld2m90009a64sae8qyrzk",
+      "habitId": "cma6lc72q0005a64snq87lpmq",
+      "date": "2025-04-29T00:00:00.000Z",
+      "completed": false,
+      "note": null,
+      "rating": 0,
+      "createdAt": "2025-05-02T09:28:32.386Z",
+      "updatedAt": "2025-05-02T09:28:33.810Z"
+    },
+    {
+      "id": "cma6nvaos000lnxexqcqdxp2h",
+      "habitId": "cma6nswnd0001nxex7osuw1nk",
+      "date": "2025-04-28T00:00:00.000Z",
+      "completed": false,
+      "note": null,
+      "rating": 0,
+      "createdAt": "2025-05-02T10:38:41.884Z",
+      "updatedAt": "2025-05-02T10:38:47.383Z"
+    },
+    {
+      "id": "cma9d8mgj0003qu0w19ixyuvl",
+      "habitId": "cma87vuh8000312it0h3lvcot",
+      "date": "2025-05-04T00:00:00.000Z",
+      "completed": true,
+      "note": null,
+      "rating": null,
+      "createdAt": "2025-05-04T08:04:26.420Z",
+      "updatedAt": "2025-05-04T08:04:26.420Z"
+    },
+    {
+      "id": "cma9d8q9m0005qu0w57rsboka",
+      "habitId": "cma87wpmp000512itngiqdzvg",
+      "date": "2025-05-04T00:00:00.000Z",
+      "completed": true,
+      "note": null,
+      "rating": null,
+      "createdAt": "2025-05-04T08:04:31.354Z",
+      "updatedAt": "2025-05-04T08:04:31.354Z"
+    },
+    {
+      "id": "cma9d8tgy0007qu0w2hyne7g8",
+      "habitId": "cma87xa7x000712it8xly05qa",
+      "date": "2025-05-04T00:00:00.000Z",
+      "completed": true,
+      "note": null,
+      "rating": null,
+      "createdAt": "2025-05-04T08:04:35.506Z",
+      "updatedAt": "2025-05-04T08:04:35.506Z"
+    },
+    {
+      "id": "cma9d8vqj0009qu0w8ydtn62e",
+      "habitId": "cma87z3xy000b12ity3jvmwzf",
+      "date": "2025-05-04T00:00:00.000Z",
+      "completed": true,
+      "note": null,
+      "rating": null,
+      "createdAt": "2025-05-04T08:04:38.443Z",
+      "updatedAt": "2025-05-04T08:04:38.443Z"
+    },
+    {
+      "id": "cma9eww7a000pf5tnz94k7903",
+      "habitId": "cma9eso3s0005f5tnqb5nnhu7",
+      "date": "2025-05-04T00:00:00.000Z",
+      "completed": true,
+      "note": null,
+      "rating": null,
+      "createdAt": "2025-05-04T08:51:18.406Z",
+      "updatedAt": "2025-05-04T08:51:18.406Z"
+    },
+    {
+      "id": "cma9ex157000rf5tn9oqbk1wh",
+      "habitId": "cma9evnt1000nf5tnx7umx4er",
+      "date": "2025-05-04T00:00:00.000Z",
+      "completed": true,
+      "note": null,
+      "rating": null,
+      "createdAt": "2025-05-04T08:51:24.812Z",
+      "updatedAt": "2025-05-04T08:51:24.812Z"
+    },
+    {
+      "id": "cma9ex1if000tf5tn7z0xwan2",
+      "habitId": "cma9etsn2000bf5tnws0lg4i0",
+      "date": "2025-05-04T00:00:00.000Z",
+      "completed": true,
+      "note": null,
+      "rating": null,
+      "createdAt": "2025-05-04T08:51:25.287Z",
+      "updatedAt": "2025-05-04T08:51:25.287Z"
+    },
+    {
+      "id": "cma9exhg0000vf5tn3ua3iora",
+      "habitId": "cma9eu5sv000ff5tn36x8tave",
+      "date": "2025-05-04T00:00:00.000Z",
+      "completed": false,
+      "note": null,
+      "rating": null,
+      "createdAt": "2025-05-04T08:51:45.936Z",
+      "updatedAt": "2025-05-04T08:51:49.372Z"
+    },
+    {
+      "id": "cma9f9ztv000113s016djwhb6",
+      "habitId": "cma6wwvzz0001htemyxhuz5tr",
+      "date": "2025-05-03T00:00:00.000Z",
+      "completed": true,
+      "note": null,
+      "rating": 0,
+      "createdAt": "2025-05-04T09:01:29.636Z",
+      "updatedAt": "2025-05-04T09:01:29.636Z"
+    }
+  ],
+  "Mission": [
+    {
+      "id": "cma6o4zg10005joeki8987xib",
+      "title": "6000€ avant la fin de l'été",
+      "quarter": 2,
+      "year": 2025,
+      "userId": "cma6nsnfv0000cv71ay9udi0h",
+      "createdAt": "2025-05-02T10:46:13.873Z",
+      "updatedAt": "2025-05-02T10:49:45.088Z",
+      "current": 0.3174603174603175,
+      "progress": 0.3174603174603175,
+      "target": 100
+    }
+  ],
+  "Objective": [
+    {
+      "id": "cma6o5hwp0009joeknk7zvzse",
+      "title": "Satisfaction client / délivrabilité",
+      "missionId": "cma6o4zg10005joeki8987xib",
+      "createdAt": "2025-05-02T10:46:37.801Z",
+      "updatedAt": "2025-05-02T10:49:45.087Z",
+      "current": 0,
+      "target": 160,
+      "progress": 0
+    },
+    {
+      "id": "cma6o55ot0007joekbasmk5x1",
+      "title": "Acquisition client",
+      "missionId": "cma6o4zg10005joeki8987xib",
+      "createdAt": "2025-05-02T10:46:21.965Z",
+      "updatedAt": "2025-05-02T10:49:45.087Z",
+      "current": 0,
+      "target": 160,
+      "progress": 0
+    },
+    {
+      "id": "cma6o5nrm000bjoekv4qzjj7n",
+      "title": "Développement personnel",
+      "missionId": "cma6o4zg10005joeki8987xib",
+      "createdAt": "2025-05-02T10:46:45.394Z",
+      "updatedAt": "2025-05-02T10:49:45.088Z",
+      "current": 4,
+      "target": 420,
+      "progress": 0.9523809523809524
+    }
+  ],
+  "ObjectiveAction": [
+    {
+      "id": "cma6o5xob000djoekfa6ghibw",
+      "title": "Prospection",
+      "objectiveId": "cma6o55ot0007joekbasmk5x1",
+      "createdAt": "2025-05-02T10:46:58.235Z",
+      "updatedAt": "2025-05-02T10:46:58.235Z",
+      "progress": 0,
+      "current": 0,
+      "target": 90
+    },
+    {
+      "id": "cma6o6hc8000fjoekb5ycnly5",
+      "title": "Travailler sur du contenu 5j/7",
+      "objectiveId": "cma6o55ot0007joekbasmk5x1",
+      "createdAt": "2025-05-02T10:47:23.721Z",
+      "updatedAt": "2025-05-02T10:47:23.721Z",
+      "progress": 0,
+      "current": 0,
+      "target": 60
+    },
+    {
+      "id": "cma6o6og8000hjoekp8grzl6j",
+      "title": "Faire 10 appels de vente ",
+      "objectiveId": "cma6o55ot0007joekbasmk5x1",
+      "createdAt": "2025-05-02T10:47:32.937Z",
+      "updatedAt": "2025-05-02T10:47:32.937Z",
+      "progress": 0,
+      "current": 0,
+      "target": 10
+    },
+    {
+      "id": "cma6o70mu000jjoekyhmei9wh",
+      "title": "Formation quotidienne",
+      "objectiveId": "cma6o5hwp0009joeknk7zvzse",
+      "createdAt": "2025-05-02T10:47:48.726Z",
+      "updatedAt": "2025-05-02T10:47:48.726Z",
+      "progress": 0,
+      "current": 0,
+      "target": 90
+    },
+    {
+      "id": "cma6o7ful000ljoek5vo5ufiy",
+      "title": "Pratiquer l'écriture de pages de vente / tunnel",
+      "objectiveId": "cma6o5hwp0009joeknk7zvzse",
+      "createdAt": "2025-05-02T10:48:08.446Z",
+      "updatedAt": "2025-05-02T10:48:08.446Z",
+      "progress": 0,
+      "current": 0,
+      "target": 60
+    },
+    {
+      "id": "cma6o7omi000njoekx11wkep1",
+      "title": "10% de taux de conversion ",
+      "objectiveId": "cma6o5hwp0009joeknk7zvzse",
+      "createdAt": "2025-05-02T10:48:19.818Z",
+      "updatedAt": "2025-05-02T10:48:19.818Z",
+      "progress": 0,
+      "current": 0,
+      "target": 10
+    },
+    {
+      "id": "cma6o8py80007qxqgg81wkj81",
+      "title": "Manger sans écran ",
+      "objectiveId": "cma6o5nrm000bjoekv4qzjj7n",
+      "createdAt": "2025-05-02T10:49:08.192Z",
+      "updatedAt": "2025-05-02T10:49:08.192Z",
+      "progress": 0,
+      "current": 0,
+      "target": 90
+    },
+    {
+      "id": "cma6o8z860009qxqgaw3m2kpe",
+      "title": "Etirements du soir",
+      "objectiveId": "cma6o5nrm000bjoekv4qzjj7n",
+      "createdAt": "2025-05-02T10:49:20.214Z",
+      "updatedAt": "2025-05-02T10:49:27.693Z",
+      "progress": 1.111111111111111,
+      "current": 1,
+      "target": 90
+    },
+    {
+      "id": "cma6o8jjk0005qxqg37ovqijc",
+      "title": "30 minutes dans téléphone après el réveil",
+      "objectiveId": "cma6o5nrm000bjoekv4qzjj7n",
+      "createdAt": "2025-05-02T10:48:59.888Z",
+      "updatedAt": "2025-05-02T10:49:34.543Z",
+      "progress": 1.111111111111111,
+      "current": 1,
+      "target": 90
+    },
+    {
+      "id": "cma6o86fk0003qxqgtgep8e61",
+      "title": "Faire du sport ",
+      "objectiveId": "cma6o5nrm000bjoekv4qzjj7n",
+      "createdAt": "2025-05-02T10:48:42.896Z",
+      "updatedAt": "2025-05-02T10:49:39.283Z",
+      "progress": 1.666666666666667,
+      "current": 1,
+      "target": 60
+    },
+    {
+      "id": "cma6o7xd20001qxqggfd75ngb",
+      "title": "Lire chaque jour ",
+      "objectiveId": "cma6o5nrm000bjoekv4qzjj7n",
+      "createdAt": "2025-05-02T10:48:31.142Z",
+      "updatedAt": "2025-05-02T10:49:41.919Z",
+      "progress": 1.111111111111111,
+      "current": 1,
+      "target": 90
+    }
+  ],
+  "Initiative": [],
+  "WarMapEvent": [],
+  "ApiToken": []
+}

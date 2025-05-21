@@ -1,5 +1,4 @@
-import React from "react"
-import SiteHeader from "@/components/site-header"
+import { Header } from "@/components/header"
 import Footer from "@/components/footer"
 
 export default function MarketingLayout({
@@ -9,8 +8,8 @@ export default function MarketingLayout({
 }) {
   return (
     <>
-      <SiteHeader />
-      {children}
+      <Header />
+      <main className="min-h-screen">{children}</main>
       <Footer />
     </>
   )

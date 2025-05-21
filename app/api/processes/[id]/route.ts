@@ -2,24 +2,41 @@ import { NextResponse } from "next/server"
 import { getAuthUser } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 
-// GET /api/processes/[id]
+// GET /api/processes/[id] - Récupérer un processus spécifique et ses tâches
 export async function GET(
-  req: Request,
+  request: Request,
   { params }: { params: { id: string } }
 ) {
   try {
     const user = await getAuthUser()
     if (!user) {
-      return NextResponse.json({ error: "Non authentifié" }, { status: 401 })
+      return NextResponse.json({ error: "Non autorisé" }, { status: 401 })
     }
 
-    const processId = params.id
+    const { id } = params
 
-    const process = await prisma.process.findFirst({
+    // Vérifier que le processus appartient à l'utilisateur
+    const process = await prisma.process.findUnique({
       where: {
-        id: processId,
-        userId: user.id,
+        id,
+        userId: user.id
       },
+      include: {
+        tasks: {
+          orderBy: {
+            createdAt: "desc"
+          },
+          include: {
+            project: {
+              select: {
+                id: true,
+                name: true,
+                color: true
+              }
+            }
+          }
+        }
+      }
     })
 
     if (!process) {

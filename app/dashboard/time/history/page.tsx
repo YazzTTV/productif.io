@@ -9,7 +9,8 @@ import { TimeEntriesTable } from "@/components/time/time-entries-table"
 
 export default async function TimeHistoryPage() {
   // Vérifier l'authentification côté serveur
-  const token = cookies().get("auth_token")?.value
+  const cookieStore = await cookies()
+  const token = cookieStore.get("auth_token")?.value
 
   if (!token) {
     redirect("/login")

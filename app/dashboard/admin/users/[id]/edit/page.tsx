@@ -18,53 +18,52 @@ interface User {
   name: string | null
   email: string
   role: string
+  companyId: string
 }
 
 export default function EditUserPage() {
   const params = useParams()
-  const userId = params.id as string
+  const userId = params?.id as string
   const router = useRouter()
   const { toast } = useToast()
   
   const [user, setUser] = useState<User | null>(null)
-  const [currentUserRole, setCurrentUserRole] = useState<string>("")
-  const [isLoading, setIsLoading] = useState(true)
-  const [isSaving, setIsSaving] = useState(false)
-  
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
   const [role, setRole] = useState("")
-  
+  const [isSaving, setIsSaving] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
+  const [currentUserRole, setCurrentUserRole] = useState<string>("")
+  const [userInfo, setUserInfo] = useState<any>(null)
+
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchUserDetails = async () => {
       try {
-        // Récupérer les informations sur l'utilisateur connecté
+        setIsLoading(true)
+        // Récupérer les informations de l'utilisateur connecté
         const meResponse = await fetch("/api/auth/me")
         if (meResponse.ok) {
           const meData = await meResponse.json()
+          setUserInfo(meData.user)
           setCurrentUserRole(meData.user.role)
         }
-        
-        // Récupérer les données de l'utilisateur à modifier
+
+        // Récupérer les détails de l'utilisateur à modifier
         const response = await fetch(`/api/users/${userId}`)
         if (!response.ok) {
-          throw new Error("Impossible de récupérer les données de l'utilisateur")
+          throw new Error("Impossible de récupérer les détails de l'utilisateur")
         }
         
         const data = await response.json()
         setUser(data.user)
-        
-        // Initialiser les champs du formulaire
-        if (data.user) {
-          setName(data.user.name || "")
-          setEmail(data.user.email)
-          setRole(data.user.role)
-        }
+        setName(data.user.name || "")
+        setEmail(data.user.email)
+        setRole(data.user.role)
       } catch (error) {
-        console.error("Erreur lors de la récupération des données:", error)
+        console.error("Erreur lors de la récupération des détails:", error)
         toast({
           title: "Erreur",
-          description: "Impossible de récupérer les données de l'utilisateur",
+          description: "Impossible de récupérer les détails de l'utilisateur",
           variant: "destructive"
         })
       } finally {
@@ -72,7 +71,9 @@ export default function EditUserPage() {
       }
     }
     
-    fetchData()
+    if (userId) {
+      fetchUserDetails()
+    }
   }, [userId, toast])
   
   const handleSubmit = async (e: React.FormEvent) => {
@@ -206,9 +207,11 @@ export default function EditUserPage() {
                       // - c'est l'utilisateur lui-même 
                       // - l'utilisateur connecté n'est pas SUPER_ADMIN et essaie de modifier un SUPER_ADMIN
                       // - l'utilisateur n'est pas SUPER_ADMIN et essaie de faire de quelqu'un un SUPER_ADMIN
+                      // - l'utilisateur est ADMIN et essaie de modifier un utilisateur d'une autre entreprise
                       userId === user.id ||
                       (currentUserRole !== "SUPER_ADMIN" && user.role === "SUPER_ADMIN") ||
-                      (currentUserRole !== "SUPER_ADMIN" && role === "SUPER_ADMIN")
+                      (currentUserRole !== "SUPER_ADMIN" && role === "SUPER_ADMIN") ||
+                      (currentUserRole === "ADMIN" && user.companyId !== userInfo?.managedCompanyId)
                     }
                   >
                     <SelectTrigger>
@@ -225,6 +228,11 @@ export default function EditUserPage() {
                   {userId === user.id && (
                     <p className="text-xs text-muted-foreground">
                       Vous ne pouvez pas modifier votre propre rôle
+                    </p>
+                  )}
+                  {currentUserRole === "ADMIN" && user.companyId !== userInfo?.managedCompanyId && (
+                    <p className="text-xs text-muted-foreground">
+                      Vous ne pouvez pas modifier les rôles des utilisateurs d'autres entreprises
                     </p>
                   )}
                 </div>

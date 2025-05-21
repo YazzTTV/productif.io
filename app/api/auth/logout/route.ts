@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import { cookies } from "next/headers"
 import { deleteSession, removeAuthCookie } from "@/lib/auth"
 
-export async function POST() {
+export async function POST(request: Request) {
   try {
     const cookieStore = cookies()
     const token = cookieStore.get("auth_token")?.value

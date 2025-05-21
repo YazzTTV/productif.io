@@ -51,6 +51,8 @@ export function TimePageClient({ taskId, taskTitle }: TimePageClientProps) {
   const [processName, setProcessName] = useState("")
   const [saveAsTemplate, setSaveAsTemplate] = useState(false)
   const [isCompleted, setIsCompleted] = useState(false)
+  const [startTime, setStartTime] = useState<Date | null>(null)
+  const [timerDuration, setTimerDuration] = useState(0)
   const { toast } = useToast()
   const router = useRouter()
 
@@ -74,8 +76,19 @@ export function TimePageClient({ taskId, taskTitle }: TimePageClientProps) {
     }
   }, [taskId, toast])
 
+  useEffect(() => {
+    // Enregistrer l'heure de début quand la page est chargée
+    setStartTime(new Date())
+  }, [])
+
   const handleComplete = async (continueSession: boolean) => {
     try {
+      // Calculer la durée réelle passée sur la tâche
+      const endTime = new Date();
+      const durationInSeconds = startTime ? Math.floor((endTime.getTime() - startTime.getTime()) / 1000) : 60 * 60; // Fallback à 1h si pas de startTime
+      
+      console.log(`[TIME] Création d'une entrée de temps - Durée: ${durationInSeconds} secondes (${durationInSeconds/60} minutes)`)
+      
       // Enregistrer l'entrée de temps
       const response = await fetch("/api/time-entries", {
         method: "POST",
@@ -85,7 +98,9 @@ export function TimePageClient({ taskId, taskTitle }: TimePageClientProps) {
         body: JSON.stringify({
           taskId,
           description: process,
-          duration: 60 * 60, // 1 heure en secondes
+          startTime: startTime?.toISOString(), // Envoyer l'heure de début réelle
+          endTime: endTime.toISOString(),     // Envoyer l'heure de fin réelle
+          duration: durationInSeconds,         // Envoyer la durée calculée en secondes
         }),
       })
 

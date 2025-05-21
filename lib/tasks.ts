@@ -20,11 +20,11 @@ const energyWeights = {
 // Fonction pour calculer l'ordre des tâches
 export function calculateTaskOrder(priority: string, energyLevel: string): number {
   const priorityScores = {
-    "P0": 500, // Quick Win
-    "P1": 400, // Urgent
-    "P2": 300, // Important
-    "P3": 200, // A faire
-    "P4": 100  // Optionnel
+    "P0": 5000, // Quick Win
+    "P1": 4000, // Urgent
+    "P2": 3000, // Important
+    "P3": 2000, // A faire
+    "P4": 1000  // Optionnel
   }
 
   const energyScores = {

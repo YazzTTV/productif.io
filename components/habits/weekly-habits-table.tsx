@@ -142,8 +142,8 @@ export function WeeklyHabitsTable({
           habitId,
           date: targetDate.toISOString(),
           completed: data.completed !== undefined ? data.completed : true,
-          note: data.note,
-          rating: data.rating
+          note: data.note || null,
+          rating: data.rating || null
         }),
       })
 
@@ -151,8 +151,46 @@ export function WeeklyHabitsTable({
         throw new Error("Erreur lors de la mise à jour de l'habitude")
       }
 
-      // Mettre à jour l'UI optimiste
-      window.location.reload() // Ceci est une solution temporaire, idéalement nous mettrions à jour l'état local
+      // Mettre à jour l'état local au lieu de recharger la page
+      const updatedHabits = sortedHabits.map(habit => {
+        if (habit.id === habitId) {
+          const updatedEntries = [...habit.entries]
+          const existingEntryIndex = updatedEntries.findIndex(e => 
+            isSameDay(new Date(e.date), targetDate)
+          )
+
+          if (existingEntryIndex >= 0) {
+            updatedEntries[existingEntryIndex] = {
+              ...updatedEntries[existingEntryIndex],
+              completed: data.completed !== undefined ? data.completed : true,
+              note: data.note || null,
+              rating: data.rating || null,
+              updatedAt: new Date()
+            }
+          } else {
+            const newEntry: HabitEntry = {
+              id: Date.now().toString(), // ID temporaire
+              habitId,
+              date: targetDate,
+              completed: data.completed !== undefined ? data.completed : true,
+              note: data.note || null,
+              rating: data.rating || null,
+              createdAt: new Date(),
+              updatedAt: new Date()
+            }
+            updatedEntries.push(newEntry)
+          }
+
+          return {
+            ...habit,
+            entries: updatedEntries
+          }
+        }
+        return habit
+      })
+
+      setSortedHabits(updatedHabits)
+      toast.success("Habitude mise à jour avec succès")
     } catch (error) {
       console.error("Error updating habit:", error)
       toast.error("Erreur lors de la mise à jour de l'habitude")
@@ -288,7 +326,7 @@ export function WeeklyHabitsTable({
                     <div className="font-medium">
                       {format(date, "EEE", { locale: fr })}
                     </div>
-                    <div className="text-xs text-gray-500">
+                    <div className="text-xs text-gray-500 dark:text-gray-400">
                       {format(date, "d MMM", { locale: fr })}
                     </div>
                   </TableHead>
@@ -317,7 +355,7 @@ export function WeeklyHabitsTable({
                 ))}
                 {sortedHabits.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={11} className="text-center py-8 text-gray-500">
+                    <TableCell colSpan={11} className="text-center py-8 text-gray-500 dark:text-gray-400">
                       Aucune habitude enregistrée. Commencez par en créer une !
                     </TableCell>
                   </TableRow>
@@ -375,7 +413,7 @@ function SortableTableRow({
   }
   
   return (
-    <TableRow ref={setNodeRef} style={style} className={cn(isDragging && "bg-gray-50")}>
+    <TableRow ref={setNodeRef} style={style} className={cn(isDragging && "bg-gray-50 dark:bg-gray-800")}>
       <TableCell className="w-[40px] cursor-grab">
         <GripVertical 
           className="h-4 w-4 text-gray-400" 
@@ -387,7 +425,7 @@ function SortableTableRow({
       <TableCell>
         <div className="flex gap-1">
           {habit.daysOfWeek.map((day) => (
-            <span key={day} className="text-xs bg-gray-100 px-1 rounded">
+            <span key={day} className="text-xs bg-gray-100 dark:bg-gray-700 dark:text-gray-300 px-1 rounded">
               {DAYS_OF_WEEK[day as keyof typeof DAYS_OF_WEEK]}
             </span>
           ))}

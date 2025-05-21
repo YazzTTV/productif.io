@@ -7,6 +7,7 @@ import { LogoutButton } from "@/components/auth/logout-button"
 import { DashboardNav } from "@/components/dashboard/nav"
 import { useLocale } from "@/lib/i18n"
 import { ClientAuthProvider } from "@/components/auth/client-auth-provider"
+import { AutoLogout } from "@/components/auth/auto-logout"
 import { Menu, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -21,6 +22,9 @@ export default function DashboardLayout({
   
   return (
     <ClientAuthProvider>
+      {/* Composant de déconnexion automatique */}
+      <AutoLogout />
+      
       <div className="flex min-h-screen flex-col">
         <header className="bg-card border-b border-border shadow z-20 sticky top-0">
           <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">

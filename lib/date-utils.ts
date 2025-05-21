@@ -1,6 +1,7 @@
 import { startOfDay, endOfDay, format as formatDate } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { formatInTimeZone } from 'date-fns-tz';
+import { toZonedTime } from 'date-fns-tz';
 
 // Récupérer le fuseau horaire depuis les variables d'environnement ou utiliser Europe/Paris par défaut
 export const USER_TIMEZONE = process.env.USER_TIMEZONE || 'Europe/Paris';
@@ -39,4 +40,52 @@ export function isToday(date: Date) {
   const dateYear = date.getFullYear();
   
   return nowDay === dateDay && nowMonth === dateMonth && nowYear === dateYear;
+}
+
+// Convertir une date locale en UTC en s'assurant que l'heure est à minuit dans le fuseau horaire local
+export function localDateToUTC(date: Date): Date {
+  // Créer une nouvelle date avec l'heure à minuit dans le fuseau horaire local
+  const localMidnight = new Date(
+    date.getFullYear(),
+    date.getMonth(),
+    date.getDate(),
+    0, 0, 0, 0
+  );
+  
+  // Convertir en UTC
+  return new Date(localMidnight.toISOString());
+}
+
+// Convertir une date UTC en date locale en s'assurant que l'heure est à minuit dans le fuseau horaire local
+export function utcToLocalDate(date: Date): Date {
+  // Convertir la date UTC en date locale
+  const localDate = toZonedTime(date, USER_TIMEZONE);
+  
+  // Retourner une nouvelle date avec l'heure à minuit dans le fuseau horaire local
+  return new Date(
+    localDate.getFullYear(),
+    localDate.getMonth(),
+    localDate.getDate(),
+    0, 0, 0, 0
+  );
+}
+
+// Vérifier si une date est aujourd'hui dans le fuseau horaire local
+export function isTodayInLocalTZ(date: Date): boolean {
+  const now = new Date();
+  const today = utcToLocalDate(now);
+  const dateToCheck = utcToLocalDate(date);
+  
+  return today.getTime() === dateToCheck.getTime();
+}
+
+// Vérifier si une date est demain dans le fuseau horaire local
+export function isTomorrowInLocalTZ(date: Date): boolean {
+  const now = new Date();
+  const tomorrow = new Date(now);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowLocal = utcToLocalDate(tomorrow);
+  const dateToCheck = utcToLocalDate(date);
+  
+  return tomorrowLocal.getTime() === dateToCheck.getTime();
 } 

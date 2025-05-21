@@ -93,49 +93,62 @@ export function TimeTracker({ projects, tasks }: TimeTrackerProps) {
 
   // Arrêter le chronomètre et enregistrer l'entrée de temps
   const stopTimer = async () => {
-    if (!startTimeRef.current) return
+    if (!startTimeRef.current) return;
 
-    pauseTimer()
+    pauseTimer();
 
     try {
-      const endTime = new Date()
+      const endTime = new Date();
+      
+      // Vérifier que le temps écoulé est d'au moins 1 seconde
+      if (elapsedTime < 1) {
+        setError("La durée enregistrée doit être d'au moins 1 seconde");
+        return;
+      }
+      
+      // Calculer le temps de début en soustrayant la durée écoulée de la date de fin
+      // Cela garantit que la durée calculée sur le serveur correspondra à la durée mesurée localement
+      const calculatedStartTime = new Date(endTime.getTime() - (elapsedTime * 1000));
+      
+      console.log(`Envoi des données: startTime=${calculatedStartTime.toISOString()}, endTime=${endTime.toISOString()}, elapsedTime=${elapsedTime}s`);
+      
       const response = await fetch("/api/time-entries", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          startTime: startTimeRef.current.toISOString(),
+          startTime: calculatedStartTime.toISOString(),
           endTime: endTime.toISOString(),
-          duration: elapsedTime,
+          duration: elapsedTime, // Envoyer la durée exacte mesurée localement
           note,
-          taskId: selectedTaskId || undefined,
-          projectId: selectedProjectId || undefined,
+          taskId: selectedTaskId === "none" ? null : selectedTaskId,
+          projectId: selectedProjectId === "none" ? null : selectedProjectId,
         }),
-      })
+      });
 
       if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.error || "Erreur lors de l'enregistrement du temps")
+        const data = await response.json();
+        throw new Error(data.error || "Erreur lors de l'enregistrement du temps");
       }
 
       // Réinitialiser le chronomètre
-      setElapsedTime(0)
-      startTimeRef.current = null
-      setSuccess("Temps enregistré avec succès")
+      setElapsedTime(0);
+      startTimeRef.current = null;
+      setSuccess("Temps enregistré avec succès");
 
       // Rafraîchir la page pour afficher la nouvelle entrée
-      router.refresh()
+      router.refresh();
 
       // Effacer le message de succès après 3 secondes
       setTimeout(() => {
-        setSuccess(null)
-      }, 3000)
+        setSuccess(null);
+      }, 3000);
     } catch (error) {
-      console.error("Erreur:", error)
-      setError(error instanceof Error ? error.message : "Une erreur est survenue")
+      console.error("Erreur:", error);
+      setError(error instanceof Error ? error.message : "Une erreur est survenue");
     }
-  }
+  };
 
   // Nettoyer l'intervalle lors du démontage du composant
   useEffect(() => {

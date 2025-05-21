@@ -1,12 +1,22 @@
-import FeaturesSection from "@/components/features-section"
+import { Metadata } from "next"
 
-export default function FeaturesPage() {
+import { FonctionnalitesHero } from "@/components/fonctionnalites/hero"
+import { FonctionnalitesFeatures } from "@/components/fonctionnalites/features"
+import { FonctionnalitesAssistant } from "@/components/fonctionnalites/assistant"
+import { FonctionnalitesCTA } from "@/components/fonctionnalites/cta"
+
+export const metadata: Metadata = {
+  title: "Fonctionnalités | productif.io",
+  description: "Découvrez toutes les fonctionnalités offertes par productif.io pour optimiser votre productivité et votre organisation.",
+}
+
+export default function FonctionnalitesPage() {
   return (
-    <main className="flex-1 py-16">
-      <div className="container">
-        <h1 className="text-4xl font-bold mb-8 text-center">Nos Fonctionnalités</h1>
-        <FeaturesSection />
-      </div>
-    </main>
+    <div>
+      <FonctionnalitesHero />
+      <FonctionnalitesFeatures />
+      <FonctionnalitesAssistant />
+      <FonctionnalitesCTA />
+    </div>
   )
 } 

@@ -44,24 +44,10 @@ export function OverviewMetrics({ className }: OverviewMetricsProps) {
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isRefreshing, setIsRefreshing] = useState(false)
-  const [clientTime, setClientTime] = useState<string>("")
-  const [serverInfo, setServerInfo] = useState<any>(null)
   const [lastUpdated, setLastUpdated] = useState<string>("")
-  const [showDebug, setShowDebug] = useState(false)
-
-  const fetchServerTime = async () => {
-    try {
-      const response = await fetch("/api/time-info")
-      const data = await response.json()
-      setServerInfo(data)
-    } catch (error) {
-      console.error("Erreur lors de la récupération du temps serveur:", error)
-    }
-  }
 
   const fetchMetrics = async () => {
     setIsRefreshing(true)
-    setClientTime(new Date().toISOString())
     
     try {
       // Récupérer les métriques générales
@@ -132,7 +118,6 @@ export function OverviewMetrics({ className }: OverviewMetricsProps) {
 
   useEffect(() => {
     fetchMetrics()
-    fetchServerTime()
   }, [])
 
   if (isLoading) {
@@ -164,23 +149,6 @@ export function OverviewMetrics({ className }: OverviewMetricsProps) {
           )}
         </div>
         <div className="flex gap-2">
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={() => setShowDebug(!showDebug)}
-                >
-                  <Info className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                Afficher/Masquer les infos de débogage
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-          
           <Button 
             variant="outline" 
             size="sm" 
@@ -192,30 +160,6 @@ export function OverviewMetrics({ className }: OverviewMetricsProps) {
           </Button>
         </div>
       </div>
-
-      {showDebug && (
-        <Card className="bg-slate-50">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Informations de débogage</CardTitle>
-          </CardHeader>
-          <CardContent className="text-xs">
-            <p><strong>Client:</strong> {clientTime}</p>
-            <p><strong>Serveur API:</strong> {metrics.debug?.serverTime}</p>
-            <p><strong>Fuseau horaire API:</strong> {metrics.debug?.timeZone}</p>
-            {serverInfo && (
-              <>
-                <p><strong>Fuseau horaire serveur:</strong> {serverInfo.timezone}</p>
-                <p><strong>Offset fuseau:</strong> {serverInfo.timezoneOffset} minutes</p>
-              </>
-            )}
-            <div className="mt-2">
-              <p><strong>Tâches créées aujourd'hui:</strong> {metrics.tasks.createdToday}</p>
-              <p><strong>Tâches planifiées aujourd'hui:</strong> {metrics.tasks.today}</p>
-              <p><strong>Tâches complétées aujourd'hui:</strong> {metrics.tasks.totalCompletedToday}</p>
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 ${className}`}>
         <Card>

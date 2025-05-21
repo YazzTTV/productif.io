@@ -27,10 +27,5 @@ export default async function SettingsPage() {
     redirect("/login")
   }
 
-  return (
-    <div className="container mx-auto py-6">
-      <h1 className="text-3xl font-bold mb-6">Paramètres</h1>
-      <SettingsForm user={userInfo} />
-    </div>
-  )
+  return <SettingsForm user={userInfo} />
 } 

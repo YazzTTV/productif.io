@@ -11,19 +11,19 @@ export default function CtaSection() {
               Prêt à transformer votre productivité ?
             </h2>
             <p className="mx-auto max-w-[700px] text-white/80 md:text-xl">
-              Commencez votre essai gratuit de 7 jours dès aujourd'hui et découvrez comment notre plateforme peut vous
+              Rejoignez notre programme beta testeur dès aujourd'hui et découvrez comment notre plateforme peut vous
               aider à atteindre vos objectifs.
             </p>
           </div>
           <div className="flex flex-col gap-2 min-[400px]:flex-row">
             <Button size="lg" className="bg-white text-brand-darkgreen hover:bg-white/90" asChild>
-              <Link href="/register?plan=premium">Commencer l'essai gratuit</Link>
+              <Link href="/register?plan=premium">Devenir beta testeur</Link>
             </Button>
             <Button size="lg" variant="outline" className="border-white/20 text-white hover:bg-white/10" asChild>
               <Link href="#features">En savoir plus</Link>
             </Button>
           </div>
-          <p className="text-sm text-white/60">Sans engagement. Annulation facile à tout moment.</p>
+          <p className="text-sm text-white/60">Sans engagement. Aucune carte bancaire requise.</p>
         </div>
       </div>
     </section>

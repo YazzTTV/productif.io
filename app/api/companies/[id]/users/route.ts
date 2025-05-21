@@ -26,7 +26,7 @@ export async function GET(
       return NextResponse.json({ error: "Accès refusé" }, { status: 403 })
     }
 
-    const companyId = params.id
+    const { id: companyId } = params
     console.log("ID de l'entreprise:", companyId)
 
     // Vérifier si l'entreprise existe
@@ -81,7 +81,7 @@ export async function POST(
       return NextResponse.json({ error: "Accès refusé" }, { status: 403 })
     }
 
-    const companyId = params.id
+    const { id: companyId } = params
     const { userId } = await request.json()
 
     if (!userId) {

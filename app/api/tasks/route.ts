@@ -2,6 +2,10 @@ import { NextResponse } from "next/server"
 import { getAuthUser } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { calculateTaskOrder } from "@/lib/tasks"
+import { format, isEqual, isBefore } from "date-fns"
+import { formatInTimezone, USER_TIMEZONE, localDateToUTC } from "@/lib/date-utils"
+import { parse, parseISO, isWithinInterval } from "date-fns"
+import { toZonedTime } from "date-fns-tz"
 
 // GET /api/tasks - Récupérer toutes les tâches de l'utilisateur
 export async function GET(request: Request) {
@@ -27,9 +31,38 @@ export async function GET(request: Request) {
     const userRole = userInfo?.[0]?.role
     const companyId = userInfo?.[0]?.managedCompanyId
     
-    // Récupérer le paramètre de requête companyId
+    // Récupérer les paramètres de requête
     const { searchParams } = new URL(request.url)
     const companyIdParam = searchParams.get('companyId')
+    const dateParam = searchParams.get('date')
+    const debug = searchParams.get('debug') === '1'
+    
+    // Pour le debug uniquement
+    if (debug) {
+      // Compter le nombre total de tâches
+      const totalTasks = await prisma.task.count({
+        where: {
+          userId
+        }
+      })
+      
+      // Compter le nombre de projets
+      const totalProjects = await prisma.project.count({
+        where: {
+          userId
+        }
+      })
+      
+      return NextResponse.json({
+        debug: true,
+        userId,
+        userInfo: userInfo[0],
+        counts: {
+          tasks: totalTasks,
+          projects: totalProjects
+        }
+      })
+    }
 
     // Déterminer si on doit filtrer par entreprise
     let shouldFilterByCompany = false
@@ -45,6 +78,19 @@ export async function GET(request: Request) {
         // Par défaut, utiliser l'entreprise que l'admin gère
         shouldFilterByCompany = true
         targetCompanyId = companyId
+      }
+    } else {
+      // Pour les membres normaux, récupérer leur entreprise
+      const userCompany = await prisma.$queryRaw`
+        SELECT "companyId" 
+        FROM "UserCompany" 
+        WHERE "userId" = ${userId}
+        LIMIT 1
+      `
+      
+      if (userCompany && Array.isArray(userCompany) && userCompany.length > 0) {
+        shouldFilterByCompany = true
+        targetCompanyId = userCompany[0].companyId
       }
     }
     
@@ -101,10 +147,72 @@ export async function GET(request: Request) {
     }
     
     // Par défaut, récupérer uniquement les tâches de l'utilisateur
+    // Construire le filtre de requête
+    let whereClause: any = { userId };
+    
+    // Si une date est spécifiée, ajouter des conditions pour filtrer par date
+    if (dateParam) {
+      try {
+        // Analyser la date fournie (format attendu: YYYY-MM-DD)
+        const targetDate = new Date(dateParam);
+        
+        // Vérifier si la date est valide
+        if (isNaN(targetDate.getTime())) {
+          return NextResponse.json({ error: "Format de date invalide. Utilisez le format YYYY-MM-DD" }, { status: 400 });
+        }
+        
+        // Importer les fonctions nécessaires pour le traitement des dates
+        const { toZonedTime } = await import('date-fns-tz');
+        const { format, parseISO } = await import('date-fns');
+        
+        // Créer le début et la fin de la journée pour la date demandée
+        // Note: Pour une implémentation plus précise, vous pourriez vouloir utiliser
+        // l'approche complète de date-utils.ts avec le fuseau horaire de l'utilisateur
+        const startOfDay = new Date(targetDate);
+        startOfDay.setHours(0, 0, 0, 0);
+        
+        const endOfDay = new Date(targetDate);
+        endOfDay.setHours(23, 59, 59, 999);
+        
+        // Ajouter la condition de date à la clause WHERE
+        whereClause = {
+          ...whereClause,
+          OR: [
+            { 
+              dueDate: {
+                gte: startOfDay,
+                lte: endOfDay
+              }
+            },
+            {
+              scheduledFor: {
+                gte: startOfDay,
+                lte: endOfDay
+              }
+            },
+            {
+              AND: [
+                { completed: true },
+                { 
+                  updatedAt: {
+                    gte: startOfDay,
+                    lte: endOfDay
+                  }
+                }
+              ]
+            }
+          ]
+        };
+        
+        console.log(`[TASKS_GET] Filtrage par date: ${format(startOfDay, 'yyyy-MM-dd')}`);
+      } catch (error) {
+        console.error("[TASKS_GET] Erreur lors du traitement de la date:", error);
+        return NextResponse.json({ error: "Erreur lors du traitement de la date" }, { status: 500 });
+      }
+    }
+    
     const tasks = await prisma.task.findMany({
-      where: {
-        userId
-      },
+      where: whereClause,
       orderBy: [
         { order: 'desc' }
       ],
@@ -140,13 +248,13 @@ export async function POST(request: Request) {
     const authUserId = user.id
     
     // Récupérer le body de la requête
-    const { title, description, priority, energyLevel, dueDate, projectId, userId } = await request.json()
+    const { title, description, priority, energyLevel, dueDate, projectId, userId, processDescription, processId } = await request.json()
     
-    // Si un userId est fourni (différent de l'utilisateur authentifié), vérifier les droits d'admin
+    // Si un userId est fourni (différent de l'utilisateur authentifié), vérifier les droits
     let targetUserId = authUserId
     
     if (userId && userId !== authUserId) {
-      // Vérifier si l'utilisateur authentifié est un administrateur
+      // Vérifier si l'utilisateur authentifié est un administrateur ou membre de la même entreprise
       const userInfo: any[] = await prisma.$queryRaw`
         SELECT 
           "role", 
@@ -158,21 +266,54 @@ export async function POST(request: Request) {
       const userRole = userInfo?.[0]?.role
       const managedCompanyId = userInfo?.[0]?.managedCompanyId
       
-      if (userRole !== 'ADMIN' && userRole !== 'SUPER_ADMIN') {
-        return NextResponse.json({ error: "Vous n'avez pas les droits pour créer des tâches pour d'autres utilisateurs" }, { status: 403 })
-      }
-      
-      // Vérifier que l'utilisateur cible appartient à l'entreprise gérée par l'admin
-      if (userRole === 'ADMIN' && managedCompanyId) {
+      // Si c'est un administrateur
+      if (userRole === 'ADMIN' || userRole === 'SUPER_ADMIN') {
+        // Vérifier que l'utilisateur cible appartient à l'entreprise gérée par l'admin
+        if (managedCompanyId) {
+          const userBelongsToCompany: any[] = await prisma.$queryRaw`
+            SELECT EXISTS(
+              SELECT 1 FROM "UserCompany"
+              WHERE "userId" = ${userId} AND "companyId" = ${managedCompanyId}
+            ) as "belongs"
+          `
+          
+          if (!userBelongsToCompany?.[0]?.belongs) {
+            return NextResponse.json({ 
+              error: "L'utilisateur cible n'appartient pas à votre entreprise" 
+            }, { status: 403 })
+          }
+        }
+      } 
+      // Si c'est un utilisateur normal, vérifier qu'il appartient à la même entreprise que l'utilisateur cible
+      else {
+        // Obtenir l'entreprise de l'utilisateur authentifié
+        const userCompany: any[] = await prisma.$queryRaw`
+          SELECT "companyId" 
+          FROM "UserCompany" 
+          WHERE "userId" = ${authUserId}
+          LIMIT 1
+        `
+        
+        if (!userCompany || userCompany.length === 0) {
+          return NextResponse.json({ 
+            error: "Vous n'appartenez à aucune entreprise" 
+          }, { status: 403 })
+        }
+        
+        const companyId = userCompany[0].companyId
+        
+        // Vérifier que l'utilisateur cible appartient à la même entreprise
         const userBelongsToCompany: any[] = await prisma.$queryRaw`
           SELECT EXISTS(
             SELECT 1 FROM "UserCompany"
-            WHERE "userId" = ${userId} AND "companyId" = ${managedCompanyId}
+            WHERE "userId" = ${userId} AND "companyId" = ${companyId}
           ) as "belongs"
         `
         
         if (!userBelongsToCompany?.[0]?.belongs) {
-          return NextResponse.json({ error: "L'utilisateur n'appartient pas à votre entreprise" }, { status: 403 })
+          return NextResponse.json({ 
+            error: "Vous ne pouvez pas assigner de tâches à des utilisateurs d'autres entreprises" 
+          }, { status: 403 })
         }
       }
       
@@ -181,7 +322,7 @@ export async function POST(request: Request) {
     }
 
     // Convertir les valeurs numériques en chaînes pour le calcul de l'ordre
-    const priorityString = priority !== null ? `P${priority}` : "P3"
+    const priorityString = priority !== null ? `P${4 - priority}` : "P2"
     const energyLevels: Record<number, string> = {
       0: "Extrême",
       1: "Élevé",
@@ -195,6 +336,28 @@ export async function POST(request: Request) {
     // Calculer l'ordre
     const order = calculateTaskOrder(priorityString, energyString)
 
+    // Utiliser un processus existant ou en créer un nouveau si nécessaire
+    let finalProcessId = processId || null;
+    
+    // Créer un nouveau processus uniquement si:
+    // 1. Aucun processId n'est fourni
+    // 2. Une description de processus est fournie
+    if (!finalProcessId && processDescription) {
+      try {
+        const process = await prisma.process.create({
+          data: {
+            name: title, // Utiliser le titre de la tâche comme nom du processus
+            description: processDescription,
+            userId: targetUserId
+          }
+        });
+        finalProcessId = process.id;
+      } catch (err) {
+        console.error("Erreur lors de la création du processus:", err);
+        // Continuer sans processus en cas d'erreur
+      }
+    }
+
     // Créer la tâche
     const task = await prisma.task.create({
       data: {
@@ -204,10 +367,11 @@ export async function POST(request: Request) {
         energyLevel,
         dueDate: dueDate ? new Date(dueDate) : null,
         projectId: projectId || null,
+        processId: finalProcessId,
         completed: false,
         userId: targetUserId,
         order,
-      },
+      }
     })
 
     return NextResponse.json(task)
@@ -271,7 +435,7 @@ export async function PATCH(req: Request) {
     let order = task.order
     if ((priority !== undefined && priority !== task.priority) || 
         (energyLevel !== undefined && energyLevel !== task.energyLevel)) {
-      const priorityString = priority !== undefined ? `P${priority}` : task.priority !== null ? `P${task.priority}` : "P3"
+      const priorityString = priority !== undefined ? `P${4 - priority}` : task.priority !== null ? `P${4 - task.priority}` : "P2"
       
       const energyLevels: Record<number, string> = {
         0: "Extrême",

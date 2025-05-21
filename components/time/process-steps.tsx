@@ -36,6 +36,8 @@ export function ProcessSteps({ value, onChange }: ProcessStepsProps) {
   const [editingStepId, setEditingStepId] = useState<string | null>(null);
   // Référence pour l'input en cours d'édition
   const editingInputRef = useRef<HTMLInputElement | null>(null);
+  // Référence pour le nouvel input créé
+  const newStepInputRef = useRef<HTMLInputElement | null>(null);
 
   // Fonction debounce pour éviter trop de mises à jour
   const debouncedUpdateValue = useCallback((newSteps: Step[]) => {
@@ -60,7 +62,15 @@ export function ProcessSteps({ value, onChange }: ProcessStepsProps) {
     }
   }, [value, editingStepId, steps])
 
-  const addStep = (parentId?: string) => {
+  // Focus sur le nouvel input créé
+  useEffect(() => {
+    if (newStepInputRef.current) {
+      newStepInputRef.current.focus();
+      newStepInputRef.current = null; // Réinitialiser la référence après l'avoir utilisée
+    }
+  }, [steps.length]);
+
+  const addStep = (parentId?: string, setFocus = false) => {
     console.log("Ajout d'une étape, parentId:", parentId)
     const newStep: Step = {
       id: Math.random().toString(36).substr(2, 9),
@@ -87,6 +97,20 @@ export function ProcessSteps({ value, onChange }: ProcessStepsProps) {
     console.log("Nouvelles steps après ajout:", updatedSteps)
     setSteps(updatedSteps)
     updateValue(updatedSteps)
+    
+    // Si setFocus est true, stocke l'ID de la nouvelle étape pour que useEffect puisse la focaliser
+    if (setFocus) {
+      setEditingStepId(newStep.id);
+      
+      // Utiliser un timeout pour s'assurer que le DOM est mis à jour avant de tenter de focus
+      setTimeout(() => {
+        const inputs = document.querySelectorAll('input[type="text"]');
+        const lastInput = inputs[inputs.length - 1] as HTMLInputElement;
+        if (lastInput) {
+          lastInput.focus();
+        }
+      }, 0);
+    }
   }
 
   const updateStep = (id: string, updates: Partial<Step>) => {
@@ -219,6 +243,37 @@ export function ProcessSteps({ value, onChange }: ProcessStepsProps) {
                 
                 // On met à jour uniquement le state local sans notifier le parent
                 setSteps(updateStepInPlace([...steps]));
+              }}
+              onKeyDown={(e) => {
+                // Si l'utilisateur appuie sur Entrée, créer une nouvelle étape au même niveau
+                if (e.key === 'Enter') {
+                  e.preventDefault(); // Empêcher le comportement par défaut
+                  
+                  // Mettre à jour d'abord l'étape actuelle
+                  setEditingStepId(null);
+                  updateValue(steps);
+                  
+                  // Déterminer le parent en fonction du niveau
+                  let parentId = undefined;
+                  if (level > 0) {
+                    // Trouver l'étape parent en recherchant l'étape actuelle dans la structure
+                    const findParent = (steps: Step[], targetId: string): string | undefined => {
+                      for (const s of steps) {
+                        if (s.subSteps.some(sub => sub.id === targetId)) {
+                          return s.id;
+                        }
+                        const foundInSubSteps = findParent(s.subSteps, targetId);
+                        if (foundInSubSteps) return foundInSubSteps;
+                      }
+                      return undefined;
+                    };
+                    
+                    parentId = findParent(steps, step.id);
+                  }
+                  
+                  // Ajouter une nouvelle étape
+                  addStep(parentId, true);
+                }
               }}
               onFocus={() => {
                 // Marquer cette étape comme étant en cours d'édition

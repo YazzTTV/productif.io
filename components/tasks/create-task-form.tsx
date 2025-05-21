@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
@@ -26,7 +26,7 @@ import {
 import { cn } from "@/lib/utils"
 import { format } from "date-fns"
 import { fr } from "date-fns/locale"
-import { CalendarIcon } from "lucide-react"
+import { CalendarIcon, Plus, Save, ChevronDown, ChevronRight } from "lucide-react"
 import {
   Select,
   SelectContent,
@@ -36,6 +36,25 @@ import {
 } from "@/components/ui/select"
 import { ProjectSelect } from "./project-select"
 import { toast } from "@/components/ui/use-toast"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { ProcessSelector } from "@/components/time/process-selector"
+import { ProcessSteps } from "@/components/time/process-steps"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog"
+
+interface Process {
+  id: string
+  name: string
+  description: string
+}
 
 const formSchema = z.object({
   title: z.string().min(1, "Le titre est requis"),
@@ -44,11 +63,16 @@ const formSchema = z.object({
   energyLevel: z.string(),
   dueDate: z.date().optional(),
   projectId: z.string().optional(),
+  useProcess: z.boolean().default(false),
 })
 
 export function CreateTaskForm() {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
+  const [process, setProcess] = useState("")
+  const [savedProcessId, setSavedProcessId] = useState<string | null>(null)
+  const [showSaveProcessDialog, setShowSaveProcessDialog] = useState(false)
+  const [processName, setProcessName] = useState("")
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -58,8 +82,111 @@ export function CreateTaskForm() {
       priority: "P3",
       energyLevel: "Moyen",
       projectId: "",
+      useProcess: false,
     },
   })
+
+  const useProcess = form.watch("useProcess")
+
+  const handleProcessSelect = (selectedProcess: Process | null) => {
+    if (selectedProcess) {
+      // Si on sélectionne un processus existant, sauvegarder son ID
+      setSavedProcessId(selectedProcess.id)
+      
+      try {
+        // Essayer de parser le process comme JSON
+        const parsed = JSON.parse(selectedProcess.description)
+        
+        // Si c'est un tableau et que les éléments ont la structure attendue
+        if (Array.isArray(parsed) && parsed.some(item => 
+          typeof item === 'object' && 
+          'title' in item && 
+          'subSteps' in item
+        )) {
+          setProcess(selectedProcess.description)
+        } else {
+          // Convertir en nouveau format
+          const simpleStep = [{
+            id: Math.random().toString(36).substr(2, 9),
+            title: selectedProcess.name,
+            completed: false,
+            isExpanded: true,
+            subSteps: [{
+              id: Math.random().toString(36).substr(2, 9),
+              title: selectedProcess.description,
+              completed: false,
+              isExpanded: true,
+              subSteps: []
+            }]
+          }]
+          setProcess(JSON.stringify(simpleStep))
+        }
+      } catch (error) {
+        // Si ce n'est pas du JSON du tout
+        const simpleStep = [{
+          id: Math.random().toString(36).substr(2, 9),
+          title: selectedProcess.name,
+          completed: false,
+          isExpanded: true,
+          subSteps: [{
+            id: Math.random().toString(36).substr(2, 9),
+            title: selectedProcess.description,
+            completed: false,
+            isExpanded: true,
+            subSteps: []
+          }]
+        }]
+        setProcess(JSON.stringify(simpleStep))
+      }
+    } else {
+      setSavedProcessId(null)
+      setProcess("")
+    }
+  }
+
+  const handleSaveProcess = async () => {
+    if (!processName.trim() || !process.trim()) {
+      toast({
+        title: "Erreur",
+        description: "Le nom du processus est requis.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      const response = await fetch("/api/processes", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: processName,
+          description: process,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error("Erreur lors de la sauvegarde du processus")
+      }
+
+      const data = await response.json();
+      setSavedProcessId(data.id); // Sauvegarder l'ID du processus créé
+
+      toast({
+        title: "Succès",
+        description: "Le processus a été sauvegardé avec succès.",
+      })
+      setShowSaveProcessDialog(false)
+      setProcessName("")
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: "Une erreur est survenue lors de la sauvegarde du processus.",
+        variant: "destructive",
+      })
+    }
+  }
 
   const onSubmit = async (data: z.infer<typeof formSchema>) => {
     setIsLoading(true)
@@ -79,30 +206,35 @@ export function CreateTaskForm() {
         projectId: data.projectId || null
       }
 
-      const response = await fetch("/api/tasks", {
+      // Créer la tâche
+      const taskResponse = await fetch("/api/tasks", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(formData),
-      })
+        body: JSON.stringify({
+          ...formData,
+          processId: savedProcessId, // Utiliser l'ID du processus sauvegardé s'il existe
+          processDescription: data.useProcess && !savedProcessId ? process : null, // Ne créer un nouveau processus que si nécessaire
+        }),
+      });
 
-      if (!response.ok) {
-        throw new Error("Erreur lors de la création de la tâche")
+      if (!taskResponse.ok) {
+        throw new Error("Erreur lors de la création de la tâche");
       }
 
-      form.reset()
-      router.refresh()
-      router.push("/dashboard/tasks")
+      form.reset();
+      router.refresh();
+      router.push("/dashboard/tasks");
     } catch (error) {
-      console.error("Erreur:", error)
+      console.error("Erreur:", error);
       toast({
         title: "Erreur",
         description: "Une erreur est survenue lors de la création de la tâche",
         variant: "destructive",
-      })
+      });
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
   }
 
@@ -249,6 +381,60 @@ export function CreateTaskForm() {
           />
         </div>
 
+        <FormField
+          control={form.control}
+          name="useProcess"
+          render={({ field }) => (
+            <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+              <FormControl>
+                <Checkbox
+                  checked={field.value}
+                  onCheckedChange={field.onChange}
+                />
+              </FormControl>
+              <div className="space-y-1 leading-none">
+                <FormLabel>Utiliser un processus</FormLabel>
+                <FormDescription>
+                  Associez cette tâche à un processus existant ou créez-en un nouveau.
+                </FormDescription>
+              </div>
+            </FormItem>
+          )}
+        />
+
+        {useProcess && (
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-lg font-semibold">Process</CardTitle>
+              <Button
+                variant="outline"
+                onClick={() => setShowSaveProcessDialog(true)}
+                className="flex items-center gap-2"
+                type="button"
+              >
+                <Save className="h-4 w-4" />
+                Sauvegarder le process
+              </Button>
+            </CardHeader>
+            <CardContent className="pt-6">
+              <div className="space-y-4">
+                <ProcessSelector onSelect={handleProcessSelect} />
+                <ProcessSteps
+                  key={process} // Force re-render when process changes
+                  value={process}
+                  onChange={(newValue) => {
+                    setProcess(newValue)
+                    // Si l'utilisateur modifie le processus, réinitialiser l'ID du processus sauvegardé
+                    if (savedProcessId) {
+                      setSavedProcessId(null);
+                    }
+                  }}
+                />
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         <div className="flex justify-end gap-4">
           <Button
             type="button"
@@ -262,6 +448,28 @@ export function CreateTaskForm() {
           </Button>
         </div>
       </form>
+
+      <Dialog open={showSaveProcessDialog} onOpenChange={setShowSaveProcessDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Sauvegarder le processus</DialogTitle>
+            <DialogDescription>
+              Donnez un nom à ce processus pour le réutiliser plus tard.
+            </DialogDescription>
+          </DialogHeader>
+          <Input
+            placeholder="Nom du processus"
+            value={processName}
+            onChange={(e) => setProcessName(e.target.value)}
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowSaveProcessDialog(false)}>
+              Annuler
+            </Button>
+            <Button onClick={handleSaveProcess}>Sauvegarder</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Form>
   )
 } 

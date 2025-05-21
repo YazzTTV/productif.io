@@ -1,0 +1,42 @@
+.buttonWrapper {
+  position: relative;
+  display: inline-block;
+}
+
+.buttonWrapper::before,
+.buttonWrapper::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: -2px;
+  border-radius: 8px;
+  background: transparent;
+}
+
+.buttonWrapper::before {
+  animation: rotate 2s linear infinite;
+  background: conic-gradient(
+    rgba(0, 0, 0, 0) 0deg,
+    rgba(0, 0, 0, 0) 60deg,
+    rgba(255, 255, 255, 0.9) 70deg,
+    rgba(61, 255, 182, 1) 110deg,
+    rgba(0, 0, 0, 0) 140deg,
+    rgba(0, 0, 0, 0) 360deg
+  );
+  filter: drop-shadow(0 0 3px #22c55e);
+}
+
+.buttonWrapper::after {
+  inset: -1px;
+  background-color: transparent;
+  border-radius: 8px;
+}
+
+@keyframes rotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+} 

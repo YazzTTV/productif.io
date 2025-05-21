@@ -21,7 +21,8 @@ export async function GET() {
         project: {
           select: {
             id: true,
-            name: true
+            name: true,
+            color: true
           }
         }
       }

@@ -4,12 +4,22 @@ const JWT_SECRET = new TextEncoder().encode(
   process.env.JWT_SECRET || "your-secret-key"
 )
 
-export async function sign(payload: any): Promise<string> {
-  const jwt = await new jose.SignJWT(payload)
+interface SignOptions {
+  expirationTime?: Date | string
+}
+
+export async function sign(payload: any, options?: SignOptions): Promise<string> {
+  let jwt = new jose.SignJWT(payload)
     .setProtectedHeader({ alg: 'HS256' })
-    .setExpirationTime('7d')
-    .sign(JWT_SECRET)
-  return jwt
+  
+  // Définir l'expiration
+  if (options?.expirationTime) {
+    jwt = jwt.setExpirationTime(options.expirationTime)
+  } else {
+    jwt = jwt.setExpirationTime('7d')
+  }
+  
+  return await jwt.sign(JWT_SECRET)
 }
 
 export async function verify(token: string): Promise<any> {

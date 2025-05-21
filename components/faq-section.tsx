@@ -20,14 +20,21 @@ export default function FaqSection() {
         <div className="mx-auto max-w-3xl mt-12">
           <Accordion type="single" collapsible className="w-full">
             <AccordionItem value="item-1">
-              <AccordionTrigger>Comment fonctionne l'essai gratuit de 7 jours ?</AccordionTrigger>
+              <AccordionTrigger>Comment fonctionne le programme beta testeur ?</AccordionTrigger>
               <AccordionContent>
-                Notre essai gratuit vous donne un accès complet à toutes les fonctionnalités premium pendant 7 jours,
-                sans aucune restriction. À la fin de la période d'essai, vous pouvez choisir de vous abonner ou votre compte sera
-                automatiquement rétrogradé.
+                Notre programme beta testeur vous donne un accès complet à toutes les fonctionnalités premium gratuitement,
+                sans aucune restriction. En tant que beta testeur, vous nous aidez à améliorer notre plateforme en nous 
+                fournissant vos retours d'expérience. Aucune carte bancaire n'est requise.
               </AccordionContent>
             </AccordionItem>
             <AccordionItem value="item-2">
+              <AccordionTrigger>Combien de temps dure le programme beta testeur ?</AccordionTrigger>
+              <AccordionContent>
+                Le programme beta testeur durera au moins jusqu'à la sortie officielle de notre plateforme. Tous les 
+                beta testeurs bénéficieront d'avantages exclusifs lorsque nous passerons à la version commerciale.
+              </AccordionContent>
+            </AccordionItem>
+            <AccordionItem value="item-3">
               <AccordionTrigger>Puis-je annuler mon abonnement à tout moment ?</AccordionTrigger>
               <AccordionContent>
                 Oui, vous pouvez annuler votre abonnement à tout moment. Si vous annulez, vous conserverez l'accès à
@@ -35,7 +42,7 @@ export default function FaqSection() {
                 remboursement partiel n'est effectué pour les mois non utilisés.
               </AccordionContent>
             </AccordionItem>
-            <AccordionItem value="item-3">
+            <AccordionItem value="item-4">
               <AccordionTrigger>Combien de membres puis-je ajouter à mon espace entreprise ?</AccordionTrigger>
               <AccordionContent>
                 Il n'y a pas de limite au nombre de membres que vous pouvez ajouter à votre espace entreprise. Chaque
@@ -43,7 +50,7 @@ export default function FaqSection() {
                 taille de votre équipe.
               </AccordionContent>
             </AccordionItem>
-            <AccordionItem value="item-4">
+            <AccordionItem value="item-5">
               <AccordionTrigger>Mes données sont-elles sécurisées ?</AccordionTrigger>
               <AccordionContent>
                 Absolument. Nous prenons la sécurité de vos données très au sérieux. Toutes les données sont chiffrées
@@ -51,7 +58,7 @@ export default function FaqSection() {
                 jamais vos informations avec des tiers sans votre consentement explicite.
               </AccordionContent>
             </AccordionItem>
-            <AccordionItem value="item-5">
+            <AccordionItem value="item-6">
               <AccordionTrigger>La plateforme est-elle accessible sur mobile ?</AccordionTrigger>
               <AccordionContent>
                 Oui, notre plateforme est entièrement responsive et fonctionne parfaitement sur tous les appareils
@@ -60,7 +67,7 @@ export default function FaqSection() {
                 prochainement.
               </AccordionContent>
             </AccordionItem>
-            <AccordionItem value="item-6">
+            <AccordionItem value="item-7">
               <AccordionTrigger>Proposez-vous des formations pour les équipes ?</AccordionTrigger>
               <AccordionContent>
                 Oui, nous proposons des formations personnalisées pour les équipes en option payante supplémentaire. Ces
@@ -68,7 +75,7 @@ export default function FaqSection() {
                 ou en présentiel selon vos préférences. Contactez notre équipe commerciale pour plus d'informations.
               </AccordionContent>
             </AccordionItem>
-            <AccordionItem value="item-7">
+            <AccordionItem value="item-8">
               <AccordionTrigger>Comment fonctionne le support technique ?</AccordionTrigger>
               <AccordionContent>
                 Tous nos clients premium bénéficient d'un support prioritaire par email avec un temps de réponse garanti

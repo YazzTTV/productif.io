@@ -54,11 +54,18 @@ export function DashboardNav({ viewAsMode = false, viewAsUserId, onNavItemClick 
         const response = await fetch(endpoint)
         if (response.ok) {
           const data = await response.json()
+          console.log("Données utilisateur:", data) // Debug
           setUserRole(data.user.role)
           setCompanyName(data.user.companyName)
           
-          if (data.companies && Array.isArray(data.companies)) {
-            setUserCompanies(data.companies)
+          // Récupérer l'entreprise de l'utilisateur
+          const companyResponse = await fetch(`/api/users/${data.user.id}/company`)
+          if (companyResponse.ok) {
+            const companyData = await companyResponse.json()
+            console.log("Données entreprise:", companyData) // Debug
+            if (companyData.company) {
+              setUserCompanies([companyData.company])
+            }
           }
         }
       } catch (error) {
@@ -109,6 +116,27 @@ export function DashboardNav({ viewAsMode = false, viewAsUserId, onNavItemClick 
       onNavItemClick();
     }
   };
+
+  // Log pour debug juste avant le rendu du menu
+  console.log("userCompanies juste avant menu:", userCompanies)
+
+  // Lien pour les membres USER d'une entreprise
+  const entrepriseMenuLink = !isLoading && userRole === "USER" && userCompanies.length > 0 ? (
+    <Link
+      href="/dashboard/entreprise"
+      className={cn(
+        buttonVariants({
+          variant: isActive("/dashboard/entreprise") ? "secondary" : "ghost",
+          size: "default",
+        }),
+        "justify-start w-full"
+      )}
+      onClick={handleNavClick}
+    >
+      <Building2 className="mr-2 h-4 w-4" />
+      <span className="truncate">{userCompanies[0]?.name || "Mon Entreprise"}</span>
+    </Link>
+  ) : null;
 
   return (
     <div className="w-full flex flex-col gap-2 p-4 pt-2">
@@ -246,6 +274,9 @@ export function DashboardNav({ viewAsMode = false, viewAsUserId, onNavItemClick 
         <span className="truncate">{t('objectives')}</span>
       </Link>
       
+      {/* Lien vers la page entreprise pour les membres USER */}
+      {entrepriseMenuLink}
+      
       {!viewAsMode && (
         <Link
           href={getHref("/dashboard/analytics")}
@@ -318,10 +349,29 @@ export function DashboardNav({ viewAsMode = false, viewAsUserId, onNavItemClick 
           )}
 
           {/* Menu Admin d'entreprise */}
-          {(isAdmin || (isSuperAdmin && companyName)) && (
+          {!isLoading && (isAdmin || (isSuperAdmin && companyName) || (userCompanies && userCompanies.length > 0)) && (
             <>
               {isSuperAdmin && <div className="h-px bg-border my-2" />}
               
+              {/* Menu pour les administrateurs */}
+              {(isAdmin || (isSuperAdmin && companyName)) && (
+                <Link
+                  href="/dashboard/admin/users"
+                  className={cn(
+                    buttonVariants({
+                      variant: isActive("/dashboard/admin/users") ? "secondary" : "ghost",
+                      size: "default",
+                    }),
+                    "justify-start w-full"
+                  )}
+                  onClick={handleNavClick}
+                >
+                  <Users className="mr-2 h-4 w-4" />
+                  <span className="truncate">{t('users')}</span>
+                </Link>
+              )}
+
+              {/* Menu pour tous les membres de l'entreprise */}
               <Link
                 href="/dashboard/admin/tasks"
                 className={cn(

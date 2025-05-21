@@ -24,11 +24,11 @@ export default async function NewTaskPage() {
   return (
     <div className="container mx-auto py-6 max-w-3xl">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Créer une nouvelle tâche</h1>
-        <p className="text-gray-600 mt-1">Ajoutez une nouvelle tâche à votre liste</p>
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Créer une nouvelle tâche</h1>
+        <p className="text-gray-600 dark:text-gray-400 mt-1">Ajoutez une nouvelle tâche à votre liste</p>
       </div>
 
-      <div className="bg-gray-50 rounded-xl p-6">
+      <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl p-6">
         <CreateTaskForm userId={userId} />
       </div>
     </div>
