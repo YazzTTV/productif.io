@@ -6,7 +6,7 @@ import { format } from "date-fns"
 import { fr } from "date-fns/locale"
 
 interface TimeByDayData {
-  day: string
+  day_of_week: number
   total_duration: number
 }
 
@@ -15,10 +15,16 @@ interface TimeByDayChartProps {
 }
 
 export function TimeByDayChart({ data }: TimeByDayChartProps) {
+  // Convertir le numéro du jour en nom du jour
+  const getDayName = (dayNum: number) => {
+    const days = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
+    return days[dayNum];
+  };
+
   // Formater les données pour le graphique
   const chartData = data.map((item) => ({
-    name: format(new Date(item.day), "EEE dd/MM", { locale: fr }),
-    value: Number(item.total_duration) / 3600, // Convertir en heures
+    name: getDayName(Number(item.day_of_week)),
+    value: Number(item.total_duration),
   }))
 
   // Personnaliser le tooltip

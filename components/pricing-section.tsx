@@ -23,7 +23,7 @@ export default function PricingSection() {
         <div className="mx-auto max-w-3xl mt-12">
           <Card className="relative overflow-hidden border-2 border-brand-green">
             <div className="absolute top-0 right-0 bg-brand-green text-white px-4 py-1 text-sm font-medium rounded-bl-lg">
-              Populaire
+              Programme Beta
             </div>
             <CardHeader className="pb-8 pt-10">
               <CardTitle className="text-3xl font-bold text-center">Premium</CardTitle>
@@ -31,11 +31,11 @@ export default function PricingSection() {
                 Toutes les fonctionnalités, sans restriction
               </CardDescription>
               <div className="mt-6 text-center">
-                <span className="text-5xl font-bold gradient-text">150€</span>
-                <span className="text-gray-500 dark:text-gray-400 ml-2">/mois</span>
+                <span className="text-5xl font-bold gradient-text">Gratuit</span>
+                <span className="text-gray-500 dark:text-gray-400 ml-2">pendant la beta</span>
               </div>
               <p className="text-center text-gray-500 dark:text-gray-400 mt-2">
-                Essai gratuit de 7 jours
+                Programme beta testeur limité
               </p>
             </CardHeader>
             <CardContent className="grid gap-4">
@@ -83,10 +83,10 @@ export default function PricingSection() {
             </CardContent>
             <CardFooter className="flex flex-col space-y-2 pb-8">
               <Button size="lg" className="w-full bg-brand-green hover:bg-brand-green/90" asChild>
-                <Link href="/register?plan=premium">Commencer l'essai gratuit</Link>
+                <Link href="/register?plan=premium">Devenir beta testeur</Link>
               </Button>
               <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
-                Paiement sécurisé via Stripe. Annulation facile à tout moment.
+                Aucune carte bancaire requise. Places limitées.
               </p>
             </CardFooter>
           </Card>

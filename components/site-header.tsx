@@ -29,7 +29,7 @@ export default function SiteHeader() {
             <Link href="/login">Se connecter</Link>
           </Button>
           <Button size="sm" className="bg-brand-green hover:bg-brand-green/90" asChild>
-            <Link href="/register?plan=premium">Essai gratuit</Link>
+            <Link href="/register?plan=premium">Devenir beta testeur</Link>
           </Button>
         </div>
       </div>

@@ -15,6 +15,7 @@ interface Task {
   updatedAt: string;
   projectId: string | null;
   projectName: string | null;
+  projectColor: string | null;
 }
 
 export async function GET(
@@ -69,7 +70,8 @@ export async function GET(
         t."createdAt",
         t."updatedAt",
         p.id AS "projectId",
-        p.name AS "projectName"
+        p.name AS "projectName",
+        p.color AS "projectColor"
       FROM 
         "Task" t
       LEFT JOIN

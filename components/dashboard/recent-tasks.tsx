@@ -5,8 +5,8 @@ import Link from "next/link"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { CheckCircle, Circle, Clock, ArrowRight, Edit, RefreshCcw } from "lucide-react"
-import { format, formatDistanceToNow } from "date-fns"
+import { CheckCircle, Circle, Clock, ArrowRight, Edit, RefreshCcw, CalendarDays } from "lucide-react"
+import { format, formatDistanceToNow, isToday, isTomorrow } from "date-fns"
 import { fr } from "date-fns/locale"
 import { cn } from "@/lib/utils"
 
@@ -17,6 +17,7 @@ interface TaskWithProject {
   priority: number | null
   energyLevel: number | null
   dueDate: Date | null
+  scheduledFor: Date | null
   completed: boolean
   project: {
     id: string
@@ -42,8 +43,8 @@ const energyLabels: Record<number, { label: string, color: string }> = {
 export function RecentTasks() {
   const [tasks, setTasks] = useState<TaskWithProject[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState("")
   const [isUpdating, setIsUpdating] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
 
   const fetchTasks = async () => {
     setIsLoading(true)
@@ -58,11 +59,19 @@ export function RecentTasks() {
       }
       
       const data = await response.json()
-      setTasks(Array.isArray(data) ? data : [])
-      setIsLoading(false)
-    } catch (error) {
-      console.error("Erreur lors du chargement des tâches:", error)
-      setError("Impossible de charger les tâches. Veuillez réessayer plus tard.")
+      
+      // Convertir les dates
+      const formattedData = Array.isArray(data) ? data.map(task => ({
+        ...task,
+        dueDate: task.dueDate ? new Date(task.dueDate) : null,
+        scheduledFor: task.scheduledFor ? new Date(task.scheduledFor) : null
+      })) : [];
+      
+      setTasks(formattedData)
+    } catch (err: any) {
+      setError(err.message || "Une erreur est survenue")
+      console.error("Erreur lors de la récupération des tâches:", err)
+    } finally {
       setIsLoading(false)
     }
   }
@@ -109,7 +118,13 @@ export function RecentTasks() {
   }, [])
 
   function formatDate(date: Date) {
-    return formatDistanceToNow(new Date(date), { addSuffix: true, locale: fr })
+    if (isToday(date)) {
+      return "Aujourd'hui";
+    }
+    if (isTomorrow(date)) {
+      return "⚠️ Demain";
+    }
+    return formatDistanceToNow(new Date(date), { addSuffix: true, locale: fr });
   }
 
   if (isLoading) {
@@ -247,22 +262,29 @@ export function RecentTasks() {
                   </Badge>
                 )}
                 {task.dueDate && (
-                  <span>
-                    Échéance : {format(new Date(task.dueDate), "d MMMM yyyy", { locale: fr })}
+                  <span className="flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    {formatDate(task.dueDate)}
+                  </span>
+                )}
+                {!task.dueDate && task.scheduledFor && (
+                  <span className="flex items-center gap-1">
+                    <CalendarDays className="h-3 w-3" />
+                    Planifiée: {formatDate(task.scheduledFor)}
                   </span>
                 )}
               </div>
             </div>
           ))}
-
-          <div className="pt-2">
-            <Link href="/dashboard/tasks">
-              <Button variant="ghost" className="w-full justify-between">
-                Voir toutes les tâches
-                <ArrowRight className="h-4 w-4" />
-              </Button>
-            </Link>
-          </div>
+        </div>
+        
+        <div className="mt-4 text-center">
+          <Link href="/dashboard/tasks">
+            <Button variant="outline" size="sm">
+              Toutes les tâches
+              <ArrowRight className="h-4 w-4 ml-2" />
+            </Button>
+          </Link>
         </div>
       </CardContent>
     </Card>

@@ -169,7 +169,7 @@ export default function SuperAdminDashboardPage() {
     }
 
     // Comme les APIs peuvent ne pas être disponibles, utilisons des données fictives pour la démo
-    const useMockData = false
+    const useMockData = false  // Toujours utiliser les vraies données
 
     if (useMockData) {
       // Stats globales

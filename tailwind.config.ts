@@ -84,11 +84,20 @@ const config: Config = {
   				to: {
   					height: "0"
   				}
+  			},
+  			rotate: {
+  				"0%": {
+  					transform: "rotate(0deg)"
+  				},
+  				"100%": {
+  					transform: "rotate(360deg)"
+  				}
   			}
   		},
   		animation: {
   			"accordion-down": "accordion-down 0.2s ease-out",
-  			"accordion-up": "accordion-up 0.2s ease-out"
+  			"accordion-up": "accordion-up 0.2s ease-out",
+  			"rotate": "rotate 2s linear infinite"
   		}
   	}
   },

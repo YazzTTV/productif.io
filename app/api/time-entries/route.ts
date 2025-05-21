@@ -111,20 +111,66 @@ export async function POST(request: Request) {
       )
     }
 
-    const userId = decoded.userId
+    const userId = (decoded as any).id || (decoded as any).userId
+    console.log('[TIME_ENTRIES_POST] userId utilisé:', userId, 'decoded:', JSON.stringify(decoded))
+    
     const body = await request.json()
-    const { taskId, description, duration } = body
+    const { taskId, projectId, description, duration, startTime: clientStartTime, endTime: clientEndTime, note } = body
+
+    // Récupérer les détails de la tâche pour vérifier son projet
+    let taskProjectId = null;
+    if (taskId) {
+      const task = await prisma.task.findUnique({
+        where: { id: taskId },
+        select: { projectId: true }
+      });
+      taskProjectId = task?.projectId;
+    }
+
+    // Utiliser les heures de début et de fin envoyées par le client
+    const startTime = new Date(clientStartTime);
+    const endTime = new Date(clientEndTime);
+
+    // Valider que les dates sont valides
+    if (isNaN(startTime.getTime()) || isNaN(endTime.getTime())) {
+      console.error("[TIME_ENTRIES_POST] Dates invalides:", { clientStartTime, clientEndTime });
+      return NextResponse.json(
+        { error: "Les dates de début et de fin sont invalides" },
+        { status: 400 }
+      );
+    }
+
+    // Calculer la durée réelle en secondes entre début et fin
+    const durationInSeconds = Math.round((endTime.getTime() - startTime.getTime()) / 1000);
+
+    // Vérifier que la durée est d'au moins 1 seconde
+    if (durationInSeconds < 1) {
+      console.error("[TIME_ENTRIES_POST] Durée trop courte:", durationInSeconds);
+      return NextResponse.json(
+        { error: "La durée de l'entrée de temps doit être d'au moins 1 seconde" },
+        { status: 400 }
+      );
+    }
+
+    // Log pour débogage
+    console.log(`[TIME_ENTRIES_POST] Création d'une entrée de temps:`, {
+      userId,
+      taskId,
+      projectId: projectId || taskProjectId,
+      startTime: startTime.toISOString(),
+      endTime: endTime.toISOString(),
+      durationInSeconds,
+      note
+    });
 
     // Créer l'entrée de temps
-    const startTime = new Date()
-    const endTime = new Date(startTime.getTime() + duration * 1000) // Convertir la durée de secondes en millisecondes
-
     const timeEntry = await prisma.timeEntry.create({
       data: {
         startTime,
         endTime,
-        description,
+        description: note || description, // Utiliser note ou description, selon ce qui est disponible
         taskId,
+        projectId: projectId || taskProjectId, // Utiliser le projectId de la tâche s'il existe
         userId,
       },
     })

@@ -5,6 +5,7 @@ interface AnalyticsSummaryProps {
   stats: {
     totalTimeTracked: number
     totalProjects: number
+    activeProjects?: number
     totalTasks: number
     completedTasks: number
     completionRate: number
@@ -13,11 +14,12 @@ interface AnalyticsSummaryProps {
 
 export function AnalyticsSummary({ stats }: AnalyticsSummaryProps) {
   // Formater le temps total (format: XXh XXm)
-  const formatTotalTime = (durationInSeconds: number) => {
-    const hours = Math.floor(durationInSeconds / 3600)
-    const minutes = Math.floor((durationInSeconds % 3600) / 60)
+  const formatTotalTime = (hours: number) => {
+    // Le temps est déjà en heures, pas en secondes
+    const wholeHours = Math.floor(hours)
+    const minutes = Math.round((hours - wholeHours) * 60)
 
-    return `${hours}h ${minutes}m`
+    return `${wholeHours}h ${minutes}m`
   }
 
   return (
@@ -40,7 +42,11 @@ export function AnalyticsSummary({ stats }: AnalyticsSummaryProps) {
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold">{stats.totalProjects}</div>
-          <p className="text-xs text-muted-foreground mt-1">Projets actifs</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            {stats.activeProjects !== undefined ? 
+             `${stats.activeProjects} projets actifs sur ${stats.totalProjects}` : 
+             'Projets créés'}
+          </p>
         </CardContent>
       </Card>
 
@@ -51,7 +57,7 @@ export function AnalyticsSummary({ stats }: AnalyticsSummaryProps) {
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold">{stats.totalTasks}</div>
-          <p className="text-xs text-muted-foreground mt-1">Tâches créées</p>
+          <p className="text-xs text-muted-foreground mt-1">{stats.completedTasks} tâches complétées</p>
         </CardContent>
       </Card>
 
@@ -62,9 +68,7 @@ export function AnalyticsSummary({ stats }: AnalyticsSummaryProps) {
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold">{stats.completionRate}%</div>
-          <p className="text-xs text-muted-foreground mt-1">
-            {stats.completedTasks} tâches terminées sur {stats.totalTasks}
-          </p>
+          <p className="text-xs text-muted-foreground mt-1">Des tâches terminées</p>
         </CardContent>
       </Card>
     </div>

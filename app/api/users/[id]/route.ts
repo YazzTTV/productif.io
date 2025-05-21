@@ -16,39 +16,69 @@ export async function GET(
       return NextResponse.json({ error: "Non authentifié" }, { status: 401 })
     }
 
-    // Vérifier si l'utilisateur est un super admin
-    const userRole = await prisma.$queryRaw`
-      SELECT "role" FROM "User" WHERE "id" = ${currentUser.id}
+    // Récupérer le rôle et l'ID de l'entreprise de l'utilisateur
+    const userInfo = await prisma.$queryRaw`
+      SELECT 
+        "role", 
+        "managedCompanyId" 
+      FROM "User" 
+      WHERE "id" = ${currentUser.id}
     `
 
-    if (!Array.isArray(userRole) || userRole.length === 0 || userRole[0].role !== "SUPER_ADMIN") {
+    const userRole = userInfo[0]?.role
+    const managedCompanyId = userInfo[0]?.managedCompanyId
+
+    // Vérifier les permissions
+    if (userRole !== "SUPER_ADMIN" && userRole !== "ADMIN") {
       return NextResponse.json({ error: "Accès non autorisé" }, { status: 403 })
     }
 
     // Récupérer les informations de l'utilisateur demandé
     const userId = params.id
-    const user = await prisma.$queryRaw`
-      SELECT 
-        u.id, 
-        u.name, 
-        u.email, 
-        u.role, 
-        u."createdAt",
-        u."managedCompanyId",
-        c.name as "companyName"
-      FROM 
-        "User" u
-      LEFT JOIN 
-        "Company" c ON u."managedCompanyId" = c.id
-      WHERE 
-        u.id = ${userId}
-    `
+    let userQuery
 
-    if (!Array.isArray(user) || user.length === 0) {
+    if (userRole === "SUPER_ADMIN") {
+      // Les SUPER_ADMIN peuvent voir tous les utilisateurs
+      userQuery = await prisma.$queryRaw`
+        SELECT 
+          u.id, 
+          u.name, 
+          u.email, 
+          u.role, 
+          u."createdAt",
+          u."managedCompanyId",
+          c.name as "companyName"
+        FROM 
+          "User" u
+        LEFT JOIN 
+          "Company" c ON u."managedCompanyId" = c.id
+        WHERE 
+          u.id = ${userId}
+      `
+    } else {
+      // Les ADMIN ne peuvent voir que les utilisateurs de leur entreprise
+      userQuery = await prisma.$queryRaw`
+        SELECT 
+          u.id, 
+          u.name, 
+          u.email, 
+          u.role, 
+          u."createdAt"
+        FROM 
+          "User" u
+        JOIN 
+          "UserCompany" uc ON u.id = uc."userId"
+        WHERE 
+          u.id = ${userId}
+          AND uc."companyId" = ${managedCompanyId}
+      `
+    }
+
+    if (!Array.isArray(userQuery) || userQuery.length === 0) {
       return NextResponse.json({ error: "Utilisateur non trouvé" }, { status: 404 })
     }
 
-    return NextResponse.json({ user: user[0] })
+    return NextResponse.json({ user: userQuery[0] })
   } catch (error) {
     console.error("Erreur lors de la récupération des informations utilisateur:", error)
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 })
@@ -67,13 +97,21 @@ export async function PUT(
       return NextResponse.json({ error: "Non authentifié" }, { status: 401 })
     }
 
-    // Seuls les administrateurs peuvent modifier le rôle des utilisateurs
-    // Un utilisateur normal peut modifier ses propres informations mais pas son rôle
-    const isAdmin = await isUserAdmin(currentUser.id)
-    const isOwnProfile = currentUser.id === params.id
+    // Récupérer le rôle et l'ID de l'entreprise de l'utilisateur
+    const userInfo = await prisma.$queryRaw`
+      SELECT 
+        "role", 
+        "managedCompanyId" 
+      FROM "User" 
+      WHERE "id" = ${currentUser.id}
+    `
 
-    if (!isAdmin && !isOwnProfile) {
-      return NextResponse.json({ error: "Accès refusé" }, { status: 403 })
+    const userRole = userInfo[0]?.role
+    const managedCompanyId = userInfo[0]?.managedCompanyId
+
+    // Vérifier les permissions
+    if (userRole !== "SUPER_ADMIN" && userRole !== "ADMIN") {
+      return NextResponse.json({ error: "Accès non autorisé" }, { status: 403 })
     }
 
     const { name, role } = await request.json()
@@ -88,10 +126,27 @@ export async function PUT(
     }
 
     // Empêcher un administrateur de se rétrograder lui-même
-    if (isOwnProfile && isAdmin && role && role !== "ADMIN" && role !== "SUPER_ADMIN") {
+    if (currentUser.id === params.id && role && role !== "ADMIN" && role !== "SUPER_ADMIN") {
       return NextResponse.json({ 
         error: "Vous ne pouvez pas rétrograder votre propre rôle d'administrateur" 
       }, { status: 403 })
+    }
+
+    // Vérifier si l'utilisateur appartient à l'entreprise de l'admin
+    if (userRole === "ADMIN") {
+      const userInCompany = await prisma.$queryRaw`
+        SELECT EXISTS(
+          SELECT 1 FROM "UserCompany" 
+          WHERE "userId" = ${params.id} 
+          AND "companyId" = ${managedCompanyId}
+        ) as "exists"
+      `
+
+      if (!userInCompany || !Array.isArray(userInCompany) || !userInCompany[0].exists) {
+        return NextResponse.json({ 
+          error: "Vous ne pouvez pas modifier les utilisateurs d'autres entreprises" 
+        }, { status: 403 })
+      }
     }
 
     // Préparation des données à mettre à jour
@@ -101,53 +156,27 @@ export async function PUT(
       updateData.name = name;
     }
     
-    // Seul un admin peut changer le rôle, et un SUPER_ADMIN pour promouvoir au rang de SUPER_ADMIN
-    if (role !== undefined && isAdmin) {
-      // Vérifier si le current user est un super admin pour les promotions SUPER_ADMIN
-      if (role === "SUPER_ADMIN") {
-        const currentUserRole = await prisma.$queryRaw`
-          SELECT "role" FROM "User" WHERE "id" = ${currentUser.id}
-        `
-        if (!Array.isArray(currentUserRole) || currentUserRole.length === 0 || currentUserRole[0].role !== "SUPER_ADMIN") {
-          return NextResponse.json({ 
-            error: "Seul un super administrateur peut promouvoir au rang de super administrateur" 
-          }, { status: 403 })
-        }
+    if (role !== undefined) {
+      // Seul un SUPER_ADMIN peut créer ou modifier des SUPER_ADMIN
+      if (role === "SUPER_ADMIN" && userRole !== "SUPER_ADMIN") {
+        return NextResponse.json({ 
+          error: "Seul un super administrateur peut créer ou modifier des super administrateurs" 
+        }, { status: 403 })
       }
       updateData.role = role;
     }
 
     // Mettre à jour l'utilisateur
-    if (Object.keys(updateData).length > 0) {
-      // Construire la requête SQL dynamique
-      let query = `UPDATE "User" SET `;
-      const values: any[] = [];
-      const placeholders: string[] = [];
-      
-      // Ajouter chaque champ à mettre à jour
-      Object.entries(updateData).forEach(([key, value], index) => {
-        values.push(value);
-        placeholders.push(`"${key}" = $${index + 1}`);
-      });
-      
-      query += placeholders.join(", ");
-      query += `, "updatedAt" = NOW() WHERE "id" = $${values.length + 1}`;
-      values.push(params.id);
-      
-      await prisma.$executeRawUnsafe(query, ...values);
-    }
-
-    // Récupérer l'utilisateur mis à jour
-    const updatedUser = await prisma.$queryRaw`
-      SELECT "id", "name", "email", "role", "createdAt", "updatedAt"
-      FROM "User"
-      WHERE "id" = ${params.id}
+    await prisma.$executeRaw`
+      UPDATE "User"
+      SET ${Object.entries(updateData).map(([key, value]) => 
+        `${key} = ${value}`
+      ).join(", ")}
+      WHERE id = ${params.id}
     `
 
     return NextResponse.json({ 
-      success: true, 
-      message: "Utilisateur mis à jour avec succès", 
-      user: Array.isArray(updatedUser) && updatedUser.length > 0 ? updatedUser[0] : null
+      message: "Utilisateur mis à jour avec succès" 
     })
   } catch (error) {
     console.error("Erreur lors de la mise à jour de l'utilisateur:", error)
@@ -203,50 +232,19 @@ export async function DELETE(
       ) as "isAdmin"
     `
 
-    if (isCompanyAdmin && Array.isArray(isCompanyAdmin) && isCompanyAdmin.length > 0 && isCompanyAdmin[0].exists) {
-      // Récupérer le nom de l'entreprise pour un message d'erreur plus informatif
-      const companyInfo = await prisma.$queryRaw`
-        SELECT c.name FROM "Company" c
-        JOIN "User" u ON u."managedCompanyId" = c.id
-        WHERE u.id = ${userId}
-      `
-      
-      const companyName = Array.isArray(companyInfo) && companyInfo.length > 0 
-        ? companyInfo[0].name 
-        : "une entreprise";
-
+    if (isCompanyAdmin && isCompanyAdmin[0].isAdmin) {
       return NextResponse.json({ 
-        error: `Cet utilisateur est administrateur de ${companyName}. Veuillez d'abord transférer ses droits d'administration.` 
+        error: "Impossible de supprimer un administrateur d'entreprise" 
       }, { status: 403 })
     }
 
-    // Supprimer l'utilisateur des entreprises (UserCompany)
-    await prisma.$queryRaw`
-      DELETE FROM "UserCompany" WHERE "userId" = ${userId}
-    `
-
-    // Supprimer les tâches associées à l'utilisateur
-    await prisma.$queryRaw`
-      DELETE FROM "Task" WHERE "userId" = ${userId}
-    `
-
-    // Supprimer les habitudes associées à l'utilisateur
-    await prisma.$queryRaw`
-      DELETE FROM "habits" WHERE "userId" = ${userId}
-    `
-
-    // Supprimer les entrées de temps associées à l'utilisateur
-    await prisma.$queryRaw`
-      DELETE FROM "TimeEntry" WHERE "userId" = ${userId}
-    `
-
-    // Finalement, supprimer l'utilisateur
-    await prisma.$queryRaw`
-      DELETE FROM "User" WHERE "id" = ${userId}
+    // Supprimer l'utilisateur
+    await prisma.$executeRaw`
+      DELETE FROM "User"
+      WHERE id = ${userId}
     `
 
     return NextResponse.json({ 
-      success: true, 
       message: "Utilisateur supprimé avec succès" 
     })
   } catch (error) {

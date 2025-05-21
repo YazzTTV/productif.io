@@ -19,7 +19,7 @@ export default function HeroSection() {
             </div>
             <div className="flex flex-col gap-2 min-[400px]:flex-row">
               <Button size="lg" className="bg-brand-green hover:bg-brand-green/90" asChild>
-                <Link href="/register?plan=premium">Commencer l'essai gratuit de 7 jours</Link>
+                <Link href="/register?plan=premium">Devenir beta testeur</Link>
               </Button>
               <Button variant="outline" size="lg" asChild>
                 <Link href="#features">Découvrir les fonctionnalités</Link>
@@ -28,7 +28,7 @@ export default function HeroSection() {
             <div className="flex items-center space-x-4 text-sm">
               <div className="flex items-center space-x-1">
                 <CheckCircle className="h-4 w-4 text-brand-green" />
-                <span>Annulation facile</span>
+                <span>Aucune carte bancaire</span>
               </div>
               <div className="flex items-center space-x-1">
                 <CheckCircle className="h-4 w-4 text-brand-green" />

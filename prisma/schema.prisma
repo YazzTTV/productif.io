@@ -14,52 +14,53 @@ enum UserRole {
 }
 
 model User {
-  id              String        @id @default(cuid())
-  name            String?
-  email           String        @unique
-  password        String
-  role            UserRole      @default(USER)
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
-  habits          Habit[]
-  missions        Mission[]
-  processes       Process[]
-  projects        Project[]
-  sessions        Session[]
-  tasks           Task[]
-  timeEntries     TimeEntry[]
-  warMapEvents    WarMapEvent[]
-  companies       UserCompany[]  // Relation avec les entreprises
-  managedCompany  Company?       @relation("CompanyAdmin", fields: [managedCompanyId], references: [id])
+  id               String        @id @default(cuid())
+  name             String?
+  email            String        @unique
+  password         String
+  role             UserRole      @default(USER)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  habits           Habit[]
+  missions         Mission[]
+  processes        Process[]
+  projects         Project[]
+  sessions         Session[]
+  tasks            Task[]
+  timeEntries      TimeEntry[]
+  warMapEvents     WarMapEvent[]
+  companies        UserCompany[] // Relation avec les entreprises
+  managedCompany   Company?      @relation("CompanyAdmin", fields: [managedCompanyId], references: [id])
   managedCompanyId String?
-  
+  apiTokens        ApiToken[] // Tokens API pour agents IA
+
   // Champs Stripe
-  stripeCustomerId     String?    @unique
-  stripeSubscriptionId String?    @unique
+  stripeCustomerId     String?   @unique
+  stripeSubscriptionId String?   @unique
   subscriptionStatus   String?
-  trialEndsAt         DateTime?
+  trialEndsAt          DateTime?
 }
 
 model Company {
-  id              String        @id @default(cuid())
-  name            String
-  description     String?
-  logo            String?
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
-  users           UserCompany[] // Relation avec les utilisateurs
-  administrators  User[]        @relation("CompanyAdmin")
+  id             String        @id @default(cuid())
+  name           String
+  description    String?
+  logo           String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  users          UserCompany[] // Relation avec les utilisateurs
+  administrators User[]        @relation("CompanyAdmin")
 }
 
 model UserCompany {
-  id         String   @id @default(cuid())
-  userId     String
-  companyId  String
-  isActive   Boolean  @default(true)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  id        String   @id @default(cuid())
+  userId    String
+  companyId String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   @@unique([userId, companyId])
   @@index([userId])
@@ -150,11 +151,11 @@ model Habit {
   id          String       @id @default(cuid())
   name        String       @db.VarChar(255)
   description String?      @db.Text
-  color       String?      @db.VarChar(7)  // Format hexadécimal: #RRGGBB
+  color       String?      @db.VarChar(7) // Format hexadécimal: #RRGGBB
   frequency   String       @db.VarChar(10) // 'daily', 'weekly', 'monthly'
-  daysOfWeek  String[]     @default([])    // ["monday", "wednesday", "friday"]
+  daysOfWeek  String[]     @default([]) // ["monday", "wednesday", "friday"]
   userId      String
-  order       Int          @default(0)     // Nouvel attribut pour l'ordre d'affichage
+  order       Int          @default(0) // Nouvel attribut pour l'ordre d'affichage
   user        User         @relation(fields: [userId], references: [id])
   entries     HabitEntry[]
   createdAt   DateTime     @default(now())
@@ -171,7 +172,7 @@ model HabitEntry {
   date      DateTime @db.Date
   completed Boolean  @default(false)
   note      String?  @db.Text
-  rating    Int?     
+  rating    Int?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -247,4 +248,21 @@ model WarMapEvent {
   color       String?
   project     Project? @relation(fields: [projectId], references: [id])
   user        User     @relation(fields: [userId], references: [id])
+}
+
+model ApiToken {
+  id          String    @id @default(cuid())
+  name        String    @db.VarChar(255)
+  token       String    @unique
+  userId      String
+  description String?   @db.Text
+  scopes      String[]  @default([]) // Permissions: ["habits:read", "habits:write", "tasks:read", etc.]
+  lastUsed    DateTime?
+  expiresAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("api_tokens")
 }

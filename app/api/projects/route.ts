@@ -57,16 +57,20 @@ export async function POST(req: Request) {
     // Vérifier l'authentification
     const user = await getAuthUser()
     if (!user) {
+      console.error("[PROJECTS_POST] Utilisateur non authentifié")
       return NextResponse.json(
         { error: "Non authentifié" },
         { status: 401 }
       )
     }
 
+    console.log("[PROJECTS_POST] Création de projet par l'utilisateur:", user.id)
     const userId = user.id
 
     const body = await req.json()
     const { name, description, color } = body
+    
+    console.log(`[PROJECTS_POST] Données du projet: nom="${name}", description="${description}", couleur="${color}"`)
 
     const project = await prisma.project.create({
       data: {
@@ -76,6 +80,8 @@ export async function POST(req: Request) {
         userId,
       },
     })
+    
+    console.log(`[PROJECTS_POST] Projet créé avec succès: ID=${project.id}`)
 
     return NextResponse.json(project)
   } catch (error) {

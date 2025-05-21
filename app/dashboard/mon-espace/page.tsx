@@ -7,12 +7,22 @@ import { fr } from "date-fns/locale"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
-import { Layers, Pencil, Save, X, Calendar } from "lucide-react"
+import { Layers, Pencil, Save, X, Calendar, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
 import { toast } from "sonner"
 import { ProcessViewer } from "@/components/process/process-viewer"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 interface HabitEntry {
   id: string
@@ -59,6 +69,7 @@ export default function MonEspacePage() {
   const [completedTasks, setCompletedTasks] = useState<CompletedTask[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [editingProcess, setEditingProcess] = useState<string | null>(null)
+  const [deletingProcess, setDeletingProcess] = useState<string | null>(null)
   const [editForm, setEditForm] = useState<{name: string, description: string}>({
     name: '',
     description: ''
@@ -179,6 +190,33 @@ export default function MonEspacePage() {
       case 2: return "bg-blue-100 text-blue-800"
       case 3: return "bg-green-100 text-green-800"
       default: return "bg-gray-100 text-gray-800"
+    }
+  }
+
+  const handleDeleteClick = (processId: string) => {
+    setDeletingProcess(processId);
+  }
+
+  const handleDeleteProcess = async () => {
+    if (!deletingProcess) return;
+
+    try {
+      const response = await fetch(`/api/processes/${deletingProcess}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        throw new Error('Erreur lors de la suppression du processus');
+      }
+
+      toast.success("Processus supprimé avec succès");
+      // Rafraîchir les données
+      fetchData();
+    } catch (error) {
+      console.error("Erreur:", error);
+      toast.error("Erreur lors de la suppression du processus");
+    } finally {
+      setDeletingProcess(null);
     }
   }
 
@@ -304,14 +342,25 @@ export default function MonEspacePage() {
                           </Button>
                         </div>
                       ) : (
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          onClick={() => handleEditClick(process)}
-                        >
-                          <Pencil className="h-4 w-4 mr-1" />
-                          Modifier
-                        </Button>
+                        <div className="flex items-center gap-2">
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={() => handleEditClick(process)}
+                          >
+                            <Pencil className="h-4 w-4 mr-1" />
+                            Modifier
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            className="text-red-500 hover:text-red-700"
+                            onClick={() => handleDeleteClick(process.id)}
+                          >
+                            <Trash2 className="h-4 w-4 mr-1" />
+                            Supprimer
+                          </Button>
+                        </div>
                       )}
                     </CardTitle>
                     <CardDescription>
@@ -394,6 +443,26 @@ export default function MonEspacePage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <AlertDialog open={!!deletingProcess} onOpenChange={(open) => !open && setDeletingProcess(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Êtes-vous sûr ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Cette action est irréversible. Elle va supprimer définitivement ce processus.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction 
+              className="bg-red-500 text-white hover:bg-red-600"
+              onClick={handleDeleteProcess}
+            >
+              Supprimer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 } 

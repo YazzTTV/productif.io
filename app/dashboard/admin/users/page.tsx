@@ -119,9 +119,9 @@ export default function UsersAdminPage() {
   // Déterminer le titre en fonction du rôle de l'utilisateur
   const getPageTitle = () => {
     if (userInfo?.role === "SUPER_ADMIN") {
-      return "Utilisateurs de la plateforme"
+      return "Gestion des utilisateurs de la plateforme"
     } else if (userInfo?.role === "ADMIN") {
-      return `Utilisateurs de ${userInfo?.companyName || 'votre entreprise'}`
+      return `Gestion des utilisateurs de ${userInfo?.companyName || 'votre entreprise'}`
     }
     return "Utilisateurs"
   }
@@ -133,16 +133,16 @@ export default function UsersAdminPage() {
         <Button asChild>
           <Link href="/dashboard/admin/users/new">
             <UserPlus className="mr-2 h-4 w-4" />
-            Ajouter un utilisateur
+            Créer un utilisateur
           </Link>
         </Button>
       )
     } else if (userInfo?.role === "ADMIN" && userInfo?.managedCompanyId) {
       return (
         <Button asChild>
-          <Link href={`/dashboard/admin/companies/${userInfo.managedCompanyId}/users/invite`}>
+          <Link href={`/dashboard/admin/companies/${userInfo.managedCompanyId}/users/add`}>
             <UserPlus className="mr-2 h-4 w-4" />
-            Inviter un utilisateur
+            Ajouter un utilisateur à l'entreprise
           </Link>
         </Button>
       )
@@ -150,9 +150,19 @@ export default function UsersAdminPage() {
     return null
   }
 
-  // Vérifier si l'utilisateur peut assigner des tâches (seulement ADMIN, pas SUPER_ADMIN)
+  // Vérifier si l'utilisateur peut assigner des tâches (seulement ADMIN)
   const canAssignTasks = () => {
     return userInfo?.role === "ADMIN";
+  }
+
+  // Vérifier si l'utilisateur peut supprimer des utilisateurs (seulement SUPER_ADMIN)
+  const canDeleteUsers = () => {
+    return userInfo?.role === "SUPER_ADMIN";
+  }
+
+  // Vérifier si l'utilisateur peut voir les données des utilisateurs (seulement SUPER_ADMIN)
+  const canViewUserData = () => {
+    return userInfo?.role === "SUPER_ADMIN";
   }
 
   // Ouvrir le modal d'assignation de tâche
@@ -510,28 +520,28 @@ export default function UsersAdminPage() {
                           </Button>
                         )}
                         
-                        {userInfo?.role === "SUPER_ADMIN" && (
-                          <>
-                            <Button 
-                              variant="default" 
-                              size="sm"
-                              asChild
-                            >
-                              <Link href={`/dashboard/admin/view-as/${user.id}`}>
-                                <Eye className="mr-1 h-3 w-3" />
-                                Voir les données
-                              </Link>
-                            </Button>
-                            
-                            <Button 
-                              variant="destructive" 
-                              size="sm"
-                              onClick={() => openDeleteDialog(user)}
-                            >
-                              <Trash className="mr-1 h-3 w-3" />
-                              Supprimer
-                            </Button>
-                          </>
+                        {canViewUserData() && (
+                          <Button 
+                            variant="default" 
+                            size="sm"
+                            asChild
+                          >
+                            <Link href={`/dashboard/admin/view-as/${user.id}`}>
+                              <Eye className="mr-1 h-3 w-3" />
+                              Voir les données
+                            </Link>
+                          </Button>
+                        )}
+                        
+                        {canDeleteUsers() && (
+                          <Button 
+                            variant="destructive" 
+                            size="sm"
+                            onClick={() => openDeleteDialog(user)}
+                          >
+                            <Trash className="mr-1 h-3 w-3" />
+                            Supprimer
+                          </Button>
                         )}
                       </div>
                     </TableCell>

@@ -68,10 +68,22 @@ export function EditTaskForm({ taskId }: EditTaskFormProps) {
   useEffect(() => {
     async function fetchTask() {
       try {
+        setIsLoading(true)
         const response = await fetch(`/api/tasks/${taskId}`)
+        
         if (!response.ok) {
-          throw new Error("Erreur lors de la récupération de la tâche")
+          // Gérer les différents cas d'erreur HTTP
+          if (response.status === 404) {
+            throw new Error("Cette tâche n'existe pas ou a été supprimée.")
+          } else if (response.status === 403) {
+            throw new Error("Vous n'avez pas l'autorisation d'accéder à cette tâche.")
+          } else if (response.status === 401) {
+            throw new Error("Veuillez vous connecter pour accéder à cette tâche.")
+          } else {
+            throw new Error("Erreur lors de la récupération de la tâche. Veuillez réessayer.")
+          }
         }
+        
         const task = await response.json()
         
         form.reset({
@@ -89,27 +101,34 @@ export function EditTaskForm({ taskId }: EditTaskFormProps) {
         })
       } catch (error) {
         console.error("Erreur:", error)
-        setError("Impossible de charger la tâche")
+        if (error instanceof Error) {
+          setError(error.message)
+        } else {
+          setError("Impossible de charger la tâche")
+        }
       } finally {
         setIsLoading(false)
       }
     }
+    
     fetchTask()
   }, [taskId, form])
 
   const onSubmit = async (data: z.infer<typeof formSchema>) => {
     setIsLoading(true)
-
+    
     try {
+      // Convertir le niveau d'énergie en valeur numérique
+      let energyLevelValue: number | null = null;
+      if (data.energyLevel === 'Extrême') energyLevelValue = 0;
+      else if (data.energyLevel === 'Élevé') energyLevelValue = 1;
+      else if (data.energyLevel === 'Moyen') energyLevelValue = 2;
+      else if (data.energyLevel === 'Faible') energyLevelValue = 3;
+      
       const formData = {
         ...data,
         priority: data.priority ? parseInt(data.priority.replace('P', '')) : null,
-        energyLevel: data.energyLevel ? {
-          'Extrême': 0,
-          'Élevé': 1,
-          'Moyen': 2,
-          'Faible': 3
-        }[data.energyLevel] : null,
+        energyLevel: energyLevelValue,
         dueDate: data.dueDate ? new Date(data.dueDate) : null,
         projectId: data.projectId || null
       }
@@ -127,7 +146,17 @@ export function EditTaskForm({ taskId }: EditTaskFormProps) {
       }
 
       router.refresh()
-      router.push("/dashboard/tasks")
+      
+      // Vérifier s'il existe une page de retour stockée
+      const returnTo = localStorage.getItem('returnTo');
+      if (returnTo) {
+        // Supprimer la valeur du localStorage pour ne pas affecter les éditions futures
+        localStorage.removeItem('returnTo');
+        router.push(returnTo);
+      } else {
+        // Comportement par défaut si aucune page de retour n'est spécifiée
+        router.push("/dashboard/tasks");
+      }
     } catch (error) {
       console.error("Erreur:", error)
       toast({
@@ -141,11 +170,50 @@ export function EditTaskForm({ taskId }: EditTaskFormProps) {
   }
 
   if (error) {
-    return <div className="text-red-500">{error}</div>
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-md p-4 mt-4">
+        <div className="flex">
+          <div className="flex-shrink-0">
+            <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+            </svg>
+          </div>
+          <div className="ml-3">
+            <h3 className="text-sm font-medium text-red-800">Erreur</h3>
+            <div className="mt-2 text-sm text-red-700">
+              <p>{error}</p>
+            </div>
+            <div className="mt-4">
+              <button
+                type="button"
+                className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-red-700 bg-red-100 hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                onClick={() => {
+                  // Vérifier s'il existe une page de retour stockée
+                  const returnTo = localStorage.getItem('returnTo');
+                  if (returnTo) {
+                    localStorage.removeItem('returnTo');
+                    router.push(returnTo);
+                  } else {
+                    router.push("/dashboard/tasks");
+                  }
+                }}
+              >
+                Retour au tableau des tâches
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   if (isLoading) {
-    return <div>Chargement...</div>
+    return (
+      <div className="flex justify-center items-center h-32">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        <span className="ml-2">Chargement de la tâche...</span>
+      </div>
+    )
   }
 
   return (
@@ -295,7 +363,16 @@ export function EditTaskForm({ taskId }: EditTaskFormProps) {
           <Button
             type="button"
             variant="outline"
-            onClick={() => router.push("/dashboard/tasks")}
+            onClick={() => {
+              // Vérifier s'il existe une page de retour stockée
+              const returnTo = localStorage.getItem('returnTo');
+              if (returnTo) {
+                localStorage.removeItem('returnTo');
+                router.push(returnTo);
+              } else {
+                router.push("/dashboard/tasks");
+              }
+            }}
           >
             Annuler
           </Button>

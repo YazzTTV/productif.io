@@ -92,3 +92,28 @@ body {
     @apply bg-background text-foreground;
   }
 }
+
+/* Styles pour la bordure animée autour des boutons de whitelist */
+.animate-border-button {
+  position: relative;
+  z-index: 2;
+  background-color: #22c55e !important;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
+
+.animate-border-button::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: -4px;
+  background: conic-gradient(#ffffff00, #ffffff, #ffffff00);
+  border-radius: 0.5rem;
+  animation: rotate 2s linear infinite;
+  opacity: 1;
+}
+
+@keyframes rotate {
+  100% {
+    transform: rotate(360deg);
+  }
+}

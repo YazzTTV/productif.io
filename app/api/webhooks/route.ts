@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
 
     if (action === 'create_task') {
       // Create a new task
-      const { title, description, userId, projectId, dueDate } = data;
+      const { title, description, userId, projectId, dueDate, priority, energyLevel } = data;
       
       if (!title || !userId) {
         return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -44,6 +44,8 @@ export async function POST(req: NextRequest) {
           userId,
           projectId,
           dueDate: dueDate ? new Date(dueDate) : undefined,
+          priority: priority !== undefined ? priority : null,
+          energyLevel: energyLevel !== undefined ? energyLevel : null,
         }
       });
       
@@ -60,6 +62,15 @@ export async function POST(req: NextRequest) {
       // Process dates if present
       if (updateData.dueDate) {
         updateData.dueDate = new Date(updateData.dueDate);
+      }
+      
+      // Ensure the data types are correct for priority and energyLevel
+      if (updateData.priority !== undefined) {
+        updateData.priority = updateData.priority !== null ? Number(updateData.priority) : null;
+      }
+      
+      if (updateData.energyLevel !== undefined) {
+        updateData.energyLevel = updateData.energyLevel !== null ? Number(updateData.energyLevel) : null;
       }
       
       const updatedTask = await prisma.task.update({

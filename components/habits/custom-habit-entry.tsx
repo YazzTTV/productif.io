@@ -40,14 +40,10 @@ export function CustomHabitEntry({ habit, date, onUpdate }: CustomHabitEntryProp
   const isDayRatingHabit = habit.name.toLowerCase().includes("note de sa journée")
 
   const handleToggle = async () => {
-    if (isLearningHabit) {
-      setIsOpen(true)
-    } else {
-      try {
-        await onUpdate(habit.id, date, { completed: !isCompleted })
-      } catch (error) {
-        toast.error("Erreur lors de la mise à jour de l'habitude")
-      }
+    try {
+      await onUpdate(habit.id, date, { completed: !isCompleted })
+    } catch (error) {
+      toast.error("Erreur lors de la mise à jour de l'habitude")
     }
   }
 
@@ -81,8 +77,6 @@ export function CustomHabitEntry({ habit, date, onUpdate }: CustomHabitEntryProp
 
       setIsOpen(false)
       toast.success("Entrée enregistrée avec succès")
-      // Recharger la page pour mettre à jour les données
-      window.location.reload()
     } catch (error) {
       console.error("Erreur lors de l'enregistrement:", error)
       toast.error("Erreur lors de l'enregistrement. Veuillez réessayer.")
@@ -140,19 +134,28 @@ export function CustomHabitEntry({ habit, date, onUpdate }: CustomHabitEntryProp
 
   return (
     <>
-      <div className="flex items-center justify-center">
+      <div className="flex items-center justify-center gap-2">
         {isLearningHabit ? (
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            className={cn(
-              "text-xs px-2 py-1 h-6",
-              isCompleted ? "text-green-600 bg-green-50" : "text-gray-500"
+          <>
+            <Checkbox
+              checked={isCompleted}
+              onCheckedChange={handleToggle}
+              className={cn(
+                "h-5 w-5",
+                isCompleted && "bg-primary border-primary"
+              )}
+            />
+            {isCompleted && (
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="text-xs px-2 py-1 h-6"
+                onClick={handleOpenDayNote}
+              >
+                +
+              </Button>
             )}
-            onClick={handleToggle}
-          >
-            {isCompleted ? "Modifer" : "Ajouter"} note
-          </Button>
+          </>
         ) : isDayRatingHabit ? (
           renderRating()
         ) : (
