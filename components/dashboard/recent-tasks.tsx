@@ -26,18 +26,18 @@ interface TaskWithProject {
 }
 
 const priorityLabels: Record<number, { label: string, color: string }> = {
-  0: { label: "Quick Win", color: "bg-green-100 text-green-800" },
-  1: { label: "Urgent", color: "bg-red-100 text-red-800" },
+  0: { label: "Optionnel", color: "bg-gray-100 text-gray-800" },
+  1: { label: "A faire", color: "bg-blue-100 text-blue-800" },
   2: { label: "Important", color: "bg-yellow-100 text-yellow-800" },
-  3: { label: "A faire", color: "bg-blue-100 text-blue-800" },
-  4: { label: "Optionnel", color: "bg-gray-100 text-gray-800" }
+  3: { label: "Urgent", color: "bg-red-100 text-red-800" },
+  4: { label: "Quick Win", color: "bg-green-100 text-green-800" }
 }
 
 const energyLabels: Record<number, { label: string, color: string }> = {
-  0: { label: "Extrême", color: "bg-red-100 text-red-800" },
-  1: { label: "Élevé", color: "bg-orange-100 text-orange-800" },
-  2: { label: "Moyen", color: "bg-yellow-100 text-yellow-800" },
-  3: { label: "Faible", color: "bg-green-100 text-green-800" }
+  0: { label: "Faible", color: "bg-green-100 text-green-800" },
+  1: { label: "Moyen", color: "bg-yellow-100 text-yellow-800" },
+  2: { label: "Élevé", color: "bg-orange-100 text-orange-800" },
+  3: { label: "Extrême", color: "bg-red-100 text-red-800" }
 }
 
 export function RecentTasks() {

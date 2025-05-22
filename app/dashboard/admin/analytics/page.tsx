@@ -142,10 +142,10 @@ export default function AdminAnalyticsPage() {
       p4: tasks.filter(task => task.priority === 4 || task.priority === "4").length,
     }
     
-    // Taux de complétion des tâches prioritaires (P0 et P1)
+    // Taux de complétion des tâches prioritaires (P4 et P3)
     const highPriorityTasks = tasks.filter(task => 
-      task.priority === 0 || task.priority === "0" || 
-      task.priority === 1 || task.priority === "1"
+      task.priority === 4 || task.priority === "4" || 
+      task.priority === 3 || task.priority === "3"
     )
     const completedHighPriorityTasks = highPriorityTasks.filter(task => task.completed)
     const highPriorityCompletionRate = highPriorityTasks.length > 0 
@@ -190,11 +190,11 @@ export default function AdminAnalyticsPage() {
   
   // Données pour les graphiques
   const priorityChartData = stats ? [
-    { name: "P0", value: stats.tasksByPriority.p0, color: "#ef4444" },
-    { name: "P1", value: stats.tasksByPriority.p1, color: "#f97316" },
-    { name: "P2", value: stats.tasksByPriority.p2, color: "#eab308" },
-    { name: "P3", value: stats.tasksByPriority.p3, color: "#3b82f6" },
-    { name: "P4", value: stats.tasksByPriority.p4, color: "#9ca3af" }
+    { name: "P0", value: stats.tasksByPriority.p0, color: "#9ca3af" }, // Optionnel - gris
+    { name: "P1", value: stats.tasksByPriority.p1, color: "#3b82f6" }, // À faire - bleu
+    { name: "P2", value: stats.tasksByPriority.p2, color: "#eab308" }, // Important - jaune
+    { name: "P3", value: stats.tasksByPriority.p3, color: "#f97316" }, // Urgent - orange
+    { name: "P4", value: stats.tasksByPriority.p4, color: "#22c55e" }  // Quick Win - vert
   ].filter(item => item.value > 0) : []
   
   const completionChartData = stats ? [
@@ -202,7 +202,7 @@ export default function AdminAnalyticsPage() {
     { name: "À faire", value: stats.totalTasks - stats.completedTasks, color: "#9ca3af" }
   ].filter(item => item.value > 0) : []
 
-  const COLORS = ["#ef4444", "#f97316", "#eab308", "#3b82f6", "#9ca3af"]
+  const COLORS = ["#9ca3af", "#3b82f6", "#eab308", "#f97316", "#22c55e"]
 
   return (
     <AdminRequiredPage>
@@ -309,7 +309,7 @@ export default function AdminAnalyticsPage() {
                     value={stats.highPriorityCompletionRate} 
                   />
                   <p className="text-xs text-muted-foreground mt-2">
-                    P0 et P1 (Quick Win & Urgent)
+                    P4 et P3 (Quick Win & Urgent)
                   </p>
                 </CardContent>
               </Card>
@@ -402,24 +402,24 @@ export default function AdminAnalyticsPage() {
                   </ResponsiveContainer>
                   <div className="grid grid-cols-5 gap-2 mt-4">
                     <div className="text-center">
-                      <Badge className="bg-red-500 hover:bg-red-600">P0</Badge>
-                      <p className="text-xs mt-1">Quick Win</p>
+                      <Badge className="bg-gray-500 hover:bg-gray-600">P0</Badge>
+                      <p className="text-xs mt-1">Optionnel</p>
                     </div>
                     <div className="text-center">
-                      <Badge className="bg-orange-500 hover:bg-orange-600">P1</Badge>
-                      <p className="text-xs mt-1">Urgent</p>
+                      <Badge className="bg-blue-500 hover:bg-blue-600">P1</Badge>
+                      <p className="text-xs mt-1">À faire</p>
                     </div>
                     <div className="text-center">
                       <Badge className="bg-yellow-500 hover:bg-yellow-600">P2</Badge>
                       <p className="text-xs mt-1">Important</p>
                     </div>
                     <div className="text-center">
-                      <Badge className="bg-blue-500 hover:bg-blue-600">P3</Badge>
-                      <p className="text-xs mt-1">À faire</p>
+                      <Badge className="bg-orange-500 hover:bg-orange-600">P3</Badge>
+                      <p className="text-xs mt-1">Urgent</p>
                     </div>
                     <div className="text-center">
-                      <Badge className="bg-gray-500 hover:bg-gray-600">P4</Badge>
-                      <p className="text-xs mt-1">Optionnel</p>
+                      <Badge className="bg-green-500 hover:bg-green-600">P4</Badge>
+                      <p className="text-xs mt-1">Quick Win</p>
                     </div>
                   </div>
                 </CardContent>

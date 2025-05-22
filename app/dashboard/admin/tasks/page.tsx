@@ -122,7 +122,7 @@ export default function AdminTasksPage() {
   
   // États pour le tri
   const [sortColumn, setSortColumn] = useState<string>("priority")
-  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc")
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc")
 
   useEffect(() => {
     const fetchData = async () => {
@@ -283,18 +283,15 @@ export default function AdminTasksPage() {
     
     switch (priorityStr) {
       case "0":
+        return <Badge variant="outline" className="text-xs font-semibold">P0 - Optionnel</Badge>
       case "1":
-      case "URGENT":
-        return <Badge variant="destructive" className="text-xs font-semibold">P1</Badge>
+        return <Badge variant="secondary" className="text-xs font-semibold">P1 - À faire</Badge>
       case "2":
-      case "HIGH":
-        return <Badge variant="default" className="bg-orange-500 text-xs font-semibold">P2</Badge>
+        return <Badge variant="default" className="bg-orange-500 text-xs font-semibold">P2 - Important</Badge>
       case "3":
-      case "MEDIUM":
-        return <Badge variant="secondary" className="text-xs font-semibold">P3</Badge>
+        return <Badge variant="destructive" className="text-xs font-semibold">P3 - Urgent</Badge>
       case "4":
-      case "LOW":
-        return <Badge variant="outline" className="text-xs font-semibold">P4</Badge>
+        return <Badge variant="default" className="bg-green-500 text-xs font-semibold">P4 - Quick Win</Badge>
       default:
         return <Badge variant="outline" className="text-xs font-semibold">{priorityStr}</Badge>
     }
@@ -386,10 +383,10 @@ export default function AdminTasksPage() {
           return task.priority === priorityValue
         } else if (typeof task.priority === 'string') {
           switch(task.priority) {
-            case 'URGENT': return priorityValue === 1
-            case 'HIGH': return priorityValue === 2
-            case 'MEDIUM': return priorityValue === 3
-            case 'LOW': return priorityValue === 4
+            case 'URGENT': return priorityValue === 3 // P3 - Urgent
+            case 'HIGH': return priorityValue === 2   // P2 - Important
+            case 'MEDIUM': return priorityValue === 1 // P1 - À faire  
+            case 'LOW': return priorityValue === 0    // P0 - Optionnel
             default: return false
           }
         }
@@ -442,17 +439,31 @@ export default function AdminTasksPage() {
     const sortedTasks = [...grouped].sort((a, b) => {
       // Fonction pour convertir la priorité en nombre pour le tri
       const getPriorityValue = (priority: number | string | null | undefined) => {
-        if (priority === null || priority === undefined) return 3 // Default to P3
+        if (priority === null || priority === undefined) return 1 // Default to P1
         
-        if (typeof priority === 'number') return priority
-        
-        switch(priority) {
-          case 'URGENT': return 1
-          case 'HIGH': return 2
-          case 'MEDIUM': return 3
-          case 'LOW': return 4
-          default: return parseInt(priority) || 3
+        if (typeof priority === 'number') {
+          // Nouveau mapping des priorités numériques (ordre décroissant)
+          // P4 (Quick Win) a la valeur la plus élevée pour être affiché en premier
+          switch(priority) {
+            case 0: return 1 // P0 - Optionnel (valeur la plus basse)
+            case 1: return 2 // P1 - À faire
+            case 2: return 3 // P2 - Important
+            case 3: return 4 // P3 - Urgent
+            case 4: return 5 // P4 - Quick Win (valeur la plus haute)
+            default: return priority
+          }
+        } else if (typeof priority === 'string') {
+          // Mapping des valeurs textuelles (rétrocompatibilité)
+          switch(priority) {
+            case 'LOW': return 1     // P0 - Optionnel
+            case 'MEDIUM': return 2  // P1 - À faire
+            case 'HIGH': return 3    // P2 - Important
+            case 'URGENT': return 4  // P3 - Urgent
+            default: return parseInt(priority) || 1
+          }
         }
+        
+        return 1 // Valeur par défaut
       }
       
       let comparison = 0
@@ -837,18 +848,19 @@ export default function AdminTasksPage() {
         
         switch (priorityStr) {
           case "0":
+            return "P0 - Optionnel"
           case "1":
-          case "URGENT":
-            return "P1 - Urgent"
+          case "URGENT":  // Pour rétrocompatibilité
+            return "P1 - À faire"
           case "2":
-          case "HIGH":
+          case "HIGH":    // Pour rétrocompatibilité
             return "P2 - Important"
           case "3":
-          case "MEDIUM":
-            return "P3 - À faire"
+          case "MEDIUM":  // Pour rétrocompatibilité
+            return "P3 - Urgent"
           case "4":
-          case "LOW":
-            return "P4 - Optionnel"
+          case "LOW":     // Pour rétrocompatibilité
+            return "P4 - Quick Win"
           default:
             return priorityStr
         }
@@ -857,10 +869,10 @@ export default function AdminTasksPage() {
       // Convertir les valeurs numériques de niveau d'énergie en texte
       const getEnergyLevelText = (energyLevel: number | null) => {
         switch (energyLevel) {
-          case 0: return "Extrême"
-          case 1: return "Élevé"
-          case 2: return "Moyen"
-          case 3: return "Faible"
+          case 0: return "Faible"
+          case 1: return "Moyen"
+          case 2: return "Élevé"
+          case 3: return "Extrême"
           default: return "Non défini"
         }
       }
@@ -1105,11 +1117,11 @@ export default function AdminTasksPage() {
                     <SelectValue placeholder="Sélectionner une priorité" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="0">P0 - Quick Win</SelectItem>
-                    <SelectItem value="1">P1 - Urgent</SelectItem>
+                    <SelectItem value="0">P0 - Optionnel</SelectItem>
+                    <SelectItem value="1">P1 - À faire</SelectItem>
                     <SelectItem value="2">P2 - Important</SelectItem>
-                    <SelectItem value="3">P3 - À faire</SelectItem>
-                    <SelectItem value="4">P4 - Optionnel</SelectItem>
+                    <SelectItem value="3">P3 - Urgent</SelectItem>
+                    <SelectItem value="4">P4 - Quick Win</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -1124,10 +1136,10 @@ export default function AdminTasksPage() {
                     <SelectValue placeholder="Niveau d'énergie requis" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="0">Extrême</SelectItem>
-                    <SelectItem value="1">Élevé</SelectItem>
-                    <SelectItem value="2">Moyen</SelectItem>
-                    <SelectItem value="3">Faible</SelectItem>
+                    <SelectItem value="0">Faible</SelectItem>
+                    <SelectItem value="1">Moyen</SelectItem>
+                    <SelectItem value="2">Élevé</SelectItem>
+                    <SelectItem value="3">Extrême</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -1335,10 +1347,11 @@ export default function AdminTasksPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Toutes les priorités</SelectItem>
-                    <SelectItem value="1" className="text-red-600 font-semibold">P1 - Urgent</SelectItem>
+                    <SelectItem value="0" className="text-gray-400 font-semibold">P0 - Optionnel</SelectItem>
+                    <SelectItem value="1" className="text-blue-600 font-semibold">P1 - À faire</SelectItem>
                     <SelectItem value="2" className="text-orange-500 font-semibold">P2 - Important</SelectItem>
-                    <SelectItem value="3" className="text-muted-foreground font-semibold">P3 - À faire</SelectItem>
-                    <SelectItem value="4" className="text-gray-400 font-semibold">P4 - Optionnel</SelectItem>
+                    <SelectItem value="3" className="text-red-600 font-semibold">P3 - Urgent</SelectItem>
+                    <SelectItem value="4" className="text-green-600 font-semibold">P4 - Quick Win</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

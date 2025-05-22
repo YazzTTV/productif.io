@@ -60,10 +60,10 @@ async function updateTask(taskId: string, data: any) {
     const priorityString = data.priority !== null ? `P${data.priority}` : "P3"
     
     let energyString = "Moyen";
-    if (data.energyLevel === 0) energyString = "Extrême";
-    else if (data.energyLevel === 1) energyString = "Élevé";
-    else if (data.energyLevel === 2) energyString = "Moyen";
-    else if (data.energyLevel === 3) energyString = "Faible";
+    if (data.energyLevel === 0) energyString = "Faible";
+    else if (data.energyLevel === 1) energyString = "Moyen";
+    else if (data.energyLevel === 2) energyString = "Élevé";
+    else if (data.energyLevel === 3) energyString = "Extrême";
 
     const order = calculateTaskOrder(priorityString, energyString)
 

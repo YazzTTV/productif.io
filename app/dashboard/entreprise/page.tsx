@@ -113,7 +113,7 @@ export default function EntreprisePage() {
   
   // États pour le tri
   const [sortColumn, setSortColumn] = useState<string>("priority")
-  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc")
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc")
 
   useEffect(() => {
     const fetchData = async () => {
@@ -268,23 +268,24 @@ export default function EntreprisePage() {
     switch (priorityStr) {
       // Format numérique
       case "0":
+        return <Badge variant="outline">Optionnel</Badge>
       case "1":
-        return <Badge variant="destructive">Urgente</Badge>
+        return <Badge variant="secondary" className="bg-blue-100 text-blue-800">À faire</Badge>
       case "2":
-        return <Badge variant="default">Haute</Badge>
+        return <Badge variant="default" className="bg-orange-500">Important</Badge>
       case "3":
-        return <Badge variant="secondary">Moyenne</Badge>
+        return <Badge variant="destructive">Urgent</Badge>
       case "4":
-        return <Badge variant="outline">Basse</Badge>
+        return <Badge variant="default" className="bg-green-500">Quick Win</Badge>
       // Format texte (compatibilité)
       case 'LOW':
-        return <Badge variant="outline">Basse</Badge>
+        return <Badge variant="outline">Optionnel</Badge>
       case 'MEDIUM':
-        return <Badge variant="secondary">Moyenne</Badge>
+        return <Badge variant="secondary" className="bg-blue-100 text-blue-800">À faire</Badge>
       case 'HIGH':
-        return <Badge variant="default">Haute</Badge>
+        return <Badge variant="default" className="bg-orange-500">Important</Badge>
       case 'URGENT':
-        return <Badge variant="destructive">Urgente</Badge>
+        return <Badge variant="destructive">Urgent</Badge>
       default:
         return <Badge variant="outline">{priorityStr}</Badge>
     }
@@ -298,24 +299,24 @@ export default function EntreprisePage() {
     // Afficher la priorité exacte définie par l'utilisateur
     switch (priorityStr) {
       case "0":
-        return <Badge variant="destructive" className="bg-red-600">P0 - Quick Win</Badge>
+        return <Badge variant="outline">P0 - Optionnel</Badge>
       case "1":
-        return <Badge variant="destructive">P1 - Urgent</Badge>
+        return <Badge variant="secondary" className="bg-blue-100 text-blue-800">P1 - À faire</Badge>
       case "2":
         return <Badge variant="default" className="bg-orange-500">P2 - Important</Badge>
       case "3":
-        return <Badge variant="secondary">P3 - À faire</Badge>
+        return <Badge variant="destructive">P3 - Urgent</Badge>
       case "4":
-        return <Badge variant="outline">P4 - Optionnel</Badge>
+        return <Badge variant="default" className="bg-green-500">P4 - Quick Win</Badge>
       // Compatibilité avec l'ancien format (URGENT, HIGH, etc.)
       case "URGENT":
-        return <Badge variant="destructive">P1 - Urgent</Badge>
+        return <Badge variant="destructive">P3 - Urgent</Badge>
       case "HIGH":
         return <Badge variant="default" className="bg-orange-500">P2 - Important</Badge>
       case "MEDIUM":
-        return <Badge variant="secondary">P3 - À faire</Badge>
+        return <Badge variant="secondary" className="bg-blue-100 text-blue-800">P1 - À faire</Badge>
       case "LOW":
-        return <Badge variant="outline">P4 - Optionnel</Badge>
+        return <Badge variant="outline">P0 - Optionnel</Badge>
       default:
         return <Badge variant="outline">P{priorityStr}</Badge>
     }
@@ -358,16 +359,27 @@ export default function EntreprisePage() {
     const sortedTasks = [...grouped].sort((a, b) => {
       // Fonction pour convertir la priorité en nombre pour le tri
       const getPriorityValue = (priority: number | string | null | undefined) => {
-        if (priority === null || priority === undefined) return 3 // Default to P3
+        if (priority === null || priority === undefined) return 1 // Default to P1
         
-        if (typeof priority === 'number') return priority
+        if (typeof priority === 'number') {
+          // Nouveau mapping des priorités numériques pour le tri
+          switch(priority) {
+            case 0: return 1  // P0 - Optionnel (valeur la plus basse)
+            case 1: return 2  // P1 - À faire
+            case 2: return 3  // P2 - Important
+            case 3: return 4  // P3 - Urgent
+            case 4: return 5  // P4 - Quick Win (valeur la plus élevée)
+            default: return priority
+          }
+        }
         
+        // Valeurs de priorité sous forme de chaîne (ancienne compatibilité)
         switch(priority) {
-          case 'URGENT': return 1
-          case 'HIGH': return 2
-          case 'MEDIUM': return 3
-          case 'LOW': return 4
-          default: return parseInt(priority) || 3
+          case 'URGENT': return 4 // Correspond à P3
+          case 'HIGH': return 3   // Correspond à P2
+          case 'MEDIUM': return 2 // Correspond à P1
+          case 'LOW': return 1    // Correspond à P0
+          default: return parseInt(priority) || 1
         }
       }
       
@@ -868,11 +880,11 @@ export default function EntreprisePage() {
                     <SelectValue placeholder="Sélectionner une priorité" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="0">P0 - Quick Win</SelectItem>
-                    <SelectItem value="1">P1 - Urgent</SelectItem>
+                    <SelectItem value="0">P0 - Optionnel</SelectItem>
+                    <SelectItem value="1">P1 - À faire</SelectItem>
                     <SelectItem value="2">P2 - Important</SelectItem>
-                    <SelectItem value="3">P3 - À faire</SelectItem>
-                    <SelectItem value="4">P4 - Optionnel</SelectItem>
+                    <SelectItem value="3">P3 - Urgent</SelectItem>
+                    <SelectItem value="4">P4 - Quick Win</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -887,10 +899,10 @@ export default function EntreprisePage() {
                     <SelectValue placeholder="Niveau d'énergie requis" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="0">Extrême</SelectItem>
-                    <SelectItem value="1">Élevé</SelectItem>
-                    <SelectItem value="2">Moyen</SelectItem>
-                    <SelectItem value="3">Faible</SelectItem>
+                    <SelectItem value="0">Faible</SelectItem>
+                    <SelectItem value="1">Moyen</SelectItem>
+                    <SelectItem value="2">Élevé</SelectItem>
+                    <SelectItem value="3">Extrême</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
