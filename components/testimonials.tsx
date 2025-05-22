@@ -5,32 +5,9 @@ import { Star } from "lucide-react"
 import { useState, useEffect, useRef } from "react"
 
 export function Testimonials() {
-  const [playingVideo, setPlayingVideo] = useState(false)
-  const videoRef = useRef<HTMLVideoElement>(null)
+  // Suppression des états et des refs qui ne sont plus nécessaires
+  // Le player Voomly gère son propre état de lecture
   
-  // Auto-play Benjamin's video when component mounts
-  useEffect(() => {
-    // Délai plus long pour s'assurer que la page est complètement chargée
-    const timer = setTimeout(() => {
-      setPlayingVideo(true)
-      // Utiliser setTimeout supplémentaire pour être sûr que l'élément vidéo est monté
-      setTimeout(() => {
-        if (videoRef.current) {
-          // Forcer la lecture directement avec l'API DOM
-          const playPromise = videoRef.current.play();
-          
-          if (playPromise !== undefined) {
-            playPromise.catch(error => {
-              console.error("Autoplay prevented:", error);
-            });
-          }
-        }
-      }, 500);
-    }, 2000)
-    
-    return () => clearTimeout(timer)
-  }, [])
-
   return (
     <section className="container mx-auto px-4 py-20">
       <div className="text-center mb-16">
@@ -49,7 +26,7 @@ export function Testimonials() {
           verified
           className="min-h-[420px] flex flex-col"
         />
-        <BenjaminVideoTestimonial playingVideo={playingVideo} setPlayingVideo={setPlayingVideo} videoRef={videoRef} className="min-h-[420px] flex flex-col" />
+        <BenjaminVideoTestimonial className="min-h-[420px] flex flex-col" />
         <TestimonialCard
           name="Sabrina"
           role="Media Buyer en freelance"
@@ -130,24 +107,20 @@ function VideoTestimonialCard({
 }
 
 function BenjaminVideoTestimonial({ 
-  playingVideo, 
-  setPlayingVideo, 
-  videoRef,
   className = "" 
 }: { 
-  playingVideo: boolean, 
-  setPlayingVideo: (v: boolean) => void, 
-  videoRef: React.RefObject<HTMLVideoElement>,
   className?: string 
 }) {
-  const [isMuted, setIsMuted] = useState(true);
-
-  const toggleMute = () => {
-    if (videoRef.current) {
-      videoRef.current.muted = !videoRef.current.muted;
-      setIsMuted(!isMuted);
+  // Ajouter le script Voomly dans le head lors du montage du composant
+  useEffect(() => {
+    // Vérifier si le script existe déjà
+    if (!document.querySelector('script[src="https://embed.voomly.com/embed/embed-build.js"]')) {
+      const script = document.createElement('script');
+      script.src = "https://embed.voomly.com/embed/embed-build.js";
+      script.async = true;
+      document.head.appendChild(script);
     }
-  };
+  }, []);
 
   return (
     <div className={`bg-white border border-gray-200 rounded-xl p-6 hover:shadow-lg transition-shadow ${className}`}>
@@ -163,55 +136,11 @@ function BenjaminVideoTestimonial({
           <p className="text-gray-500 text-sm">Entrepreneur</p>
         </div>
       </div>
-      <div className="relative aspect-video mb-4 rounded-lg overflow-hidden bg-gray-100 flex items-center justify-center">
-        {!playingVideo ? (
-          <div className="absolute inset-0 flex items-center justify-center cursor-pointer bg-black/30 hover:bg-black/40 transition-colors z-10" onClick={() => setPlayingVideo(true)}>
-            <div className="w-16 h-16 bg-white/90 rounded-full flex items-center justify-center">
-              <div className="w-0 h-0 border-t-[8px] border-t-transparent border-l-[16px] border-l-green-500 border-b-[8px] border-b-transparent ml-1"></div>
-            </div>
-          </div>
-        ) : null}
-        
-        {/* Indicateur de son désactivé */}
-        {playingVideo && isMuted && (
-          <div 
-            className="absolute bottom-14 right-14 z-20 cursor-pointer bg-red-500 rounded-full p-2 animate-pulse hover:scale-110 transition-transform"
-            onClick={toggleMute}
-            title="Cliquez pour activer le son"
-          >
-            <div className="relative w-6 h-6">
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="white" className="w-6 h-6">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M19.114 5.636a9 9 0 0 1 0 12.728M16.463 8.288a5.25 5.25 0 0 1 0 7.424M6.75 8.25l4.72-4.72a.75.75 0 0 1 1.28.53v15.88a.75.75 0 0 1-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.009 9.009 0 0 1 2.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75Z" />
-              </svg>
-              <div className="absolute top-0 left-0 w-full h-full flex items-center justify-center">
-                <div className="w-8 h-0.5 bg-white rotate-45 rounded-full"></div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        <video
-          ref={videoRef}
-          src="/videos/benjamin-temoignage.mp4"
-          poster="/placeholder.svg"
-          controls
-          autoPlay={playingVideo}
-          muted={isMuted}
-          playsInline
-          className="w-full h-full object-cover"
-          style={{ display: playingVideo ? 'block' : 'none' }}
-          onEnded={() => setPlayingVideo(false)}
-          onClick={toggleMute}
-        />
-        {!playingVideo && (
-          <Image
-            src="/placeholder.svg"
-            alt="Miniature vidéo Benjamin Courdrais"
-            fill
-            className="object-cover"
-          />
-        )}
+      
+      <div className="mb-4">
+        <div className="voomly-embed" data-id="NnKKLXyQmwRrf284PnBRA8RqZwgkpD52kTMVRAkPHcr_fxEwC" data-ratio="0.566667" data-type="v" data-skin-color="rgba(0,255,61,1)" data-shadow="" style={{ width: "100%", aspectRatio: "0.566667 / 1", background: "linear-gradient(45deg, rgb(142, 150, 164) 0%, rgb(201, 208, 222) 100%)", borderRadius: "10px" }}></div>
       </div>
+      
       <p className="text-gray-600">« En tant que fondateur de startup, je travaille sur plusieurs projets en parallèle. Productif.io m'a fait gagner un temps précieux en centralisant toutes mes tâches et objectifs. »</p>
     </div>
   )
