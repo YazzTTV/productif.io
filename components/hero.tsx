@@ -4,41 +4,46 @@ import { Button } from "@/components/ui/button"
 import { AnimatedButton } from "@/components/ui/animated-button"
 import Image from "next/image"
 import { useState, useRef, useEffect } from "react"
+import Script from "next/script"
+
+// Composant dédié pour Voomly Player
+const VoomlyPlayer = () => {
+  return (
+    <>
+      <Script 
+        src="https://embed.voomly.com/embed/embed-build.js" 
+        strategy="afterInteractive"
+      />
+      <div 
+        className="voomly-embed absolute inset-0 w-full h-full" 
+        data-id="GhnLqJqenI8KJAFJGZIkoFmfwYkMkyeiWhJS1cyecbwKKFE3Z" 
+        data-ratio="1.777778" 
+        data-type="v" 
+        data-skin-color="rgba(0,255,79,1)" 
+        data-shadow=""
+        style={{ 
+          width: '100%', 
+          aspectRatio: '1.77778 / 1', 
+          background: 'linear-gradient(45deg, rgb(142, 150, 164) 0%, rgb(201, 208, 222) 100%)', 
+          borderRadius: '10px'
+        }}
+      />
+    </>
+  )
+}
 
 export function Hero() {
   const [videoPlaying, setVideoPlaying] = useState(false)
-  const [isMuted, setIsMuted] = useState(true)
-  const videoRef = useRef<HTMLVideoElement>(null)
   
   // Auto-play video when component mounts
   useEffect(() => {
     // Délai pour s'assurer que la page est chargée
     const timer = setTimeout(() => {
       setVideoPlaying(true)
-      // Délai supplémentaire pour s'assurer que l'élément vidéo est monté
-      setTimeout(() => {
-        if (videoRef.current) {
-          // Forcer la lecture directement avec l'API DOM
-          const playPromise = videoRef.current.play();
-          
-          if (playPromise !== undefined) {
-            playPromise.catch(error => {
-              console.error("Autoplay prevented:", error);
-            });
-          }
-        }
-      }, 500);
     }, 1000)
     
     return () => clearTimeout(timer)
   }, [])
-  
-  const toggleMute = () => {
-    if (videoRef.current) {
-      videoRef.current.muted = !videoRef.current.muted;
-      setIsMuted(!isMuted);
-    }
-  };
   
   return (
     <section className="container mx-auto px-4 py-20 text-center relative">
@@ -54,37 +59,7 @@ export function Hero() {
         <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl overflow-hidden shadow-lg border border-gray-200">
           <div className="relative aspect-video">
             {videoPlaying ? (
-              <>
-                {/* Indicateur de son désactivé */}
-                {isMuted && (
-                  <div 
-                    className="absolute top-4 left-4 z-20 cursor-pointer bg-red-500 rounded-full p-3 animate-pulse hover:scale-110 transition-transform shadow-lg"
-                    onClick={toggleMute}
-                    title="Cliquez pour activer le son"
-                  >
-                    <div className="relative w-10 h-10">
-                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="white" className="w-10 h-10">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M19.114 5.636a9 9 0 0 1 0 12.728M16.463 8.288a5.25 5.25 0 0 1 0 7.424M6.75 8.25l4.72-4.72a.75.75 0 0 1 1.28.53v15.88a.75.75 0 0 1-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.009 9.009 0 0 1 2.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75Z" />
-                      </svg>
-                      <div className="absolute top-0 left-0 w-full h-full flex items-center justify-center">
-                        <div className="w-12 h-1 bg-white rotate-45 rounded-full"></div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-                
-                <video
-                  ref={videoRef}
-                  src="/videos/presentation-productif.mp4"
-                  poster="/placeholder.svg?key=u4w4a"
-                  controls
-                  autoPlay
-                  muted={isMuted}
-                  playsInline
-                  className="absolute inset-0 w-full h-full"
-                  onClick={toggleMute}
-                />
-              </>
+              <VoomlyPlayer />
             ) : (
               <>
                 <Image
