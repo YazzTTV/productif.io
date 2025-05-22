@@ -163,11 +163,11 @@ export async function GET() {
 
       // Ensuite trier par priorité (P0 > P1 > P2 > P3 > P4)
       const priorityOrder = {
-        0: 5, // Quick Win
-        1: 4, // Urgent
+        0: 1, // Optionnel
+        1: 2, // A faire
         2: 3, // Important
-        3: 2, // A faire
-        4: 1  // Optionnel
+        3: 4, // Urgent
+        4: 5  // Quick Win
       };
       
       const priorityA = priorityOrder[a.priority as keyof typeof priorityOrder] || 0;
@@ -179,10 +179,10 @@ export async function GET() {
 
       // Si même priorité, trier par niveau d'énergie
       const energyOrder = {
-        0: 4, // Extrême
-        1: 3, // Élevé
-        2: 2, // Moyen
-        3: 1  // Faible
+        0: 1, // Faible
+        1: 2, // Moyen
+        2: 3, // Élevé
+        3: 4  // Extrême
       };
       
       const energyA = energyOrder[a.energyLevel as keyof typeof energyOrder] || 0;

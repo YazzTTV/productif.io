@@ -36,12 +36,9 @@ export async function GET(
 
     const isAdmin = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN'
 
-    // Récupérer la tâche sans restriction d'userId pour les admins
+    // Récupérer la tâche
     const task = await prisma.task.findUnique({
-      where: {
-        id,
-        ...(isAdmin ? {} : { userId }) // Ajouter la restriction userId uniquement pour les non-admins
-      },
+      where: { id },
       include: {
         project: {
           select: {
@@ -57,23 +54,51 @@ export async function GET(
       return new Response("Tâche non trouvée", { status: 404 })
     }
 
-    // Si l'utilisateur est admin et ce n'est pas sa tâche, vérifier qu'il a le droit de la voir
-    if (isAdmin && task.userId !== userId) {
-      // Pour les admins, vérifier que l'utilisateur assigné à la tâche appartient à son entreprise gérée
-      if (user?.managedCompanyId) {
-        const userBelongsToManagedCompany = await prisma.userCompany.findFirst({
-          where: {
-            userId: task.userId,
-            companyId: user.managedCompanyId
-          }
-        })
-
-        if (!userBelongsToManagedCompany) {
-          return new Response("Non autorisé - L'utilisateur n'appartient pas à votre entreprise", { status: 403 })
+    // Vérifier si l'utilisateur peut accéder à cette tâche
+    // Cas 1: C'est sa propre tâche -> OK
+    if (task.userId === userId) {
+      return NextResponse.json(task)
+    }
+    
+    // Cas 2: L'utilisateur est admin et gère une entreprise
+    if (isAdmin && user?.managedCompanyId) {
+      // Vérifier que l'utilisateur assigné à la tâche appartient à l'entreprise gérée par l'admin
+      const userBelongsToManagedCompany = await prisma.userCompany.findFirst({
+        where: {
+          userId: task.userId,
+          companyId: user.managedCompanyId
         }
+      })
+
+      if (userBelongsToManagedCompany) {
+        return NextResponse.json(task)
       }
     }
-
+    
+    // Cas 3: Utilisateur normal - vérifier qu'il appartient à la même entreprise que le propriétaire de la tâche
+    // Obtenir l'entreprise de l'utilisateur actuel
+    const userCompany = await prisma.userCompany.findFirst({
+      where: { userId },
+      select: { companyId: true }
+    })
+    
+    if (!userCompany) {
+      return new Response("Utilisateur non associé à une entreprise", { status: 403 })
+    }
+    
+    // Vérifier que le propriétaire de la tâche appartient à la même entreprise
+    const taskOwnerCompany = await prisma.userCompany.findFirst({
+      where: {
+        userId: task.userId,
+        companyId: userCompany.companyId
+      }
+    })
+    
+    if (!taskOwnerCompany) {
+      return new Response("Non autorisé - Cette tâche n'appartient pas à un membre de votre entreprise", { status: 403 })
+    }
+    
+    // Si on arrive ici, l'utilisateur et le propriétaire de la tâche sont dans la même entreprise
     return NextResponse.json(task)
   } catch (error) {
     console.error("[TASK_GET]", error)
@@ -122,13 +147,14 @@ export async function PATCH(
       return new Response("Tâche non trouvée", { status: 404 })
     }
 
-    // Vérifier si l'utilisateur a le droit de modifier cette tâche
-    if (!isAdmin && existingTask.userId !== userId) {
-      return new Response("Non autorisé à modifier cette tâche", { status: 403 })
+    // Vérifier si l'utilisateur peut modifier cette tâche
+    // Cas 1: C'est sa propre tâche -> OK
+    if (existingTask.userId === userId) {
+      // Autorisation OK
     }
-
-    // Pour les admins, vérifier que l'utilisateur assigné à la tâche appartient à son entreprise gérée
-    if (isAdmin && existingTask.userId !== userId && user?.managedCompanyId) {
+    // Cas 2: L'utilisateur est admin et gère une entreprise
+    else if (isAdmin && user?.managedCompanyId) {
+      // Vérifier que l'utilisateur assigné à la tâche appartient à l'entreprise gérée par l'admin
       const userBelongsToManagedCompany = await prisma.userCompany.findFirst({
         where: {
           userId: existingTask.userId,
@@ -138,6 +164,30 @@ export async function PATCH(
 
       if (!userBelongsToManagedCompany) {
         return new Response("Non autorisé - L'utilisateur n'appartient pas à votre entreprise", { status: 403 })
+      }
+    }
+    // Cas 3: Utilisateur normal - vérifier qu'il appartient à la même entreprise que le propriétaire de la tâche
+    else {
+      // Obtenir l'entreprise de l'utilisateur actuel
+      const userCompany = await prisma.userCompany.findFirst({
+        where: { userId },
+        select: { companyId: true }
+      })
+      
+      if (!userCompany) {
+        return new Response("Utilisateur non associé à une entreprise", { status: 403 })
+      }
+      
+      // Vérifier que le propriétaire de la tâche appartient à la même entreprise
+      const taskOwnerCompany = await prisma.userCompany.findFirst({
+        where: {
+          userId: existingTask.userId,
+          companyId: userCompany.companyId
+        }
+      })
+      
+      if (!taskOwnerCompany) {
+        return new Response("Non autorisé - Cette tâche n'appartient pas à un membre de votre entreprise", { status: 403 })
       }
     }
 
