@@ -404,16 +404,16 @@ Les champs `priority` et `energyLevel` sont utilisés pour gérer l'importance e
   - 3 : Élevée (affiché comme "Urgent" dans l'interface)
   - 4 : Très élevée (affiché comme "Quick Win" dans l'interface)
 
-- **Niveau d'énergie** : Échelle de 0-3, où **0 est le niveau d'énergie le plus élevé**
-  - 0 : Extrême (niveau d'énergie le plus élevé)
-  - 1 : Élevé
-  - 2 : Moyen
-  - 3 : Faible (niveau d'énergie le plus bas)
+- **Niveau d'énergie** : Échelle de 0-3, où **0 est le niveau d'énergie le plus bas**
+  - 0 : Faible (niveau d'énergie le plus bas)
+  - 1 : Moyen
+  - 2 : Élevé
+  - 3 : Extrême (niveau d'énergie le plus élevé)
 
 **Exemples concrets :**
 - Une tâche avec `"priority": 4` dans l'API apparaîtra comme "Quick Win" dans l'interface
 - Une tâche avec `"priority": 3` dans l'API apparaîtra comme "Urgent" dans l'interface
-- Une tâche avec `"energyLevel": 0` dans l'API apparaîtra comme "Extrême" dans l'interface
+- Une tâche avec `"energyLevel": 3` dans l'API apparaîtra comme "Extrême" dans l'interface
 
 ### Format Habit
 
