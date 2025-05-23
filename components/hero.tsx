@@ -16,7 +16,7 @@ const VoomlyPlayer = () => {
       />
       <div 
         className="voomly-embed absolute inset-0 w-full h-full" 
-        data-id="GhnLqJqenI8KJAFJGZIkoFmfwYkMkyeiWhJS1cyecbwKKFE3Z" 
+        data-id="oMPeVAFqWACU1YsR6exYat3UA8hPfEL6AO4QRTtxZO5aBkUVB" 
         data-ratio="1.777778" 
         data-type="v" 
         data-skin-color="rgba(0,255,79,1)" 
@@ -56,7 +56,7 @@ export function Hero() {
       </p>
 
       <div className="mt-8 relative">
-        <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl overflow-hidden shadow-lg border border-gray-200">
+        <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl overflow-hidden shadow-lg border border-gray-200 max-w-6xl mx-auto">
           <div className="relative aspect-video">
             {videoPlaying ? (
               <VoomlyPlayer />
