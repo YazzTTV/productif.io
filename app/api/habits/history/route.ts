@@ -1,26 +1,19 @@
-import { NextRequest, NextResponse } from "next/server"
-import { apiAuth } from "@/middleware/api-auth"
+import { NextResponse } from "next/server"
+import { getAuthUser } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { format, subDays } from "date-fns"
 
-export async function GET(req: NextRequest) {
-  // Vérifier l'authentification API
-  const authResponse = await apiAuth(req, {
-    requiredScopes: ['habits:read']
-  })
-  
-  // Si l'authentification a échoué, retourner la réponse d'erreur
-  if (authResponse) {
-    return authResponse
-  }
-  
-  // Extraire l'ID de l'utilisateur à partir de l'en-tête (ajouté par le middleware)
-  const userId = req.headers.get('x-api-user-id')
-  if (!userId) {
-    return NextResponse.json({ error: 'Utilisateur non trouvé' }, { status: 404 })
-  }
-
+export async function GET() {
   try {
+    const user = await getAuthUser()
+    
+    if (!user) {
+      return new NextResponse(
+        JSON.stringify({ error: "Non authentifié" }),
+        { status: 401 }
+      )
+    }
+
     // Date d'aujourd'hui et date d'il y a 30 jours
     const today = new Date()
     today.setHours(23, 59, 59, 999)
@@ -31,7 +24,7 @@ export async function GET(req: NextRequest) {
     // Récupérer toutes les habitudes de l'utilisateur
     const habits = await prisma.habit.findMany({
       where: {
-        userId: userId
+        userId: user.id
       },
       include: {
         entries: {
@@ -56,52 +49,49 @@ export async function GET(req: NextRequest) {
       }[]
     }> = {}
     
-    // Initialiser tous les jours avec 0 habitudes
+    // Préparer les entrées pour chaque jour dans la plage de 30 jours
     for (let i = 0; i <= 30; i++) {
       const date = subDays(today, i)
-      const dateKey = format(date, 'yyyy-MM-dd')
-      historyData[dateKey] = {
-        date: dateKey,
-        count: 0,
-        percentage: 0,
-        habits: []
+      const dateStr = format(date, "yyyy-MM-dd")
+      
+      // Récupérer le jour de la semaine
+      const dayOfWeek = format(date, "EEEE").toLowerCase()
+      
+      // Filtrer les habitudes qui devraient être suivies ce jour
+      const habitsForDay = habits.filter(habit => {
+        if (habit.frequency === "daily") return true
+        if (habit.frequency === "weekly" && habit.daysOfWeek.includes(dayOfWeek)) return true
+        return false
+      })
+      
+      // Déterminer quelles habitudes ont été complétées ce jour
+      const habitsStatus = habitsForDay.map(habit => {
+        const completed = habit.entries.some(
+          entry => format(new Date(entry.date), "yyyy-MM-dd") === dateStr && entry.completed
+        )
+        
+        return {
+          name: habit.name,
+          completed
+        }
+      })
+      
+      // Calculer les statistiques pour ce jour
+      const completedCount = habitsStatus.filter(h => h.completed).length
+      
+      historyData[dateStr] = {
+        date: dateStr,
+        count: completedCount,
+        percentage: habitsForDay.length > 0 ? Math.round((completedCount / habitsForDay.length) * 100) : 0,
+        habits: habitsStatus
       }
     }
     
-    // Remplir les données avec les habitudes complétées
-    habits.forEach(habit => {
-      habit.entries.forEach(entry => {
-        const dateKey = format(entry.date, 'yyyy-MM-dd')
-        if (historyData[dateKey]) {
-          historyData[dateKey].habits.push({
-            name: habit.name,
-            completed: entry.completed
-          })
-          if (entry.completed) {
-            historyData[dateKey].count++
-          }
-        }
-      })
-    })
-    
-    // Calculer les pourcentages
-    Object.values(historyData).forEach(day => {
-      const totalHabits = day.habits.length
-      if (totalHabits > 0) {
-        day.percentage = Math.round((day.count / totalHabits) * 100)
-      }
-    })
-    
-    // Convertir en tableau et trier par date
-    const sortedHistory = Object.values(historyData).sort((a, b) => 
-      new Date(a.date).getTime() - new Date(b.date).getTime()
-    )
-    
-    return NextResponse.json(sortedHistory)
+    return NextResponse.json(historyData)
   } catch (error) {
-    console.error("Erreur lors de la récupération de l'historique:", error)
-    return NextResponse.json(
-      { error: "Erreur lors de la récupération de l'historique" },
+    console.error("Erreur lors de la récupération de l'historique des habitudes:", error)
+    return new NextResponse(
+      JSON.stringify({ error: "Erreur interne du serveur" }),
       { status: 500 }
     )
   }

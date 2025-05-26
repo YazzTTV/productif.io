@@ -1,7 +1,6 @@
-import { NextRequest, NextResponse } from "next/server"
+import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { apiAuth } from "@/middleware/api-auth"
-import { startOfDay, subDays } from "date-fns"
+import { getAuthUser } from "@/lib/auth"
 
 // Fonction pour calculer le taux de complétion pour une période donnée (en jours)
 const calculateCompletionRate = async (habitId: string, userId: string, days: number) => {
@@ -76,67 +75,94 @@ const calculateCompletionRate = async (habitId: string, userId: string, days: nu
   return Math.min(100, Math.round(completionRate))
 }
 
-export async function GET(req: NextRequest) {
-  // Vérifier l'authentification API
-  const authResponse = await apiAuth(req, {
-    requiredScopes: ['habits:read']
-  })
-  
-  // Si l'authentification a échoué, retourner la réponse d'erreur
-  if (authResponse) {
-    return authResponse
-  }
-  
-  // Extraire l'ID de l'utilisateur à partir de l'en-tête (ajouté par le middleware)
-  const userId = req.headers.get('x-api-user-id')
-  if (!userId) {
-    return NextResponse.json({ error: 'Utilisateur non trouvé' }, { status: 404 })
-  }
-
+export async function GET() {
   try {
-    // Obtenir la date d'il y a 7 jours
-    const sevenDaysAgo = subDays(new Date(), 7)
+    const user = await getAuthUser()
     
-    // Récupérer toutes les habitudes de l'utilisateur avec leurs entrées des 7 derniers jours
+    if (!user) {
+      return NextResponse.json(
+        { error: "Non autorisé" },
+        { status: 401 }
+      )
+    }
+    
+    // Récupérer toutes les habitudes de l'utilisateur
     const habits = await prisma.habit.findMany({
       where: {
-        userId: userId,
+        userId: user.id,
       },
-      include: {
-        entries: {
-          where: {
-            date: {
-              gte: startOfDay(sevenDaysAgo),
-            },
-          },
-        },
-      },
-    })
-
-    // Calculer le taux de complétion pour chaque habitude
-    const habitsWithCompletionRate = habits.map(habit => {
-      const totalEntries = habit.entries.length
-      const completedEntries = habit.entries.filter(entry => entry.completed).length
-      const completionRate = totalEntries > 0 ? (completedEntries / totalEntries) * 100 : 0
-
-      return {
-        ...habit,
-        completionRate,
-        totalEntries,
-        completedEntries,
+      select: {
+        id: true,
+        name: true,
+        color: true,
+        frequency: true,
+        daysOfWeek: true,
+        createdAt: true
       }
     })
-
-    // Trier par taux de complétion croissant (les moins suivies en premier)
-    const leastTrackedHabits = habitsWithCompletionRate
-      .sort((a, b) => a.completionRate - b.completionRate)
-      .slice(0, 5) // Prendre les 5 moins suivies
-
-    return NextResponse.json(leastTrackedHabits)
+    
+    // Calculer le taux de complétion pour chaque habitude sur 7 jours et 30 jours
+    const habitsWithRates = await Promise.all(
+      habits.map(async (habit) => {
+        // Ignorer les habitudes créées il y a moins de 7 jours pour le calcul sur 7 jours
+        const habitAge = Math.floor((Date.now() - new Date(habit.createdAt).getTime()) / (1000 * 60 * 60 * 24))
+        
+        // Calculer les taux de complétion
+        const completionRate7Days = habitAge >= 7 
+          ? await calculateCompletionRate(habit.id, user.id, 7)
+          : null
+        
+        const completionRate30Days = habitAge >= 7 
+          ? await calculateCompletionRate(habit.id, user.id, 30) 
+          : null
+        
+        return {
+          id: habit.id,
+          name: habit.name,
+          color: habit.color,
+          completionRate7Days,
+          completionRate30Days,
+          habitAge
+        }
+      })
+    )
+    
+    // Filtrer et trier pour les 7 jours
+    const habits7Days = habitsWithRates
+      .filter(h => h.completionRate7Days !== null)
+      .sort((a, b) => (a.completionRate7Days || 0) - (b.completionRate7Days || 0))
+      .slice(0, 3)
+    
+    // Filtrer et trier pour les 30 jours
+    const habits30Days = habitsWithRates
+      .filter(h => h.completionRate30Days !== null)
+      .sort((a, b) => (a.completionRate30Days || 0) - (b.completionRate30Days || 0))
+      .slice(0, 3)
+    
+    // Formater les résultats
+    const formattedHabits7Days = habits7Days.map(h => ({
+      id: h.id,
+      name: h.name,
+      color: h.color,
+      completionRate: h.completionRate7Days
+    }))
+    
+    const formattedHabits30Days = habits30Days.map(h => ({
+      id: h.id,
+      name: h.name,
+      color: h.color,
+      completionRate: h.completionRate30Days
+    }))
+    
+    return NextResponse.json({
+      habits7Days: formattedHabits7Days,
+      habits30Days: formattedHabits30Days
+    })
+    
   } catch (error) {
-    console.error("Erreur lors de la récupération des habitudes les moins suivies:", error)
+    console.error("[HABITS_LEAST_TRACKED_ERROR]", error)
     return NextResponse.json(
-      { error: "Erreur lors de la récupération des habitudes les moins suivies" },
+      { error: "Erreur interne du serveur" },
       { status: 500 }
     )
   }

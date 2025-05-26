@@ -1,28 +1,17 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { apiAuth } from '@/middleware/api-auth';
+import { getAuthUser } from '@/lib/auth';
 import { parseISO, startOfDay } from 'date-fns';
 
-export async function GET(req: NextRequest) {
-  // Vérifier l'authentification API
-  const authResponse = await apiAuth(req, {
-    requiredScopes: ['habits:read']
-  })
-  
-  // Si l'authentification a échoué, retourner la réponse d'erreur
-  if (authResponse) {
-    return authResponse
-  }
-  
-  // Extraire l'ID de l'utilisateur à partir de l'en-tête (ajouté par le middleware)
-  const userId = req.headers.get('x-api-user-id')
-  if (!userId) {
-    return NextResponse.json({ error: 'Utilisateur non trouvé' }, { status: 404 })
-  }
-
+export async function GET(request: Request) {
   try {
+    const user = await getAuthUser();
+    if (!user) {
+      return NextResponse.json({ error: 'Non authentifié' }, { status: 401 });
+    }
+
     // Récupérer la date depuis les paramètres de requête
-    const { searchParams } = new URL(req.url);
+    const { searchParams } = new URL(request.url);
     const dateParam = searchParams.get('date');
 
     if (!dateParam) {
@@ -54,7 +43,7 @@ export async function GET(req: NextRequest) {
     // Récupérer toutes les habitudes de l'utilisateur pour ce jour
     const habits = await prisma.habit.findMany({
       where: {
-        userId: userId,
+        userId: user.id,
         // Filtrer uniquement les habitudes pour ce jour de la semaine
         daysOfWeek: {
           has: dayOfWeek
@@ -111,26 +100,15 @@ export async function GET(req: NextRequest) {
   }
 }
 
-export async function POST(req: NextRequest) {
-  // Vérifier l'authentification API
-  const authResponse = await apiAuth(req, {
-    requiredScopes: ['habits:write']
-  })
-  
-  // Si l'authentification a échoué, retourner la réponse d'erreur
-  if (authResponse) {
-    return authResponse
-  }
-  
-  // Extraire l'ID de l'utilisateur à partir de l'en-tête (ajouté par le middleware)
-  const userId = req.headers.get('x-api-user-id')
-  if (!userId) {
-    return NextResponse.json({ error: 'Utilisateur non trouvé' }, { status: 404 })
-  }
-
+export async function POST(request: Request) {
   try {
+    const user = await getAuthUser();
+    if (!user) {
+      return NextResponse.json({ error: 'Non authentifié' }, { status: 401 });
+    }
+
     // Récupérer les données de la requête
-    const body = await req.json();
+    const body = await request.json();
     const { date, habits } = body;
 
     // Validation
@@ -166,7 +144,7 @@ export async function POST(req: NextRequest) {
     const userHabits = await prisma.habit.findMany({
       where: {
         id: { in: habitIds },
-        userId: userId
+        userId: user.id
       }
     });
 

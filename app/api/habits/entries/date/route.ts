@@ -1,114 +1,17 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { apiAuth } from '@/middleware/api-auth';
-import { parseISO, startOfDay } from 'date-fns';
+import { getAuthUser } from '@/lib/auth';
+import { parseISO } from 'date-fns';
 
-export async function GET(req: NextRequest) {
-  // Vérifier l'authentification API
-  const authResponse = await apiAuth(req, {
-    requiredScopes: ['habits:read']
-  })
-  
-  // Si l'authentification a échoué, retourner la réponse d'erreur
-  if (authResponse) {
-    return authResponse
-  }
-  
-  // Extraire l'ID de l'utilisateur à partir de l'en-tête (ajouté par le middleware)
-  const userId = req.headers.get('x-api-user-id')
-  if (!userId) {
-    return NextResponse.json({ error: 'Utilisateur non trouvé' }, { status: 404 })
-  }
-
+export async function POST(request: Request) {
   try {
-    const { searchParams } = new URL(req.url);
-    const dateParam = searchParams.get('date');
-
-    if (!dateParam) {
-      return NextResponse.json(
-        { error: 'Le paramètre "date" est requis (format: YYYY-MM-DD)' },
-        { status: 400 }
-      );
+    const user = await getAuthUser();
+    if (!user) {
+      return NextResponse.json({ error: 'Non authentifié' }, { status: 401 });
     }
 
-    // Parser et normaliser la date
-    let targetDate;
-    try {
-      targetDate = parseISO(dateParam);
-      targetDate.setHours(12, 0, 0, 0);
-    } catch (error) {
-      return NextResponse.json(
-        { error: 'Format de date invalide. Utilisez le format YYYY-MM-DD.' },
-        { status: 400 }
-      );
-    }
-
-    // Récupérer les entrées pour cette date
-    const entries = await prisma.habitEntry.findMany({
-      where: {
-        date: targetDate,
-        habit: {
-          userId: userId,
-        },
-      },
-      include: {
-        habit: {
-          select: {
-            id: true,
-            name: true,
-            color: true,
-          },
-        },
-      },
-      orderBy: {
-        habit: {
-          order: 'asc',
-        },
-      },
-    });
-
-    return NextResponse.json({
-      date: targetDate.toISOString(),
-      entries: entries.map(entry => ({
-        id: entry.id,
-        habitId: entry.habitId,
-        habitName: entry.habit.name,
-        habitColor: entry.habit.color,
-        completed: entry.completed,
-        note: entry.note,
-        rating: entry.rating,
-        date: entry.date,
-      })),
-    });
-  } catch (error) {
-    console.error('Erreur lors de la récupération des entrées par date:', error);
-    return NextResponse.json(
-      { error: 'Erreur interne du serveur' },
-      { status: 500 }
-    );
-  }
-}
-
-export async function POST(req: NextRequest) {
-  // Vérifier l'authentification API
-  const authResponse = await apiAuth(req, {
-    requiredScopes: ['habits:write']
-  })
-  
-  // Si l'authentification a échoué, retourner la réponse d'erreur
-  if (authResponse) {
-    return authResponse
-  }
-  
-  // Extraire l'ID de l'utilisateur à partir de l'en-tête (ajouté par le middleware)
-  const userId = req.headers.get('x-api-user-id')
-  if (!userId) {
-    return NextResponse.json({ error: 'Utilisateur non trouvé' }, { status: 404 })
-  }
-
-  try {
     // Récupérer les données de la requête
-    const body = await req.json();
+    const body = await request.json();
     const { habitId, date, completed, note, rating } = body;
 
     // Validation
@@ -143,7 +46,7 @@ export async function POST(req: NextRequest) {
     const habit = await prisma.habit.findFirst({
       where: {
         id: habitId,
-        userId: userId
+        userId: user.id
       }
     });
 
