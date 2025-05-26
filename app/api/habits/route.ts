@@ -1,7 +1,7 @@
-import { NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { startOfDay, endOfDay, subDays } from "date-fns"
-import { getAuthUser } from "@/lib/auth"
+import { apiAuth } from "@/middleware/api-auth"
 
 // Habitudes par défaut
 const DEFAULT_HABITS = [
@@ -23,18 +23,29 @@ const DEFAULT_HABITS = [
   },
 ]
 
-export async function GET() {
-  try {
-    const user = await getAuthUser()
-    if (!user) {
-      return NextResponse.json({ error: "Non authentifié" }, { status: 401 })
-    }
+export async function GET(req: NextRequest) {
+  // Vérifier l'authentification API
+  const authResponse = await apiAuth(req, {
+    requiredScopes: ['habits:read']
+  })
+  
+  // Si l'authentification a échoué, retourner la réponse d'erreur
+  if (authResponse) {
+    return authResponse
+  }
+  
+  // Extraire l'ID de l'utilisateur à partir de l'en-tête (ajouté par le middleware)
+  const userId = req.headers.get('x-api-user-id')
+  if (!userId) {
+    return NextResponse.json({ error: 'Utilisateur non trouvé' }, { status: 404 })
+  }
 
+  try {
     // Vérifier et créer les habitudes par défaut
     for (const defaultHabit of DEFAULT_HABITS) {
       const existingHabit = await prisma.habit.findFirst({
         where: {
-          userId: user.id,
+          userId: userId,
           name: defaultHabit.name,
         },
       })
@@ -44,7 +55,7 @@ export async function GET() {
         await prisma.habit.create({
           data: {
             ...defaultHabit,
-            userId: user.id,
+            userId: userId,
           },
         });
       }
@@ -53,7 +64,7 @@ export async function GET() {
     // 1. Récupérer toutes les habitudes avec Prisma
     const habits = await prisma.habit.findMany({
       where: {
-        userId: user.id,
+        userId: userId,
       },
       include: {
         entries: {
@@ -106,13 +117,24 @@ export async function GET() {
   }
 }
 
-export async function POST(req: Request) {
-  try {
-    const user = await getAuthUser()
-    if (!user) {
-      return NextResponse.json({ error: "Non authentifié" }, { status: 401 })
-    }
+export async function POST(req: NextRequest) {
+  // Vérifier l'authentification API
+  const authResponse = await apiAuth(req, {
+    requiredScopes: ['habits:write']
+  })
+  
+  // Si l'authentification a échoué, retourner la réponse d'erreur
+  if (authResponse) {
+    return authResponse
+  }
+  
+  // Extraire l'ID de l'utilisateur à partir de l'en-tête (ajouté par le middleware)
+  const userId = req.headers.get('x-api-user-id')
+  if (!userId) {
+    return NextResponse.json({ error: 'Utilisateur non trouvé' }, { status: 404 })
+  }
 
+  try {
     const body = await req.json()
     const { name, description, daysOfWeek, frequency, color } = body
 
@@ -159,7 +181,7 @@ export async function POST(req: Request) {
 
     // Trouver l'ordre maximum actuel pour placer la nouvelle habitude en dernier
     const maxOrderHabit = await prisma.habit.findFirst({
-      where: { userId: user.id },
+      where: { userId: userId },
       orderBy: { order: 'desc' },
       select: { order: true }
     });
@@ -175,7 +197,7 @@ export async function POST(req: Request) {
         daysOfWeek,
         color,
         order: maxOrder,
-        userId: user.id,
+        userId: userId,
       },
     })
 
@@ -189,20 +211,30 @@ export async function POST(req: Request) {
   }
 }
 
-export async function PATCH(req: Request) {
-  try {
-    const user = await getAuthUser()
-    if (!user) {
-      return NextResponse.json({ error: "Non authentifié" }, { status: 401 })
-    }
+export async function PATCH(req: NextRequest) {
+  // Vérifier l'authentification API
+  const authResponse = await apiAuth(req, {
+    requiredScopes: ['habits:write']
+  })
+  
+  // Si l'authentification a échoué, retourner la réponse d'erreur
+  if (authResponse) {
+    return authResponse
+  }
+  
+  // Extraire l'ID de l'utilisateur à partir de l'en-tête (ajouté par le middleware)
+  const userId = req.headers.get('x-api-user-id')
+  if (!userId) {
+    return NextResponse.json({ error: 'Utilisateur non trouvé' }, { status: 404 })
+  }
 
+  try {
     const body = await req.json()
     const { habits } = body
 
-    // Validation
     if (!habits || !Array.isArray(habits)) {
       return NextResponse.json(
-        { error: "Format de données invalide" },
+        { error: "Liste d'habitudes invalide" },
         { status: 400 }
       )
     }
@@ -212,8 +244,8 @@ export async function PATCH(req: Request) {
     const userHabits = await prisma.habit.findMany({
       where: {
         id: { in: habitIds },
-        userId: user.id
-      }
+        userId: userId,
+      },
     })
 
     if (userHabits.length !== habitIds.length) {
@@ -223,15 +255,15 @@ export async function PATCH(req: Request) {
       )
     }
 
-    // Mise à jour en masse des ordres
-    const updates = habits.map((habit, index) => 
+    // Mettre à jour l'ordre des habitudes
+    const updatePromises = habits.map((habit, index) =>
       prisma.habit.update({
         where: { id: habit.id },
-        data: { order: index }
+        data: { order: index },
       })
     )
 
-    await prisma.$transaction(updates)
+    await Promise.all(updatePromises)
 
     return NextResponse.json({ success: true })
   } catch (error) {
@@ -243,21 +275,37 @@ export async function PATCH(req: Request) {
   }
 }
 
-export async function DELETE(req: Request) {
+export async function DELETE(req: NextRequest) {
+  // Vérifier l'authentification API
+  const authResponse = await apiAuth(req, {
+    requiredScopes: ['habits:write']
+  })
+  
+  // Si l'authentification a échoué, retourner la réponse d'erreur
+  if (authResponse) {
+    return authResponse
+  }
+  
+  // Extraire l'ID de l'utilisateur à partir de l'en-tête (ajouté par le middleware)
+  const userId = req.headers.get('x-api-user-id')
+  if (!userId) {
+    return NextResponse.json({ error: 'Utilisateur non trouvé' }, { status: 404 })
+  }
+
   try {
-    const user = await getAuthUser()
-    if (!user) {
-      return NextResponse.json({ error: "Non authentifié" }, { status: 401 })
+    const { searchParams } = new URL(req.url)
+    const habitId = searchParams.get("id")
+
+    if (!habitId) {
+      return NextResponse.json(
+        { error: "ID de l'habitude requis" },
+        { status: 400 }
+      )
     }
 
-    const { habitId } = await req.json()
-
     // Vérifier que l'habitude appartient à l'utilisateur
-    const habit = await prisma.habit.findFirst({
-      where: {
-        id: habitId,
-        userId: user.id,
-      },
+    const habit = await prisma.habit.findUnique({
+      where: { id: habitId },
     })
 
     if (!habit) {
@@ -267,12 +315,22 @@ export async function DELETE(req: Request) {
       )
     }
 
-    // Supprimer l'habitude
-    await prisma.habit.delete({
-      where: {
-        id: habitId,
-      },
-    })
+    if (habit.userId !== userId) {
+      return NextResponse.json(
+        { error: "Non autorisé" },
+        { status: 403 }
+      )
+    }
+
+    // Supprimer l'habitude et ses entrées
+    await prisma.$transaction([
+      prisma.habitEntry.deleteMany({
+        where: { habitId },
+      }),
+      prisma.habit.delete({
+        where: { id: habitId },
+      }),
+    ])
 
     return NextResponse.json({ success: true })
   } catch (error) {

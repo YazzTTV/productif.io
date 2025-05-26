@@ -1,17 +1,28 @@
-import { NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { getAuthUser } from "@/lib/auth"
+import { apiAuth } from "@/middleware/api-auth"
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  // Vérifier l'authentification API
+  const authResponse = await apiAuth(req, {
+    requiredScopes: ['habits:read']
+  })
+  
+  // Si l'authentification a échoué, retourner la réponse d'erreur
+  if (authResponse) {
+    return authResponse
+  }
+  
+  // Extraire l'ID de l'utilisateur à partir de l'en-tête (ajouté par le middleware)
+  const userId = req.headers.get('x-api-user-id')
+  if (!userId) {
+    return NextResponse.json({ error: 'Utilisateur non trouvé' }, { status: 404 })
+  }
+
   try {
-    const user = await getAuthUser()
-    if (!user) {
-      return NextResponse.json({ error: "Non authentifié" }, { status: 401 })
-    }
-
     const habits = await prisma.habit.findMany({
       where: {
-        userId: user.id,
+        userId: userId,
       },
       include: {
         entries: {
@@ -69,9 +80,9 @@ export async function GET() {
 
     return NextResponse.json(habitsWithStreaks)
   } catch (error) {
-    console.error("Erreur lors de la récupération des habitudes:", error)
+    console.error("Erreur lors de la récupération des habitudes récentes:", error)
     return NextResponse.json(
-      { error: "Erreur lors de la récupération des habitudes" },
+      { error: "Erreur lors de la récupération des habitudes récentes" },
       { status: 500 }
     )
   }
