@@ -1,26 +1,15 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { apiAuth } from '@/middleware/api-auth';
+import { getAuthUser } from '@/lib/auth';
 import { startOfDay, parseISO, addHours } from 'date-fns';
 
-export async function POST(req: NextRequest) {
-  // Vérifier l'authentification API
-  const authResponse = await apiAuth(req, {
-    requiredScopes: ['habits:write']
-  })
-  
-  // Si l'authentification a échoué, retourner la réponse d'erreur
-  if (authResponse) {
-    return authResponse
-  }
-  
-  // Extraire l'ID de l'utilisateur à partir de l'en-tête (ajouté par le middleware)
-  const userId = req.headers.get('x-api-user-id')
-  if (!userId) {
-    return NextResponse.json({ error: 'Utilisateur non trouvé' }, { status: 404 })
-  }
-
+export async function POST(req: Request) {
   try {
+    const user = await getAuthUser();
+    if (!user) {
+      return NextResponse.json({ error: 'Non authentifié' }, { status: 401 });
+    }
+
     const { habitId, date, completed, note, rating, skipDayValidation = false } = await req.json();
     
     // Correction du problème de fuseau horaire
@@ -35,7 +24,7 @@ export async function POST(req: NextRequest) {
     const habit = await prisma.habit.findFirst({
       where: {
         id: habitId,
-        userId: userId,
+        userId: user.id,
       },
     });
 
@@ -43,13 +32,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { error: 'Habitude non trouvée' },
         { status: 404 }
-      );
-    }
-
-    if (habit.userId !== userId) {
-      return NextResponse.json(
-        { error: 'Non autorisé' },
-        { status: 403 }
       );
     }
 

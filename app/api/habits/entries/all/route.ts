@@ -1,52 +1,56 @@
-import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { apiAuth } from "@/middleware/api-auth"
+import { getAuthUser } from "@/lib/auth"
+import { NextResponse } from "next/server"
 
-export async function GET(req: NextRequest) {
-  // Vérifier l'authentification API
-  const authResponse = await apiAuth(req, {
-    requiredScopes: ['habits:read']
-  })
-  
-  // Si l'authentification a échoué, retourner la réponse d'erreur
-  if (authResponse) {
-    return authResponse
-  }
-  
-  // Extraire l'ID de l'utilisateur à partir de l'en-tête (ajouté par le middleware)
-  const userId = req.headers.get('x-api-user-id')
-  if (!userId) {
-    return NextResponse.json({ error: 'Utilisateur non trouvé' }, { status: 404 })
-  }
-
+export async function GET() {
   try {
-    // Récupérer toutes les entrées d'habitudes de l'utilisateur
-    const entries = await prisma.habitEntry.findMany({
-      where: {
-        habit: {
-          userId: userId,
-        },
-      },
-      include: {
-        habit: {
-          select: {
-            id: true,
-            name: true,
-            color: true,
-          },
-        },
-      },
-      orderBy: {
-        date: "desc",
-      },
-    })
+    const user = await getAuthUser()
 
-    return NextResponse.json(entries)
+    if (!user?.id) {
+      return new NextResponse("Non autorisé", { status: 401 })
+    }
+
+    // Utiliser une requête SQL directe pour récupérer toutes les entrées avec les notes et évaluations
+    const entries = await prisma.$queryRaw`
+      SELECT 
+        he.id, 
+        he."habitId", 
+        he.date, 
+        he.completed, 
+        he.note, 
+        he.rating, 
+        he."createdAt", 
+        he."updatedAt",
+        h.id as "habit_id", 
+        h.name as "habit_name", 
+        h.color as "habit_color"
+      FROM "habit_entries" he
+      JOIN "habits" h ON he."habitId" = h.id
+      WHERE h."userId" = ${user.id}
+      AND (he.note IS NOT NULL OR he.rating IS NOT NULL)
+      ORDER BY he.date DESC
+    `;
+
+    // Transformer les résultats pour correspondre à la structure attendue
+    const formattedEntries = (entries as any[]).map(entry => ({
+      id: entry.id,
+      habitId: entry.habitId,
+      date: entry.date,
+      completed: entry.completed,
+      note: entry.note,
+      rating: entry.rating,
+      createdAt: entry.createdAt,
+      updatedAt: entry.updatedAt,
+      habit: {
+        id: entry.habit_id,
+        name: entry.habit_name,
+        color: entry.habit_color
+      }
+    }));
+
+    return NextResponse.json(formattedEntries)
   } catch (error) {
-    console.error("Erreur lors de la récupération de toutes les entrées d'habitudes:", error)
-    return NextResponse.json(
-      { error: "Erreur lors de la récupération des entrées d'habitudes" },
-      { status: 500 }
-    )
+    console.error("Erreur lors de la récupération des entrées:", error)
+    return new NextResponse("Erreur interne du serveur", { status: 500 })
   }
 } 

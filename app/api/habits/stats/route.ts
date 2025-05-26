@@ -1,26 +1,15 @@
-import { NextRequest, NextResponse } from "next/server"
+import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { apiAuth } from "@/middleware/api-auth"
+import { getAuthUser } from "@/lib/auth"
 import { startOfDay, endOfDay, subDays, format, eachDayOfInterval } from "date-fns"
 
-export async function GET(req: NextRequest) {
-  // Vérifier l'authentification API
-  const authResponse = await apiAuth(req, {
-    requiredScopes: ['habits:read']
-  })
-  
-  // Si l'authentification a échoué, retourner la réponse d'erreur
-  if (authResponse) {
-    return authResponse
-  }
-  
-  // Extraire l'ID de l'utilisateur à partir de l'en-tête (ajouté par le middleware)
-  const userId = req.headers.get('x-api-user-id')
-  if (!userId) {
-    return NextResponse.json({ error: 'Utilisateur non trouvé' }, { status: 404 })
-  }
-
+export async function GET(request: Request) {
   try {
+    const user = await getAuthUser()
+    if (!user) {
+      return NextResponse.json({ error: "Non authentifié" }, { status: 401 })
+    }
+
     // Obtenir la date du jour
     const today = new Date()
     // Normaliser à minuit puis mettre à midi pour éviter les problèmes de fuseau horaire
@@ -42,7 +31,7 @@ export async function GET(req: NextRequest) {
     // Récupérer toutes les habitudes de l'utilisateur
     const habits = await prisma.habit.findMany({
       where: {
-        userId: userId,
+        userId: user.id,
       },
       include: {
         entries: {
@@ -125,7 +114,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Détecter quel format est demandé via le paramètre de requête "format"
-    const url = new URL(req.url)
+    const url = new URL(request.url)
     const formatParam = url.searchParams.get('format')
     
     if (formatParam === 'simple') {

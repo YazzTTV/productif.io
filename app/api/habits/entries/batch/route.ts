@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { apiAuth } from '@/middleware/api-auth';
+import { getAuthUser } from '@/lib/auth';
 import { startOfDay } from 'date-fns';
 
 interface BatchAction {
@@ -9,79 +9,126 @@ interface BatchAction {
   completed: boolean;
 }
 
-export async function POST(req: NextRequest) {
-  // Vérifier l'authentification API
-  const authResponse = await apiAuth(req, {
-    requiredScopes: ['habits:write']
-  })
-  
-  // Si l'authentification a échoué, retourner la réponse d'erreur
-  if (authResponse) {
-    return authResponse
-  }
-  
-  // Extraire l'ID de l'utilisateur à partir de l'en-tête (ajouté par le middleware)
-  const userId = req.headers.get('x-api-user-id')
-  if (!userId) {
-    return NextResponse.json({ error: 'Utilisateur non trouvé' }, { status: 404 })
-  }
-
+export async function POST(req: Request) {
   try {
-    const { actions }: { actions: BatchAction[] } = await req.json();
+    const user = await getAuthUser();
+    if (!user) {
+      return NextResponse.json({ error: 'Non authentifié' }, { status: 401 });
+    }
 
-    if (!actions || !Array.isArray(actions)) {
+    const { actions } = await req.json();
+    
+    if (!actions || !Array.isArray(actions) || actions.length === 0) {
       return NextResponse.json(
-        { error: 'Actions invalides' },
+        { error: 'Aucune action fournie' },
         { status: 400 }
       );
     }
 
-    // Vérifier que toutes les habitudes appartiennent à l'utilisateur
+    console.log('Actions reçues:', JSON.stringify(actions));
+
+    // Validation des données et vérification des permissions
     const habitIds = [...new Set(actions.map(action => action.habitId))];
-    const habits = await prisma.habit.findMany({
+    
+    // Vérifier que toutes les habitudes appartiennent à l'utilisateur
+    const userHabits = await prisma.habit.findMany({
       where: {
         id: { in: habitIds },
-        userId: userId,
+        userId: user.id,
       },
+      select: {
+        id: true,
+        daysOfWeek: true,
+      }
     });
 
-    if (habits.length !== habitIds.length) {
+    if (userHabits.length !== habitIds.length) {
       return NextResponse.json(
-        { error: 'Certaines habitudes n\'appartiennent pas à l\'utilisateur' },
+        { error: 'Certaines habitudes n\'appartiennent pas à cet utilisateur' },
         { status: 403 }
       );
     }
 
-    // Traiter chaque action
-    const results = await Promise.all(
-      actions.map(async (action) => {
-        const entryDate = new Date(action.date);
-        entryDate.setHours(12, 0, 0, 0);
+    // Créer un map des habitudes pour faciliter l'accès
+    const habitsMap = new Map(userHabits.map(habit => [habit.id, habit]));
 
-        return prisma.habitEntry.upsert({
+    // Traiter chaque action
+    const results = [];
+    
+    for (const action of actions) {
+      const { habitId, date, completed } = action;
+      const habit = habitsMap.get(habitId);
+      
+      if (!habit) continue; // Ignoré si l'habitude n'existe pas (ne devrait pas arriver à ce stade)
+      
+      // Normaliser la date en s'assurant qu'elle correspond au début du jour (minuit)
+      // puis configurer à midi pour éviter les problèmes de fuseau horaire
+      const parsedDate = new Date(date);
+      const normalizedDate = startOfDay(parsedDate);
+      normalizedDate.setHours(12, 0, 0, 0);
+      
+      console.log('Date reçue:', date);
+      console.log('Date normalisée:', normalizedDate.toISOString());
+      
+      // Vérifier si le jour est dans les jours sélectionnés
+      const dayName = normalizedDate.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+      console.log('Jour de la semaine:', dayName);
+      console.log('Jours configurés:', habit.daysOfWeek);
+      
+      if (!habit.daysOfWeek.includes(dayName)) {
+        results.push({
+          habitId,
+          date: normalizedDate,
+          status: 'error',
+          message: 'Ce jour n\'est pas sélectionné pour cette habitude'
+        });
+        continue;
+      }
+      
+      try {
+        // Approche upsert : mettre à jour si l'entrée existe, sinon créer une nouvelle
+        const entry = await prisma.habitEntry.upsert({
           where: {
             habitId_date: {
-              habitId: action.habitId,
-              date: entryDate,
-            },
+              habitId,
+              date: normalizedDate,
+            }
           },
           update: {
-            completed: action.completed,
+            completed,
           },
           create: {
-            habitId: action.habitId,
-            date: entryDate,
-            completed: action.completed,
+            habitId,
+            date: normalizedDate,
+            completed,
           },
         });
-      })
-    );
+        
+        results.push({
+          habitId,
+          date: normalizedDate,
+          status: 'success',
+          entry
+        });
+      } catch (error) {
+        console.error(`Erreur lors du traitement de l'entrée pour ${habitId}:`, error);
+        results.push({
+          habitId,
+          date: normalizedDate,
+          status: 'error',
+          message: 'Erreur lors du traitement de l\'entrée'
+        });
+      }
+    }
 
-    return NextResponse.json({ success: true, entries: results });
+    return NextResponse.json({
+      success: true,
+      results
+    });
   } catch (error) {
-    console.error('Erreur lors du traitement en lot des entrées d\'habitudes:', error);
+    console.error('Erreur lors du traitement du lot d\'habitudes:', error);
     return NextResponse.json(
-      { error: 'Erreur interne du serveur' },
+      { error: 'Erreur lors du traitement du lot d\'habitudes' },
       { status: 500 }
     );
   }
