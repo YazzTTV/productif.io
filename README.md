@@ -2,6 +2,16 @@
 
 Ce projet est configuré pour fonctionner avec Docker, ce qui permet de développer facilement sur n'importe quel ordinateur.
 
+## 🚀 Nouveautés - Mai 2025
+
+### API pour Agents IA
+- **Documentation complète** : Guide détaillé pour l'intégration d'agents IA
+- **Endpoints optimisés** : API `/habits/agent` avec performances améliorées
+- **Authentification clarifiée** : Résolution des problèmes de tokens API
+- **Sauvegarde automatique** : Scripts de backup de base de données
+
+📖 **[Consultez la documentation API complète](docs/api-tokens.md)**
+
 ## Prérequis
 
 - [Docker](https://docs.docker.com/get-docker/)
@@ -125,9 +135,50 @@ Accéder au shell dans le conteneur :
 docker compose exec app bash
 ```
 
+## 🤖 API pour Agents IA
+
+### Authentification
+Utilisez les tokens API pour connecter vos agents IA :
+
+```bash
+curl -X GET "https://productif.io/api/habits/agent" \
+  -H "Authorization: Bearer {votre_token}"
+```
+
+### Endpoints principaux
+- **`/api/habits/agent`** - Gestion des habitudes (GET/POST)
+- **`/api/tasks/agent`** - Gestion des tâches
+- **`/api/test-token`** - Test de votre token API
+
+### Documentation complète
+📖 **[Guide complet des APIs](docs/api-tokens.md)** - Exemples, authentification, résolution des problèmes
+
+## 🛠️ Scripts utiles
+
+### Sauvegarde de la base de données
+```bash
+node scripts/backup-database.js
+```
+
+### Déploiement
+```bash
+# Commit et push
+git add .
+git commit -m "Votre message"
+git push origin main
+
+# Déploiement Vercel
+vercel --prod
+```
+
 ## Développement
 
 Tous les changements dans le code source seront automatiquement reflétés dans l'application en cours d'exécution grâce au volume monté et au mode de développement de Next.js.
+
+## 📚 Documentation
+
+- **[API Tokens](docs/api-tokens.md)** - Guide complet pour les intégrations d'agents IA
+- **[Changelog](CHANGELOG.md)** - Historique des modifications
 
 ## Déploiement
 
