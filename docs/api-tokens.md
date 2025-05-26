@@ -41,70 +41,16 @@ Pour authentifier une requête API, incluez le token dans l'en-tête `Authorizat
 Authorization: Bearer {votre_token}
 ```
 
-### Types d'authentification
-
-L'application productif.io utilise deux systèmes d'authentification différents selon les endpoints :
-
-#### 🤖 **Authentification par Token API** (Recommandée pour les agents IA)
-- **Format** : `Authorization: Bearer {votre_token_api}`
-- **Endpoints compatibles** : `/api/habits/agent`, `/api/tasks/agent`, `/api/processes`, etc.
-- **Avantages** : 
-  - ✅ Conçu pour les intégrations externes
-  - ✅ Gestion des permissions par scopes
-  - ✅ Pas de gestion de session complexe
-  - ✅ Idéal pour N8N, Zapier, etc.
-
-#### 🍪 **Authentification par Cookie de session** (Interface web)
-- **Format** : `Cookie: auth_token=your_session_cookie`
-- **Endpoints compatibles** : `/api/habits/date`, `/api/habits/entries`, etc.
-- **Utilisation** : Principalement pour l'interface web de l'application
-
-**⚠️ Important** : Certains endpoints n'acceptent que l'authentification par cookie. Dans ce cas, utilisez les endpoints alternatifs optimisés pour les agents IA (comme `/api/habits/agent` au lieu de `/api/habits/date`).
-
 ## Exemples d'utilisation
 
 ### Habitudes
 
-#### 1. Récupérer les habitudes du jour actuel
-
-**Endpoint optimisé pour les agents IA** - Retourne uniquement les habitudes programmées pour aujourd'hui avec leurs entrées du jour.
+#### 1. Récupérer les habitudes
 
 ```bash
 curl -X GET "https://productif.io/api/habits/agent" \
   -H "Authorization: Bearer {votre_token}"
 ```
-
-**Réponse** :
-```json
-[
-  {
-    "id": "clg123abc",
-    "name": "Apprentissage",
-    "description": "Notez ce que vous avez appris aujourd'hui",
-    "color": "#4338CA",
-    "frequency": "daily",
-    "daysOfWeek": ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"],
-    "order": 0,
-    "entries": [
-      {
-        "id": "entry_today",
-        "date": "2023-04-15T12:00:00.000Z",
-        "completed": true,
-        "note": "Appris les APIs REST",
-        "rating": 8,
-        "createdAt": "2023-04-15T18:00:00.000Z",
-        "updatedAt": "2023-04-15T18:00:00.000Z"
-      }
-    ]
-  }
-]
-```
-
-**Caractéristiques** :
-- ✅ Filtre automatiquement par jour de la semaine actuel
-- ✅ Retourne uniquement l'entrée d'aujourd'hui (si elle existe)
-- ✅ Optimisé pour les agents IA
-- ✅ Authentification par token API
 
 #### 2. Marquer une habitude comme complétée
 
@@ -116,27 +62,22 @@ curl -X POST "https://productif.io/api/habits/agent" \
     "habitId": "clg123abc",
     "date": "2023-04-15",
     "completed": true,
-    "note": "Complété par l'assistant IA",
-    "rating": 8
+    "note": "Complété par l'assistant IA"
   }'
 ```
 
-#### 3. Récupérer les habitudes pour une date spécifique (authentification par cookie)
-
-⚠️ **Note** : Cette API nécessite une authentification par cookie de session, pas par token API.
+#### 3. Récupérer les habitudes pour une date spécifique
 
 ```bash
 curl -X GET "https://productif.io/api/habits/date?date=2023-04-15" \
-  -H "Cookie: auth_token=your_session_cookie"
+  -H "Authorization: Bearer {votre_token}"
 ```
 
-#### 4. Enregistrer plusieurs habitudes pour une date (authentification par cookie)
-
-⚠️ **Note** : Cette API nécessite une authentification par cookie de session, pas par token API.
+#### 4. Enregistrer plusieurs habitudes pour une date
 
 ```bash
 curl -X POST "https://productif.io/api/habits/date" \
-  -H "Cookie: auth_token=your_session_cookie" \
+  -H "Authorization: Bearer {votre_token}" \
   -H "Content-Type: application/json" \
   -d '{
     "date": "2023-04-15",
@@ -157,13 +98,11 @@ curl -X POST "https://productif.io/api/habits/date" \
   }'
 ```
 
-#### 5. Enregistrer une entrée d'habitude individuelle (authentification par cookie)
-
-⚠️ **Note** : Cette API nécessite une authentification par cookie de session, pas par token API.
+#### 5. Enregistrer une entrée d'habitude individuelle
 
 ```bash
 curl -X POST "https://productif.io/api/habits/entries/date" \
-  -H "Cookie: auth_token=your_session_cookie" \
+  -H "Authorization: Bearer {votre_token}" \
   -H "Content-Type: application/json" \
   -d '{
     "habitId": "clg123abc",
@@ -174,16 +113,12 @@ curl -X POST "https://productif.io/api/habits/entries/date" \
   }'
 ```
 
-#### 6. Récupérer les entrées d'habitudes sur une période (authentification par cookie)
-
-⚠️ **Note** : Cette API nécessite une authentification par cookie de session, pas par token API.
+#### 6. Récupérer les entrées d'habitudes sur une période
 
 ```bash
 curl -X GET "https://productif.io/api/habits/entries/period?startDate=2023-04-01&endDate=2023-04-30" \
-  -H "Cookie: auth_token=your_session_cookie"
+  -H "Authorization: Bearer {votre_token}"
 ```
-
-**Recommandation pour les agents IA** : Utilisez prioritairement l'endpoint `/api/habits/agent` qui est optimisé pour l'authentification par token API et retourne les données du jour actuel.
 
 ### Tâches
 
