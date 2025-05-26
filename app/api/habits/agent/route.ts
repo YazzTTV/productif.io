@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { apiAuth } from '@/middleware/api-auth'
-import { startOfDay } from 'date-fns'
+import { startOfDay, endOfDay } from 'date-fns'
 
 // Liste toutes les habitudes pour un agent IA
 export async function GET(req: NextRequest) {
@@ -22,10 +22,10 @@ export async function GET(req: NextRequest) {
   }
   
   try {
-    // Obtenir la date du jour normalisée
+    // Obtenir la date du jour avec début et fin de journée
     const today = new Date()
-    const normalizedDate = startOfDay(today)
-    normalizedDate.setHours(12, 0, 0, 0) // Normaliser à midi pour éviter les problèmes de fuseau horaire
+    const startOfToday = startOfDay(today)
+    const endOfToday = endOfDay(today)
     
     // Obtenir le jour en anglais pour le filtrage
     const currentDayOfWeek = today.toLocaleDateString("en-US", { weekday: "long" }).toLowerCase()
@@ -42,8 +42,11 @@ export async function GET(req: NextRequest) {
       include: {
         entries: {
           where: {
-            // Filtrer les entrées pour la date d'aujourd'hui uniquement
-            date: normalizedDate
+            // Filtrer les entrées pour la date d'aujourd'hui avec une plage
+            date: {
+              gte: startOfToday,
+              lte: endOfToday
+            }
           }
         }
       },
