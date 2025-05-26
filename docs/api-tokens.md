@@ -50,7 +50,8 @@ Authorization: Bearer {votre_token}
 
 ### ✅ Endpoints recommandés pour les agents IA
 
-- `/api/habits/agent` - Gestion des habitudes (GET/POST)
+- `/api/habits/agent` - Gestion des habitudes (GET/POST pour marquer comme complétées)
+- `/api/webhooks/habits` - Création d'habitudes et actions avancées
 - `/api/tasks/agent` - Gestion des tâches
 - `/api/test-token` - Test de votre token API
 
@@ -58,7 +59,8 @@ Authorization: Bearer {votre_token}
 
 - `/api/habits/date` - Utilise l'authentification par cookies uniquement
 - `/api/habits/today` - Utilise l'authentification par cookies uniquement
-- Tous les autres endpoints `/habits/*` sauf `/habits/agent`
+- `/api/habits` (POST) - Création d'habitudes via interface web uniquement
+- Tous les autres endpoints `/habits/*` sauf `/habits/agent` et `/webhooks/habits`
 
 ## Exemples d'utilisation
 
@@ -112,7 +114,59 @@ curl -X GET "https://productif.io/api/habits/agent" \
 - Entrées triées par date décroissante (plus récente en premier)
 - Compatible avec l'authentification par token API
 
-#### 2. Marquer une habitude comme complétée
+#### 2. Créer une nouvelle habitude
+
+**Endpoint** : `/api/webhooks/habits`
+**Méthode** : POST
+**Authentification** : Token API avec scope `habits:write`
+
+```bash
+curl -X POST "https://productif.io/api/webhooks/habits" \
+  -H "Authorization: Bearer {votre_token}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "action": "create_habit",
+    "data": {
+      "name": "Ma nouvelle habitude",
+      "description": "Description de l'habitude",
+      "frequency": "daily",
+      "daysOfWeek": ["monday", "tuesday", "wednesday", "thursday", "friday"],
+      "userId": "user_id_here",
+      "color": "#4338CA"
+    }
+  }'
+```
+
+**Paramètres requis** :
+- `action` : "create_habit"
+- `data.name` : Nom de l'habitude
+- `data.frequency` : "daily" ou "weekly"
+- `data.userId` : ID de l'utilisateur
+
+**Paramètres optionnels** :
+- `data.description` : Description de l'habitude
+- `data.daysOfWeek` : Array des jours (par défaut : tous les jours)
+- `data.color` : Couleur en hexadécimal
+
+**Réponse** :
+```json
+{
+  "success": true,
+  "habit": {
+    "id": "new_habit_id",
+    "name": "Ma nouvelle habitude",
+    "description": "Description de l'habitude",
+    "frequency": "daily",
+    "daysOfWeek": ["monday", "tuesday", "wednesday", "thursday", "friday"],
+    "color": "#4338CA",
+    "userId": "user_id_here",
+    "createdAt": "2025-05-26T20:00:00.000Z",
+    "updatedAt": "2025-05-26T20:00:00.000Z"
+  }
+}
+```
+
+#### 3. Marquer une habitude comme complétée
 
 **Endpoint** : `/api/habits/agent`
 **Méthode** : POST
@@ -138,7 +192,7 @@ curl -X POST "https://productif.io/api/habits/agent" \
 - `note` (optionnel) : Note textuelle
 - `rating` (optionnel) : Note de 0 à 10
 
-#### 3. Test de votre token API
+#### 4. Test de votre token API
 
 ```bash
 curl -X GET "https://productif.io/api/test-token" \
