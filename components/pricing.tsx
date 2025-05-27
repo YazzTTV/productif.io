@@ -10,7 +10,7 @@ export function Pricing() {
     <section className="container mx-auto px-4 py-20 bg-gray-50">
       <div className="text-center mb-16">
         <h2 className="text-3xl md:text-4xl font-bold text-gray-900">
-          Offre exclusive <span className="text-green-500">whitelist</span>
+          Offre exclusive <span className="text-green-500">waitlist</span>
         </h2>
         <p className="text-gray-600 mt-4 max-w-2xl mx-auto">
           Sécurise ton accès à vie pour moins cher que ton coiffeur.
@@ -28,9 +28,9 @@ export function Pricing() {
 
         <AnimatedButton 
           className="w-full mb-6"
-          onClick={() => window.location.href = 'https://whitelist.productif.io'}
+          onClick={() => window.location.href = 'https://waitlist.productif.io'}
         >
-          Rejoindre la whitelist pour 1€
+          Rejoindre la waitlist pour 1€
         </AnimatedButton>
         <p className="text-xs text-center text-gray-500 mb-6">
           1€ pour réserver ta place + accès à l'offre lifetime à prix préférentiel lors du lancement
