@@ -93,7 +93,7 @@ body {
   }
 }
 
-/* Styles pour la bordure animée autour des boutons de whitelist */
+/* Styles pour la bordure animée autour des boutons de waitlist */
 .animate-border-button {
   position: relative;
   z-index: 2;

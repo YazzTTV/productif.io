@@ -36,9 +36,9 @@ export function FonctionnalitesHero() {
           </p>
           <Button 
             className="bg-green-500 hover:bg-green-600 text-white"
-            onClick={() => window.location.href = 'https://whitelist.productif.io'}
+            onClick={() => window.location.href = 'https://waitlist.productif.io'}
           >
-            Rejoindre la whitelist pour 1€
+            Rejoindre la waitlist pour 1€
           </Button>
         </div>
       </div>

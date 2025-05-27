@@ -9,19 +9,19 @@ export function FonctionnalitesCTA() {
         <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-6">
           Prêt à <span className="text-green-500">révolutionner</span> ta productivité ?
         </h2>
-        <p className="text-gray-600 text-xl mb-10 max-w-2xl mx-auto">
-          Rejoins notre whitelist exclusive et sécurise ton accès à vie à un tarif préférentiel lors du lancement.
+        <p className="text-gray-600 text-lg mb-8 max-w-3xl mx-auto">
+          Rejoins notre waitlist exclusive et sécurise ton accès à vie à un tarif préférentiel lors du lancement.
           Seulement 150 places disponibles !
         </p>
         
         <div className="bg-white border border-green-200 rounded-xl p-8 shadow-lg max-w-2xl mx-auto">
-          <h3 className="text-2xl font-bold text-gray-900 mb-4">Offre spéciale whitelist</h3>
+          <h3 className="text-2xl font-bold text-gray-900 mb-4">Offre spéciale waitlist</h3>
           <div className="mb-6">
             <div className="inline-block bg-green-50 text-green-800 text-sm font-medium px-4 py-1 rounded-full mb-2">
               Accès prioritaire
             </div>
             <p className="text-gray-600">
-              Investis seulement 1€ aujourd'hui pour rejoindre la whitelist et bénéficier d'un 
+              Investis seulement 1€ aujourd'hui pour rejoindre la waitlist et bénéficier d'un 
               tarif privilégié à vie lors du lancement.
             </p>
           </div>
@@ -55,9 +55,9 @@ export function FonctionnalitesCTA() {
           
           <Button 
             className="w-full bg-green-500 hover:bg-green-600 text-white text-lg py-6 h-auto"
-            onClick={() => window.location.href = 'https://whitelist.productif.io'}
+            onClick={() => window.location.href = 'https://waitlist.productif.io'}
           >
-            Rejoindre la whitelist pour 1€
+            Rejoindre la waitlist pour 1€
           </Button>
           <p className="text-xs text-gray-500 mt-4">
             Paiement sécurisé. Satisfaction garantie ou remboursement.

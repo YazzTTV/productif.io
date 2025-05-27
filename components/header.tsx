@@ -42,9 +42,9 @@ export function Header() {
           
         <AnimatedButton 
             className="text-xs md:text-sm px-3 py-1.5 md:px-4 md:py-2"
-          onClick={() => window.location.href = 'https://whitelist.productif.io'}
+          onClick={() => window.location.href = 'https://waitlist.productif.io'}
         >
-          Rejoindre la whitelist
+          Rejoindre la waitlist
         </AnimatedButton>
 
           {/* Menu mobile */}

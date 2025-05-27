@@ -83,22 +83,19 @@ export function Hero() {
         </div>
       </div>
       
-      {/* Section de whitelist en dessous de la vidéo */}
-      <div className="mt-16 max-w-2xl mx-auto text-center">
-        <h2 className="text-2xl font-bold text-gray-900 mb-4">
-          Rejoins la whitelist exclusive (1€) et sécurise ton accès à vie pour un tarif préférentiel.
-        </h2>
-        
-        <div className="mt-8">
-          <AnimatedButton 
-            className="text-lg px-8 py-4 bg-green-500 hover:bg-green-600"
-            onClick={() => window.location.href = 'https://whitelist.productif.io'}
+      {/* Section de waitlist en dessous de la vidéo */}
+      <div className="mt-8 p-6 bg-gray-50 rounded-lg border border-gray-200">
+        <p className="text-gray-700 text-center mb-4">
+          Rejoins la waitlist exclusive (1€) et sécurise ton accès à vie pour un tarif préférentiel.
+        </p>
+        <div className="flex justify-center">
+          <Button 
+            className="bg-green-500 hover:bg-green-600 text-white px-6 py-3"
+            onClick={() => window.location.href = 'https://waitlist.productif.io'}
           >
-            Sécurise ta place pour 1€
-          </AnimatedButton>
+            Rejoindre la waitlist pour 1€
+          </Button>
         </div>
-        
-        <p className="text-gray-600 mt-4">Seulement 150 places disponibles</p>
       </div>
     </section>
   )
