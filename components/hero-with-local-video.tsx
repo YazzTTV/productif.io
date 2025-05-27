@@ -23,11 +23,11 @@ export function HeroWithLocalVideo() {
       <div className="w-full max-w-2xl mx-auto h-1 bg-gradient-to-r from-transparent via-green-500 to-transparent my-6"></div>
       <p className="text-gray-600 text-xl max-w-2xl mx-auto mb-8">
         Ton cerveau mérite mieux que des to-do lists. Productif.io s'occupe de tout.
-        <span className="block mt-2 font-medium">Rejoins la whitelist exclusive (1€) et sécurise ton accès à vie pour un tarif préférentiel.</span>
+        <span className="block mt-2 font-medium">Rejoins la waitlist exclusive (1€) et sécurise ton accès à vie pour un tarif préférentiel.</span>
       </p>
       <Button 
         className="bg-green-500 hover:bg-green-600 text-white text-lg px-8 py-6 h-auto"
-        onClick={() => window.location.href = 'https://whitelist.productif.io'}
+        onClick={() => window.location.href = 'https://waitlist.productif.io'}
       >
         Sécurise ta place pour 1€
       </Button>

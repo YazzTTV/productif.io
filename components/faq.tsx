@@ -24,10 +24,10 @@ export function Faq() {
 
           <AccordionItem value="item-2" className="border-b border-gray-200">
             <AccordionTrigger className="px-6 py-4 text-gray-900 hover:text-green-500 hover:no-underline">
-              Comment fonctionne l'offre whitelist à 1€ ?
+              Comment fonctionne l'offre waitlist à 1€ ?
             </AccordionTrigger>
             <AccordionContent className="px-6 pb-4 text-gray-600">
-              En payant 1€, tu réserves ta place dans notre whitelist exclusive limitée à 150 personnes. Ce petit investissement symbolique nous permet de filtrer les personnes réellement intéressées. Lors du lancement officiel, tu auras accès en priorité à notre offre Lifetime exceptionnelle à un tarif préférentiel. Ce tarif ne changera jamais pour toi, même quand nous augmenterons nos prix à l'avenir.
+              En payant 1€, tu réserves ta place dans notre waitlist exclusive limitée à 150 personnes. Ce petit investissement symbolique nous permet de filtrer les personnes réellement intéressées. Lors du lancement officiel, tu auras accès en priorité à notre offre Lifetime exceptionnelle à un tarif préférentiel. Ce tarif ne changera jamais pour toi, même quand nous augmenterons nos prix à l'avenir.
             </AccordionContent>
           </AccordionItem>
 
@@ -53,10 +53,10 @@ export function Faq() {
 
           <AccordionItem value="item-5">
             <AccordionTrigger className="px-6 py-4 text-gray-900 hover:text-green-500 hover:no-underline">
-              Qu'est-ce que je gagne exactement avec cette whitelist ?
+              Qu'est-ce que je gagne exactement avec cette waitlist ?
             </AccordionTrigger>
             <AccordionContent className="px-6 pb-4 text-gray-600">
-              En rejoignant la whitelist pour 1€, tu obtiens: 1) Un accès anticipé à Productif.io avant son lancement officiel, 2) L'offre Lifetime à un tarif préférentiel qui ne sera jamais reproduit, 3) Un accompagnement personnalisé pour maximiser les bénéfices de l'outil, 4) La priorité absolue sur les nouvelles fonctionnalités à venir, et 5) La certitude de faire partie des premiers à bénéficier d'une technologie qui va transformer ta productivité.
+              En rejoignant la waitlist pour 1€, tu obtiens: 1) Un accès anticipé à Productif.io avant son lancement officiel, 2) L'offre Lifetime à un tarif préférentiel qui ne sera jamais reproduit, 3) Un accompagnement personnalisé pour maximiser les bénéfices de l'outil, 4) La priorité absolue sur les nouvelles fonctionnalités à venir, et 5) La certitude de faire partie des premiers à bénéficier d'une technologie qui va transformer ta productivité.
             </AccordionContent>
           </AccordionItem>
         </Accordion>
