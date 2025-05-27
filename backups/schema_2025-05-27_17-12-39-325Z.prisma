@@ -33,10 +33,6 @@ model User {
   managedCompany   Company?      @relation("CompanyAdmin", fields: [managedCompanyId], references: [id])
   managedCompanyId String?
   apiTokens        ApiToken[] // Tokens API pour agents IA
-  
-  // Relations de gamification
-  gamification     UserGamification?
-  notificationSettings NotificationSettings?
 
   // Champs Stripe
   stripeCustomerId     String?   @unique
@@ -269,85 +265,4 @@ model ApiToken {
 
   @@index([userId])
   @@map("api_tokens")
-}
-
-// Modèles de gamification
-model UserGamification {
-  id                String   @id @default(cuid())
-  userId            String   @unique
-  totalPoints       Int      @default(0)
-  level             Int      @default(1)
-  currentStreak     Int      @default(0)
-  longestStreak     Int      @default(0)
-  totalHabitsCompleted Int   @default(0)
-  weeklyGoal        Int      @default(7) // Objectif d'habitudes par semaine
-  monthlyGoal       Int      @default(30) // Objectif d'habitudes par mois
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  achievements      UserAchievement[]
-  streakHistory     StreakHistory[]
-
-  @@map("user_gamification")
-}
-
-model Achievement {
-  id          String   @id @default(cuid())
-  name        String   @db.VarChar(255)
-  description String   @db.Text
-  icon        String   @db.VarChar(50) // Nom de l'icône (ex: "trophy", "fire", "star")
-  category    String   @db.VarChar(50) // "streak", "completion", "consistency", "milestone"
-  condition   String   @db.Text // Condition JSON pour débloquer l'achievement
-  points      Int      @default(0) // Points accordés pour cet achievement
-  rarity      String   @db.VarChar(20) @default("common") // "common", "rare", "epic", "legendary"
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  users       UserAchievement[]
-
-  @@map("achievements")
-}
-
-model UserAchievement {
-  id            String      @id @default(cuid())
-  userId        String
-  achievementId String
-  unlockedAt    DateTime    @default(now())
-  user          UserGamification @relation(fields: [userId], references: [userId], onDelete: Cascade)
-  achievement   Achievement @relation(fields: [achievementId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, achievementId])
-  @@map("user_achievements")
-}
-
-model StreakHistory {
-  id        String   @id @default(cuid())
-  userId    String
-  date      DateTime @db.Date
-  streakCount Int
-  habitsCompleted Int @default(0)
-  totalHabitsForDay Int @default(0)
-  createdAt DateTime @default(now())
-  user      UserGamification @relation(fields: [userId], references: [userId], onDelete: Cascade)
-
-  @@unique([userId, date])
-  @@index([userId])
-  @@index([date])
-  @@map("streak_history")
-}
-
-model NotificationSettings {
-  id                    String   @id @default(cuid())
-  userId                String   @unique
-  streakReminders       Boolean  @default(true)
-  achievementNotifications Boolean @default(true)
-  dailyMotivation       Boolean  @default(true)
-  weeklyProgress        Boolean  @default(true)
-  pushEnabled           Boolean  @default(false)
-  emailEnabled          Boolean  @default(true)
-  reminderTime          String   @default("09:00") // Format HH:MM
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
-  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("notification_settings")
 }

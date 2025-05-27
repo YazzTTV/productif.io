@@ -11,7 +11,14 @@
     "backup": "node scripts/backup-database.js",
     "cleanup-backups": "node scripts/cleanup-backups.js",
     "schedule-backups": "node scripts/schedule-backups.js",
-    "test-backup": "node scripts/test-schedule.js"
+    "test-backup": "node scripts/test-schedule.js",
+    "init-achievements": "node scripts/init-achievements.js",
+    "restore-backup": "node scripts/restore-backup.js",
+    "debug-streak": "node scripts/debug-streak.js",
+    "recalculate-streak": "node scripts/recalculate-streak.js",
+    "check-date-habits": "node scripts/check-date-habits.js",
+    "fix-habit-dates": "node scripts/fix-habit-dates.js",
+    "analyze-date-flow": "node scripts/analyze-date-flow.js"
   },
   "dependencies": {
     "@clerk/nextjs": "^6.12.12",
@@ -63,6 +70,7 @@
     "date-fns-tz": "^3.2.0",
     "dotenv": "^16.5.0",
     "embla-carousel-react": "8.5.1",
+    "framer-motion": "^12.15.0",
     "googleapis": "^148.0.0",
     "input-otp": "1.4.1",
     "jose": "^6.0.10",

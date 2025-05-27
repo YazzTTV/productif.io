@@ -1,7 +1,15 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getAuthUser } from '@/lib/auth';
-import { startOfDay, parseISO, addHours } from 'date-fns';
+import { parseISO } from 'date-fns';
+import { GamificationService } from '@/services/gamification';
+
+// Normaliser une date comme le frontend (midi UTC)
+function normalizeDate(date: Date): Date {
+  const normalized = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  normalized.setHours(12, 0, 0, 0); // Même logique que le frontend
+  return normalized;
+}
 
 export async function POST(req: Request) {
   try {
@@ -12,13 +20,12 @@ export async function POST(req: Request) {
 
     const { habitId, date, completed, note, rating, skipDayValidation = false } = await req.json();
     
-    // Correction du problème de fuseau horaire
+    // Normaliser la date comme le frontend (midi UTC)
     const parsedDate = parseISO(date);
-    const localDate = new Date(parsedDate);
-    localDate.setHours(12, 0, 0, 0); // Définir à midi pour éviter les problèmes de changement de jour
+    const normalizedDate = normalizeDate(parsedDate);
     
     console.log('Date reçue:', date);
-    console.log('Date ajustée:', localDate.toISOString());
+    console.log('Date normalisée (midi UTC):', normalizedDate.toISOString());
 
     // Vérifier que l'habitude appartient à l'utilisateur
     const habit = await prisma.habit.findFirst({
@@ -37,7 +44,7 @@ export async function POST(req: Request) {
 
     // Vérifier si le jour est dans les jours sélectionnés (sauf si skipDayValidation est true)
     if (!skipDayValidation) {
-      const dayName = localDate.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+      const dayName = normalizedDate.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
       if (!habit.daysOfWeek.includes(dayName)) {
         console.warn(`Jour ${dayName} non sélectionné pour l'habitude ${habit.name} (${habitId})`);
         console.warn('Jours configurés:', habit.daysOfWeek);
@@ -53,95 +60,67 @@ export async function POST(req: Request) {
       );
     }
 
-    try {
-      // Utiliser la méthode upsert de Prisma pour éviter les erreurs de clé dupliquée
-      const entry = await prisma.habitEntry.upsert({
+    // Vérifier s'il existe déjà une entrée pour cette habitude à cette date
+    const existingEntry = await prisma.habitEntry.findUnique({
+      where: {
+        habitId_date: {
+          habitId,
+          date: normalizedDate,
+        },
+      },
+    });
+
+    let entry;
+    if (existingEntry) {
+      // Mettre à jour l'entrée existante
+      entry = await prisma.habitEntry.update({
         where: {
-          habitId_date: {
-            habitId: habitId,
-            date: localDate,
-          },
+          id: existingEntry.id,
         },
-        update: {
-          completed: completed,
+        data: {
+          completed,
           note: note || null,
-          rating: rating === undefined ? null : Number(rating),
-          updatedAt: new Date(),
-        },
-        create: {
-          habitId: habitId,
-          date: localDate,
-          completed: completed,
-          note: note || null,
-          rating: rating === undefined ? null : Number(rating),
+          rating: rating ? Number(rating) : null,
         },
       });
+    } else {
+      // Créer une nouvelle entrée
+      entry = await prisma.habitEntry.create({
+        data: {
+          habitId,
+          date: normalizedDate,
+          completed,
+          note: note || null,
+          rating: rating ? Number(rating) : null,
+        },
+      });
+    }
 
-      return NextResponse.json(entry);
-    } catch (dbError) {
-      console.error("Erreur lors de l'upsert:", dbError);
-      
-      // Essayer avec une approche alternative en cas d'échec
+    // Traitement de la gamification si l'habitude est complétée
+    let gamificationResult = null;
+    if (completed) {
       try {
-        console.log("Tentative alternative pour sauvegarder l'entrée...");
-        // 1. Vérifier si l'entrée existe déjà
-        const existingEntry = await prisma.habitEntry.findUnique({
-          where: {
-            habitId_date: {
-              habitId: habitId,
-              date: localDate,
-            },
-          }
-        });
-
-        let entry;
-        if (existingEntry) {
-          // 2. Mettre à jour si elle existe
-          entry = await prisma.habitEntry.update({
-            where: {
-              id: existingEntry.id
-            },
-            data: {
-              completed: completed,
-              note: note || null,
-              rating: rating === undefined ? null : Number(rating),
-              updatedAt: new Date(),
-            }
-          });
-        } else {
-          // 3. Créer une nouvelle entrée sinon
-          entry = await prisma.habitEntry.create({
-            data: {
-              habitId: habitId,
-              date: localDate,
-              completed: completed,
-              note: note || null,
-              rating: rating === undefined ? null : Number(rating),
-            }
-          });
-        }
-        
-        return NextResponse.json(entry);
-      } catch (fallbackError) {
-        console.error("Échec de la tentative alternative:", fallbackError);
-        // Fournir plus de détails sur l'erreur pour le débogage
-        const errorDetails = typeof dbError === 'object' && dbError !== null ? 
-          JSON.stringify(dbError, Object.getOwnPropertyNames(dbError)) : String(dbError);
-        
-        return NextResponse.json(
-          { error: 'Erreur lors de l\'opération en base de données', details: errorDetails },
-          { status: 500 }
+        const gamificationService = new GamificationService();
+        gamificationResult = await gamificationService.processHabitCompletion(
+          user.id,
+          habitId,
+          normalizedDate
         );
+        console.log('Gamification traitée:', gamificationResult);
+      } catch (error) {
+        console.error('Erreur lors du traitement de la gamification:', error);
+        // On continue même si la gamification échoue
       }
     }
+
+    return NextResponse.json({
+      entry,
+      gamification: gamificationResult
+    });
   } catch (error) {
-    console.error('Erreur lors de la mise à jour de l\'habitude:', error);
-    // Fournir plus de détails sur l'erreur pour le débogage
-    const errorDetails = typeof error === 'object' && error !== null ? 
-      JSON.stringify(error, Object.getOwnPropertyNames(error)) : String(error);
-    
+    console.error('Erreur lors de la création/mise à jour de l\'entrée d\'habitude:', error);
     return NextResponse.json(
-      { error: 'Erreur lors de la mise à jour de l\'habitude', details: errorDetails },
+      { error: 'Erreur interne du serveur' },
       { status: 500 }
     );
   }
