@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useState, useEffect } from "react"
-import { LayoutDashboard, CheckSquare, Clock, BarChart, Settings, FolderKanban, Heart, Target, Book, Users, Building2, LineChart } from "lucide-react"
+import { LayoutDashboard, CheckSquare, Clock, BarChart, Settings, FolderKanban, Heart, Target, Book, Users, Building2, LineChart, Trophy } from "lucide-react"
 import { buttonVariants } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { cn } from "@/lib/utils"
@@ -223,6 +223,21 @@ export function DashboardNav({ viewAsMode = false, viewAsUserId, onNavItemClick 
       >
         <Heart className="mr-2 h-4 w-4" />
         <span className="truncate">{t('habits')}</span>
+      </Link>
+      
+      <Link
+        href={getHref("/dashboard/achievements")}
+        className={cn(
+          buttonVariants({
+            variant: isActive("/dashboard/achievements") ? "secondary" : "ghost",
+            size: "default",
+          }),
+          "justify-start w-full"
+        )}
+        onClick={handleNavClick}
+      >
+        <Trophy className="mr-2 h-4 w-4" />
+        <span className="truncate">Achievements</span>
       </Link>
       
       {!viewAsMode && (

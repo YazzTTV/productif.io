@@ -6,7 +6,7 @@ import { getAuthUser } from "@/lib/auth"
 import { OverviewMetrics } from "@/components/dashboard/overview-metrics"
 import { HabitHeatmap } from "@/components/dashboard/habit-heatmap"
 import HabitStats from "@/components/dashboard/habit-stats"
-import { LeastTrackedHabits } from "@/components/dashboard/least-tracked-habits"
+import { GamificationOverview } from "@/components/gamification/gamification-overview"
 
 export default async function DashboardPage() {
   const user = await getAuthUser()
@@ -58,7 +58,7 @@ export default async function DashboardPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
           {/* Première rangée */}
           <RecentTasks />
-          <LeastTrackedHabits />
+          <GamificationOverview />
           
           {/* Deuxième rangée */}
           <ProjectsList projects={projects} />
