@@ -18,23 +18,51 @@ export function Pricing() {
       </div>
 
       <div className="max-w-md mx-auto bg-white border border-green-200 rounded-xl p-8 shadow-md">
+        <div className="bg-gradient-to-r from-red-500 to-orange-500 text-white text-sm font-bold py-2 px-4 rounded-full text-center mb-6 animate-pulse">
+          🔥 OFFRE LIMITÉE - 150 PLACES SEULEMENT
+        </div>
+
         <div className="text-center mb-6 relative">
-          <h3 className="text-2xl font-bold text-gray-900 mt-5">Offre Lifetime</h3>
-          <div className="mt-4 mb-2">
-            <span className="text-5xl font-bold text-green-500">Tarif spécial</span>
+          <h3 className="text-2xl font-bold text-gray-900 mt-2">Accès Lifetime</h3>
+          
+          <div className="mt-4 mb-4">
+            <div className="flex items-center justify-center gap-4 mb-2">
+              <div className="text-center">
+                <div className="text-lg text-red-500 line-through font-medium">20€/mois</div>
+                <div className="text-xs text-gray-500">Prix de lancement</div>
+              </div>
+              <div className="text-2xl text-gray-400">→</div>
+              <div className="text-center">
+                <div className="text-3xl font-bold text-green-500">4,95€/mois</div>
+                <div className="text-xs text-green-600 font-medium">À VIE</div>
+              </div>
+            </div>
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mt-4">
+              <p className="text-sm text-yellow-800 font-medium">
+                💰 <strong>Économise 75%</strong> en rejoignant la waitlist maintenant !
+              </p>
+              <p className="text-xs text-yellow-700 mt-1">
+                Paye seulement <strong>1€ aujourd'hui</strong> et bénéficie du tarif préférentiel de <strong>4,95€/mois à vie</strong> au lieu de 20€/mois lors du lancement officiel.
+              </p>
+            </div>
           </div>
-          <p className="text-green-600 font-medium">Pour toujours. Sans augmentation.</p>
         </div>
 
         <AnimatedButton 
-          className="w-full mb-6"
+          className="w-full mb-4 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700"
           onClick={() => window.location.href = 'https://waitlist.productif.io'}
         >
-          Rejoindre la waitlist pour 1€
+          🚀 Réserver ma place pour 1€
         </AnimatedButton>
-        <p className="text-xs text-center text-gray-500 mb-6">
-          1€ pour réserver ta place + accès à l'offre lifetime à prix préférentiel lors du lancement
-        </p>
+        
+        <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-6">
+          <p className="text-sm text-green-800 font-medium text-center">
+            ✅ <strong>1€ maintenant</strong> = <strong>4,95€/mois à vie</strong> garanti
+          </p>
+          <p className="text-xs text-green-700 text-center mt-1">
+            Accès prioritaire + tarif préférentiel verrouillé
+          </p>
+        </div>
 
         <ul className="space-y-3">
           <PricingItem>Accès prioritaire lors du lancement</PricingItem>
@@ -43,7 +71,7 @@ export function Pricing() {
           <PricingItem>Organisation automatique de tes tâches par l'IA</PricingItem>
           <PricingItem>Support prioritaire</PricingItem>
           <PricingItem>Mises à jour à vie incluses</PricingItem>
-          <PricingItem>Seulement 150 places disponibles</PricingItem>
+          <PricingItem>Tarif à vie verrouillé à 4,95€/mois</PricingItem>
         </ul>
 
         <p className="text-gray-500 text-sm mt-6 text-center">
