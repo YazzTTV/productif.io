@@ -4,11 +4,13 @@ import { useEffect, useState } from "react"
 import { useParams } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { BarChart, CheckSquare, Clock, Info, LineChart, Target, Folder } from "lucide-react"
+import { BarChart, CheckSquare, Clock, Info, LineChart, Target, Folder, Brain } from "lucide-react"
 import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { format } from "date-fns"
 import { fr } from "date-fns/locale"
+import { Button } from "@/components/ui/button"
+import Link from "next/link"
 
 interface HabitCompletion {
   id: string
@@ -37,7 +39,7 @@ interface Project {
 
 export default function ViewAsPage() {
   const params = useParams()
-  const userId = params.userId as string
+  const userId = params?.userId as string
   const [isLoading, setIsLoading] = useState(true)
   const [userData, setUserData] = useState<any>(null)
   const [tasks, setTasks] = useState<any[]>([])
@@ -47,6 +49,12 @@ export default function ViewAsPage() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    if (!userId) {
+      setError("ID utilisateur manquant")
+      setIsLoading(false)
+      return
+    }
+
     const fetchUserData = async () => {
       try {
         setIsLoading(true)
@@ -147,12 +155,22 @@ export default function ViewAsPage() {
   
   return (
     <div>
-      <h1 className="text-3xl font-bold mb-2">
-        Tableau de bord de {userData?.name || userData?.email || "l'utilisateur"}
-      </h1>
-      <p className="text-muted-foreground mb-6">
-        Vue d'ensemble des activités et performances
-      </p>
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-3xl font-bold mb-2">
+            Tableau de bord de {userData?.name || userData?.email || "l'utilisateur"}
+          </h1>
+          <p className="text-muted-foreground">
+            Vue d'ensemble des activités et performances
+          </p>
+        </div>
+        <Link href={`/dashboard/admin/view-as/${userId}/analytics`}>
+          <Button variant="outline" className="flex items-center gap-2">
+            <Brain className="h-4 w-4" />
+            Analyse avancée
+          </Button>
+        </Link>
+      </div>
       
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <Card>
