@@ -16,7 +16,6 @@ type HabitWithEntries = Habit & {
 export default function HabitsPage() {
   const [habits, setHabits] = useState<HabitWithEntries[]>([])
   const [loading, setLoading] = useState(true)
-  const [isSaving, setIsSaving] = useState(false)
   const router = useRouter()
   const pathname = usePathname()
 
@@ -44,8 +43,6 @@ export default function HabitsPage() {
       // Normaliser la date: définir à midi pour éviter les problèmes de fuseau horaire
       const targetDate = new Date(date);
       targetDate.setHours(12, 0, 0, 0);
-
-      setIsSaving(true);
       
       // Envoyer la requête au serveur
       const response = await fetch("/api/habits/entries", {
@@ -74,8 +71,6 @@ export default function HabitsPage() {
       console.error("Erreur lors de la sauvegarde:", error);
       toast.error("Erreur lors de la sauvegarde");
       return false;
-    } finally {
-      setIsSaving(false);
     }
   };
 
@@ -136,46 +131,46 @@ export default function HabitsPage() {
       })
     );
 
-    // Sauvegarder immédiatement, sans file d'attente
-    const success = await saveHabitStatus(habitId, targetDate, newCompleted);
-    
-    // Si la sauvegarde échoue, revenir à l'état précédent
-    if (!success) {
-      setHabits((prevHabits) =>
-        prevHabits.map((habit) => {
-          if (habit.id !== habitId) return habit;
+    // Sauvegarder en arrière-plan sans bloquer l'interface
+    saveHabitStatus(habitId, targetDate, newCompleted).then(success => {
+      // Si la sauvegarde échoue, revenir à l'état précédent
+      if (!success) {
+        setHabits((prevHabits) =>
+          prevHabits.map((habit) => {
+            if (habit.id !== habitId) return habit;
 
-          // Utiliser une fonction plus robuste pour comparer les dates
-          const isSameDate = (date1: Date, date2: Date) => {
-            const d1 = new Date(date1);
-            const d2 = new Date(date2);
-            return d1.getFullYear() === d2.getFullYear() && 
-                  d1.getMonth() === d2.getMonth() && 
-                  d1.getDate() === d2.getDate();
-          };
-
-          const existingEntryIndex = habit.entries.findIndex((e) =>
-            isSameDate(new Date(e.date), targetDate)
-          );
-
-          if (existingEntryIndex >= 0) {
-            // Remettre l'ancienne valeur
-            const updatedEntries = [...habit.entries];
-            updatedEntries[existingEntryIndex] = {
-              ...updatedEntries[existingEntryIndex],
-              completed: currentCompleted,
+            // Utiliser une fonction plus robuste pour comparer les dates
+            const isSameDate = (date1: Date, date2: Date) => {
+              const d1 = new Date(date1);
+              const d2 = new Date(date2);
+              return d1.getFullYear() === d2.getFullYear() && 
+                    d1.getMonth() === d2.getMonth() && 
+                    d1.getDate() === d2.getDate();
             };
-            return { ...habit, entries: updatedEntries };
-          } else {
-            // Supprimer l'entrée temporaire si elle avait été ajoutée
-            return {
-              ...habit,
-              entries: habit.entries.filter(entry => !entry.id.startsWith('temp-'))
-            };
-          }
-        })
-      );
-    }
+
+            const existingEntryIndex = habit.entries.findIndex((e) =>
+              isSameDate(new Date(e.date), targetDate)
+            );
+
+            if (existingEntryIndex >= 0) {
+              // Remettre l'ancienne valeur
+              const updatedEntries = [...habit.entries];
+              updatedEntries[existingEntryIndex] = {
+                ...updatedEntries[existingEntryIndex],
+                completed: currentCompleted,
+              };
+              return { ...habit, entries: updatedEntries };
+            } else {
+              // Supprimer l'entrée temporaire si elle avait été ajoutée
+              return {
+                ...habit,
+                entries: habit.entries.filter(entry => !entry.id.startsWith('temp-'))
+              };
+            }
+          })
+        );
+      }
+    });
   }, []);
 
   if (loading) {
@@ -191,11 +186,6 @@ export default function HabitsPage() {
           Nouvelle Habitude
         </Button>
       </div>
-      {isSaving && (
-        <div className="mb-4 text-xs text-slate-500 italic">
-          Sauvegarde en cours...
-        </div>
-      )}
       <WeeklyHabitsTable habits={habits} onToggleHabit={handleToggleHabit} />
     </div>
   )
