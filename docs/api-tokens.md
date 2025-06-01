@@ -46,22 +46,6 @@ Authorization: Bearer {votre_token}
 - Les endpoints standards (comme `/habits/date`) utilisent l'authentification par cookies et ne fonctionnent PAS avec les tokens API
 - Assurez-vous que votre token a les scopes appropriés pour l'action demandée
 
-## Endpoints compatibles avec les tokens API
-
-### ✅ Endpoints recommandés pour les agents IA
-
-- `/api/habits/agent` - Gestion des habitudes (GET/POST pour marquer comme complétées)
-- `/api/webhooks/habits` - Création d'habitudes et actions avancées
-- `/api/tasks/agent` - Gestion des tâches
-- `/api/test-token` - Test de votre token API
-
-### ❌ Endpoints NON compatibles avec les tokens API
-
-- `/api/habits/date` - Utilise l'authentification par cookies uniquement
-- `/api/habits/today` - Utilise l'authentification par cookies uniquement
-- `/api/habits` (POST) - Création d'habitudes via interface web uniquement
-- Tous les autres endpoints `/habits/*` sauf `/habits/agent` et `/webhooks/habits`
-
 ## Exemples d'utilisation
 
 ### Habitudes
@@ -253,20 +237,273 @@ curl -X PATCH "https://productif.io/api/tasks/agent/{task_id}" \
 #### 1. Récupérer tous les processus
 
 ```bash
-curl -X GET "https://productif.io/api/processes" \
+curl -X GET "https://productif.io/api/processes/agent" \
+  -H "Authorization: Bearer {votre_token}"
+```
+
+**Paramètres optionnels** :
+- `?includeStats=true` - Inclure les statistiques (nombre de tâches, pourcentage d'achèvement)
+- `?includeTasks=true` - Inclure toutes les tâches associées à chaque processus
+
+**Exemple avec statistiques** :
+```bash
+curl -X GET "https://productif.io/api/processes/agent?includeStats=true" \
   -H "Authorization: Bearer {votre_token}"
 ```
 
 #### 2. Créer un nouveau processus
 
 ```bash
-curl -X POST "https://productif.io/api/processes" \
+curl -X POST "https://productif.io/api/processes/agent" \
   -H "Authorization: Bearer {votre_token}" \
   -H "Content-Type: application/json" \
   -d '{
     "name": "Processus de publication d'article",
     "description": "Étapes pour publier un article sur le blog"
   }'
+```
+
+#### 3. Mettre à jour un processus
+
+```bash
+curl -X PATCH "https://productif.io/api/processes/agent" \
+  -H "Authorization: Bearer {votre_token}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "id": "process_id_123",
+    "name": "Nouveau nom du processus",
+    "description": "Nouvelle description"
+  }'
+```
+
+#### 4. Supprimer un processus
+
+```bash
+curl -X DELETE "https://productif.io/api/processes/agent" \
+  -H "Authorization: Bearer {votre_token}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "id": "process_id_123"
+  }'
+```
+
+#### 5. Assigner un processus à une tâche
+
+```bash
+curl -X PATCH "https://productif.io/api/tasks/agent/{task_id}/process" \
+  -H "Authorization: Bearer {votre_token}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "processId": "process_id_123"
+  }'
+```
+
+#### 6. Retirer un processus d'une tâche
+
+```bash
+curl -X PATCH "https://productif.io/api/tasks/agent/{task_id}/process" \
+  -H "Authorization: Bearer {votre_token}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "processId": null
+  }'
+```
+
+#### 7. Récupérer le processus assigné à une tâche
+
+```bash
+curl -X GET "https://productif.io/api/tasks/agent/{task_id}/process" \
+  -H "Authorization: Bearer {votre_token}"
+```
+
+### Objectifs (OKR)
+
+#### 1. Récupérer toutes les missions et objectifs
+
+```bash
+curl -X GET "https://productif.io/api/objectives/agent" \
+  -H "Authorization: Bearer {votre_token}"
+```
+
+**Paramètres optionnels** :
+- `?current=true` - Récupérer uniquement la mission du trimestre actuel
+- `?quarter=1&year=2024` - Filtrer par trimestre et année spécifiques
+
+**Exemple pour le trimestre actuel** :
+```bash
+curl -X GET "https://productif.io/api/objectives/agent?current=true" \
+  -H "Authorization: Bearer {votre_token}"
+```
+
+#### 2. Créer une nouvelle mission
+
+```bash
+curl -X POST "https://productif.io/api/objectives/agent" \
+  -H "Authorization: Bearer {votre_token}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "type": "mission",
+    "title": "Développer l'activité commerciale",
+    "quarter": 1,
+    "year": 2024,
+    "target": 100
+  }'
+```
+
+#### 3. Créer un nouvel objectif
+
+```bash
+curl -X POST "https://productif.io/api/objectives/agent" \
+  -H "Authorization: Bearer {votre_token}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "type": "objective",
+    "title": "Augmenter le nombre de prospects",
+    "missionId": "mission_id_123",
+    "target": 100
+  }'
+```
+
+#### 4. Créer une nouvelle action
+
+```bash
+curl -X POST "https://productif.io/api/objectives/agent" \
+  -H "Authorization: Bearer {votre_token}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "type": "action",
+    "title": "Prospecter des entreprises",
+    "objectiveId": "objective_id_123",
+    "target": 50,
+    "current": 0
+  }'
+```
+
+#### 5. Mettre à jour la progression d'une action (Mode incrémental)
+
+**Exemple : "Aujourd'hui j'ai prospecté 1 personne"**
+
+```bash
+curl -X PATCH "https://productif.io/api/objectives/agent/actions/{action_id}/progress" \
+  -H "Authorization: Bearer {votre_token}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "increment": 1,
+    "note": "Prospecté 1 nouvelle entreprise aujourd'hui"
+  }'
+```
+
+#### 6. Définir une valeur absolue pour une action
+
+```bash
+curl -X PATCH "https://productif.io/api/objectives/agent/actions/{action_id}/progress" \
+  -H "Authorization: Bearer {votre_token}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "setValue": 25
+  }'
+```
+
+#### 7. Récupérer les détails d'une action
+
+```bash
+curl -X GET "https://productif.io/api/objectives/agent/actions/{action_id}/progress" \
+  -H "Authorization: Bearer {votre_token}"
+```
+
+#### 8. Mettre à jour la progression via l'endpoint principal
+
+```bash
+curl -X PATCH "https://productif.io/api/objectives/agent" \
+  -H "Authorization: Bearer {votre_token}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "actionId": "action_id_123",
+    "increment": 5
+  }'
+```
+
+### Cas d'usage typique pour les OKR
+
+**Scénario** : Vous avez un objectif "Prospecter 50 personnes" et chaque jour vous voulez incrémenter votre progression.
+
+1. **Créer la structure OKR** :
+```bash
+# 1. Créer une mission pour Q1 2024
+curl -X POST "https://productif.io/api/objectives/agent" \
+  -H "Authorization: Bearer {votre_token}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "type": "mission",
+    "title": "Développer l'activité commerciale Q1",
+    "quarter": 1,
+    "year": 2024
+  }'
+
+# 2. Créer un objectif
+curl -X POST "https://productif.io/api/objectives/agent" \
+  -H "Authorization: Bearer {votre_token}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "type": "objective",
+    "title": "Augmenter la prospection",
+    "missionId": "mission_id_from_step_1"
+  }'
+
+# 3. Créer une action mesurable
+curl -X POST "https://productif.io/api/objectives/agent" \
+  -H "Authorization: Bearer {votre_token}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "type": "action",
+    "title": "Prospecter des entreprises",
+    "objectiveId": "objective_id_from_step_2",
+    "target": 50,
+    "current": 0
+  }'
+```
+
+2. **Incrémenter quotidiennement** :
+```bash
+# Chaque jour, ajouter votre progression
+curl -X PATCH "https://productif.io/api/objectives/agent/actions/{action_id}/progress" \
+  -H "Authorization: Bearer {votre_token}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "increment": 3,
+    "note": "Prospecté 3 entreprises aujourd'hui"
+  }'
+```
+
+**Réponse typique** :
+```json
+{
+  "success": true,
+  "action": {
+    "id": "action_id",
+    "title": "Prospecter des entreprises",
+    "current": 15,
+    "target": 50,
+    "progress": 30,
+    "objective": {
+      "id": "objective_id",
+      "title": "Augmenter la prospection",
+      "progress": 30
+    },
+    "mission": {
+      "id": "mission_id",
+      "title": "Développer l'activité commerciale Q1",
+      "quarter": 1,
+      "year": 2024
+    }
+  },
+  "message": "Progression mise à jour: 15/50 (30.0%)",
+  "previousValue": 12,
+  "newValue": 15,
+  "change": 3,
+  "completed": false,
+  "note": "Prospecté 3 entreprises aujourd'hui"
+}
 ```
 
 ## Résolution des problèmes
