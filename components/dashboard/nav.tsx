@@ -240,6 +240,21 @@ export function DashboardNav({ viewAsMode = false, viewAsUserId, onNavItemClick 
         <span className="truncate">Achievements</span>
       </Link>
       
+      <Link
+        href={getHref("/dashboard/leaderboard")}
+        className={cn(
+          buttonVariants({
+            variant: isActive("/dashboard/leaderboard") ? "secondary" : "ghost",
+            size: "default",
+          }),
+          "justify-start w-full"
+        )}
+        onClick={handleNavClick}
+      >
+        <Users className="mr-2 h-4 w-4" />
+        <span className="truncate">Classement</span>
+      </Link>
+      
       {!viewAsMode && (
         <Link
           href={getHref("/dashboard/mon-espace")}

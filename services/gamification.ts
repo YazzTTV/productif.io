@@ -22,6 +22,19 @@ export interface Achievement {
   unlockedAt?: Date
 }
 
+export interface LeaderboardEntry {
+  userId: string
+  userName: string
+  userEmail: string
+  totalPoints: number
+  level: number
+  currentStreak: number
+  longestStreak: number
+  totalHabitsCompleted: number
+  achievements: number
+  rank: number
+}
+
 export class GamificationService {
   // Points accordés par action
   private static readonly POINTS = {
@@ -421,6 +434,63 @@ export class GamificationService {
       totalHabitsCompleted: userGamification.totalHabitsCompleted,
       pointsToNextLevel,
       recentAchievements
+    }
+  }
+
+  // Obtenir le classement des utilisateurs (leaderboard)
+  async getLeaderboard(limit: number = 50, userId?: string): Promise<{
+    leaderboard: LeaderboardEntry[]
+    userRank?: number
+    totalUsers: number
+  }> {
+    // Récupérer toutes les données de gamification avec les utilisateurs
+    const allUserGamification = await prisma.userGamification.findMany({
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true
+          }
+        },
+        achievements: true
+      },
+      orderBy: [
+        { totalPoints: 'desc' },
+        { level: 'desc' },
+        { longestStreak: 'desc' },
+        { totalHabitsCompleted: 'desc' }
+      ]
+    })
+
+    // Formater les données pour le leaderboard avec le rang
+    const leaderboard: LeaderboardEntry[] = allUserGamification.map((userGamif, index) => ({
+      userId: userGamif.userId,
+      userName: userGamif.user.name || userGamif.user.email.split('@')[0],
+      userEmail: userGamif.user.email,
+      totalPoints: userGamif.totalPoints,
+      level: userGamif.level,
+      currentStreak: userGamif.currentStreak,
+      longestStreak: userGamif.longestStreak,
+      totalHabitsCompleted: userGamif.totalHabitsCompleted,
+      achievements: userGamif.achievements.length,
+      rank: index + 1
+    }))
+
+    // Trouver le rang de l'utilisateur actuel si spécifié
+    let userRank: number | undefined
+    if (userId) {
+      const userEntry = leaderboard.find(entry => entry.userId === userId)
+      userRank = userEntry?.rank
+    }
+
+    // Limiter le nombre de résultats
+    const limitedLeaderboard = leaderboard.slice(0, limit)
+
+    return {
+      leaderboard: limitedLeaderboard,
+      userRank,
+      totalUsers: allUserGamification.length
     }
   }
 } 
