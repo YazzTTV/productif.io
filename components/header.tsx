@@ -25,18 +25,18 @@ export function Header() {
         </Link>
       </div>
       <nav className="hidden md:flex items-center gap-8">
-        <Link href="/" className="text-gray-600 hover:text-gray-900 transition-colors">
+        <Link href="/" className="text-gray-600 hover:text-green-500 transition-colors">
           Accueil
         </Link>
-        <Link href="/fonctionnalites" className="text-gray-600 hover:text-gray-900 transition-colors">
+        <Link href="/fonctionnalites" className="text-gray-600 hover:text-green-500 transition-colors">
           Fonctionnalités
         </Link>
-        <Link href="/tarification" className="text-gray-600 hover:text-gray-900 transition-colors">
+        <Link href="/tarification" className="text-gray-600 hover:text-green-500 transition-colors">
           Tarification
         </Link>
       </nav>
         <div className="flex items-center gap-2">
-        <Link href="/login" className="text-gray-600 hover:text-gray-900 transition-colors hidden md:block">
+        <Link href="/login" className="text-gray-600 hover:text-green-500 transition-colors hidden md:block">
           Connexion
         </Link>
           
