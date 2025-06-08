@@ -54,11 +54,13 @@ interface WeeklyHabitsTableProps {
     entries: HabitEntry[]
   })[]
   onToggleHabit: (habitId: string, date: Date, completed: boolean) => Promise<void>
+  onCustomUpdate: (habitId: string, date: Date, data: { completed?: boolean; note?: string; rating?: number }) => Promise<void>
 }
 
 export function WeeklyHabitsTable({
   habits,
   onToggleHabit,
+  onCustomUpdate,
 }: WeeklyHabitsTableProps) {
   const [currentWeek, setCurrentWeek] = useState(() => startOfWeek(new Date(), { weekStartsOn: 1 }))
   const [loading, setLoading] = useState<string | null>(null)
@@ -79,6 +81,7 @@ export function WeeklyHabitsTable({
   )
 
   // Mettre à jour les habitudes triées lorsque props.habits change
+  // UNIQUEMENT pour le tri, pas pour les mises à jour d'entrées
   useEffect(() => {
     setSortedHabits(habits)
   }, [habits])
@@ -120,7 +123,7 @@ export function WeeklyHabitsTable({
     }
   }
 
-  const handleCustomUpdate = async (
+  const handleCustomUpdateWrapper = async (
     habitId: string,
     date: Date,
     data: { completed?: boolean; note?: string; rating?: number }
@@ -129,71 +132,9 @@ export function WeeklyHabitsTable({
     
     try {
       setLoading(habitId)
-      const targetDate = new Date(date)
-      targetDate.setHours(12, 0, 0, 0)
-      
-      // Envoyer la requête au serveur
-      const response = await fetch("/api/habits/entries", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          habitId,
-          date: targetDate.toISOString(),
-          completed: data.completed !== undefined ? data.completed : true,
-          note: data.note || null,
-          rating: data.rating || null
-        }),
-      })
-
-      if (!response.ok) {
-        throw new Error("Erreur lors de la mise à jour de l'habitude")
-      }
-
-      // Mettre à jour l'état local au lieu de recharger la page
-      const updatedHabits = sortedHabits.map(habit => {
-        if (habit.id === habitId) {
-          const updatedEntries = [...habit.entries]
-          const existingEntryIndex = updatedEntries.findIndex(e => 
-            isSameDay(new Date(e.date), targetDate)
-          )
-
-          if (existingEntryIndex >= 0) {
-            updatedEntries[existingEntryIndex] = {
-              ...updatedEntries[existingEntryIndex],
-              completed: data.completed !== undefined ? data.completed : true,
-              note: data.note || null,
-              rating: data.rating || null,
-              updatedAt: new Date()
-            }
-          } else {
-            const newEntry: HabitEntry = {
-              id: Date.now().toString(), // ID temporaire
-              habitId,
-              date: targetDate,
-              completed: data.completed !== undefined ? data.completed : true,
-              note: data.note || null,
-              rating: data.rating || null,
-              createdAt: new Date(),
-              updatedAt: new Date()
-            }
-            updatedEntries.push(newEntry)
-          }
-
-          return {
-            ...habit,
-            entries: updatedEntries
-          }
-        }
-        return habit
-      })
-
-      setSortedHabits(updatedHabits)
-      toast.success("Habitude mise à jour avec succès")
+      await onCustomUpdate(habitId, date, data)
     } catch (error) {
       console.error("Error updating habit:", error)
-      toast.error("Erreur lors de la mise à jour de l'habitude")
     } finally {
       setLoading(null)
     }
@@ -348,7 +289,7 @@ export function WeeklyHabitsTable({
                     isDefaultHabit={isDefaultHabit}
                     loading={loading}
                     handleToggle={handleToggle}
-                    handleCustomUpdate={handleCustomUpdate}
+                    handleCustomUpdate={handleCustomUpdateWrapper}
                     handleDeleteHabit={handleDeleteHabit}
                     DAYS_OF_WEEK={DAYS_OF_WEEK}
                   />
