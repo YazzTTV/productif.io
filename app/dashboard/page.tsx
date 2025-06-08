@@ -59,13 +59,13 @@ export default async function DashboardPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
           {/* Première rangée - 2 colonnes principales */}
           <div className="lg:col-span-2 space-y-4 sm:space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-              <RecentTasks />
-              <GamificationOverview />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+          <RecentTasks />
+          <GamificationOverview />
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-              <ProjectsList projects={projects} />
-              <HabitHeatmap />
+          <ProjectsList projects={projects} />
+          <HabitHeatmap />
             </div>
           </div>
           

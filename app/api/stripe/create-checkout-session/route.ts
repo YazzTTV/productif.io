@@ -60,7 +60,7 @@ export async function POST(req: Request) {
         },
       ],
       mode: 'subscription' as const,
-      success_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard?success=true`,
+      success_url: `${process.env.NEXT_PUBLIC_APP_URL}/merci?success=true`,
       cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/pricing?canceled=true`,
       subscription_data: {
         trial_period_days: TRIAL_PERIOD_DAYS,

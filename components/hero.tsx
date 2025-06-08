@@ -91,7 +91,7 @@ export function Hero() {
         <div className="flex justify-center">
           <Button 
             className="bg-green-500 hover:bg-green-600 text-white px-6 py-3"
-            onClick={() => window.location.href = 'https://waitlist.productif.io'}
+            onClick={() => window.location.href = '/inscription'}
           >
             Rejoindre la waitlist pour 1€
           </Button>
