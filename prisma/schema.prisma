@@ -13,6 +13,12 @@ enum UserRole {
   USER
 }
 
+enum WaitlistStatus {
+  EMAIL_ONLY      // Email saisi mais pas payé
+  PAID           // Payment effectué (tag "Waitlist")
+  COMPLETED      // Inscription complètement finalisée
+}
+
 model User {
   id               String        @id @default(cuid())
   name             String?
@@ -350,4 +356,42 @@ model NotificationSettings {
   user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("notification_settings")
+}
+
+// Modèle pour la waitlist et inscription multi-étapes
+model WaitlistLead {
+  id              String          @id @default(cuid())
+  email           String          @unique
+  phone           String?
+  reason          String?         @db.Text // Raison d'utiliser Productif
+  status          WaitlistStatus  @default(EMAIL_ONLY)
+  
+  // Données de paiement
+  stripeSessionId String?         @unique // ID de session Stripe
+  stripePriceId   String?         // Prix payé
+  amountPaid      Int?            // Montant en centimes
+  paidAt          DateTime?       // Date de paiement
+  
+  // Metadata et tracking
+  ipAddress       String?
+  userAgent       String?
+  referrer        String?
+  utmSource       String?
+  utmMedium       String?
+  utmCampaign     String?
+  
+  // Système.io integration
+  systemeIoContactId String?      @unique // ID du contact dans Système.io
+  
+  // Timestamps
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  emailCapturedAt DateTime        @default(now()) // Quand l'email a été capturé
+  phoneAddedAt    DateTime?       // Quand le téléphone a été ajouté
+  completedAt     DateTime?       // Quand l'inscription est complète
+
+  @@index([email])
+  @@index([status])
+  @@index([createdAt])
+  @@map("waitlist_leads")
 }
