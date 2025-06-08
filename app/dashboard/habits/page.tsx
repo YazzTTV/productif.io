@@ -74,6 +74,15 @@ export default function HabitsPage() {
     }
   };
 
+  // Fonction utilitaire pour comparer les dates
+  const isSameDate = (date1: Date, date2: Date) => {
+    const d1 = new Date(date1);
+    const d2 = new Date(date2);
+    return d1.getFullYear() === d2.getFullYear() && 
+           d1.getMonth() === d2.getMonth() && 
+           d1.getDate() === d2.getDate();
+  };
+
   const handleToggleHabit = useCallback(async (habitId: string, date: Date, currentCompleted: boolean): Promise<void> => {
     const newCompleted = !currentCompleted;
     
@@ -85,15 +94,6 @@ export default function HabitsPage() {
     setHabits((prevHabits) =>
       prevHabits.map((habit) => {
         if (habit.id !== habitId) return habit;
-
-        // Utiliser une fonction plus robuste pour comparer les dates
-        const isSameDate = (date1: Date, date2: Date) => {
-          const d1 = new Date(date1);
-          const d2 = new Date(date2);
-          return d1.getFullYear() === d2.getFullYear() && 
-                 d1.getMonth() === d2.getMonth() && 
-                 d1.getDate() === d2.getDate();
-        };
 
         const existingEntryIndex = habit.entries.findIndex((e) =>
           isSameDate(new Date(e.date), targetDate)
@@ -139,15 +139,6 @@ export default function HabitsPage() {
           prevHabits.map((habit) => {
             if (habit.id !== habitId) return habit;
 
-            // Utiliser une fonction plus robuste pour comparer les dates
-            const isSameDate = (date1: Date, date2: Date) => {
-              const d1 = new Date(date1);
-              const d2 = new Date(date2);
-              return d1.getFullYear() === d2.getFullYear() && 
-                    d1.getMonth() === d2.getMonth() && 
-                    d1.getDate() === d2.getDate();
-            };
-
             const existingEntryIndex = habit.entries.findIndex((e) =>
               isSameDate(new Date(e.date), targetDate)
             );
@@ -173,6 +164,89 @@ export default function HabitsPage() {
     });
   }, []);
 
+  // Nouvelle fonction pour gérer les mises à jour custom (apprentissage, note, etc.)
+  const handleCustomUpdate = useCallback(async (
+    habitId: string, 
+    date: Date, 
+    data: { completed?: boolean; note?: string; rating?: number }
+  ): Promise<void> => {
+    const targetDate = new Date(date);
+    targetDate.setHours(12, 0, 0, 0);
+
+    // Mise à jour optimiste immédiate dans l'état principal
+    setHabits((prevHabits) =>
+      prevHabits.map((habit) => {
+        if (habit.id !== habitId) return habit;
+
+        const existingEntryIndex = habit.entries.findIndex((e) =>
+          isSameDate(new Date(e.date), targetDate)
+        );
+
+        const now = new Date();
+        const entryData = {
+          completed: data.completed !== undefined ? data.completed : true,
+          note: data.note !== undefined ? data.note : null,
+          rating: data.rating !== undefined ? data.rating : null,
+          updatedAt: now,
+        };
+
+        if (existingEntryIndex >= 0) {
+          // Mettre à jour l'entrée existante
+          const updatedEntries = [...habit.entries];
+          updatedEntries[existingEntryIndex] = {
+            ...updatedEntries[existingEntryIndex],
+            ...entryData,
+          };
+          return { ...habit, entries: updatedEntries };
+        } else {
+          // Ajouter une nouvelle entrée
+          return {
+            ...habit,
+            entries: [
+              ...habit.entries,
+              {
+                id: `temp-${Date.now()}`,
+                habitId,
+                date: targetDate,
+                createdAt: now,
+                ...entryData,
+              },
+            ],
+          };
+        }
+      })
+    );
+
+    // Sauvegarder sur le serveur
+    try {
+      const response = await fetch("/api/habits/entries", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          habitId,
+          date: targetDate.toISOString(),
+          completed: data.completed !== undefined ? data.completed : true,
+          note: data.note || null,
+          rating: data.rating || null
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Erreur lors de la mise à jour de l'habitude");
+      }
+
+      toast.success("Habitude mise à jour avec succès");
+    } catch (error) {
+      console.error("Error updating habit:", error);
+      toast.error("Erreur lors de la mise à jour de l'habitude");
+      
+      // En cas d'erreur, recharger les données depuis le serveur
+      fetchHabits();
+    }
+  }, []);
+
   if (loading) {
     return <div>Chargement...</div>
   }
@@ -186,7 +260,11 @@ export default function HabitsPage() {
           Nouvelle Habitude
         </Button>
       </div>
-      <WeeklyHabitsTable habits={habits} onToggleHabit={handleToggleHabit} />
+      <WeeklyHabitsTable 
+        habits={habits} 
+        onToggleHabit={handleToggleHabit}
+        onCustomUpdate={handleCustomUpdate}
+      />
     </div>
   )
 } 
