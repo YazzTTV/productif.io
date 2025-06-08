@@ -506,6 +506,231 @@ curl -X PATCH "https://productif.io/api/objectives/agent/actions/{action_id}/pro
 }
 ```
 
+## Endpoints utilitaires pour le développement
+
+### Récupération des IDs
+
+Pour faciliter le développement et les tests, trois endpoints spéciaux permettent de récupérer facilement tous les IDs nécessaires aux requêtes API :
+
+#### 1. Tous les IDs avec détails complets
+
+**Endpoint** : `/api/debug/ids`
+**Méthode** : GET
+**Authentification** : Token API avec scopes appropriés
+
+```bash
+curl -X GET "https://productif.io/api/debug/ids" \
+  -H "Authorization: Bearer {votre_token}"
+```
+
+**Réponse** :
+```json
+{
+  "user": {
+    "id": "user_id",
+    "email": "user@example.com",
+    "name": "John Doe"
+  },
+  "quickIds": {
+    "userId": "user_id",
+    "taskId": "task_id_123",
+    "habitId": "habit_id_456",
+    "projectId": "project_id_789",
+    "missionId": "mission_id_abc",
+    "objectiveId": "objective_id_def",
+    "actionId": "action_id_ghi"
+  },
+  "tasks": {
+    "count": 15,
+    "completed": 8,
+    "incomplete": 7,
+    "ids": ["task_1", "task_2", "..."],
+    "items": [
+      {
+        "id": "task_1",
+        "title": "Ma tâche",
+        "completed": false,
+        "priority": "medium"
+      }
+    ]
+  },
+  "habits": {
+    "count": 5,
+    "ids": ["habit_1", "habit_2", "..."],
+    "items": [...]
+  },
+  "projects": {
+    "count": 3,
+    "ids": ["project_1", "project_2", "..."],
+    "items": [...]
+  },
+  "gamification": {
+    "totalPoints": 1250,
+    "level": 5,
+    "currentStreak": 7,
+    "longestStreak": 15
+  }
+}
+```
+
+#### 2. IDs rapides pour tests
+
+**Endpoint** : `/api/debug/quick-ids`
+**Méthode** : GET
+**Authentification** : Token API
+
+```bash
+curl -X GET "https://productif.io/api/debug/quick-ids" \
+  -H "Authorization: Bearer {votre_token}"
+```
+
+**Réponse** :
+```json
+{
+  "quickIds": {
+    "userId": "user_id",
+    "taskId": "task_id_123",
+    "habitId": "habit_id_456",
+    "projectId": "project_id_789",
+    "missionId": "mission_id_abc",
+    "objectiveId": "objective_id_def",
+    "actionId": "action_id_ghi"
+  },
+  "entities": {
+    "task": {
+      "id": "task_id_123",
+      "title": "Ma première tâche",
+      "completed": false
+    },
+    "habit": {
+      "id": "habit_id_456",
+      "name": "Apprentissage",
+      "frequency": "daily"
+    }
+  },
+  "examples": {
+    "completeTask": "PATCH /api/tasks/agent/task_id_123",
+    "markHabit": "POST /api/habits/agent",
+    "updateAction": "PATCH /api/objectives/agent/actions/action_id_ghi/progress"
+  }
+}
+```
+
+#### 3. IDs par type spécifique
+
+**Endpoint** : `/api/debug/ids/[type]`
+**Méthode** : GET
+**Authentification** : Token API
+
+**Types disponibles** :
+- `tasks` - Tâches
+- `habits` - Habitudes
+- `habit-entries` - Entrées d'habitudes
+- `projects` - Projets
+- `missions` - Missions OKR
+- `objectives` - Objectifs OKR
+- `actions` - Actions OKR
+- `processes` - Processus
+- `time-entries` - Entrées de temps
+- `achievements` - Réalisations
+- `user-achievements` - Réalisations utilisateur
+
+```bash
+# Récupérer seulement les IDs des tâches
+curl -X GET "https://productif.io/api/debug/ids/tasks" \
+  -H "Authorization: Bearer {votre_token}"
+
+# Récupérer seulement les IDs des habitudes
+curl -X GET "https://productif.io/api/debug/ids/habits" \
+  -H "Authorization: Bearer {votre_token}"
+
+# Récupérer seulement les IDs des actions OKR
+curl -X GET "https://productif.io/api/debug/ids/actions" \
+  -H "Authorization: Bearer {votre_token}"
+```
+
+**Réponse exemple pour `/api/debug/ids/tasks`** :
+```json
+{
+  "type": "tasks",
+  "stats": {
+    "total": 15,
+    "completed": 8,
+    "incomplete": 7
+  },
+  "ids": [
+    "task_id_1",
+    "task_id_2",
+    "task_id_3"
+  ],
+  "items": [
+    {
+      "id": "task_id_1",
+      "title": "Finaliser le rapport",
+      "completed": false,
+      "priority": "high",
+      "createdAt": "2025-05-26T10:00:00Z"
+    },
+    {
+      "id": "task_id_2",
+      "title": "Réunion équipe",
+      "completed": true,
+      "priority": "medium",
+      "completedAt": "2025-05-26T14:30:00Z"
+    }
+  ]
+}
+```
+
+### Cas d'usage des endpoints d'IDs
+
+#### Workflow de développement rapide
+
+1. **Récupérer les IDs rapides** :
+```bash
+curl -X GET "https://productif.io/api/debug/quick-ids" \
+  -H "Authorization: Bearer {votre_token}"
+```
+
+2. **Utiliser les IDs dans vos requêtes** :
+```bash
+# Marquer une tâche comme terminée
+curl -X PATCH "https://productif.io/api/tasks/agent/{taskId}" \
+  -H "Authorization: Bearer {votre_token}" \
+  -H "Content-Type: application/json" \
+  -d '{"completed": true}'
+
+# Marquer une habitude
+curl -X POST "https://productif.io/api/habits/agent" \
+  -H "Authorization: Bearer {votre_token}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "habitId": "{habitId}",
+    "date": "2025-05-27",
+    "completed": true,
+    "note": "Test via API"
+  }'
+
+# Incrémenter une action OKR
+curl -X PATCH "https://productif.io/api/objectives/agent/actions/{actionId}/progress" \
+  -H "Authorization: Bearer {votre_token}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "increment": 1,
+    "note": "Progression via API"
+  }'
+```
+
+#### Tests automatisés
+
+Ces endpoints sont particulièrement utiles pour :
+- **Tests d'intégration** : Récupérer des IDs valides pour vos tests
+- **Scripts de développement** : Automatiser les tests d'API
+- **Débuggage** : Vérifier les données disponibles
+- **Documentation** : Générer des exemples avec de vraies données
+
+**⚠️ Note importante** : Ces endpoints sont destinés au développement et aux tests. En production, utilisez les endpoints standards avec authentification appropriée.
+
 ## Résolution des problèmes
 
 ### Erreur 401 "Non authentifié"
@@ -549,6 +774,14 @@ curl -X GET "https://productif.io/api/test-token" \
 6. **Gérez les erreurs** appropriément dans votre code
 
 ## Changelog
+
+### Version 2025-05-27
+- ✅ **Nouveaux endpoints utilitaires** : Ajout de 3 endpoints pour récupérer facilement tous les IDs
+  - `/api/debug/ids` - Tous les IDs avec détails complets
+  - `/api/debug/quick-ids` - IDs rapides pour tests
+  - `/api/debug/ids/[type]` - IDs par type spécifique
+- ✅ **Documentation des endpoints d'IDs** : Guide complet d'utilisation avec exemples
+- ✅ **Workflow de développement** : Documentation des cas d'usage pour tests et développement
 
 ### Version 2025-05-26
 - ✅ Optimisation de l'API `/habits/agent` : limitation à 7 dernières entrées au lieu de 30
