@@ -8,7 +8,8 @@ const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;
 export async function POST(req: Request) {
   try {
     const body = await req.text();
-    const signature = headers().get('stripe-signature')!;
+    const headersList = await headers();
+    const signature = headersList.get('stripe-signature')!;
 
     let event;
     try {
@@ -20,6 +21,35 @@ export async function POST(req: Request) {
 
     // Handle the event
     switch (event.type) {
+      case 'checkout.session.completed': {
+        const session = event.data.object as any;
+        console.log('Processing checkout.session.completed:', session.id);
+
+        // Vérifier si c'est un paiement waitlist
+        if (session.metadata && session.metadata.type === 'waitlist') {
+          const email = session.metadata.email || session.customer_email;
+          
+          if (email) {
+            console.log(`Marking waitlist entry as paid for email: ${email}`);
+            
+            try {
+              await prisma.waitlistEntry.update({
+                where: { email },
+                data: {
+                  status: 'paye',
+                  currentStep: 3,
+                  updatedAt: new Date()
+                }
+              });
+              console.log(`✅ Successfully updated waitlist status for ${email}`);
+            } catch (error) {
+              console.error(`❌ Error updating waitlist for ${email}:`, error);
+            }
+          }
+        }
+        break;
+      }
+
       case 'customer.subscription.created':
       case 'customer.subscription.updated': {
         const subscription = event.data.object as any;
