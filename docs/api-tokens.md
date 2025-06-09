@@ -12,6 +12,23 @@ Cette documentation est spécialement conçue pour les agents IA qui doivent int
 3. Crée un nouveau token avec les scopes nécessaires
 4. Copie le token (affiché une seule fois)
 
+### ⚡ Caractéristiques des Tokens (Mise à jour importante)
+
+**✅ Tokens Permanents par Défaut** (Depuis décembre 2025)
+- Quand vous **laissez le champ "Date d'expiration" vide** lors de la création : le token est **permanent** (jamais d'expiration)
+- Quand vous **spécifiez une date d'expiration** : le token expire à cette date exacte
+- **Headers JWT conformes** avec `"typ": "JWT"` pour une compatibilité optimale
+
+**🔧 Améliorations Techniques**
+- Format JWT standard avec tous les headers requis
+- Tokens immédiatement fonctionnels après création
+- Plus de problème d'expiration inattendue
+
+**⚠️ Important pour les développeurs**
+- Les anciens tokens (créés avant décembre 2025) peuvent avoir des durées d'expiration limitées
+- Créez de nouveaux tokens pour bénéficier des améliorations
+- Utilisez l'interface web `/settings/api-tokens` pour une création optimale
+
 ### Utiliser le Token
 **En-tête obligatoire pour chaque requête** :
 ```
@@ -597,8 +614,8 @@ curl -X GET "https://productif.io/api/objectives/agent" \
     {
       "id": "mission_id",
       "title": "Développer l'activité commerciale Q1",
-      "quarter": 1,
-      "year": 2024,
+    "quarter": 1,
+    "year": 2024,
       "progress": 65,
       "objectives": [
         {
@@ -606,7 +623,7 @@ curl -X GET "https://productif.io/api/objectives/agent" \
           "title": "Augmenter la prospection",
           "progress": 30,
           "current": 15,
-          "target": 50,
+    "target": 50,
           "actions": [
             {
               "id": "action_id",
@@ -881,15 +898,23 @@ curl -X POST "/api/habits/agent" \
 ### Bonnes Pratiques Générales
 1. **Utilisez les endpoints `/agent`** pour toutes vos intégrations d'IA
 2. **Stockez vos tokens de manière sécurisée** et ne les partagez jamais
-3. **Définissez des dates d'expiration** appropriées pour vos tokens
+3. **Créez des tokens permanents** en laissant le champ d'expiration vide pour une utilisation durable, ou définissez une date d'expiration spécifique si nécessaire
 4. **Utilisez des scopes minimaux** nécessaires pour votre cas d'usage
 5. **Testez vos intégrations** avec l'endpoint `/test-token`
 6. **Gérez les erreurs** appropriément dans votre code
 7. **Utilisez les endpoints debug** pour récupérer facilement les IDs nécessaires
+8. **Mettez à jour vos anciens tokens** si vous rencontrez des problèmes d'expiration
 
 ---
 
 ## 📝 CHANGELOG
+
+### Version 2.1 (Décembre 2025) - CORRECTIONS MAJEURES
+- 🔥 **TOKENS PERMANENTS** : Les tokens créés sans date d'expiration sont maintenant permanents (jamais d'expiration)
+- ✅ **Headers JWT conformes** : Tous les tokens incluent maintenant `"typ": "JWT"` pour une compatibilité optimale
+- ⚡ **Fonctionnement immédiat** : Plus de problème d'expiration prématurée, les tokens fonctionnent dès la création
+- 🔧 **Interface web améliorée** : Création de tokens optimisée via `/settings/api-tokens`
+- 📚 **Documentation mise à jour** : Nouvelles sections sur les caractéristiques des tokens
 
 ### Version 2.0 (Juin 2025)
 - ✅ Restructuration complète pour agents IA par sections claires
@@ -929,4 +954,4 @@ curl -X POST "/api/habits/agent" \
 ### Version précédente
 - Création de la documentation initiale
 - Définition des scopes et de l'authentification
-- Exemples de base pour les habitudes et tâches
+- Exemples de base pour les habitudes et tâches 

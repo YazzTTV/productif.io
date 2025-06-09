@@ -37,7 +37,12 @@ export async function generateApiToken({
   }
   
   // Signer le token avec JWT
-  const token = await sign(payload, expiresAt ? { expirationTime: expiresAt } : undefined)
+  const token = await sign(
+    payload, 
+    expiresAt 
+      ? { expirationTime: expiresAt } 
+      : { noExpiration: true }
+  )
   
   // Enregistrer le token dans la base de données
   const apiToken = await prisma.apiToken.create({
