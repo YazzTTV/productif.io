@@ -55,7 +55,7 @@ export function FonctionnalitesCTA() {
           
           <Button 
             className="w-full bg-green-500 hover:bg-green-600 text-white text-lg py-6 h-auto"
-            onClick={() => window.location.href = 'https://waitlist.productif.io'}
+            onClick={() => window.location.href = '/waitlist'}
           >
             Rejoindre la waitlist pour 1€
           </Button>

@@ -351,3 +351,17 @@ model NotificationSettings {
 
   @@map("notification_settings")
 }
+
+model WaitlistEntry {
+  id          String   @id @default(cuid())
+  email       String   @unique
+  phone       String?
+  motivation  String?  @db.Text
+  status      String   @default("pas_paye") // "pas_paye", "paye"
+  currentStep Int      @default(1) // 1: email, 2: phone+motivation, 3: paiement
+  stripeSessionId String? // ID de session Stripe pour le paiement
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("waitlist_entries")
+}
