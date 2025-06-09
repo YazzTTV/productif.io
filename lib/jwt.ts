@@ -6,17 +6,21 @@ const JWT_SECRET = new TextEncoder().encode(
 
 interface SignOptions {
   expirationTime?: Date | string
+  noExpiration?: boolean
 }
 
 export async function sign(payload: any, options?: SignOptions): Promise<string> {
   let jwt = new jose.SignJWT(payload)
-    .setProtectedHeader({ alg: 'HS256' })
+    .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
   
   // Définir l'expiration
-  if (options?.expirationTime) {
+  if (options?.noExpiration) {
+    // Ne pas définir d'expiration pour un token permanent
+  } else if (options?.expirationTime) {
     jwt = jwt.setExpirationTime(options.expirationTime)
   } else {
-    jwt = jwt.setExpirationTime('7d')
+    // Expiration par défaut plus longue : 1 an au lieu de 7 jours
+    jwt = jwt.setExpirationTime('1y')
   }
   
   return await jwt.sign(JWT_SECRET)

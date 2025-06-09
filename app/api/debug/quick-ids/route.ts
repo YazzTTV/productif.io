@@ -1,12 +1,63 @@
-import { NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 import { getAuthUser } from "@/lib/auth"
+import { apiAuth } from "@/middleware/api-auth"
 import { prisma } from "@/lib/prisma"
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const user = await getAuthUser()
+    let userId: string | null = null
+    let authMethod = 'session-cookie'
+
+    // Vérifier d'abord l'authentification par token API
+    const authHeader = req.headers.get('authorization')
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      // Utiliser le middleware apiAuth pour l'authentification API
+      const authResponse = await apiAuth(req, {
+        requiredScopes: ['habits:read'] // Scope minimal requis
+      })
+      
+      // Si l'authentification a échoué, retourner la réponse d'erreur
+      if (authResponse) {
+        return authResponse
+      }
+      
+      // Extraire l'ID de l'utilisateur à partir de l'en-tête (ajouté par le middleware)
+      userId = req.headers.get('x-api-user-id')
+      authMethod = 'api-token'
+      
+      if (!userId) {
+        return NextResponse.json({ error: 'Utilisateur non trouvé' }, { status: 404 })
+      }
+    } else {
+      // Sinon, utiliser l'authentification par cookie de session
+      const user = await getAuthUser()
+      if (!user) {
+        return NextResponse.json(
+          { error: "Non authentifié" }, 
+          { status: 401 }
+        )
+      }
+      userId = user.id
+    }
+
+    if (!userId) {
+      return NextResponse.json(
+        { error: "Non authentifié" }, 
+        { status: 401 }
+      )
+    }
+
+    // Récupérer les informations de l'utilisateur
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, name: true, email: true, role: true }
+    })
+
     if (!user) {
-      return NextResponse.json({ error: "Non authentifié" }, { status: 401 })
+      return NextResponse.json(
+        { error: "Utilisateur non trouvé" }, 
+        { status: 404 }
+      )
     }
 
     // Récupérer juste les premiers IDs de chaque entité
@@ -93,7 +144,7 @@ export async function GET() {
         id: user.id,
         name: user.name,
         email: user.email,
-        role: user.role
+        role: user.role || null
       },
       
       // IDs essentiels pour les tests rapides
@@ -141,16 +192,20 @@ export async function GET() {
       
       meta: {
         timestamp: new Date().toISOString(),
+        authMethod: authMethod,
         note: "Cet endpoint fournit les IDs les plus récents de chaque type d'entité pour faciliter les tests API"
       }
     }
 
     return NextResponse.json(response)
 
-  } catch (error) {
+  } catch (error: any) {
     console.error("Erreur lors de la récupération des IDs rapides:", error)
     return NextResponse.json(
-      { error: "Erreur lors de la récupération des IDs rapides" },
+      { 
+        error: "Erreur lors de la récupération des IDs rapides",
+        details: error.message
+      },
       { status: 500 }
     )
   }
