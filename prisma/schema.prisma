@@ -358,40 +358,16 @@ model NotificationSettings {
   @@map("notification_settings")
 }
 
-// Modèle pour la waitlist et inscription multi-étapes
-model WaitlistLead {
-  id              String          @id @default(cuid())
-  email           String          @unique
-  phone           String?
-  reason          String?         @db.Text // Raison d'utiliser Productif
-  status          WaitlistStatus  @default(EMAIL_ONLY)
-  
-  // Données de paiement
-  stripeSessionId String?         @unique // ID de session Stripe
-  stripePriceId   String?         // Prix payé
-  amountPaid      Int?            // Montant en centimes
-  paidAt          DateTime?       // Date de paiement
-  
-  // Metadata et tracking
-  ipAddress       String?
-  userAgent       String?
-  referrer        String?
-  utmSource       String?
-  utmMedium       String?
-  utmCampaign     String?
-  
-  // Système.io integration
-  systemeIoContactId String?      @unique // ID du contact dans Système.io
-  
-  // Timestamps
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
-  emailCapturedAt DateTime        @default(now()) // Quand l'email a été capturé
-  phoneAddedAt    DateTime?       // Quand le téléphone a été ajouté
-  completedAt     DateTime?       // Quand l'inscription est complète
+model WaitlistEntry {
+  id          String   @id @default(cuid())
+  email       String   @unique
+  phone       String?
+  motivation  String?  @db.Text
+  status      String   @default("pas_paye") // "pas_paye", "paye"
+  currentStep Int      @default(1) // 1: email, 2: phone+motivation, 3: paiement
+  stripeSessionId String? // ID de session Stripe pour le paiement
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  @@index([email])
-  @@index([status])
-  @@index([createdAt])
-  @@map("waitlist_leads")
+  @@map("waitlist_entries")
 }
