@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, Suspense } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -11,7 +11,7 @@ import { AnimatedButton } from "@/components/ui/animated-button"
 import Link from "next/link"
 import Image from "next/image"
 
-export default function WaitlistPage() {
+function WaitlistContent() {
   const [currentStep, setCurrentStep] = useState(1)
   const [email, setEmail] = useState("")
   const [phone, setPhone] = useState("")
@@ -455,5 +455,20 @@ export default function WaitlistPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function WaitlistPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-8 h-8 border-4 border-green-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">Chargement...</p>
+        </div>
+      </div>
+    }>
+      <WaitlistContent />
+    </Suspense>
   )
 } 
