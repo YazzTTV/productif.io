@@ -9,6 +9,8 @@ import HabitStats from "@/components/dashboard/habit-stats"
 import { GamificationOverview } from "@/components/gamification/gamification-overview"
 import { LeaderboardCompact } from "@/components/gamification/leaderboard-compact"
 
+export const dynamic = 'force-dynamic'
+
 export default async function DashboardPage() {
   const user = await getAuthUser()
 
