@@ -103,7 +103,7 @@ function SuccessContent() {
 
           {/* Message de fin */}
           <p className="text-gray-500 text-sm mt-8">
-            Des questions ? Contacte-nous à <a href="mailto:hello@productif.io" className="text-green-500 hover:underline">hello@productif.io</a>
+            Des questions ? Contacte-nous à <a href="mailto:contact@productif.io" className="text-green-500 hover:underline">contact@productif.io</a>
           </p>
         </CardContent>
       </Card>
