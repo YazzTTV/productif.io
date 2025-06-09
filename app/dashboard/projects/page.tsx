@@ -6,6 +6,8 @@ import { PlusCircle } from "lucide-react"
 import { ProjectsGrid } from "@/components/projects/projects-grid"
 import { getAuthUser } from "@/lib/auth"
 
+export const dynamic = 'force-dynamic'
+
 export default async function ProjectsPage() {
   // Vérifier l'authentification côté serveur
   const user = await getAuthUser()

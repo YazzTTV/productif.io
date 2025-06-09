@@ -27,7 +27,7 @@ export function HeroWithLocalVideo() {
       </p>
       <Button 
         className="bg-green-500 hover:bg-green-600 text-white text-lg px-8 py-6 h-auto"
-        onClick={() => window.location.href = 'https://waitlist.productif.io'}
+        onClick={() => window.location.href = '/waitlist'}
       >
         Sécurise ta place pour 1€
       </Button>
