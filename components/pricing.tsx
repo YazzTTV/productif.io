@@ -50,7 +50,7 @@ export function Pricing() {
 
         <AnimatedButton 
           className="w-full mb-4 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700"
-          onClick={() => window.location.href = 'https://waitlist.productif.io'}
+          onClick={() => window.location.href = '/waitlist'}
         >
           🚀 Réserver ma place pour 1€
         </AnimatedButton>
