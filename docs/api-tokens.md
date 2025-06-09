@@ -1,58 +1,340 @@
-﻿# Tokens API pour Agents IA
+﻿# 🤖 Documentation API pour Agents IA - productif.io
 
-Ce document explique comment utiliser les tokens API pour connecter des agents IA à l'application productif.io.
+Cette documentation est spécialement conçue pour les agents IA qui doivent interagir avec l'API productif.io pour envoyer des rappels, récupérer des données et gérer les habitudes/tâches des utilisateurs.
 
-## Introduction
+---
 
-Les tokens API permettent à des applications tierces et des agents IA d'accéder aux ressources de l'application productif.io au nom d'un utilisateur. Cela facilite l'intégration avec des assistants IA qui peuvent aider à gérer les habitudes, tâches, et autres fonctionnalités.
+## 🔐 SECTION 1 : AUTHENTIFICATION
 
-## Obtenir un token API
+### Obtenir un Token API
+1. L'utilisateur se connecte à productif.io
+2. Va dans Paramètres > Tokens API 
+3. Crée un nouveau token avec les scopes nécessaires
+4. Copie le token (affiché une seule fois)
 
-1. Connectez-vous à votre compte productif.io
-2. Accédez à la section Paramètres > Tokens API
-3. Cliquez sur "Créer un nouveau token"
-4. Donnez un nom descriptif au token (ex: "Assistant IA")
-5. Sélectionnez les permissions (scopes) nécessaires
-6. Définissez éventuellement une date d'expiration
-7. Cliquez sur "Créer"
-
-**Important**: Le token complet ne sera affiché qu'une seule fois à la création. Copiez-le immédiatement et stockez-le de manière sécurisée.
-
-## Scopes disponibles
-
-Les tokens API utilisent un système de permissions (scopes) pour limiter l'accès :
-
-- `habits:read` - Lecture des habitudes
-- `habits:write` - Création et mise à jour des habitudes
-- `tasks:read` - Lecture des tâches
-- `tasks:write` - Création et mise à jour des tâches
-- `projects:read` - Lecture des projets
-- `projects:write` - Création et mise à jour des projets
-- `objectives:read` - Lecture des objectifs OKR
-- `objectives:write` - Création et mise à jour des objectifs OKR
-- `processes:read` - Lecture des processus
-- `processes:write` - Création et mise à jour des processus
-
-## Authentification
-
-Pour authentifier une requête API, incluez le token dans l'en-tête `Authorization` :
-
+### Utiliser le Token
+**En-tête obligatoire pour chaque requête** :
 ```
-Authorization: Bearer {votre_token}
+Authorization: Bearer {le_token_complet}
 ```
 
-**⚠️ Important pour l'authentification** :
+### Scopes Disponibles
+- `habits:read` - Lire les habitudes
+- `habits:write` - Créer/modifier les habitudes
+- `tasks:read` - Lire les tâches  
+- `tasks:write` - Créer/modifier les tâches
+- `projects:read` - Lire les projets
+- `projects:write` - Créer/modifier les projets
+- `objectives:read` - Lire les objectifs OKR
+- `objectives:write` - Créer/modifier les objectifs OKR
+- `processes:read` - Lire les processus
+- `processes:write` - Créer/modifier les processus
+
+### ⚠️ Important pour l'authentification
 - Utilisez UNIQUEMENT les endpoints `/agent` pour les requêtes avec tokens API
 - Les endpoints standards (comme `/habits/date`) utilisent l'authentification par cookies et ne fonctionnent PAS avec les tokens API
 - Assurez-vous que votre token a les scopes appropriés pour l'action demandée
 
-## Exemples d'utilisation
+---
 
-### Habitudes
+## 📊 SECTION 2 : RÉCUPÉRER L'ID UTILISATEUR ET TOUS LES IDS
 
-#### 1. Récupérer toutes les habitudes avec historique (RECOMMANDÉ)
+### 2.1 - Endpoint : Tous les IDs (Complet)
 
-**Endpoint** : `/api/habits/agent`
+**URL** : `/api/debug/ids`
+**Méthode** : GET
+**Usage** : Pour avoir une vue complète de toutes les données utilisateur
+
+**Réponse** :
+```json
+{
+  "user": {
+    "id": "cm8vqf9xk0001a6kh6y7z8w9x",  // ← USER ID ICI
+    "name": "John Doe",
+    "email": "john@example.com",
+    "role": "USER"
+  },
+  "quickIds": {
+    "userId": "cm8vqf9xk0001a6kh6y7z8w9x",  // ← USER ID AUSSI ICI
+    "firstTaskId": "task_123",
+    "firstHabitId": "habit_456",
+    "firstProjectId": "project_789",
+    "firstMissionId": "mission_abc",
+    "firstObjectiveId": "objective_def",
+    "firstProcessId": "process_ghi",
+    "companyId": "company_xyz",
+    "gamificationId": "gamif_123"
+  },
+  "tasks": {
+    "count": 15,
+    "ids": ["task_1", "task_2"],
+    "completedIds": ["task_1", "task_3"],
+    "incompleteIds": ["task_2"],
+    "items": [{"id": "task_1", "title": "Ma tâche", "completed": false, "projectId": "project_789", "createdAt": "2025-05-26T10:00:00.000Z"}]
+  },
+  "habits": {
+    "count": 5, 
+    "ids": ["habit_1", "habit_2"],
+    "items": [{"id": "habit_1", "name": "Exercice", "frequency": "daily", "createdAt": "2025-05-01T10:00:00.000Z"}]
+  },
+  "projects": {
+    "count": 3,
+    "ids": ["project_1", "project_2"],
+    "items": [...]
+  },
+  "missions": {
+    "count": 2,
+    "ids": ["mission_1", "mission_2"],
+    "items": [...]
+  },
+  "objectives": {
+    "count": 4,
+    "ids": ["obj_1", "obj_2", "obj_3"],
+    "items": [...]
+  },
+  "gamification": {
+    "totalPoints": 1250,
+    "level": 5,
+    "currentStreak": 7,
+    "longestStreak": 15
+  },
+  "meta": {
+    "timestamp": "2025-06-09T16:15:45.081Z",
+    "totalEntities": {
+      "tasks": 15,
+      "habits": 5,
+      "projects": 3,
+      "missions": 2,
+      "objectives": 4
+    }
+  }
+}
+```
+
+### 2.2 - Endpoint : IDs Rapides (Essentiel)
+
+**URL** : `/api/debug/quick-ids`
+**Méthode** : GET
+**Usage** : Pour récupérer rapidement les IDs principaux
+
+**Réponse** :
+```json
+{
+  "quickIds": {
+    "userId": "cm8vqf9xk0001a6kh6y7z8w9x",  // ← USER ID ICI
+    "taskId": "task_123",
+    "habitId": "habit_456",
+    "projectId": "project_789",
+    "missionId": "mission_abc",
+    "objectiveId": "objective_def",
+    "actionId": "action_ghi",
+    "processId": "process_jkl"
+  },
+  "entities": {
+    "task": {
+      "id": "task_123",
+      "title": "Ma première tâche",
+      "completed": false,
+      "priority": "medium"
+    },
+    "habit": {
+      "id": "habit_456",
+      "name": "Apprentissage",
+      "frequency": "daily"
+    },
+    "project": {
+      "id": "project_789",
+      "name": "Mon premier projet"
+    }
+  },
+  "examples": {
+    "completeTask": "PATCH /api/tasks/agent/task_123",
+    "markHabit": "POST /api/habits/agent",
+    "updateAction": "PATCH /api/objectives/agent/actions/action_ghi/progress",
+    "updateProject": "PATCH /api/projects/project_789"
+  },
+  "meta": {
+    "timestamp": "2025-06-09T16:15:45.081Z",
+    "note": "IDs les plus récents pour tests rapides"
+  }
+}
+```
+
+### 2.3 - Endpoint : IDs par Type (Spécifique)
+
+**URL** : `/api/debug/ids/[type]`
+**Méthode** : GET
+**Usage** : Pour récupérer les IDs d'un type spécifique
+
+**Types disponibles** :
+- `tasks` - Tâches
+- `habits` - Habitudes  
+- `habit-entries` - Entrées d'habitudes
+- `projects` - Projets
+- `missions` - Missions OKR
+- `objectives` - Objectifs OKR
+- `actions` - Actions OKR
+- `processes` - Processus
+- `time-entries` - Entrées de temps
+- `achievements` - Réalisations
+- `user-achievements` - Réalisations utilisateur
+
+**Exemple avec les tâches** :
+```bash
+GET /api/debug/ids/tasks
+```
+
+**Réponse** :
+```json
+{
+  "type": "tasks",
+  "entityName": "tâches",
+  "count": 3,
+  "ids": ["task_1", "task_2", "task_3"],
+  "items": [
+    {
+      "id": "task_1",
+      "title": "Ma tâche importante", 
+      "completed": false,
+      "dueDate": "2025-06-10",
+      "priority": "high",
+      "projectId": "project_789",
+      "createdAt": "2025-05-26T10:00:00.000Z"
+    }
+  ],
+  "stats": {
+    "total": 15,
+    "completed": 8,
+    "incomplete": 7
+  },
+  "meta": {
+    "userId": "cm8vqf9xk0001a6kh6y7z8w9x",  // ← USER ID ICI
+    "timestamp": "2025-06-09T16:15:45.081Z",
+    "requestedType": "tasks"
+  }
+}
+```
+
+---
+
+## 📋 SECTION 3 : GESTION DES TÂCHES
+
+### 3.1 - Récupérer les Tâches du Jour
+
+**URL** : `/api/agent/tasks/today`
+**Méthode** : GET
+**Usage** : Pour envoyer des rappels de tâches quotidiennes
+
+**Réponse** :
+```json
+{
+  "tasks": [
+    {
+      "id": "task_123",
+      "title": "Finir le rapport",
+      "completed": false,
+      "dueDate": "2025-06-09",
+      "priority": "high",
+      "project": {
+        "id": "project_456", 
+        "name": "Projet Alpha"
+      }
+    }
+  ],
+  "summary": {
+    "total": 3,
+    "completed": 1, 
+    "remaining": 2
+  }
+}
+```
+
+### 3.2 - Créer une Nouvelle Tâche
+
+**URL** : `/api/tasks/agent`
+**Méthode** : POST
+**Authentification** : Token API avec scope `tasks:write`
+
+```bash
+curl -X POST "https://productif.io/api/tasks/agent" \
+  -H "Authorization: Bearer {votre_token}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Nouvelle tâche créée par l'IA",
+    "description": "Cette tâche a été générée automatiquement",
+    "scheduledFor": "2025-05-26",
+    "priority": 2,
+    "energyLevel": 1,
+    "dueDate": "2025-05-30"
+  }'
+```
+
+### 3.3 - Niveaux de Priorité et d'Énergie
+
+#### Niveaux de Priorité
+**Échelle : 0 à 4** (Plus la valeur est élevée, plus la priorité est importante)
+
+| Valeur | Libellé    | Description                               | Affichage Interface |
+|--------|------------|-------------------------------------------|-------------------|
+| 0      | Optionnel  | Tâches qui peuvent être reportées        | P0 - Optionnel    |
+| 1      | À faire    | Tâches importantes mais pas urgentes      | P1 - À faire      |
+| 2      | Important  | Tâches qui méritent de l'attention        | P2 - Important    |
+| 3      | Urgent     | Tâches qui requièrent une action rapide   | P3 - Urgent       |
+| 4      | Quick Win  | Priorité maximale, gains rapides          | P4 - Quick Win    |
+
+#### Niveaux d'Énergie
+**Échelle : 0 à 3** (Plus la valeur est élevée, plus l'énergie requise est importante)
+
+| Valeur | Libellé  | Description                               |
+|--------|----------|-------------------------------------------|
+| 0      | Faible   | Tâches simples, peu d'effort mental       |
+| 1      | Moyen    | Tâches de complexité moyenne              |
+| 2      | Élevé    | Tâches complexes, besoin de concentration |
+| 3      | Extrême  | Tâches très exigeantes mentalement        |
+
+#### Exemples Pratiques
+```json
+{
+  "title": "Répondre aux emails",
+  "priority": 1,     // P1 - À faire
+  "energyLevel": 0   // Faible effort
+}
+
+{
+  "title": "Présentation importante client",
+  "priority": 4,     // P4 - Quick Win
+  "energyLevel": 3   // Effort extrême
+}
+
+{
+  "title": "Mise à jour documentation",
+  "priority": 2,     // P2 - Important  
+  "energyLevel": 2   // Effort élevé
+}
+```
+
+### 3.4 - Marquer une Tâche comme Terminée
+
+**URL** : `/api/tasks/agent/{task_id}`
+**Méthode** : PATCH
+**Authentification** : Token API avec scope `tasks:write`
+
+```bash
+curl -X PATCH "https://productif.io/api/tasks/agent/{task_id}" \
+  -H "Authorization: Bearer {votre_token}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "completed": true
+  }'
+```
+
+---
+
+## 🎯 SECTION 4 : GESTION DES HABITUDES
+
+### 4.1 - Récupérer Toutes les Habitudes avec Historique (RECOMMANDÉ)
+
+**URL** : `/api/habits/agent`
 **Méthode** : GET
 **Authentification** : Token API avec scope `habits:read`
 
@@ -98,9 +380,9 @@ curl -X GET "https://productif.io/api/habits/agent" \
 - Entrées triées par date décroissante (plus récente en premier)
 - Compatible avec l'authentification par token API
 
-#### 2. Créer une nouvelle habitude
+### 4.2 - Créer une Nouvelle Habitude
 
-**Endpoint** : `/api/webhooks/habits`
+**URL** : `/api/webhooks/habits`
 **Méthode** : POST
 **Authentification** : Token API avec scope `habits:write`
 
@@ -150,9 +432,9 @@ curl -X POST "https://productif.io/api/webhooks/habits" \
 }
 ```
 
-#### 3. Marquer une habitude comme complétée
+### 4.3 - Marquer une Habitude comme Complétée
 
-**Endpoint** : `/api/habits/agent`
+**URL** : `/api/habits/agent`
 **Méthode** : POST
 **Authentification** : Token API avec scope `habits:write`
 
@@ -176,14 +458,7 @@ curl -X POST "https://productif.io/api/habits/agent" \
 - `note` (optionnel) : Note textuelle
 - `rating` (optionnel) : Note de 0 à 10
 
-#### 4. Test de votre token API
-
-```bash
-curl -X GET "https://productif.io/api/test-token" \
-  -H "Authorization: Bearer {votre_token}"
-```
-
-### Habitudes spéciales
+### 4.4 - Habitudes Spéciales
 
 #### Habitude "Apprentissage"
 L'habitude "Apprentissage" est une habitude par défaut créée automatiquement pour chaque utilisateur :
@@ -203,38 +478,15 @@ L'habitude "Apprentissage" est une habitude par défaut créée automatiquement 
 - **Ordre** : 1 (deuxième position)
 - **Protection** : Ne peut pas être supprimée
 
-### Tâches
+---
 
-#### 1. Créer une nouvelle tâche
+## ⚙️ SECTION 5 : GESTION DES PROCESSUS
 
-```bash
-curl -X POST "https://productif.io/api/tasks/agent" \
-  -H "Authorization: Bearer {votre_token}" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "title": "Nouvelle tâche créée par l'IA",
-    "description": "Cette tâche a été générée automatiquement",
-    "scheduledFor": "2025-05-26",
-    "priority": 2,
-    "energyLevel": 1,
-    "dueDate": "2025-05-30"
-  }'
-```
+### 5.1 - Récupérer Tous les Processus
 
-#### 2. Marquer une tâche comme terminée
-
-```bash
-curl -X PATCH "https://productif.io/api/tasks/agent/{task_id}" \
-  -H "Authorization: Bearer {votre_token}" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "completed": true
-  }'
-```
-
-### Processus
-
-#### 1. Récupérer tous les processus
+**URL** : `/api/processes/agent`
+**Méthode** : GET
+**Authentification** : Token API avec scope `processes:read`
 
 ```bash
 curl -X GET "https://productif.io/api/processes/agent" \
@@ -251,7 +503,11 @@ curl -X GET "https://productif.io/api/processes/agent?includeStats=true" \
   -H "Authorization: Bearer {votre_token}"
 ```
 
-#### 2. Créer un nouveau processus
+### 5.2 - Créer un Nouveau Processus
+
+**URL** : `/api/processes/agent`
+**Méthode** : POST
+**Authentification** : Token API avec scope `processes:write`
 
 ```bash
 curl -X POST "https://productif.io/api/processes/agent" \
@@ -263,7 +519,7 @@ curl -X POST "https://productif.io/api/processes/agent" \
   }'
 ```
 
-#### 3. Mettre à jour un processus
+### 5.3 - Mettre à Jour un Processus
 
 ```bash
 curl -X PATCH "https://productif.io/api/processes/agent" \
@@ -276,7 +532,7 @@ curl -X PATCH "https://productif.io/api/processes/agent" \
   }'
 ```
 
-#### 4. Supprimer un processus
+### 5.4 - Supprimer un Processus
 
 ```bash
 curl -X DELETE "https://productif.io/api/processes/agent" \
@@ -287,7 +543,7 @@ curl -X DELETE "https://productif.io/api/processes/agent" \
   }'
 ```
 
-#### 5. Assigner un processus à une tâche
+### 5.5 - Assigner un Processus à une Tâche
 
 ```bash
 curl -X PATCH "https://productif.io/api/tasks/agent/{task_id}/process" \
@@ -298,7 +554,7 @@ curl -X PATCH "https://productif.io/api/tasks/agent/{task_id}/process" \
   }'
 ```
 
-#### 6. Retirer un processus d'une tâche
+### 5.6 - Retirer un Processus d'une Tâche
 
 ```bash
 curl -X PATCH "https://productif.io/api/tasks/agent/{task_id}/process" \
@@ -309,16 +565,22 @@ curl -X PATCH "https://productif.io/api/tasks/agent/{task_id}/process" \
   }'
 ```
 
-#### 7. Récupérer le processus assigné à une tâche
+### 5.7 - Récupérer le Processus Assigné à une Tâche
 
 ```bash
 curl -X GET "https://productif.io/api/tasks/agent/{task_id}/process" \
   -H "Authorization: Bearer {votre_token}"
 ```
 
-### Objectifs (OKR)
+---
 
-#### 1. Récupérer toutes les missions et objectifs
+## 🎯 SECTION 6 : GESTION DES OBJECTIFS (OKR)
+
+### 6.1 - Récupérer Toutes les Missions et Objectifs
+
+**URL** : `/api/objectives/agent`
+**Méthode** : GET
+**Authentification** : Token API avec scope `objectives:read`
 
 ```bash
 curl -X GET "https://productif.io/api/objectives/agent" \
@@ -327,145 +589,47 @@ curl -X GET "https://productif.io/api/objectives/agent" \
 
 **Paramètres optionnels** :
 - `?current=true` - Récupérer uniquement la mission du trimestre actuel
-- `?quarter=1&year=2024` - Filtrer par trimestre et année spécifiques
 
-**Exemple pour le trimestre actuel** :
-```bash
-curl -X GET "https://productif.io/api/objectives/agent?current=true" \
-  -H "Authorization: Bearer {votre_token}"
+**Réponse** :
+```json
+{
+  "missions": [
+    {
+      "id": "mission_id",
+      "title": "Développer l'activité commerciale Q1",
+      "quarter": 1,
+      "year": 2024,
+      "progress": 65,
+      "objectives": [
+        {
+          "id": "objective_id",
+          "title": "Augmenter la prospection",
+          "progress": 30,
+          "current": 15,
+          "target": 50,
+          "actions": [
+            {
+              "id": "action_id",
+              "title": "Prospecter des entreprises",
+              "progress": 30,
+              "current": 15,
+              "target": 50
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
 ```
 
-#### 2. Créer une nouvelle mission
+### 6.2 - Mettre à Jour le Progrès d'une Action
+
+**URL** : `/api/objectives/agent/actions/{action_id}/progress`
+**Méthode** : PATCH
+**Authentification** : Token API avec scope `objectives:write`
 
 ```bash
-curl -X POST "https://productif.io/api/objectives/agent" \
-  -H "Authorization: Bearer {votre_token}" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "type": "mission",
-    "title": "Développer l'activité commerciale",
-    "quarter": 1,
-    "year": 2024,
-    "target": 100
-  }'
-```
-
-#### 3. Créer un nouvel objectif
-
-```bash
-curl -X POST "https://productif.io/api/objectives/agent" \
-  -H "Authorization: Bearer {votre_token}" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "type": "objective",
-    "title": "Augmenter le nombre de prospects",
-    "missionId": "mission_id_123",
-    "target": 100
-  }'
-```
-
-#### 4. Créer une nouvelle action
-
-```bash
-curl -X POST "https://productif.io/api/objectives/agent" \
-  -H "Authorization: Bearer {votre_token}" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "type": "action",
-    "title": "Prospecter des entreprises",
-    "objectiveId": "objective_id_123",
-    "target": 50,
-    "current": 0
-  }'
-```
-
-#### 5. Mettre à jour la progression d'une action (Mode incrémental)
-
-**Exemple : "Aujourd'hui j'ai prospecté 1 personne"**
-
-```bash
-curl -X PATCH "https://productif.io/api/objectives/agent/actions/{action_id}/progress" \
-  -H "Authorization: Bearer {votre_token}" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "increment": 1,
-    "note": "Prospecté 1 nouvelle entreprise aujourd'hui"
-  }'
-```
-
-#### 6. Définir une valeur absolue pour une action
-
-```bash
-curl -X PATCH "https://productif.io/api/objectives/agent/actions/{action_id}/progress" \
-  -H "Authorization: Bearer {votre_token}" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "setValue": 25
-  }'
-```
-
-#### 7. Récupérer les détails d'une action
-
-```bash
-curl -X GET "https://productif.io/api/objectives/agent/actions/{action_id}/progress" \
-  -H "Authorization: Bearer {votre_token}"
-```
-
-#### 8. Mettre à jour la progression via l'endpoint principal
-
-```bash
-curl -X PATCH "https://productif.io/api/objectives/agent" \
-  -H "Authorization: Bearer {votre_token}" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "actionId": "action_id_123",
-    "increment": 5
-  }'
-```
-
-### Cas d'usage typique pour les OKR
-
-**Scénario** : Vous avez un objectif "Prospecter 50 personnes" et chaque jour vous voulez incrémenter votre progression.
-
-1. **Créer la structure OKR** :
-```bash
-# 1. Créer une mission pour Q1 2024
-curl -X POST "https://productif.io/api/objectives/agent" \
-  -H "Authorization: Bearer {votre_token}" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "type": "mission",
-    "title": "Développer l'activité commerciale Q1",
-    "quarter": 1,
-    "year": 2024
-  }'
-
-# 2. Créer un objectif
-curl -X POST "https://productif.io/api/objectives/agent" \
-  -H "Authorization: Bearer {votre_token}" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "type": "objective",
-    "title": "Augmenter la prospection",
-    "missionId": "mission_id_from_step_1"
-  }'
-
-# 3. Créer une action mesurable
-curl -X POST "https://productif.io/api/objectives/agent" \
-  -H "Authorization: Bearer {votre_token}" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "type": "action",
-    "title": "Prospecter des entreprises",
-    "objectiveId": "objective_id_from_step_2",
-    "target": 50,
-    "current": 0
-  }'
-```
-
-2. **Incrémenter quotidiennement** :
-```bash
-# Chaque jour, ajouter votre progression
 curl -X PATCH "https://productif.io/api/objectives/agent/actions/{action_id}/progress" \
   -H "Authorization: Bearer {votre_token}" \
   -H "Content-Type: application/json" \
@@ -475,7 +639,12 @@ curl -X PATCH "https://productif.io/api/objectives/agent/actions/{action_id}/pro
   }'
 ```
 
-**Réponse typique** :
+**Paramètres** :
+- `increment` (optionnel) : Nombre à ajouter à la valeur actuelle
+- `current` (optionnel) : Nouvelle valeur absolue
+- `note` (optionnel) : Note explicative de la progression
+
+**Réponse** :
 ```json
 {
   "success": true,
@@ -506,232 +675,104 @@ curl -X PATCH "https://productif.io/api/objectives/agent/actions/{action_id}/pro
 }
 ```
 
-## Endpoints utilitaires pour le développement
+---
 
-### Récupération des IDs
+## 📈 SECTION 7 : DONNÉES MOTIVATIONNELLES
 
-Pour faciliter le développement et les tests, trois endpoints spéciaux permettent de récupérer facilement tous les IDs nécessaires aux requêtes API :
+### 7.1 - Récupérer les Métriques du Tableau de Bord
 
-#### 1. Tous les IDs avec détails complets
-
-**Endpoint** : `/api/debug/ids`
+**URL** : `/api/agent/dashboard/metrics`
 **Méthode** : GET
-**Authentification** : Token API avec scopes appropriés
-
-```bash
-curl -X GET "https://productif.io/api/debug/ids" \
-  -H "Authorization: Bearer {votre_token}"
-```
+**Usage** : Pour donner un résumé motivationnel quotidien
 
 **Réponse** :
 ```json
 {
-  "user": {
-    "id": "user_id",
-    "email": "user@example.com",
-    "name": "John Doe"
-  },
-  "quickIds": {
-    "userId": "user_id",
-    "taskId": "task_id_123",
-    "habitId": "habit_id_456",
-    "projectId": "project_id_789",
-    "missionId": "mission_id_abc",
-    "objectiveId": "objective_id_def",
-    "actionId": "action_id_ghi"
-  },
   "tasks": {
-    "count": 15,
-    "completed": 8,
-    "incomplete": 7,
-    "ids": ["task_1", "task_2", "..."],
-    "items": [
-      {
-        "id": "task_1",
-        "title": "Ma tâche",
-        "completed": false,
-        "priority": "medium"
-      }
-    ]
+    "today": 5,
+    "completed": 3,
+    "completionRate": 60
   },
   "habits": {
-    "count": 5,
-    "ids": ["habit_1", "habit_2", "..."],
-    "items": [...]
+    "today": 4,
+    "completed": 2, 
+    "streak": 7
   },
-  "projects": {
-    "count": 3,
-    "ids": ["project_1", "project_2", "..."],
-    "items": [...]
-  },
-  "gamification": {
-    "totalPoints": 1250,
-    "level": 5,
-    "currentStreak": 7,
-    "longestStreak": 15
+  "productivity": {
+    "score": 75,
+    "trend": "up"
   }
 }
 ```
 
-#### 2. IDs rapides pour tests
+### 7.2 - Récupérer les Réalisations
 
-**Endpoint** : `/api/debug/quick-ids`
+**URL** : `/api/agent/achievements`
 **Méthode** : GET
-**Authentification** : Token API
+**Usage** : Pour féliciter l'utilisateur sur ses accomplissements
+
+### 7.3 - Test de Token API
 
 ```bash
-curl -X GET "https://productif.io/api/debug/quick-ids" \
+curl -X GET "https://productif.io/api/test-token" \
   -H "Authorization: Bearer {votre_token}"
 ```
 
-**Réponse** :
-```json
-{
-  "quickIds": {
-    "userId": "user_id",
-    "taskId": "task_id_123",
-    "habitId": "habit_id_456",
-    "projectId": "project_id_789",
-    "missionId": "mission_id_abc",
-    "objectiveId": "objective_id_def",
-    "actionId": "action_id_ghi"
-  },
-  "entities": {
-    "task": {
-      "id": "task_id_123",
-      "title": "Ma première tâche",
-      "completed": false
-    },
-    "habit": {
-      "id": "habit_id_456",
-      "name": "Apprentissage",
-      "frequency": "daily"
-    }
-  },
-  "examples": {
-    "completeTask": "PATCH /api/tasks/agent/task_id_123",
-    "markHabit": "POST /api/habits/agent",
-    "updateAction": "PATCH /api/objectives/agent/actions/action_id_ghi/progress"
-  }
-}
+---
+
+## 💬 SECTION 8 : EXEMPLES D'USAGE POUR AGENT WHATSAPP
+
+### Rappel Matinal (8h00)
+```
+🌅 Bonjour ! Voici vos tâches du jour :
+• ✅ Finir le rapport (Priorité haute)
+• 📝 Réunion équipe à 14h
+• 🎯 Review projet Alpha
+
+Habitudes du jour :
+• 🏃 Exercice matinal (Streak: 5 jours!)
+• 📚 Lecture 20min
+• 💧 Boire 2L d'eau
+
+Bonne journée ! 💪
 ```
 
-#### 3. IDs par type spécifique
+### Rappel Habitudes (Personnalisé)
+```
+⏰ Il est 8h00 !
+C'est l'heure de votre exercice matinal 🏃‍♀️
 
-**Endpoint** : `/api/debug/ids/[type]`
-**Méthode** : GET
-**Authentification** : Token API
+Votre streak actuel : 5 jours 🔥
+Objectif : Continuer cette belle série !
 
-**Types disponibles** :
-- `tasks` - Tâches
-- `habits` - Habitudes
-- `habit-entries` - Entrées d'habitudes
-- `projects` - Projets
-- `missions` - Missions OKR
-- `objectives` - Objectifs OKR
-- `actions` - Actions OKR
-- `processes` - Processus
-- `time-entries` - Entrées de temps
-- `achievements` - Réalisations
-- `user-achievements` - Réalisations utilisateur
-
-```bash
-# Récupérer seulement les IDs des tâches
-curl -X GET "https://productif.io/api/debug/ids/tasks" \
-  -H "Authorization: Bearer {votre_token}"
-
-# Récupérer seulement les IDs des habitudes
-curl -X GET "https://productif.io/api/debug/ids/habits" \
-  -H "Authorization: Bearer {votre_token}"
-
-# Récupérer seulement les IDs des actions OKR
-curl -X GET "https://productif.io/api/debug/ids/actions" \
-  -H "Authorization: Bearer {votre_token}"
+Répondez "Fait" quand c'est terminé 👍
 ```
 
-**Réponse exemple pour `/api/debug/ids/tasks`** :
-```json
-{
-  "type": "tasks",
-  "stats": {
-    "total": 15,
-    "completed": 8,
-    "incomplete": 7
-  },
-  "ids": [
-    "task_id_1",
-    "task_id_2",
-    "task_id_3"
-  ],
-  "items": [
-    {
-      "id": "task_id_1",
-      "title": "Finaliser le rapport",
-      "completed": false,
-      "priority": "high",
-      "createdAt": "2025-05-26T10:00:00Z"
-    },
-    {
-      "id": "task_id_2",
-      "title": "Réunion équipe",
-      "completed": true,
-      "priority": "medium",
-      "completedAt": "2025-05-26T14:30:00Z"
-    }
-  ]
-}
+### Résumé du Soir (20h00)
+```
+🌙 Récap de votre journée :
+
+Tâches : 3/5 terminées ✅
+Habitudes : 2/4 accomplies 🎯
+Score productivité : 75% 📈
+
+Bravo ! Vous avez débloqué :
+🏆 "Maître des Habitudes" (+100 pts)
+
+À demain pour une nouvelle journée productive ! 🚀
 ```
 
-### Cas d'usage des endpoints d'IDs
+---
 
-#### Workflow de développement rapide
+## ⚙️ SECTION 9 : GESTION D'ERREURS ET RÉSOLUTION DE PROBLÈMES
 
-1. **Récupérer les IDs rapides** :
-```bash
-curl -X GET "https://productif.io/api/debug/quick-ids" \
-  -H "Authorization: Bearer {votre_token}"
-```
-
-2. **Utiliser les IDs dans vos requêtes** :
-```bash
-# Marquer une tâche comme terminée
-curl -X PATCH "https://productif.io/api/tasks/agent/{taskId}" \
-  -H "Authorization: Bearer {votre_token}" \
-  -H "Content-Type: application/json" \
-  -d '{"completed": true}'
-
-# Marquer une habitude
-curl -X POST "https://productif.io/api/habits/agent" \
-  -H "Authorization: Bearer {votre_token}" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "habitId": "{habitId}",
-    "date": "2025-05-27",
-    "completed": true,
-    "note": "Test via API"
-  }'
-
-# Incrémenter une action OKR
-curl -X PATCH "https://productif.io/api/objectives/agent/actions/{actionId}/progress" \
-  -H "Authorization: Bearer {votre_token}" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "increment": 1,
-    "note": "Progression via API"
-  }'
-```
-
-#### Tests automatisés
-
-Ces endpoints sont particulièrement utiles pour :
-- **Tests d'intégration** : Récupérer des IDs valides pour vos tests
-- **Scripts de développement** : Automatiser les tests d'API
-- **Débuggage** : Vérifier les données disponibles
-- **Documentation** : Générer des exemples avec de vraies données
-
-**⚠️ Note importante** : Ces endpoints sont destinés au développement et aux tests. En production, utilisez les endpoints standards avec authentification appropriée.
-
-## Résolution des problèmes
+### Codes de Retour
+- `200` - Succès
+- `401` - Token invalide ou manquant
+- `403` - Permissions insuffisantes (scope manquant)
+- `404` - Ressource non trouvée
+- `429` - Trop de requêtes (rate limiting)
+- `500` - Erreur serveur
 
 ### Erreur 401 "Non authentifié"
 
@@ -755,25 +796,120 @@ Votre token n'a pas les scopes requis pour cette action. Vérifiez les scopes de
 - Lecture : `habits:read`, `tasks:read`, etc.
 - Écriture : `habits:write`, `tasks:write`, etc.
 
-### Test de connectivité
-
-Utilisez l'endpoint de test pour vérifier votre configuration :
-
-```bash
-curl -X GET "https://productif.io/api/test-token" \
-  -H "Authorization: Bearer {votre_token}"
+### Exemples d'Erreurs
+```json
+{
+  "error": "Token invalide",
+  "code": 401,
+  "message": "Le token fourni n'est pas valide"
+}
 ```
 
-## Bonnes pratiques
+```json
+{
+  "error": "Scope insuffisant", 
+  "code": 403,
+  "required": "habits:write",
+  "provided": ["habits:read"]
+}
+```
 
+---
+
+## 🔧 SECTION 10 : BONNES PRATIQUES
+
+### Pour un Agent WhatsApp
+1. **Récupérer l'ID utilisateur** avec `/api/debug/quick-ids` au début
+2. **Stocker les IDs** essentiels pour éviter les requêtes répétées  
+3. **Utiliser les endpoints `/agent`** uniquement (pas les endpoints standards)
+4. **Gérer les erreurs** gracieusement avec des messages utilisateur amicaux
+5. **Respecter les limites** de taux de requêtes
+6. **Personnaliser les messages** selon les données utilisateur
+
+### Workflow de Développement Recommandé
+
+#### 1. Découverte initiale
+```bash
+# Obtenir une vue d'ensemble
+curl -X GET "/api/debug/ids" -H "Authorization: Bearer {token}"
+```
+
+#### 2. Tests rapides
+```bash
+# Obtenir les IDs essentiels
+curl -X GET "/api/debug/quick-ids" -H "Authorization: Bearer {token}"
+```
+
+#### 3. Développement ciblé
+```bash
+# Focus sur les tâches
+curl -X GET "/api/debug/ids/tasks" -H "Authorization: Bearer {token}"
+
+# Focus sur les habitudes  
+curl -X GET "/api/debug/ids/habits" -H "Authorization: Bearer {token}"
+```
+
+#### 4. Utilisation des IDs récupérés
+```bash
+# Utiliser l'ID utilisateur et les IDs d'entités
+userId="cm8vqf9xk0001a6kh6y7z8w9x"    # De n'importe quel endpoint
+taskId="task_id_123"                   # Des endpoints debug
+habitId="habit_id_456"                 # Des endpoints debug
+
+# Marquer une tâche comme terminée
+curl -X PATCH "/api/tasks/agent/$taskId" \
+  -H "Authorization: Bearer {token}" \
+  -d '{"completed": true}'
+
+# Marquer une habitude
+curl -X POST "/api/habits/agent" \
+  -H "Authorization: Bearer {token}" \
+  -d '{
+    "habitId": "'$habitId'",
+    "date": "2025-06-09",
+    "completed": true,
+    "note": "Test via API"
+  }'
+```
+
+### Fréquence Recommandée
+- **Rappel matinal** : 1x par jour (8h00)
+- **Rappel habitudes** : Selon préférences utilisateur  
+- **Résumé du soir** : 1x par jour (20h00)
+- **Vérification données** : Max 1x par heure
+
+### Bonnes Pratiques Générales
 1. **Utilisez les endpoints `/agent`** pour toutes vos intégrations d'IA
 2. **Stockez vos tokens de manière sécurisée** et ne les partagez jamais
 3. **Définissez des dates d'expiration** appropriées pour vos tokens
 4. **Utilisez des scopes minimaux** nécessaires pour votre cas d'usage
 5. **Testez vos intégrations** avec l'endpoint `/test-token`
 6. **Gérez les erreurs** appropriément dans votre code
+7. **Utilisez les endpoints debug** pour récupérer facilement les IDs nécessaires
 
-## Changelog
+---
+
+## 📝 CHANGELOG
+
+### Version 2.0 (Juin 2025)
+- ✅ Restructuration complète pour agents IA par sections claires
+- ✅ Conservation de TOUTES les fonctionnalités précédentes
+- ✅ Sections numérotées pour navigation facile
+- ✅ Exemples complets pour WhatsApp
+- ✅ Gestion d'erreurs détaillée
+- ✅ ID utilisateur disponible dans tous les endpoints debug
+- ✅ Workflows de développement détaillés
+
+### Version 2025-06-09
+- ✅ **Documentation complètement restructurée** : 
+  - Nouvelle section dédiée "🆔 Récupération des IDs - Guide Complet"
+  - Tableaux de comparaison des endpoints
+  - Exemples détaillés avec structure des réponses
+  - Workflow de développement recommandé
+  - Cas d'usage pratiques avec scripts
+- ✅ **ID Utilisateur clarifié** : Documentation explicite de où trouver l'ID utilisateur dans chaque endpoint
+- ✅ **Organisation améliorée** : Sections claires et numérotées pour une navigation facile
+- ✅ **Exemples pratiques** : Scripts bash et cas d'usage réels pour les développeurs
 
 ### Version 2025-05-27
 - ✅ **Nouveaux endpoints utilitaires** : Ajout de 3 endpoints pour récupérer facilement tous les IDs
@@ -793,4 +929,4 @@ curl -X GET "https://productif.io/api/test-token" \
 ### Version précédente
 - Création de la documentation initiale
 - Définition des scopes et de l'authentification
-- Exemples de base pour les habitudes et tâches 
+- Exemples de base pour les habitudes et tâches
