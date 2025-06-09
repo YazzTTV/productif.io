@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useState, useEffect } from "react"
-import { LayoutDashboard, CheckSquare, Clock, BarChart, Settings, FolderKanban, Heart, Target, Book, Users, Building2, LineChart, Trophy } from "lucide-react"
+import { LayoutDashboard, CheckSquare, Clock, BarChart, Settings, FolderKanban, Heart, Target, Book, Users, Building2, LineChart, Trophy, Mail } from "lucide-react"
 import { buttonVariants } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { cn } from "@/lib/utils"
@@ -374,6 +374,21 @@ export function DashboardNav({ viewAsMode = false, viewAsUserId, onNavItemClick 
               >
                 <LineChart className="mr-2 h-4 w-4" />
                 <span className="truncate">{t('adminDashboard')}</span>
+              </Link>
+
+              <Link
+                href="/dashboard/admin/waitlist"
+                className={cn(
+                  buttonVariants({
+                    variant: isActive("/dashboard/admin/waitlist") ? "secondary" : "ghost",
+                    size: "default",
+                  }),
+                  "justify-start w-full"
+                )}
+                onClick={handleNavClick}
+              >
+                <Mail className="mr-2 h-4 w-4" />
+                <span className="truncate">Waitlist</span>
               </Link>
             </>
           )}
