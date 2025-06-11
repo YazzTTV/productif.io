@@ -3,6 +3,8 @@
 import { useEffect, useState, useCallback } from "react"
 import { Habit, HabitEntry } from "@prisma/client"
 import { WeeklyHabitsTable } from "@/components/habits/weekly-habits-table"
+import { MobileHabitsCards } from "@/components/habits/mobile-habits-cards"
+import { useIsMobile } from "@/hooks/use-mobile"
 import { Button } from "@/components/ui/button"
 import { Plus } from "lucide-react"
 import { useRouter, usePathname } from "next/navigation"
@@ -16,6 +18,7 @@ type HabitWithEntries = Habit & {
 export default function HabitsPage() {
   const [habits, setHabits] = useState<HabitWithEntries[]>([])
   const [loading, setLoading] = useState(true)
+  const isMobile = useIsMobile()
   const router = useRouter()
   const pathname = usePathname()
 
@@ -253,18 +256,31 @@ export default function HabitsPage() {
 
   return (
     <div className="container mx-auto py-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Mes Habitudes</h1>
-        <Button onClick={() => router.push("/dashboard/habits/new")}>
-          <Plus className="mr-2 h-4 w-4" />
-          Nouvelle Habitude
-        </Button>
-      </div>
-      <WeeklyHabitsTable 
-        habits={habits} 
-        onToggleHabit={handleToggleHabit}
-        onCustomUpdate={handleCustomUpdate}
-      />
+      {/* Interface mobile */}
+      {isMobile ? (
+        <MobileHabitsCards
+          habits={habits}
+          onToggleHabit={handleToggleHabit}
+          onCustomUpdate={handleCustomUpdate}
+          loading={loading}
+        />
+      ) : (
+        /* Interface desktop */
+        <>
+          <div className="flex justify-between items-center mb-6">
+            <h1 className="text-2xl font-bold">Mes Habitudes</h1>
+            <Button onClick={() => router.push("/dashboard/habits/new")}>
+              <Plus className="mr-2 h-4 w-4" />
+              Nouvelle Habitude
+            </Button>
+          </div>
+          <WeeklyHabitsTable 
+            habits={habits} 
+            onToggleHabit={handleToggleHabit}
+            onCustomUpdate={handleCustomUpdate}
+          />
+        </>
+      )}
     </div>
   )
 } 

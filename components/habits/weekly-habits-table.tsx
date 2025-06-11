@@ -393,11 +393,11 @@ function SortableTableRow({
                 checked={isCompleted}
                 disabled={loading === habit.id || !isScheduledDay}
                 onCheckedChange={() =>
-                  handleToggle(habit.id, date, isCompleted)
+                  handleCustomUpdate(habit.id, date, { completed: !isCompleted })
                 }
                 className={cn(
                   "h-5 w-5",
-                  isCompleted && "bg-primary border-primary",
+                  isCompleted && "bg-green-500 border-green-500",
                   !isScheduledDay && "opacity-50"
                 )}
               />
