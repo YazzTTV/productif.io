@@ -8,6 +8,7 @@ import { HabitHeatmap } from "@/components/dashboard/habit-heatmap"
 import HabitStats from "@/components/dashboard/habit-stats"
 import { GamificationOverview } from "@/components/gamification/gamification-overview"
 import { LeaderboardCompact } from "@/components/gamification/leaderboard-compact"
+import { FitbitMobileDashboard } from "@/components/dashboard/fitbit-mobile-dashboard"
 
 export const dynamic = 'force-dynamic'
 
@@ -41,42 +42,50 @@ export default async function DashboardPage() {
     })
 
     return (
-      <div className="space-y-6 sm:space-y-8">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold mb-2">Tableau de bord</h1>
-          <p className="text-sm sm:text-base text-gray-600">
-            Bienvenue sur votre espace personnel. Retrouvez ici une vue d'ensemble de vos activités.
-          </p>
+      <>
+        {/* Interface mobile Fitbit-style */}
+        <div className="block md:hidden">
+          <FitbitMobileDashboard />
         </div>
 
-        {/* Métriques d'aperçu global */}
-        <OverviewMetrics />
+        {/* Interface desktop classique */}
+        <div className="hidden md:block space-y-6 sm:space-y-8">
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold mb-2">Tableau de bord</h1>
+            <p className="text-sm sm:text-base text-gray-600">
+              Bienvenue sur votre espace personnel. Retrouvez ici une vue d'ensemble de vos activités.
+            </p>
+          </div>
 
-        {/* Graphiques et suivi */}
-        <div className="grid grid-cols-1 md:grid-cols-1 gap-4 sm:gap-6">
-          <HabitStats className="lg:col-span-1" />
-        </div>
+          {/* Métriques d'aperçu global */}
+          <OverviewMetrics />
 
-        {/* Grille responsive pour les modules */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
-          {/* Première rangée - 2 colonnes principales */}
-          <div className="lg:col-span-2 space-y-4 sm:space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-          <RecentTasks />
-          <GamificationOverview />
+          {/* Graphiques et suivi */}
+          <div className="grid grid-cols-1 md:grid-cols-1 gap-4 sm:gap-6">
+            <HabitStats className="lg:col-span-1" />
+          </div>
+
+          {/* Grille responsive pour les modules */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
+            {/* Première rangée - 2 colonnes principales */}
+            <div className="lg:col-span-2 space-y-4 sm:space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+            <RecentTasks />
+            <GamificationOverview />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+            <ProjectsList projects={projects} />
+            <HabitHeatmap />
+              </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-          <ProjectsList projects={projects} />
-          <HabitHeatmap />
+            
+            {/* Colonne latérale - Leaderboard */}
+            <div className="lg:col-span-1">
+              <LeaderboardCompact />
             </div>
           </div>
-          
-          {/* Colonne latérale - Leaderboard */}
-          <div className="lg:col-span-1">
-            <LeaderboardCompact />
-          </div>
         </div>
-      </div>
+      </>
     )
   } catch (error) {
     console.error("Error loading dashboard:", error)

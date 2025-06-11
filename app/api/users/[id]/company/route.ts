@@ -9,11 +9,11 @@ interface UserInfo {
 
 export async function GET(
   request: Request,
-  context: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     const currentUser = await getAuthUser()
-    const { id: userId } = context.params
+    const { id: userId } = await context.params
 
     if (!currentUser) {
       return NextResponse.json({ error: "Non authentifié" }, { status: 401 })

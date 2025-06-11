@@ -1,19 +1,23 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
-import { AnimatedButton } from "@/components/ui/animated-button"
 import Image from "next/image"
-import { useState, useRef, useEffect } from "react"
-import Script from "next/script"
+import { useState, useEffect } from "react"
 
-// Composant dédié pour Voomly Player
-const VoomlyPlayer = () => {
+// Composant dédié pour le player vidéo (mobile-friendly)
+const VideoPlayer = () => {
+  // Charger le script Voomly
+  useEffect(() => {
+    if (!document.querySelector('script[src="https://embed.voomly.com/embed/embed-build.js"]')) {
+      const script = document.createElement('script');
+      script.src = "https://embed.voomly.com/embed/embed-build.js";
+      script.async = true;
+      document.head.appendChild(script);
+  }
+  }, []);
+
+  // Version unifiée : Voomly Player pour tous les appareils
   return (
-    <>
-      <Script 
-        src="https://embed.voomly.com/embed/embed-build.js" 
-        strategy="afterInteractive"
-      />
       <div 
         className="voomly-embed absolute inset-0 w-full h-full" 
         data-id="oMPeVAFqWACU1YsR6exYat3UA8hPfEL6AO4QRTtxZO5aBkUVB" 
@@ -28,7 +32,6 @@ const VoomlyPlayer = () => {
           borderRadius: '10px'
         }}
       />
-    </>
   )
 }
 
@@ -59,7 +62,7 @@ export function Hero() {
         <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl overflow-hidden shadow-lg border border-gray-200 max-w-6xl mx-auto">
           <div className="relative aspect-video">
             {videoPlaying ? (
-              <VoomlyPlayer />
+              <VideoPlayer />
             ) : (
               <>
                 <Image

@@ -5,6 +5,7 @@ import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { Providers } from "./providers"
 import { Analytics } from '@vercel/analytics/next'
+import { MobileInit } from "@/components/mobile-init"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -21,6 +22,7 @@ export default function RootLayout({
   return (
     <html lang="fr" suppressHydrationWarning>
       <body className={inter.className}>
+        <MobileInit />
         <Providers>
           <ThemeProvider attribute="class" defaultTheme="light" disableTransitionOnChange>
             {children}
