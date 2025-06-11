@@ -3,10 +3,20 @@ import type { CapacitorConfig } from '@capacitor/cli';
 const config: CapacitorConfig = {
   appId: 'io.productif',
   appName: 'Productif.io',
-  webDir: 'out',
+  webDir: 'dist',
   server: {
-    url: 'http://localhost:3000',
-    cleartext: true
+    url: 'https://productif.io',
+    cleartext: false
+  },
+  plugins: {
+    SplashScreen: {
+      launchShowDuration: 2000,
+      backgroundColor: "#ffffff",
+      showSpinner: false
+    }
+  },
+  android: {
+    allowMixedContent: true
   }
 };
 

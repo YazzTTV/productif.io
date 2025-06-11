@@ -2,7 +2,7 @@
 
 import type React from "react"
 import Link from "next/link"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { LogoutButton } from "@/components/auth/logout-button"
 import { DashboardNav } from "@/components/dashboard/nav"
 import { useLocale } from "@/lib/i18n"
@@ -11,6 +11,8 @@ import { AutoLogout } from "@/components/auth/auto-logout"
 import { Menu, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import { Capacitor } from '@capacitor/core'
+import { MobileNav } from "@/components/navigation/mobile-nav"
 
 export default function DashboardLayout({
   children,
@@ -19,6 +21,11 @@ export default function DashboardLayout({
 }) {
   const { locale } = useLocale();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isNativeMobile, setIsNativeMobile] = useState(false);
+  
+  useEffect(() => {
+    setIsNativeMobile(Capacitor.isNativePlatform());
+  }, []);
   
   return (
     <ClientAuthProvider>
@@ -26,8 +33,14 @@ export default function DashboardLayout({
       <AutoLogout />
       
       <div className="flex min-h-screen flex-col">
-        <header className="bg-card border-b border-border shadow z-20 sticky top-0">
-          <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
+        <header className={cn(
+          "bg-card border-b border-border shadow z-20 sticky top-0",
+          isNativeMobile && "pt-safe-area-inset-top"
+        )}>
+          <div className={cn(
+            "mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8",
+            isNativeMobile && "pt-2"
+          )}>
             <div className="flex items-center">
               <Button
                 variant="ghost"
@@ -53,7 +66,7 @@ export default function DashboardLayout({
           {/* Mobile sidebar backdrop */}
           {sidebarOpen && (
             <div 
-              className="fixed inset-0 bg-black/50 z-10 md:hidden"
+              className="fixed inset-0 bg-black/80 z-10 md:hidden"
               onClick={() => setSidebarOpen(false)}
             />
           )}
@@ -61,10 +74,11 @@ export default function DashboardLayout({
           {/* Sidebar */}
           <aside 
             className={cn(
-              "fixed md:static inset-y-0 left-0 z-10 w-64 transform transition-transform duration-200 ease-in-out bg-card border-r border-border overflow-y-auto",
+              "fixed md:static inset-y-0 left-0 z-20 w-64 transform transition-transform duration-200 ease-in-out bg-card border-r border-border overflow-y-auto",
               sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0",
               "md:h-[calc(100vh-4rem)] md:sticky md:top-16",
-              "pt-20 md:pt-0"
+              isNativeMobile ? "pt-24" : "pt-20",
+              "md:pt-0"
             )}
           >
             <div className="px-2 py-2">
@@ -73,7 +87,7 @@ export default function DashboardLayout({
           </aside>
 
           {/* Main content */}
-          <main className="flex-1 p-4 sm:p-6 bg-background w-full overflow-auto">
+          <main className="flex-1 p-4 sm:p-6 bg-background w-full overflow-auto pb-24 md:pb-6">
             <div className="mx-auto max-w-7xl">
               {children}
             </div>
@@ -87,6 +101,9 @@ export default function DashboardLayout({
             </p>
           </div>
         </footer>
+        
+        {/* Navigation mobile globale */}
+        <MobileNav />
       </div>
     </ClientAuthProvider>
   )

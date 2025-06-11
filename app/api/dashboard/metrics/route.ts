@@ -3,7 +3,7 @@ import { getAuthUser } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { format, startOfDay, endOfDay, isSameDay, isAfter, isBefore, startOfTomorrow, isTomorrow } from "date-fns"
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const user = await getAuthUser()
     
@@ -14,10 +14,15 @@ export async function GET() {
       )
     }
 
+    // Récupérer le paramètre date de l'URL
+    const { searchParams } = new URL(request.url)
+    const dateParam = searchParams.get('date')
+    
     console.log("[METRICS] Récupération des métriques pour l'utilisateur:", user.id)
+    console.log("[METRICS] Paramètre date reçu:", dateParam)
 
-    // Récupération des tâches du jour
-    const now = new Date()
+    // Utiliser la date fournie ou la date actuelle
+    const now = dateParam ? new Date(dateParam) : new Date()
     const today = startOfDay(now)
     const endToday = endOfDay(now)
     const tomorrow = startOfTomorrow()

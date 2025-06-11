@@ -220,3 +220,25 @@ body {
   background-clip: text;
   text-fill-color: transparent;
 }
+
+/* Safe area inset for mobile devices */
+.pt-safe-area-inset-top {
+  padding-top: 20px; /* Fallback */
+}
+
+@supports (padding-top: env(safe-area-inset-top)) {
+  .pt-safe-area-inset-top {
+    padding-top: env(safe-area-inset-top);
+  }
+}
+
+/* Additional mobile safe area utilities */
+.pb-safe-area-inset-bottom {
+  padding-bottom: 20px; /* Fallback */
+}
+
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .pb-safe-area-inset-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
