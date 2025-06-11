@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Play, Pause, StopCircle } from "lucide-react"
+import { Play, Pause, StopCircle, Sync } from "lucide-react"
 
 interface Project {
   id: string
@@ -31,6 +31,24 @@ interface TimeTrackerProps {
   tasks: Task[]
 }
 
+// Clés pour la persistance
+const STORAGE_KEYS = {
+  TIMER_STATE: 'timer_state',
+  TIMER_START: 'timer_start_time',
+  TIMER_ELAPSED: 'timer_elapsed_time',
+  TIMER_SYNC: 'timer_last_sync'
+}
+
+interface TimerState {
+  isRunning: boolean
+  startTime: string | null
+  elapsedTime: number
+  selectedTaskId: string | null
+  selectedProjectId: string | null
+  note: string
+  lastSync: number
+}
+
 export function TimeTracker({ projects, tasks }: TimeTrackerProps) {
   const router = useRouter()
   const [isRunning, setIsRunning] = useState(false)
@@ -40,11 +58,114 @@ export function TimeTracker({ projects, tasks }: TimeTrackerProps) {
   const [note, setNote] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+  const [lastSync, setLastSync] = useState<number>(0)
+  const [isSyncing, setIsSyncing] = useState(false)
+  
   const timerRef = useRef<NodeJS.Timeout | null>(null)
   const startTimeRef = useRef<Date | null>(null)
+  const syncIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
   // Filtrer les tâches en fonction du projet sélectionné
   const filteredTasks = selectedProjectId ? tasks.filter((task) => task.project?.id === selectedProjectId) : tasks
+
+  // Calculer le temps basé sur les timestamps serveur
+  const calculateElapsedTime = (startTime: Date): number => {
+    const now = new Date()
+    return Math.floor((now.getTime() - startTime.getTime()) / 1000)
+  }
+
+  // Sauvegarder l'état du timer
+  const saveTimerState = () => {
+    if (typeof window === 'undefined') return
+    
+    const state: TimerState = {
+      isRunning,
+      startTime: startTimeRef.current?.toISOString() || null,
+      elapsedTime,
+      selectedTaskId,
+      selectedProjectId,
+      note,
+      lastSync: Date.now()
+    }
+    
+    localStorage.setItem(STORAGE_KEYS.TIMER_STATE, JSON.stringify(state))
+  }
+
+  // Charger l'état du timer au démarrage
+  const loadTimerState = () => {
+    if (typeof window === 'undefined') return false
+    
+    try {
+      const saved = localStorage.getItem(STORAGE_KEYS.TIMER_STATE)
+      if (!saved) return false
+      
+      const state: TimerState = JSON.parse(saved)
+      
+      // Vérifier si la session n'est pas trop ancienne (24h)
+      const maxAge = 24 * 60 * 60 * 1000 // 24 heures
+      if (Date.now() - state.lastSync > maxAge) {
+        clearTimerState()
+        return false
+      }
+      
+      if (state.isRunning && state.startTime) {
+        const startTime = new Date(state.startTime)
+        const currentElapsed = calculateElapsedTime(startTime)
+        
+        setIsRunning(true)
+        setElapsedTime(currentElapsed)
+        setSelectedTaskId(state.selectedTaskId)
+        setSelectedProjectId(state.selectedProjectId)
+        setNote(state.note)
+        setLastSync(state.lastSync)
+        startTimeRef.current = startTime
+        
+        return true
+      }
+    } catch (error) {
+      console.error('Erreur lors du chargement de l\'état du timer:', error)
+      clearTimerState()
+    }
+    
+    return false
+  }
+
+  // Nettoyer l'état du timer
+  const clearTimerState = () => {
+    if (typeof window === 'undefined') return
+    localStorage.removeItem(STORAGE_KEYS.TIMER_STATE)
+  }
+
+  // Synchroniser avec le serveur
+  const syncWithServer = async () => {
+    if (!isRunning || !startTimeRef.current) return
+    
+    setIsSyncing(true)
+    try {
+      const response = await fetch('/api/timer/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          startTime: startTimeRef.current.toISOString(),
+          currentTime: new Date().toISOString()
+        })
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        setLastSync(Date.now())
+        
+        // Ajuster si nécessaire basé sur la réponse serveur
+        if (data.serverElapsed && Math.abs(data.serverElapsed - elapsedTime) > 2) {
+          setElapsedTime(data.serverElapsed)
+        }
+      }
+    } catch (error) {
+      console.error('Erreur de synchronisation:', error)
+    } finally {
+      setIsSyncing(false)
+    }
+  }
 
   // Formater le temps écoulé (format: HH:MM:SS)
   const formatElapsedTime = (timeInSeconds: number) => {
@@ -70,14 +191,30 @@ export function TimeTracker({ projects, tasks }: TimeTrackerProps) {
 
     setError(null)
     setIsRunning(true)
-    startTimeRef.current = new Date()
+    
+    // Utiliser l'heure serveur si possible
+    const now = new Date()
+    startTimeRef.current = now
 
+    // Timer principal avec correction de dérive
     timerRef.current = setInterval(() => {
-      const now = new Date()
-      const start = startTimeRef.current || now
-      const diffInSeconds = Math.floor((now.getTime() - start.getTime()) / 1000)
-      setElapsedTime(diffInSeconds)
+      if (startTimeRef.current) {
+        const newElapsed = calculateElapsedTime(startTimeRef.current)
+        setElapsedTime(newElapsed)
+        
+        // Sauvegarder périodiquement
+        if (newElapsed % 10 === 0) { // Toutes les 10 secondes
+          saveTimerState()
+        }
+      }
     }, 1000)
+
+    // Synchronisation périodique avec le serveur
+    syncIntervalRef.current = setInterval(() => {
+      syncWithServer()
+    }, 60000) // Toutes les minutes
+
+    saveTimerState()
   }
 
   // Mettre en pause le chronomètre
@@ -89,6 +226,12 @@ export function TimeTracker({ projects, tasks }: TimeTrackerProps) {
       clearInterval(timerRef.current)
       timerRef.current = null
     }
+    if (syncIntervalRef.current) {
+      clearInterval(syncIntervalRef.current)
+      syncIntervalRef.current = null
+    }
+    
+    saveTimerState()
   }
 
   // Arrêter le chronomètre et enregistrer l'entrée de temps
@@ -106,11 +249,10 @@ export function TimeTracker({ projects, tasks }: TimeTrackerProps) {
         return;
       }
       
-      // Calculer le temps de début en soustrayant la durée écoulée de la date de fin
-      // Cela garantit que la durée calculée sur le serveur correspondra à la durée mesurée localement
-      const calculatedStartTime = new Date(endTime.getTime() - (elapsedTime * 1000));
+      // Utiliser l'heure de début réelle et calculer précisément
+      const actualDuration = calculateElapsedTime(startTimeRef.current)
       
-      console.log(`Envoi des données: startTime=${calculatedStartTime.toISOString()}, endTime=${endTime.toISOString()}, elapsedTime=${elapsedTime}s`);
+      console.log(`Envoi des données: startTime=${startTimeRef.current.toISOString()}, endTime=${endTime.toISOString()}, duration=${actualDuration}s`);
       
       const response = await fetch("/api/time-entries", {
         method: "POST",
@@ -118,9 +260,9 @@ export function TimeTracker({ projects, tasks }: TimeTrackerProps) {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          startTime: calculatedStartTime.toISOString(),
+          startTime: startTimeRef.current.toISOString(),
           endTime: endTime.toISOString(),
-          duration: elapsedTime, // Envoyer la durée exacte mesurée localement
+          duration: actualDuration,
           note,
           taskId: selectedTaskId === "none" ? null : selectedTaskId,
           projectId: selectedProjectId === "none" ? null : selectedProjectId,
@@ -136,6 +278,7 @@ export function TimeTracker({ projects, tasks }: TimeTrackerProps) {
       setElapsedTime(0);
       startTimeRef.current = null;
       setSuccess("Temps enregistré avec succès");
+      clearTimerState();
 
       // Rafraîchir la page pour afficher la nouvelle entrée
       router.refresh();
@@ -150,19 +293,64 @@ export function TimeTracker({ projects, tasks }: TimeTrackerProps) {
     }
   };
 
-  // Nettoyer l'intervalle lors du démontage du composant
+  // Charger l'état au démarrage
+  useEffect(() => {
+    const hasActiveSession = loadTimerState()
+    
+    if (hasActiveSession && isRunning) {
+      // Reprendre le timer
+      timerRef.current = setInterval(() => {
+        if (startTimeRef.current) {
+          const newElapsed = calculateElapsedTime(startTimeRef.current)
+          setElapsedTime(newElapsed)
+          
+          if (newElapsed % 10 === 0) {
+            saveTimerState()
+          }
+        }
+      }, 1000)
+      
+      // Reprendre la synchronisation
+      syncIntervalRef.current = setInterval(() => {
+        syncWithServer()
+      }, 60000)
+    }
+  }, [])
+
+  // Sauvegarder l'état quand les valeurs changent
+  useEffect(() => {
+    if (isRunning) {
+      saveTimerState()
+    }
+  }, [selectedTaskId, selectedProjectId, note])
+
+  // Nettoyer les intervalles lors du démontage du composant
   useEffect(() => {
     return () => {
       if (timerRef.current) {
         clearInterval(timerRef.current)
       }
+      if (syncIntervalRef.current) {
+        clearInterval(syncIntervalRef.current)
+      }
+      if (isRunning) {
+        saveTimerState()
+      }
     }
-  }, [])
+  }, [isRunning])
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Chronomètre</CardTitle>
+        <CardTitle className="flex items-center gap-2">
+          Chronomètre
+          {isSyncing && <Sync className="h-4 w-4 animate-spin" />}
+          {lastSync > 0 && (
+            <span className="text-xs text-muted-foreground">
+              Sync: {new Date(lastSync).toLocaleTimeString()}
+            </span>
+          )}
+        </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         {error && (
@@ -226,17 +414,17 @@ export function TimeTracker({ projects, tasks }: TimeTrackerProps) {
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="note">Note</Label>
+          <Label htmlFor="note">Note (optionnel)</Label>
           <Textarea
             id="note"
+            placeholder="Ajouter une note sur cette session de travail..."
             value={note}
             onChange={(e) => setNote(e.target.value)}
-            placeholder="Décrivez ce que vous faites..."
-            rows={3}
+            disabled={isRunning}
           />
         </div>
       </CardContent>
-      <CardFooter className="flex justify-center space-x-2">
+      <CardFooter className="flex gap-2 justify-center">
         {!isRunning ? (
           <Button onClick={startTimer} className="w-32">
             <Play className="mr-2 h-4 w-4" />
@@ -248,11 +436,17 @@ export function TimeTracker({ projects, tasks }: TimeTrackerProps) {
             Pause
           </Button>
         )}
-
+        
         <Button onClick={stopTimer} variant="destructive" className="w-32" disabled={elapsedTime === 0}>
           <StopCircle className="mr-2 h-4 w-4" />
           Arrêter
         </Button>
+        
+        {isRunning && (
+          <Button onClick={syncWithServer} variant="ghost" size="sm" disabled={isSyncing}>
+            <Sync className={`h-4 w-4 ${isSyncing ? 'animate-spin' : ''}`} />
+          </Button>
+        )}
       </CardFooter>
     </Card>
   )
