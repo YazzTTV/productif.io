@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Productif.io</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: system-ui, -apple-system, sans-serif;
+        }
+        .test-button {
+            padding: 10px 20px;
+            background: #22c55e;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Test App Mobile</h1>
+    <p>Si vous voyez cette page, l'app fonctionne !</p>
+    <button class="test-button" onclick="testAPI()">Tester l'API</button>
+
+    <script>
+        async function testAPI() {
+            try {
+                const response = await fetch('http://localhost:3000/api/test');
+                const data = await response.json();
+                alert('API Response: ' + JSON.stringify(data));
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+    </script>
+</body>
+</html> 
