@@ -1,5 +1,11 @@
 {
   "routes": [
+    { 
+      "src": "/.well-known/assetlinks.json",
+      "headers": {
+        "Content-Type": "application/json"
+      }
+    },
     { "src": "/fonctionnalites", "dest": "/app/(marketing)/fonctionnalites" },
     { "src": "/tarifs", "dest": "/app/(marketing)/tarifs" },
     { "src": "/tarification", "dest": "/app/(marketing)/tarification" }
