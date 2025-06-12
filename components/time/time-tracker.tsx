@@ -191,7 +191,7 @@ export function TimeTracker({ projects, tasks }: TimeTrackerProps) {
 
     setError(null)
     setIsRunning(true)
-    
+
     // Utiliser l'heure serveur si possible
     const now = new Date()
     startTimeRef.current = now
@@ -436,7 +436,7 @@ export function TimeTracker({ projects, tasks }: TimeTrackerProps) {
             Pause
           </Button>
         )}
-        
+
         <Button onClick={stopTimer} variant="destructive" className="w-32" disabled={elapsedTime === 0}>
           <StopCircle className="mr-2 h-4 w-4" />
           Arrêter
