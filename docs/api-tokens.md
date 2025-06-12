@@ -48,9 +48,24 @@ Authorization: Bearer {le_token_complet}
 - `processes:write` - Créer/modifier les processus
 
 ### ⚠️ Important pour l'authentification
-- Utilisez UNIQUEMENT les endpoints `/agent` pour les requêtes avec tokens API
-- Les endpoints standards (comme `/habits/date`) utilisent l'authentification par cookies et ne fonctionnent PAS avec les tokens API
+- **Structure d'URL correcte** : `/api/<resource>/agent` (exemple: `/api/tasks/agent`)
+- Utilisez UNIQUEMENT les endpoints contenant `/agent` pour les requêtes avec tokens API
+- Les endpoints standards (comme `/api/habits/date` ou `/api/tasks/today`) utilisent l'authentification par cookies et ne fonctionnent PAS avec les tokens API
 - Assurez-vous que votre token a les scopes appropriés pour l'action demandée
+
+### 📋 Structure des Endpoints Agent
+**Pattern correct** : `/api/<resource>/agent[/action]`
+
+**Exemples valides** :
+- ✅ `/api/tasks/agent` - Liste toutes les tâches
+- ✅ `/api/tasks/agent/date?date=YYYY-MM-DD` - Tâches d'une date
+- ✅ `/api/habits/agent` - Liste/marquer habitudes
+- ✅ `/api/objectives/agent` - Gestion des objectifs
+- ✅ `/api/processes/agent` - Gestion des processus
+
+**Exemples incorrects** :
+- ❌ `/api/agent/tasks/today` (n'existe pas)
+- ❌ `/api/agent/habits` (n'existe pas)
 
 ---
 
@@ -236,34 +251,51 @@ GET /api/debug/ids/tasks
 
 ## 📋 SECTION 3 : GESTION DES TÂCHES
 
-### 3.1 - Récupérer les Tâches du Jour
+### 3.1 - Récupérer les Tâches d'une Date Spécifique
 
-**URL** : `/api/agent/tasks/today`
+**URL** : `/api/tasks/agent/date`
 **Méthode** : GET
-**Usage** : Pour envoyer des rappels de tâches quotidiennes
+**Authentification** : Token API avec scope `tasks:read`
+**Usage** : Pour récupérer les tâches d'une date précise (aujourd'hui ou n'importe quelle date)
+
+**Paramètres requis** :
+- `date` : Date au format YYYY-MM-DD
+
+**Exemples d'utilisation** :
+
+```bash
+# Tâches d'aujourd'hui (remplacez par la date actuelle)
+curl -X GET "https://productif.io/api/tasks/agent/date?date=2025-01-15" \
+  -H "Authorization: Bearer {votre_token}"
+
+# Tâches d'une date spécifique
+curl -X GET "https://productif.io/api/tasks/agent/date?date=2025-01-20" \
+  -H "Authorization: Bearer {votre_token}"
+```
 
 **Réponse** :
 ```json
-{
-  "tasks": [
-    {
-      "id": "task_123",
-      "title": "Finir le rapport",
-      "completed": false,
-      "dueDate": "2025-06-09",
-      "priority": "high",
-      "project": {
-        "id": "project_456", 
-        "name": "Projet Alpha"
-      }
-    }
-  ],
-  "summary": {
-    "total": 3,
-    "completed": 1, 
-    "remaining": 2
+[
+  {
+    "id": "task_123",
+    "title": "Finir le rapport",
+    "completed": false,
+    "dueDate": "2025-01-15T00:00:00.000Z",
+    "scheduledFor": "2025-01-15T09:00:00.000Z",
+    "priority": 3,
+    "energyLevel": 2,
+    "project": {
+      "id": "project_456", 
+      "name": "Projet Alpha",
+      "color": "#3B82F6"
+    },
+    "createdAt": "2025-01-10T10:00:00.000Z",
+    "updatedAt": "2025-01-14T15:30:00.000Z"
   }
-}
+]
+```
+
+**Note importante** : Cet endpoint retourne un tableau de tâches, pas un objet avec summary. Pour obtenir un résumé, utilisez l'endpoint `/api/tasks/agent` avec des filtres.
 ```
 
 ### 3.2 - Créer une Nouvelle Tâche
@@ -694,41 +726,9 @@ curl -X PATCH "https://productif.io/api/objectives/agent/actions/{action_id}/pro
 
 ---
 
-## 📈 SECTION 7 : DONNÉES MOTIVATIONNELLES
+## 📈 SECTION 7 : OUTILS DE DÉVELOPPEMENT
 
-### 7.1 - Récupérer les Métriques du Tableau de Bord
-
-**URL** : `/api/agent/dashboard/metrics`
-**Méthode** : GET
-**Usage** : Pour donner un résumé motivationnel quotidien
-
-**Réponse** :
-```json
-{
-  "tasks": {
-    "today": 5,
-    "completed": 3,
-    "completionRate": 60
-  },
-  "habits": {
-    "today": 4,
-    "completed": 2, 
-    "streak": 7
-  },
-  "productivity": {
-    "score": 75,
-    "trend": "up"
-  }
-}
-```
-
-### 7.2 - Récupérer les Réalisations
-
-**URL** : `/api/agent/achievements`
-**Méthode** : GET
-**Usage** : Pour féliciter l'utilisateur sur ses accomplissements
-
-### 7.3 - Test de Token API
+### 7.1 - Test de Token API
 
 ```bash
 curl -X GET "https://productif.io/api/test-token" \
@@ -742,9 +742,9 @@ curl -X GET "https://productif.io/api/test-token" \
 ### Rappel Matinal (8h00)
 ```
 🌅 Bonjour ! Voici vos tâches du jour :
-• ✅ Finir le rapport (Priorité haute)
-• 📝 Réunion équipe à 14h
-• 🎯 Review projet Alpha
+• ✅ Finir le rapport (P3 - Urgent)
+• 📝 Réunion équipe à 14h (P2 - Important)
+• 🎯 Review projet Alpha (P1 - À faire)
 
 Habitudes du jour :
 • 🏃 Exercice matinal (Streak: 5 jours!)
@@ -752,6 +752,17 @@ Habitudes du jour :
 • 💧 Boire 2L d'eau
 
 Bonne journée ! 💪
+```
+
+**Code exemple pour récupérer ces données** :
+```bash
+# Récupérer les tâches du jour (remplacez la date)
+curl -X GET "https://productif.io/api/tasks/agent/date?date=2025-01-15" \
+  -H "Authorization: Bearer {token}"
+
+# Récupérer les habitudes
+curl -X GET "https://productif.io/api/habits/agent" \
+  -H "Authorization: Bearer {token}"
 ```
 
 ### Rappel Habitudes (Personnalisé)
@@ -795,8 +806,11 @@ Bravo ! Vous avez débloqué :
 
 **Causes possibles** :
 1. **Mauvais endpoint** : Vous utilisez un endpoint non compatible avec les tokens API
-   - ❌ `/api/habits/date` 
-   - ✅ `/api/habits/agent`
+   - ❌ `/api/habits/date` (utilise cookies)
+   - ❌ `/api/tasks/today` (utilise cookies)
+   - ✅ `/api/habits/agent` (utilise JWT)
+   - ✅ `/api/tasks/agent` (utilise JWT)
+   - ✅ `/api/tasks/agent/date` (utilise JWT)
 
 2. **Format d'en-tête incorrect** :
    - ❌ `Authorization: {votre_token}`
