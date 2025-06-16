@@ -1,8 +1,6 @@
 import * as jose from 'jose'
 
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET || "your-secret-key"
-)
+const JWT_SECRET = process.env.JWT_SECRET || "un_secret_tres_securise_pour_jwt_tokens"
 
 interface SignOptions {
   expirationTime?: Date | string
@@ -23,12 +21,14 @@ export async function sign(payload: any, options?: SignOptions): Promise<string>
     jwt = jwt.setExpirationTime('1y')
   }
   
-  return await jwt.sign(JWT_SECRET)
+  const secretBytes = new TextEncoder().encode(JWT_SECRET)
+  return await jwt.sign(secretBytes)
 }
 
 export async function verify(token: string): Promise<any> {
   try {
-    const { payload } = await jose.jwtVerify(token, JWT_SECRET)
+    const secretBytes = new TextEncoder().encode(JWT_SECRET)
+    const { payload } = await jose.jwtVerify(token, secretBytes)
     return payload
   } catch (error) {
     console.error('JWT verification error:', error)
