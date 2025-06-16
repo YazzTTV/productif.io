@@ -63,8 +63,6 @@ async function testDebugAPIs() {
   console.log('🔍 === TEST DES APIs DEBUG ===\n');
   
   const debugEndpoints = [
-    '/api/debug/quick-ids',
-    '/api/debug/ids',
     '/api/debug/ids/tasks',
     '/api/debug/ids/habits',
     '/api/debug/ids/habit-entries',
@@ -88,9 +86,6 @@ async function testDebugAPIs() {
     
     if (result.success) {
       console.log(`   ✅ Status: ${result.status}`);
-      if (result.data.quickIds) {
-        console.log(`   📊 Quick IDs: ${Object.keys(result.data.quickIds).length} items`);
-      }
       if (result.data.count !== undefined) {
         console.log(`   📊 Count: ${result.data.count}`);
       }

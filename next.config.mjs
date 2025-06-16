@@ -9,8 +9,7 @@ const nextConfig = {
   images: {
     unoptimized: true, // Garde pour la compatibilité mobile
   },
-  // PAS d'output: 'export' en mode hybride !
-  // trailingSlash: true, // Pas nécessaire en mode serveur
+  trailingSlash: true,
   distDir: '.next', // Dossier standard Next.js
   experimental: {
     webpackBuildWorker: false,
@@ -44,4 +43,4 @@ const nextConfig = {
   },
 }
 
-export default nextConfig 
+export default nextConfig; 
