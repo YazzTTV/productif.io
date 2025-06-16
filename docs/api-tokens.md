@@ -69,248 +69,65 @@ Authorization: Bearer {le_token_complet}
 
 ---
 
-## 📊 SECTION 2 : RÉCUPÉRER L'ID UTILISATEUR ET TOUS LES IDS
+## 📊 SECTION 2 : RÉCUPÉRER LES IDS
 
-### 2.1 - Endpoint : Tous les IDs (Complet)
-
-**URL** : `/api/debug/ids`
-**Méthode** : GET
-**Usage** : Pour avoir une vue complète de toutes les données utilisateur
-
-**Réponse** :
-```json
-{
-  "user": {
-    "id": "cm8vqf9xk0001a6kh6y7z8w9x",  // ← USER ID ICI
-    "name": "John Doe",
-    "email": "john@example.com",
-    "role": "USER"
-  },
-  "quickIds": {
-    "userId": "cm8vqf9xk0001a6kh6y7z8w9x",  // ← USER ID AUSSI ICI
-    "firstTaskId": "task_123",
-    "firstHabitId": "habit_456",
-    "firstProjectId": "project_789",
-    "firstMissionId": "mission_abc",
-    "firstObjectiveId": "objective_def",
-    "firstProcessId": "process_ghi",
-    "companyId": "company_xyz",
-    "gamificationId": "gamif_123"
-  },
-  "tasks": {
-    "count": 15,
-    "ids": ["task_1", "task_2"],
-    "completedIds": ["task_1", "task_3"],
-    "incompleteIds": ["task_2"],
-    "items": [{"id": "task_1", "title": "Ma tâche", "completed": false, "projectId": "project_789", "createdAt": "2025-05-26T10:00:00.000Z"}]
-  },
-  "habits": {
-    "count": 5, 
-    "ids": ["habit_1", "habit_2"],
-    "items": [{"id": "habit_1", "name": "Exercice", "frequency": "daily", "createdAt": "2025-05-01T10:00:00.000Z"}]
-  },
-  "projects": {
-    "count": 3,
-    "ids": ["project_1", "project_2"],
-    "items": [...]
-  },
-  "missions": {
-    "count": 2,
-    "ids": ["mission_1", "mission_2"],
-    "items": [...]
-  },
-  "objectives": {
-    "count": 4,
-    "ids": ["obj_1", "obj_2", "obj_3"],
-    "items": [...]
-  },
-  "gamification": {
-    "totalPoints": 1250,
-    "level": 5,
-    "currentStreak": 7,
-    "longestStreak": 15
-  },
-  "meta": {
-    "timestamp": "2025-06-09T16:15:45.081Z",
-    "totalEntities": {
-      "tasks": 15,
-      "habits": 5,
-      "projects": 3,
-      "missions": 2,
-      "objectives": 4
-    }
-  }
-}
-```
-
-### 2.2 - Endpoint : IDs Rapides (Essentiel)
-
-**URL** : `/api/debug/quick-ids`
-**Méthode** : GET
-**Usage** : Pour récupérer rapidement les IDs principaux
-
-**Réponse** :
-```json
-{
-  "quickIds": {
-    "userId": "cm8vqf9xk0001a6kh6y7z8w9x",  // ← USER ID ICI
-    "taskId": "task_123",
-    "habitId": "habit_456",
-    "projectId": "project_789",
-    "missionId": "mission_abc",
-    "objectiveId": "objective_def",
-    "actionId": "action_ghi",
-    "processId": "process_jkl"
-  },
-  "entities": {
-    "task": {
-      "id": "task_123",
-      "title": "Ma première tâche",
-      "completed": false,
-      "priority": "medium"
-    },
-    "habit": {
-      "id": "habit_456",
-      "name": "Apprentissage",
-      "frequency": "daily"
-    },
-    "project": {
-      "id": "project_789",
-      "name": "Mon premier projet"
-    }
-  },
-  "examples": {
-    "completeTask": "PATCH /api/tasks/agent/task_123",
-    "markHabit": "POST /api/habits/agent",
-    "updateAction": "PATCH /api/objectives/agent/actions/action_ghi/progress",
-    "updateProject": "PATCH /api/projects/project_789"
-  },
-  "meta": {
-    "timestamp": "2025-06-09T16:15:45.081Z",
-    "note": "IDs les plus récents pour tests rapides"
-  }
-}
-```
-
-### 2.3 - Endpoint : IDs par Type (Spécifique)
+### 2.1 - Endpoint : IDs par Type
 
 **URL** : `/api/debug/ids/[type]`
 **Méthode** : GET
 **Usage** : Pour récupérer les IDs d'un type spécifique
 
 **Types disponibles** :
-- `tasks` - Tâches
-- `habits` - Habitudes  
-- `habit-entries` - Entrées d'habitudes
-- `projects` - Projets
-- `missions` - Missions OKR
-- `objectives` - Objectifs OKR
-- `actions` - Actions OKR
-- `processes` - Processus
-- `time-entries` - Entrées de temps
-- `achievements` - Réalisations
-- `user-achievements` - Réalisations utilisateur
-- `user-team` - Utilisateur et ses entreprises
+- `user-team` : Récupère les IDs utilisateur et entreprise
+- `tasks` : Récupère tous les IDs des tâches
+- `habits` : Récupère tous les IDs des habitudes
+- `projects` : Récupère tous les IDs des projets
+- `missions` : Récupère tous les IDs des missions
+- `objectives` : Récupère tous les IDs des objectifs
+- `processes` : Récupère tous les IDs des processus
 
-**Exemple avec les tâches** :
-```bash
-GET /api/debug/ids/tasks
-```
-
-**Réponse pour les tâches** :
+**Exemple de réponse pour `/api/debug/ids/user-team`** :
 ```json
 {
-  "type": "tasks",
-  "entityName": "tasks",
-  "count": 15,
-  "ids": ["task_1", "task_2", "task_3"],
-  "items": [
-    {
-      "id": "task_1",
-      "title": "Ma tâche",
-      "completed": false,
-      "projectId": "project_789",
-      "createdAt": "2025-05-26T10:00:00.000Z"
-    }
-  ],
-  "meta": {
-    "timestamp": "2025-06-09T16:15:45.081Z",
-    "userId": "user_123",
-    "requestedType": "tasks",
-    "authMethod": "api-token",
-    "success": true
-  }
-}
-```
-
-**Exemple avec user-team** :
-```bash
-GET /api/debug/ids/user-team
-```
-
-**Réponse pour user-team** :
-```json
-{
-  "type": "user-team",
-  "entityName": "user-team",
-  "count": 1,
-  "ids": {
-    "userId": "user_123",
-    "companyIds": ["company_1", "company_2"]
+  "user": {
+    "id": "cm8vqf9xk0001a6kh6y7z8w9x",
+    "name": "John Doe",
+    "email": "john@example.com",
+    "role": "USER"
   },
-  "items": [
-    {
-      "user": {
-        "id": "user_123",
-        "name": "John Doe",
-        "email": "john@example.com"
-      },
-      "companies": [
-        {
-          "id": "company_1",
-          "name": "Entreprise A",
-          "role": "ACTIVE"
-        },
-        {
-          "id": "company_2",
-          "name": "Entreprise B",
-          "role": "INACTIVE"
-        }
-      ]
-    }
-  ],
+  "company": {
+    "id": "company_xyz",
+    "name": "Ma Société",
+    "role": "MEMBER"
+  },
   "meta": {
-    "timestamp": "2025-06-09T16:15:45.081Z",
-    "userId": "user_123",
-    "requestedType": "user-team",
-    "authMethod": "api-token",
-    "success": true
+    "timestamp": "2025-06-09T16:15:45.081Z"
   }
 }
 ```
 
-#### 4. Utilisation des IDs récupérés
-```bash
-# Utiliser l'ID utilisateur et les IDs d'entités
-userId="user_123"                      # De l'endpoint user-team
-companyId="company_1"                  # De l'endpoint user-team
-taskId="task_id_123"                   # De l'endpoint tasks
-habitId="habit_id_456"                 # De l'endpoint habits
-
-# Marquer une tâche comme terminée
-curl -X PATCH "/api/tasks/agent/$taskId" \
-  -H "Authorization: Bearer {token}" \
-  -d '{"completed": true}'
-
-# Marquer une habitude
-curl -X POST "/api/habits/agent" \
-  -H "Authorization: Bearer {token}" \
-  -d '{
-    "habitId": "'$habitId'",
-    "date": "2025-06-09",
-    "completed": true,
-    "note": "Test via API"
-  }'
+**Exemple de réponse pour `/api/debug/ids/tasks`** :
+```json
+{
+  "tasks": {
+    "count": 15,
+    "ids": ["task_1", "task_2", "task_3"],
+    "completedIds": ["task_1"],
+    "incompleteIds": ["task_2", "task_3"],
+    "items": [
+      {
+        "id": "task_1",
+        "title": "Ma tâche",
+        "completed": true,
+        "projectId": "project_789",
+        "createdAt": "2025-05-26T10:00:00.000Z"
+      }
+    ]
+  },
+  "meta": {
+    "timestamp": "2025-06-09T16:15:45.081Z"
+  }
+}
 ```
 
 ---
