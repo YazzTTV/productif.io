@@ -3,10 +3,11 @@ import type { CapacitorConfig } from '@capacitor/cli';
 const config: CapacitorConfig = {
   appId: 'io.productif',
   appName: 'Productif.io',
-  webDir: 'out',
+  webDir: '.next',
   server: {
-    url: 'http://localhost:3000',
-    cleartext: true
+    url: 'http://10.0.2.2:3001',
+    cleartext: true,
+    androidScheme: 'http'
   },
   plugins: {
     SplashScreen: {

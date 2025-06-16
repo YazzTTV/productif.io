@@ -2,11 +2,31 @@ import { NextRequest, NextResponse } from "next/server"
 import { getAuthUser } from "@/lib/auth"
 import { verifyApiToken } from "@/lib/api-token"
 import { prisma } from "@/lib/prisma"
+import { UserRole } from "@prisma/client"
+
+// Types pour les entreprises
+interface Company {
+  id: string
+  name: string
+}
+
+interface UserCompany {
+  company: Company
+  role: UserRole
+  isActive: boolean
+}
+
+interface UserWithCompanies {
+  id: string
+  name: string | null
+  email: string
+  companies: UserCompany[]
+}
 
 const VALID_TYPES = [
   'tasks', 'habits', 'habit-entries', 'projects', 'missions', 
   'objectives', 'actions', 'processes', 'time-entries',
-  'achievements', 'user-achievements'
+  'achievements', 'user-achievements', 'user-team'
 ] as const
 
 type ValidType = typeof VALID_TYPES[number]
@@ -16,7 +36,20 @@ export async function GET(
   { params }: { params: { type: string } }
 ) {
   try {
+    const type = params.type as ValidType
+    if (!VALID_TYPES.includes(type)) {
+      return NextResponse.json(
+        { 
+          error: `Type invalide: ${type}`,
+          validTypes: VALID_TYPES
+        },
+        { status: 400 }
+      )
+    }
+
+    // Authentification de l'utilisateur
     let userId: string | null = null
+    let authMethod = 'session-cookie'
 
     // Vérifier d'abord l'authentification par token API
     const authHeader = request.headers.get('authorization')
@@ -25,9 +58,10 @@ export async function GET(
       const decoded = await verifyApiToken(token)
       if (decoded) {
         userId = decoded.userId
+        authMethod = 'api-token'
       } else {
         return NextResponse.json(
-          { error: "Token API invalide ou expiré" }, 
+          { error: "Token API invalide ou expiré" },
           { status: 401 }
         )
       }
@@ -36,7 +70,7 @@ export async function GET(
       const user = await getAuthUser()
       if (!user) {
         return NextResponse.json(
-          { error: "Non authentifié" }, 
+          { error: "Non authentifié" },
           { status: 401 }
         )
       }
@@ -45,45 +79,53 @@ export async function GET(
 
     if (!userId) {
       return NextResponse.json(
-        { error: "Non authentifié" }, 
+        { error: "Non authentifié" },
         { status: 401 }
       )
     }
 
-    // Récupérer les informations de l'utilisateur
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { id: true, name: true, email: true, role: true }
-    })
-
-    if (!user) {
-      return NextResponse.json(
-        { error: "Utilisateur non trouvé" }, 
-        { status: 404 }
-      )
-    }
-
-    const type = params.type as ValidType
-
-    if (!VALID_TYPES.includes(type)) {
-      return NextResponse.json(
-        { 
-          error: "Type invalide", 
-          validTypes: VALID_TYPES,
-          receivedType: params.type
-        }, 
-        { status: 400 }
-      )
-    }
-
     let data: any[] = []
-    let entityName = ""
+    let entityName: ValidType = type
 
-    try {
+    // Récupération des données selon le type
+    if (type === 'user-team') {
+      // Récupérer l'utilisateur avec ses informations d'entreprise
+      const userWithCompanies = await prisma.user.findUnique({
+        where: { id: userId },
+        include: {
+          companies: {
+            include: {
+              company: true
+            }
+          }
+        }
+      })
+
+      if (!userWithCompanies) {
+        return NextResponse.json(
+          { error: "Utilisateur non trouvé" },
+          { status: 404 }
+        )
+      }
+
+      // Formater les données pour inclure l'utilisateur et ses entreprises
+      data = [{
+        user: {
+          id: userWithCompanies.id,
+          name: userWithCompanies.name,
+          email: userWithCompanies.email
+        },
+        companies: userWithCompanies.companies.map(userCompany => ({
+          id: userCompany.company.id,
+          name: userCompany.company.name,
+          role: userCompany.isActive ? 'ACTIVE' : 'INACTIVE'
+        }))
+      }]
+    } else {
       switch (type) {
         case 'tasks':
           data = await prisma.task.findMany({
-            where: { userId: user.id },
+            where: { userId },
             select: { 
               id: true, 
               title: true, 
@@ -95,12 +137,11 @@ export async function GET(
             },
             orderBy: { createdAt: 'desc' }
           })
-          entityName = "tâches"
           break
 
         case 'habits':
           data = await prisma.habit.findMany({
-            where: { userId: user.id },
+            where: { userId },
             select: { 
               id: true, 
               name: true, 
@@ -110,13 +151,11 @@ export async function GET(
             },
             orderBy: { createdAt: 'desc' }
           })
-          entityName = "habitudes"
           break
 
         case 'habit-entries':
-          // D'abord récupérer les habitudes de l'utilisateur
           const userHabits = await prisma.habit.findMany({
-            where: { userId: user.id },
+            where: { userId },
             select: { id: true }
           })
           
@@ -134,15 +173,14 @@ export async function GET(
                 createdAt: true
               },
               orderBy: { createdAt: 'desc' },
-              take: 50 // Limiter car il peut y en avoir beaucoup
+              take: 50
             })
           }
-          entityName = "entrées d'habitudes"
           break
 
         case 'projects':
           data = await prisma.project.findMany({
-            where: { userId: user.id },
+            where: { userId },
             select: { 
               id: true, 
               name: true, 
@@ -152,12 +190,11 @@ export async function GET(
             },
             orderBy: { createdAt: 'desc' }
           })
-          entityName = "projets"
           break
 
         case 'missions':
           data = await prisma.mission.findMany({
-            where: { userId: user.id },
+            where: { userId },
             select: { 
               id: true, 
               title: true, 
@@ -168,13 +205,12 @@ export async function GET(
             },
             orderBy: { createdAt: 'desc' }
           })
-          entityName = "missions"
           break
 
         case 'objectives':
           data = await prisma.objective.findMany({
             where: { 
-              mission: { userId: user.id }
+              mission: { userId }
             },
             select: { 
               id: true, 
@@ -186,13 +222,11 @@ export async function GET(
             },
             orderBy: { createdAt: 'desc' }
           })
-          entityName = "objectifs"
           break
 
         case 'actions':
-          // D'abord récupérer les objectifs de l'utilisateur
           const userObjectives = await prisma.objective.findMany({
-            where: { mission: { userId: user.id } },
+            where: { mission: { userId } },
             select: { id: true }
           })
           
@@ -212,12 +246,11 @@ export async function GET(
               orderBy: { createdAt: 'desc' }
             })
           }
-          entityName = "actions d'objectifs"
           break
 
         case 'processes':
           data = await prisma.process.findMany({
-            where: { userId: user.id },
+            where: { userId },
             select: { 
               id: true, 
               name: true, 
@@ -226,12 +259,11 @@ export async function GET(
             },
             orderBy: { createdAt: 'desc' }
           })
-          entityName = "processus"
           break
 
         case 'time-entries':
           data = await prisma.timeEntry.findMany({
-            where: { userId: user.id },
+            where: { userId },
             select: { 
               id: true, 
               description: true, 
@@ -242,13 +274,11 @@ export async function GET(
               createdAt: true
             },
             orderBy: { createdAt: 'desc' },
-            take: 30 // Limiter car il peut y en avoir beaucoup
+            take: 30
           })
-          entityName = "entrées de temps"
           break
 
         case 'achievements':
-          // Pas besoin de filtrer par utilisateur pour les achievements généraux
           data = await prisma.achievement.findMany({
             select: {
               id: true,
@@ -261,12 +291,11 @@ export async function GET(
             },
             orderBy: { name: 'asc' }
           })
-          entityName = "achievements disponibles"
           break
 
         case 'user-achievements':
           data = await prisma.userAchievement.findMany({
-            where: { userId: user.id },
+            where: { userId },
             include: {
               achievement: {
                 select: {
@@ -280,7 +309,6 @@ export async function GET(
             },
             orderBy: { unlockedAt: 'desc' }
           })
-          entityName = "achievements débloqués"
           break
 
         default:
@@ -289,43 +317,25 @@ export async function GET(
             { status: 400 }
           )
       }
-    } catch (queryError: any) {
-      console.error(`Erreur lors de la requête pour ${type}:`, queryError)
-      return NextResponse.json(
-        { 
-          error: `Erreur lors de la requête ${type}`, 
-          details: queryError.message,
-          type 
-        },
-        { status: 500 }
-      )
     }
 
     const response = {
       type,
       entityName,
       count: data.length,
-      ids: data.map((item: any) => item.id),
+      ids: type === 'user-team' 
+        ? {
+            userId: data[0]?.user?.id,
+            companyIds: data[0]?.companies?.map((c: { id: string }) => c.id) || []
+          }
+        : data.map((item: any) => item.id),
       items: data,
-      
-      // Statistiques utiles
-      stats: {
-        total: data.length,
-        ...(type === 'tasks' && {
-          completed: data.filter((item: any) => item.completed).length,
-          incomplete: data.filter((item: any) => !item.completed).length
-        }),
-        ...(type === 'habit-entries' && {
-          completed: data.filter((item: any) => item.completed).length,
-          incomplete: data.filter((item: any) => !item.completed).length
-        })
-      },
       
       meta: {
         timestamp: new Date().toISOString(),
-        userId: user.id,
+        userId,
         requestedType: type,
-        authMethod: authHeader ? 'api-token' : 'session-cookie',
+        authMethod,
         success: true
       }
     }

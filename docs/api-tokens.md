@@ -210,41 +210,107 @@ Authorization: Bearer {le_token_complet}
 - `time-entries` - Entrées de temps
 - `achievements` - Réalisations
 - `user-achievements` - Réalisations utilisateur
+- `user-team` - Utilisateur et ses entreprises
 
 **Exemple avec les tâches** :
 ```bash
 GET /api/debug/ids/tasks
 ```
 
-**Réponse** :
+**Réponse pour les tâches** :
 ```json
 {
   "type": "tasks",
-  "entityName": "tâches",
-  "count": 3,
+  "entityName": "tasks",
+  "count": 15,
   "ids": ["task_1", "task_2", "task_3"],
   "items": [
     {
       "id": "task_1",
-      "title": "Ma tâche importante", 
+      "title": "Ma tâche",
       "completed": false,
-      "dueDate": "2025-06-10",
-      "priority": "high",
       "projectId": "project_789",
       "createdAt": "2025-05-26T10:00:00.000Z"
     }
   ],
-  "stats": {
-    "total": 15,
-    "completed": 8,
-    "incomplete": 7
-  },
   "meta": {
-    "userId": "cm8vqf9xk0001a6kh6y7z8w9x",  // ← USER ID ICI
     "timestamp": "2025-06-09T16:15:45.081Z",
-    "requestedType": "tasks"
+    "userId": "user_123",
+    "requestedType": "tasks",
+    "authMethod": "api-token",
+    "success": true
   }
 }
+```
+
+**Exemple avec user-team** :
+```bash
+GET /api/debug/ids/user-team
+```
+
+**Réponse pour user-team** :
+```json
+{
+  "type": "user-team",
+  "entityName": "user-team",
+  "count": 1,
+  "ids": {
+    "userId": "user_123",
+    "companyIds": ["company_1", "company_2"]
+  },
+  "items": [
+    {
+      "user": {
+        "id": "user_123",
+        "name": "John Doe",
+        "email": "john@example.com"
+      },
+      "companies": [
+        {
+          "id": "company_1",
+          "name": "Entreprise A",
+          "role": "ACTIVE"
+        },
+        {
+          "id": "company_2",
+          "name": "Entreprise B",
+          "role": "INACTIVE"
+        }
+      ]
+    }
+  ],
+  "meta": {
+    "timestamp": "2025-06-09T16:15:45.081Z",
+    "userId": "user_123",
+    "requestedType": "user-team",
+    "authMethod": "api-token",
+    "success": true
+  }
+}
+```
+
+#### 4. Utilisation des IDs récupérés
+```bash
+# Utiliser l'ID utilisateur et les IDs d'entités
+userId="user_123"                      # De l'endpoint user-team
+companyId="company_1"                  # De l'endpoint user-team
+taskId="task_id_123"                   # De l'endpoint tasks
+habitId="habit_id_456"                 # De l'endpoint habits
+
+# Marquer une tâche comme terminée
+curl -X PATCH "/api/tasks/agent/$taskId" \
+  -H "Authorization: Bearer {token}" \
+  -d '{"completed": true}'
+
+# Marquer une habitude
+curl -X POST "/api/habits/agent" \
+  -H "Authorization: Bearer {token}" \
+  -d '{
+    "habitId": "'$habitId'",
+    "date": "2025-06-09",
+    "completed": true,
+    "note": "Test via API"
+  }'
 ```
 
 ---
@@ -883,9 +949,10 @@ curl -X GET "/api/debug/ids/habits" -H "Authorization: Bearer {token}"
 #### 4. Utilisation des IDs récupérés
 ```bash
 # Utiliser l'ID utilisateur et les IDs d'entités
-userId="cm8vqf9xk0001a6kh6y7z8w9x"    # De n'importe quel endpoint
-taskId="task_id_123"                   # Des endpoints debug
-habitId="habit_id_456"                 # Des endpoints debug
+userId="user_123"                      # De l'endpoint user-team
+companyId="company_1"                  # De l'endpoint user-team
+taskId="task_id_123"                   # De l'endpoint tasks
+habitId="habit_id_456"                 # De l'endpoint habits
 
 # Marquer une tâche comme terminée
 curl -X PATCH "/api/tasks/agent/$taskId" \
