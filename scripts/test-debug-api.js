@@ -40,13 +40,25 @@ async function testEndpoint(url, options = {}) {
 async function testBasicEndpoints() {
   console.log('🔍 === TEST ENDPOINTS DEBUG BASIQUES ===\n');
   
-  // Test endpoint principal
-  await testEndpoint(`${BASE_URL}/api/debug/ids`);
-  console.log();
-  
-  // Test endpoint quick-ids
-  await testEndpoint(`${BASE_URL}/api/debug/quick-ids`);
-  console.log();
+  // Test des endpoints par type
+  const types = [
+    'tasks',
+    'habits',
+    'habit-entries',
+    'projects',
+    'missions',
+    'objectives',
+    'actions',
+    'processes',
+    'time-entries',
+    'achievements',
+    'user-achievements'
+  ];
+
+  for (const type of types) {
+    await testEndpoint(`${BASE_URL}/api/debug/ids/${type}`);
+    console.log();
+  }
 }
 
 async function testTypeEndpoints() {
