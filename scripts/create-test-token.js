@@ -1,6 +1,8 @@
-const { PrismaClient } = require('@prisma/client');
-const { randomBytes } = require('crypto');
-const jwt = require('jsonwebtoken');
+import { PrismaClient } from '@prisma/client';
+import { randomBytes } from 'crypto';
+import jwt from 'jsonwebtoken';
+import fs from 'fs';
+import path from 'path';
 
 const prisma = new PrismaClient();
 
@@ -92,9 +94,6 @@ async function createTestToken() {
     // 8. Mise à jour des fichiers de test
     console.log('📝 Mise à jour des scripts de test...');
     
-    const fs = require('fs');
-    const path = require('path');
-    
     const scriptsToUpdate = [
       'scripts/test-create-task.js',
       'scripts/test-single.js',
@@ -130,14 +129,11 @@ async function createTestToken() {
     console.log('   node scripts/test-with-token.js');
 
   } catch (error) {
-    console.error('❌ Erreur lors de la création du token:', error);
+    console.error('❌ Erreur:', error);
   } finally {
     await prisma.$disconnect();
   }
 }
 
-if (require.main === module) {
-  createTestToken();
-}
-
-module.exports = { createTestToken }; 
+// Exécuter la fonction
+createTestToken(); 
