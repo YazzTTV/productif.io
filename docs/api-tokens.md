@@ -12,27 +12,21 @@ Cette documentation est spécialement conçue pour les agents IA qui doivent int
 3. Crée un nouveau token avec les scopes nécessaires
 4. Copie le token (affiché une seule fois)
 
-### ⚡ Caractéristiques des Tokens (Mise à jour importante)
+### ⚡ Caractéristiques des Tokens API
 
-**✅ Tokens Permanents par Défaut** (Depuis décembre 2025)
-- Quand vous **laissez le champ "Date d'expiration" vide** lors de la création : le token est **permanent** (jamais d'expiration)
+**✅ Durée de validité** (Depuis décembre 2025)
+- Quand vous **laissez le champ "Date d'expiration" vide** lors de la création : le token est **permanent**
 - Quand vous **spécifiez une date d'expiration** : le token expire à cette date exacte
-- **Headers JWT conformes** avec `"typ": "JWT"` pour une compatibilité optimale
 
-**🔧 Améliorations Techniques**
-- Format JWT standard avec tous les headers requis
+**🔧 Fonctionnalités**
 - Tokens immédiatement fonctionnels après création
-- Plus de problème d'expiration inattendue
-
-**⚠️ Important pour les développeurs**
-- Les anciens tokens (créés avant décembre 2025) peuvent avoir des durées d'expiration limitées
-- Créez de nouveaux tokens pour bénéficier des améliorations
-- Utilisez l'interface web `/settings/api-tokens` pour une création optimale
+- Stockés de manière sécurisée dans la base de données
+- Traçabilité complète de l'utilisation
 
 ### Utiliser le Token
 **En-tête obligatoire pour chaque requête** :
 ```
-Authorization: Bearer {le_token_complet}
+Authorization: Bearer {votre_token_api}
 ```
 
 ### Scopes Disponibles
@@ -50,7 +44,7 @@ Authorization: Bearer {le_token_complet}
 ### ⚠️ Important pour l'authentification
 - **Structure d'URL correcte** : `/api/<resource>/agent` (exemple: `/api/tasks/agent`)
 - Utilisez UNIQUEMENT les endpoints contenant `/agent` pour les requêtes avec tokens API
-- Les endpoints standards (comme `/api/habits/date` ou `/api/tasks/today`) utilisent l'authentification par cookies et ne fonctionnent PAS avec les tokens API
+- Les endpoints standards ne fonctionnent pas avec les tokens API
 - Assurez-vous que votre token a les scopes appropriés pour l'action demandée
 
 ### 📋 Structure des Endpoints Agent
@@ -106,28 +100,39 @@ Authorization: Bearer {le_token_complet}
 }
 ```
 
-**Exemple de réponse pour `/api/debug/ids/tasks`** :
-```json
-{
-  "tasks": {
-    "count": 15,
-    "ids": ["task_1", "task_2", "task_3"],
-    "completedIds": ["task_1"],
-    "incompleteIds": ["task_2", "task_3"],
-    "items": [
-      {
-        "id": "task_1",
-        "title": "Ma tâche",
-        "completed": true,
-        "projectId": "project_789",
-        "createdAt": "2025-05-26T10:00:00.000Z"
-      }
-    ]
-  },
-  "meta": {
-    "timestamp": "2025-06-09T16:15:45.081Z"
-  }
-}
+### 2.2 - Exemples d'utilisation des IDs
+
+#### 1. Récupérer les IDs nécessaires
+```bash
+# Focus sur les tâches
+curl -X GET "/api/debug/ids/tasks" -H "Authorization: Bearer {token}"
+
+# Focus sur les habitudes  
+curl -X GET "/api/debug/ids/habits" -H "Authorization: Bearer {token}"
+```
+
+#### 2. Utilisation des IDs récupérés
+```bash
+# Utiliser l'ID utilisateur et les IDs d'entités
+userId="user_123"                      # De l'endpoint user-team
+companyId="company_1"                  # De l'endpoint user-team
+taskId="task_id_123"                   # De l'endpoint tasks
+habitId="habit_id_456"                 # De l'endpoint habits
+
+# Marquer une tâche comme terminée
+curl -X PATCH "/api/tasks/agent/$taskId" \
+  -H "Authorization: Bearer {token}" \
+  -d '{"completed": true}'
+
+# Marquer une habitude
+curl -X POST "/api/habits/agent" \
+  -H "Authorization: Bearer {token}" \
+  -d '{
+    "habitId": "'$habitId'",
+    "date": "2025-06-09",
+    "completed": true,
+    "note": "Test via API"
+  }'
 ```
 
 ---
@@ -176,9 +181,6 @@ curl -X GET "https://productif.io/api/tasks/agent/date?date=2025-01-20" \
     "updatedAt": "2025-01-14T15:30:00.000Z"
   }
 ]
-```
-
-**Note importante** : Cet endpoint retourne un tableau de tâches, pas un objet avec summary. Pour obtenir un résumé, utilisez l'endpoint `/api/tasks/agent` avec des filtres.
 ```
 
 ### 3.2 - Créer une Nouvelle Tâche
@@ -503,353 +505,3 @@ curl -X PATCH "https://productif.io/api/tasks/agent/{task_id}/process" \
 curl -X GET "https://productif.io/api/tasks/agent/{task_id}/process" \
   -H "Authorization: Bearer {votre_token}"
 ```
-
----
-
-## 🎯 SECTION 6 : GESTION DES OBJECTIFS (OKR)
-
-### 6.1 - Récupérer Toutes les Missions et Objectifs
-
-**URL** : `/api/objectives/agent`
-**Méthode** : GET
-**Authentification** : Token API avec scope `objectives:read`
-
-```bash
-curl -X GET "https://productif.io/api/objectives/agent" \
-  -H "Authorization: Bearer {votre_token}"
-```
-
-**Paramètres optionnels** :
-- `?current=true` - Récupérer uniquement la mission du trimestre actuel
-
-**Réponse** :
-```json
-{
-  "missions": [
-    {
-      "id": "mission_id",
-      "title": "Développer l'activité commerciale Q1",
-    "quarter": 1,
-    "year": 2024,
-      "progress": 65,
-      "objectives": [
-        {
-          "id": "objective_id",
-          "title": "Augmenter la prospection",
-          "progress": 30,
-          "current": 15,
-    "target": 50,
-          "actions": [
-            {
-              "id": "action_id",
-              "title": "Prospecter des entreprises",
-              "progress": 30,
-              "current": 15,
-              "target": 50
-            }
-          ]
-        }
-      ]
-    }
-  ]
-}
-```
-
-### 6.2 - Mettre à Jour le Progrès d'une Action
-
-**URL** : `/api/objectives/agent/actions/{action_id}/progress`
-**Méthode** : PATCH
-**Authentification** : Token API avec scope `objectives:write`
-
-```bash
-curl -X PATCH "https://productif.io/api/objectives/agent/actions/{action_id}/progress" \
-  -H "Authorization: Bearer {votre_token}" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "increment": 3,
-    "note": "Prospecté 3 entreprises aujourd'hui"
-  }'
-```
-
-**Paramètres** :
-- `increment` (optionnel) : Nombre à ajouter à la valeur actuelle
-- `current` (optionnel) : Nouvelle valeur absolue
-- `note` (optionnel) : Note explicative de la progression
-
-**Réponse** :
-```json
-{
-  "success": true,
-  "action": {
-    "id": "action_id",
-    "title": "Prospecter des entreprises",
-    "current": 15,
-    "target": 50,
-    "progress": 30,
-    "objective": {
-      "id": "objective_id",
-      "title": "Augmenter la prospection",
-      "progress": 30
-    },
-    "mission": {
-      "id": "mission_id",
-      "title": "Développer l'activité commerciale Q1",
-      "quarter": 1,
-      "year": 2024
-    }
-  },
-  "message": "Progression mise à jour: 15/50 (30.0%)",
-  "previousValue": 12,
-  "newValue": 15,
-  "change": 3,
-  "completed": false,
-  "note": "Prospecté 3 entreprises aujourd'hui"
-}
-```
-
----
-
-## 📈 SECTION 7 : OUTILS DE DÉVELOPPEMENT
-
-### 7.1 - Test de Token API
-
-```bash
-curl -X GET "https://productif.io/api/test-token" \
-  -H "Authorization: Bearer {votre_token}"
-```
-
----
-
-## 💬 SECTION 8 : EXEMPLES D'USAGE POUR AGENT WHATSAPP
-
-### Rappel Matinal (8h00)
-```
-🌅 Bonjour ! Voici vos tâches du jour :
-• ✅ Finir le rapport (P3 - Urgent)
-• 📝 Réunion équipe à 14h (P2 - Important)
-• 🎯 Review projet Alpha (P1 - À faire)
-
-Habitudes du jour :
-• 🏃 Exercice matinal (Streak: 5 jours!)
-• 📚 Lecture 20min
-• 💧 Boire 2L d'eau
-
-Bonne journée ! 💪
-```
-
-**Code exemple pour récupérer ces données** :
-```bash
-# Récupérer les tâches du jour (remplacez la date)
-curl -X GET "https://productif.io/api/tasks/agent/date?date=2025-01-15" \
-  -H "Authorization: Bearer {token}"
-
-# Récupérer les habitudes
-curl -X GET "https://productif.io/api/habits/agent" \
-  -H "Authorization: Bearer {token}"
-```
-
-### Rappel Habitudes (Personnalisé)
-```
-⏰ Il est 8h00 !
-C'est l'heure de votre exercice matinal 🏃‍♀️
-
-Votre streak actuel : 5 jours 🔥
-Objectif : Continuer cette belle série !
-
-Répondez "Fait" quand c'est terminé 👍
-```
-
-### Résumé du Soir (20h00)
-```
-🌙 Récap de votre journée :
-
-Tâches : 3/5 terminées ✅
-Habitudes : 2/4 accomplies 🎯
-Score productivité : 75% 📈
-
-Bravo ! Vous avez débloqué :
-🏆 "Maître des Habitudes" (+100 pts)
-
-À demain pour une nouvelle journée productive ! 🚀
-```
-
----
-
-## ⚙️ SECTION 9 : GESTION D'ERREURS ET RÉSOLUTION DE PROBLÈMES
-
-### Codes de Retour
-- `200` - Succès
-- `401` - Token invalide ou manquant
-- `403` - Permissions insuffisantes (scope manquant)
-- `404` - Ressource non trouvée
-- `429` - Trop de requêtes (rate limiting)
-- `500` - Erreur serveur
-
-### Erreur 401 "Non authentifié"
-
-**Causes possibles** :
-1. **Mauvais endpoint** : Vous utilisez un endpoint non compatible avec les tokens API
-   - ❌ `/api/habits/date` (utilise cookies)
-   - ❌ `/api/tasks/today` (utilise cookies)
-   - ✅ `/api/habits/agent` (utilise JWT)
-   - ✅ `/api/tasks/agent` (utilise JWT)
-   - ✅ `/api/tasks/agent/date` (utilise JWT)
-
-2. **Format d'en-tête incorrect** :
-   - ❌ `Authorization: {votre_token}`
-   - ❌ `Authorization: bearer {votre_token}`
-   - ✅ `Authorization: Bearer {votre_token}`
-
-3. **Token expiré ou invalide** : Vérifiez votre token dans les paramètres
-
-4. **Scopes insuffisants** : Assurez-vous que votre token a les permissions nécessaires
-
-### Erreur 403 "Permissions insuffisantes"
-
-Votre token n'a pas les scopes requis pour cette action. Vérifiez les scopes de votre token :
-- Lecture : `habits:read`, `tasks:read`, etc.
-- Écriture : `habits:write`, `tasks:write`, etc.
-
-### Exemples d'Erreurs
-```json
-{
-  "error": "Token invalide",
-  "code": 401,
-  "message": "Le token fourni n'est pas valide"
-}
-```
-
-```json
-{
-  "error": "Scope insuffisant", 
-  "code": 403,
-  "required": "habits:write",
-  "provided": ["habits:read"]
-}
-```
-
----
-
-## 🔧 SECTION 10 : BONNES PRATIQUES
-
-### Pour un Agent WhatsApp
-1. **Récupérer l'ID utilisateur** avec `/api/debug/quick-ids` au début
-2. **Stocker les IDs** essentiels pour éviter les requêtes répétées  
-3. **Utiliser les endpoints `/agent`** uniquement (pas les endpoints standards)
-4. **Gérer les erreurs** gracieusement avec des messages utilisateur amicaux
-5. **Respecter les limites** de taux de requêtes
-6. **Personnaliser les messages** selon les données utilisateur
-
-### Workflow de Développement Recommandé
-
-#### 1. Découverte initiale
-```bash
-# Obtenir une vue d'ensemble
-curl -X GET "/api/debug/ids" -H "Authorization: Bearer {token}"
-```
-
-#### 2. Tests rapides
-```bash
-# Obtenir les IDs essentiels
-curl -X GET "/api/debug/quick-ids" -H "Authorization: Bearer {token}"
-```
-
-#### 3. Développement ciblé
-```bash
-# Focus sur les tâches
-curl -X GET "/api/debug/ids/tasks" -H "Authorization: Bearer {token}"
-
-# Focus sur les habitudes  
-curl -X GET "/api/debug/ids/habits" -H "Authorization: Bearer {token}"
-```
-
-#### 4. Utilisation des IDs récupérés
-```bash
-# Utiliser l'ID utilisateur et les IDs d'entités
-userId="user_123"                      # De l'endpoint user-team
-companyId="company_1"                  # De l'endpoint user-team
-taskId="task_id_123"                   # De l'endpoint tasks
-habitId="habit_id_456"                 # De l'endpoint habits
-
-# Marquer une tâche comme terminée
-curl -X PATCH "/api/tasks/agent/$taskId" \
-  -H "Authorization: Bearer {token}" \
-  -d '{"completed": true}'
-
-# Marquer une habitude
-curl -X POST "/api/habits/agent" \
-  -H "Authorization: Bearer {token}" \
-  -d '{
-    "habitId": "'$habitId'",
-    "date": "2025-06-09",
-    "completed": true,
-    "note": "Test via API"
-  }'
-```
-
-### Fréquence Recommandée
-- **Rappel matinal** : 1x par jour (8h00)
-- **Rappel habitudes** : Selon préférences utilisateur  
-- **Résumé du soir** : 1x par jour (20h00)
-- **Vérification données** : Max 1x par heure
-
-### Bonnes Pratiques Générales
-1. **Utilisez les endpoints `/agent`** pour toutes vos intégrations d'IA
-2. **Stockez vos tokens de manière sécurisée** et ne les partagez jamais
-3. **Créez des tokens permanents** en laissant le champ d'expiration vide pour une utilisation durable, ou définissez une date d'expiration spécifique si nécessaire
-4. **Utilisez des scopes minimaux** nécessaires pour votre cas d'usage
-5. **Testez vos intégrations** avec l'endpoint `/test-token`
-6. **Gérez les erreurs** appropriément dans votre code
-7. **Utilisez les endpoints debug** pour récupérer facilement les IDs nécessaires
-8. **Mettez à jour vos anciens tokens** si vous rencontrez des problèmes d'expiration
-
----
-
-## 📝 CHANGELOG
-
-### Version 2.1 (Décembre 2025) - CORRECTIONS MAJEURES
-- 🔥 **TOKENS PERMANENTS** : Les tokens créés sans date d'expiration sont maintenant permanents (jamais d'expiration)
-- ✅ **Headers JWT conformes** : Tous les tokens incluent maintenant `"typ": "JWT"` pour une compatibilité optimale
-- ⚡ **Fonctionnement immédiat** : Plus de problème d'expiration prématurée, les tokens fonctionnent dès la création
-- 🔧 **Interface web améliorée** : Création de tokens optimisée via `/settings/api-tokens`
-- 📚 **Documentation mise à jour** : Nouvelles sections sur les caractéristiques des tokens
-
-### Version 2.0 (Juin 2025)
-- ✅ Restructuration complète pour agents IA par sections claires
-- ✅ Conservation de TOUTES les fonctionnalités précédentes
-- ✅ Sections numérotées pour navigation facile
-- ✅ Exemples complets pour WhatsApp
-- ✅ Gestion d'erreurs détaillée
-- ✅ ID utilisateur disponible dans tous les endpoints debug
-- ✅ Workflows de développement détaillés
-
-### Version 2025-06-09
-- ✅ **Documentation complètement restructurée** : 
-  - Nouvelle section dédiée "🆔 Récupération des IDs - Guide Complet"
-  - Tableaux de comparaison des endpoints
-  - Exemples détaillés avec structure des réponses
-  - Workflow de développement recommandé
-  - Cas d'usage pratiques avec scripts
-- ✅ **ID Utilisateur clarifié** : Documentation explicite de où trouver l'ID utilisateur dans chaque endpoint
-- ✅ **Organisation améliorée** : Sections claires et numérotées pour une navigation facile
-- ✅ **Exemples pratiques** : Scripts bash et cas d'usage réels pour les développeurs
-
-### Version 2025-05-27
-- ✅ **Nouveaux endpoints utilitaires** : Ajout de 3 endpoints pour récupérer facilement tous les IDs
-  - `/api/debug/ids` - Tous les IDs avec détails complets
-  - `/api/debug/quick-ids` - IDs rapides pour tests
-  - `/api/debug/ids/[type]` - IDs par type spécifique
-- ✅ **Documentation des endpoints d'IDs** : Guide complet d'utilisation avec exemples
-- ✅ **Workflow de développement** : Documentation des cas d'usage pour tests et développement
-
-### Version 2025-05-26
-- ✅ Optimisation de l'API `/habits/agent` : limitation à 7 dernières entrées au lieu de 30
-- ✅ Clarification de la compatibilité des endpoints avec les tokens API
-- ✅ Ajout de la documentation des habitudes spéciales
-- ✅ Amélioration de la section de résolution des problèmes
-- ✅ Ajout d'exemples de réponses détaillés
-
-### Version précédente
-- Création de la documentation initiale
-- Définition des scopes et de l'authentification
-- Exemples de base pour les habitudes et tâches 
