@@ -5,7 +5,7 @@ const jwt = require('jsonwebtoken');
 const prisma = new PrismaClient();
 
 // Utilisons la même clé JWT que l'application
-const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key';
+const JWT_SECRET = process.env.JWT_SECRET || "un_secret_tres_securise_pour_jwt_tokens";
 
 async function testFixedTokens() {
   console.log('🔨 === TEST DES CORRECTIONS DE TOKENS ===\n');
