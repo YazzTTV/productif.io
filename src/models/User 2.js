@@ -10,14 +10,6 @@ const userSchema = new mongoose.Schema({
         type: String,
         required: true
     },
-    token: {
-        type: String,
-        default: null
-    },
-    isAuthenticated: {
-        type: Boolean,
-        default: false
-    },
     preferences: {
         wakeUpTime: Date,
         coffeeDelay: {
