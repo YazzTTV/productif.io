@@ -7,7 +7,7 @@ import path from 'path';
 const prisma = new PrismaClient();
 
 // Utilisons la même clé JWT que l'application
-const JWT_SECRET = process.env.JWT_SECRET || "un_secret_tres_securise_pour_jwt_tokens";
+const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key';
 
 async function createTestToken() {
   console.log('🔨 === CRÉATION D\'UN TOKEN API DE TEST ===\n');
