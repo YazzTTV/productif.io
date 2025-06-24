@@ -1,14 +1,16 @@
-#!/usr/bin/env node
+import { PrismaClient } from '@prisma/client';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const prisma = new PrismaClient();
 
 /**
  * Script de restauration de la base de données depuis une sauvegarde JSON
  */
-
-const { PrismaClient } = require('@prisma/client');
-const fs = require('fs');
-const path = require('path');
-
-const prisma = new PrismaClient();
 
 async function restoreBackup(backupFilePath) {
   console.log('🔄 Début de la restauration...');
@@ -26,8 +28,8 @@ async function restoreBackup(backupFilePath) {
 
     // Ordre de restauration (important pour les relations)
     const restoreOrder = [
+      'Company',
       'User',
-      'Company', 
       'UserCompany',
       'Session',
       'Project',
@@ -41,129 +43,113 @@ async function restoreBackup(backupFilePath) {
       'ObjectiveAction',
       'Initiative',
       'WarMapEvent',
-      'ApiToken'
+      'ApiToken',
+      'UserGamification',
+      'Achievement',
+      'UserAchievement',
+      'StreakHistory',
+      'NotificationSettings'
     ];
 
     let totalRestored = 0;
+    const restoredIds = new Map();
 
+    // Restaurer les données dans l'ordre
     for (const modelName of restoreOrder) {
-      if (backupData[modelName] && backupData[modelName].length > 0) {
-        console.log(`\n📝 Restauration de ${modelName}...`);
-        
-        const modelNameLower = modelName.charAt(0).toLowerCase() + modelName.slice(1);
-        
-        try {
-          // Vérifier si le modèle existe dans Prisma
-          if (typeof prisma[modelNameLower] !== 'undefined') {
-            const records = backupData[modelName];
-            let restoredCount = 0;
-            
-            // Restaurer enregistrement par enregistrement avec upsert
-            for (const record of records) {
-              try {
-                // Traiter les données pour s'assurer qu'elles sont compatibles
-                const processed = { ...record };
-                
-                // Convertir les champs de date
-                ['createdAt', 'updatedAt', 'date', 'dueDate', 'scheduledFor', 'startTime', 'endTime', 'startDate', 'endDate', 'expiresAt', 'lastUsed', 'trialEndsAt', 'unlockedAt'].forEach(dateField => {
-                  if (processed[dateField]) {
-                    processed[dateField] = new Date(processed[dateField]);
-                  }
-                });
-
-                // Définir les clés uniques selon le modèle
-                let whereClause = {};
-                let updateData = { ...processed };
-                let createData = { ...processed };
-
-                // Supprimer l'id des données de mise à jour si présent
-                delete updateData.id;
-
-                switch (modelName) {
-                  case 'User':
-                    whereClause = { id: processed.id };
-                    break;
-                  case 'Company':
-                    whereClause = { id: processed.id };
-                    break;
-                  case 'UserCompany':
-                    whereClause = { 
-                      userId_companyId: {
-                        userId: processed.userId,
-                        companyId: processed.companyId
-                      }
-                    };
-                    break;
-                  case 'Session':
-                    whereClause = { id: processed.id };
-                    break;
-                  case 'Project':
-                    whereClause = { id: processed.id };
-                    break;
-                  case 'Process':
-                    whereClause = { id: processed.id };
-                    break;
-                  case 'Task':
-                    whereClause = { id: processed.id };
-                    break;
-                  case 'TimeEntry':
-                    whereClause = { id: processed.id };
-                    break;
-                  case 'Habit':
-                    whereClause = { id: processed.id };
-                    break;
-                  case 'HabitEntry':
-                    whereClause = { 
-                      habitId_date: {
-                        habitId: processed.habitId,
-                        date: processed.date
-                      }
-                    };
-                    break;
-                  case 'Mission':
-                    whereClause = { id: processed.id };
-                    break;
-                  case 'Objective':
-                    whereClause = { id: processed.id };
-                    break;
-                  case 'ObjectiveAction':
-                    whereClause = { id: processed.id };
-                    break;
-                  case 'WarMapEvent':
-                    whereClause = { id: processed.id };
-                    break;
-                  case 'ApiToken':
-                    whereClause = { id: processed.id };
-                    break;
-                  default:
-                    whereClause = { id: processed.id };
-                }
-
-                await prisma[modelNameLower].upsert({
-                  where: whereClause,
-                  update: updateData,
-                  create: createData
-                });
-
-                restoredCount++;
-              } catch (recordError) {
-                console.error(`    ⚠️  Erreur pour un enregistrement de ${modelName}:`, recordError.message);
-                // Continuer avec les autres enregistrements
-              }
-            }
-
-            console.log(`  ✅ ${restoredCount} enregistrements restaurés sur ${records.length} disponibles`);
-            totalRestored += restoredCount;
-          } else {
-            console.log(`  ⚠️  Modèle ${modelName} non trouvé dans Prisma, ignoré`);
-          }
-        } catch (error) {
-          console.error(`  ❌ Erreur lors de la restauration de ${modelName}:`, error.message);
-          // Continuer avec les autres modèles
-        }
-      } else {
-        console.log(`  ℹ️  Aucune donnée pour ${modelName}`);
+      if (!backupData[modelName] || backupData[modelName].length === 0) {
+        continue;
       }
+
+      console.log(`\n📝 Restauration de ${modelName}...`);
+      const modelNameLower = modelName.charAt(0).toLowerCase() + modelName.slice(1);
+      let restoredCount = 0;
+
+      // Stocker les IDs restaurés pour ce modèle
+      if (!restoredIds.has(modelName)) {
+        restoredIds.set(modelName, new Set());
+      }
+
+      for (const record of backupData[modelName]) {
+        try {
+          const { id, ...data } = record;
+          const whereClause = { id };
+          const createData = { id, ...data };
+          const updateData = { ...data };
+
+          // Vérifier les relations avant de restaurer
+          let canRestore = true;
+
+          // Vérifier la relation Company pour les utilisateurs
+          if (modelName === 'User' && data.managedCompanyId) {
+            const companyExists = restoredIds.get('Company')?.has(data.managedCompanyId);
+            if (!companyExists) {
+              console.log(`    ⚠️  Entreprise ${data.managedCompanyId} non trouvée pour l'utilisateur ${id}`);
+              delete createData.managedCompanyId;
+              delete updateData.managedCompanyId;
+            }
+          }
+
+          // Vérifier la relation User
+          if (data.userId) {
+            const userExists = restoredIds.get('User')?.has(data.userId);
+            if (!userExists) {
+              console.log(`    ⚠️  Utilisateur ${data.userId} non trouvé pour ${modelName} ${id}`);
+              canRestore = false;
+            }
+          }
+
+          // Vérifier la relation Habit
+          if (modelName === 'HabitEntry' && data.habitId) {
+            const habitExists = restoredIds.get('Habit')?.has(data.habitId);
+            if (!habitExists) {
+              console.log(`    ⚠️  Habitude ${data.habitId} non trouvée pour l'entrée ${id}`);
+              canRestore = false;
+            }
+          }
+
+          // Vérifier la relation Project
+          if (data.projectId) {
+            const projectExists = restoredIds.get('Project')?.has(data.projectId);
+            if (!projectExists && data.projectId !== null) {
+              console.log(`    ⚠️  Projet ${data.projectId} non trouvé pour ${modelName} ${id}`);
+              canRestore = false;
+            }
+          }
+
+          if (!canRestore) {
+            continue;
+          }
+
+          // Supprimer les champs non présents dans le schéma
+          if (modelName === 'ApiToken') {
+            delete updateData.description;
+            delete createData.description;
+            delete updateData.scopes;
+            delete createData.scopes;
+          }
+
+          // Gérer les champs spéciaux pour WarMapEvent
+          if (modelName === 'WarMapEvent') {
+            updateData.date = updateData.startDate;
+            createData.date = createData.startDate;
+          }
+
+          const result = await prisma[modelNameLower].upsert({
+            where: whereClause,
+            update: updateData,
+            create: createData
+          });
+
+          // Stocker l'ID restauré
+          restoredIds.get(modelName).add(result.id);
+          restoredCount++;
+        } catch (error) {
+          console.log(`    ⚠️  Erreur pour un enregistrement de ${modelName}: \n${error}`);
+        }
+      }
+
+      console.log(`  ✅ ${restoredCount} enregistrements restaurés sur ${backupData[modelName].length} disponibles`);
+      totalRestored += restoredCount;
     }
 
     console.log(`\n🎉 Restauration terminée !`);
@@ -221,8 +207,6 @@ async function main() {
 }
 
 // Exécuter le script
-if (require.main === module) {
-  main();
-}
+main().catch(console.error);
 
-module.exports = { restoreBackup }; 
+export { restoreBackup }; 

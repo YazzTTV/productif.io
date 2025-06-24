@@ -1,7 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { generateApiToken, revokeApiToken } from '@/lib/api-token'
+import { SignJWT } from 'jose'
+import { v4 as uuidv4 } from 'uuid'
+import { TextEncoder } from 'util'
+
+// Secret pour signer les tokens JWT
+const JWT_SECRET = process.env.JWT_SECRET || "un_secret_tres_securise_pour_jwt_tokens"
+
+// Liste de toutes les permissions disponibles
+const ALL_PERMISSIONS = [
+  'tasks:read',
+  'tasks:write',
+  'habits:read',
+  'habits:write',
+  'projects:read',
+  'projects:write',
+  'objectives:read',
+  'objectives:write',
+  'processes:read',
+  'processes:write'
+]
 
 // Liste tous les tokens API de l'utilisateur authentifié
 export async function GET() {
@@ -11,13 +30,27 @@ export async function GET() {
   }
 
   try {
-    // Utiliser une requête SQL brute en attendant la migration Prisma
-    const tokens = await prisma.$queryRaw`
-      SELECT id, name, description, scopes, "lastUsed", "expiresAt", "createdAt"
-      FROM api_tokens
-      WHERE "userId" = ${user.id}
-      ORDER BY "createdAt" DESC
-    `
+    const tokens = await prisma.apiToken.findMany({
+      where: {
+        userId: user.id
+      },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        scopes: true,
+        lastUsed: true,
+        expiresAt: true,
+        createdAt: true,
+        token: false,
+        userId: false,
+        updatedAt: false,
+        user: false
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    })
 
     return NextResponse.json(tokens)
   } catch (error) {
@@ -34,24 +67,38 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { name, description, scopes, expiresAt } = await req.json()
+    const { name } = await req.json()
 
     // Validation
     if (!name) {
       return NextResponse.json({ error: 'Un nom est requis' }, { status: 400 })
     }
 
-    if (!scopes || !Array.isArray(scopes) || scopes.length === 0) {
-      return NextResponse.json({ error: 'Des scopes valides sont requis' }, { status: 400 })
+    // Générer un ID unique pour le token
+    const tokenId = uuidv4()
+
+    // Créer le payload JWT
+    const payload = {
+      tokenId,
+      userId: user.id,
+      scopes: ALL_PERMISSIONS
     }
 
-    // Générer le token
-    const { token, apiToken } = await generateApiToken({
-      name,
-      userId: user.id,
-      description,
-      scopes,
-      expiresAt: expiresAt ? new Date(expiresAt) : undefined
+    // Signer le token avec jose
+    const secretBytes = new TextEncoder().encode(JWT_SECRET)
+    const token = await new SignJWT(payload)
+      .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
+      .sign(secretBytes)
+
+    // Créer le token avec toutes les permissions
+    const apiToken = await prisma.apiToken.create({
+      data: {
+        id: tokenId,
+        token,
+        name,
+        userId: user.id,
+        scopes: ALL_PERMISSIONS
+      }
     })
 
     // Ne retourner le token complet qu'une seule fois lors de la création
@@ -63,7 +110,7 @@ export async function POST(req: NextRequest) {
       lastUsed: apiToken.lastUsed,
       expiresAt: apiToken.expiresAt,
       createdAt: apiToken.createdAt,
-      token
+      token: apiToken.token
     })
   } catch (error) {
     console.error('Erreur lors de la création du token API:', error)

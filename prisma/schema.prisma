@@ -7,48 +7,32 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum UserRole {
-  SUPER_ADMIN
-  ADMIN
-  USER
-}
-
-enum WaitlistStatus {
-  EMAIL_ONLY      // Email saisi mais pas payé
-  PAID           // Payment effectué (tag "Waitlist")
-  COMPLETED      // Inscription complètement finalisée
-}
-
 model User {
-  id               String        @id @default(cuid())
-  name             String?
-  email            String        @unique
-  password         String
-  role             UserRole      @default(USER)
-  createdAt        DateTime      @default(now())
-  updatedAt        DateTime      @updatedAt
-  habits           Habit[]
-  missions         Mission[]
-  processes        Process[]
-  projects         Project[]
-  sessions         Session[]
-  tasks            Task[]
-  timeEntries      TimeEntry[]
-  warMapEvents     WarMapEvent[]
-  companies        UserCompany[] // Relation avec les entreprises
-  managedCompany   Company?      @relation("CompanyAdmin", fields: [managedCompanyId], references: [id])
-  managedCompanyId String?
-  apiTokens        ApiToken[] // Tokens API pour agents IA
-  
-  // Relations de gamification
-  gamification     UserGamification?
-  notificationSettings NotificationSettings?
-
-  // Champs Stripe
-  stripeCustomerId     String?   @unique
-  stripeSubscriptionId String?   @unique
+  id                   String                @id @default(cuid())
+  name                 String?
+  email                String                @unique
+  password             String
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  managedCompanyId     String?
+  stripeCustomerId     String?               @unique
+  stripeSubscriptionId String?               @unique
   subscriptionStatus   String?
   trialEndsAt          DateTime?
+  role                 String                @default("USER")
+  missions             Mission[]
+  processes            Process[]
+  projects             Project[]
+  sessions             Session[]
+  tasks                Task[]
+  timeEntries          TimeEntry[]
+  managedCompany       Company?              @relation("CompanyAdmin", fields: [managedCompanyId], references: [id])
+  companies            UserCompany[]
+  gamification         UserGamification?
+  warMapEvents         WarMapEvent[]
+  apiTokens            ApiToken[]
+  habits               Habit[]
+  notificationSettings NotificationSettings?
 }
 
 model Company {
@@ -58,8 +42,8 @@ model Company {
   logo           String?
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
-  users          UserCompany[] // Relation avec les utilisateurs
   administrators User[]        @relation("CompanyAdmin")
+  users          UserCompany[]
 }
 
 model UserCompany {
@@ -69,8 +53,8 @@ model UserCompany {
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, companyId])
   @@index([userId])
@@ -160,16 +144,16 @@ model TimeEntry {
 model Habit {
   id          String       @id @default(cuid())
   name        String       @db.VarChar(255)
-  description String?      @db.Text
-  color       String?      @db.VarChar(7) // Format hexadécimal: #RRGGBB
-  frequency   String       @db.VarChar(10) // 'daily', 'weekly', 'monthly'
-  daysOfWeek  String[]     @default([]) // ["monday", "wednesday", "friday"]
+  description String?
+  color       String?      @db.VarChar(7)
+  frequency   String       @db.VarChar(10)
+  daysOfWeek  String[]
   userId      String
-  order       Int          @default(0) // Nouvel attribut pour l'ordre d'affichage
-  user        User         @relation(fields: [userId], references: [id])
-  entries     HabitEntry[]
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
+  order       Int          @default(0)
+  entries     HabitEntry[]
+  user        User         @relation(fields: [userId], references: [id])
 
   @@index([userId])
   @@map("habits")
@@ -178,13 +162,13 @@ model Habit {
 model HabitEntry {
   id        String   @id @default(cuid())
   habitId   String
-  habit     Habit    @relation(fields: [habitId], references: [id], onDelete: Cascade)
   date      DateTime @db.Date
   completed Boolean  @default(false)
-  note      String?  @db.Text
-  rating    Int?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  note      String?
+  rating    Int?
+  habit     Habit    @relation(fields: [habitId], references: [id], onDelete: Cascade)
 
   @@unique([habitId, date])
   @@index([habitId])
@@ -255,9 +239,13 @@ model WarMapEvent {
   projectId   String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  color       String?
+  color       String?  @db.VarChar(7)
+  date        DateTime @db.Date
   project     Project? @relation(fields: [projectId], references: [id])
   user        User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([projectId])
 }
 
 model ApiToken {
@@ -265,8 +253,8 @@ model ApiToken {
   name        String    @db.VarChar(255)
   token       String    @unique
   userId      String
-  description String?   @db.Text
-  scopes      String[]  @default([]) // Permissions: ["habits:read", "habits:write", "tasks:read", etc.]
+  description String?
+  scopes      String[]  @default([])
   lastUsed    DateTime?
   expiresAt   DateTime?
   createdAt   DateTime  @default(now())
@@ -277,40 +265,31 @@ model ApiToken {
   @@map("api_tokens")
 }
 
-// Modèles de gamification
 model UserGamification {
-  id                String   @id @default(cuid())
-  userId            String   @unique
-  totalPoints       Int      @default(0)
-  level             Int      @default(1)
-  currentStreak     Int      @default(0)
-  longestStreak     Int      @default(0)
-  totalHabitsCompleted Int   @default(0)
-  weeklyGoal        Int      @default(7) // Objectif d'habitudes par semaine
-  monthlyGoal       Int      @default(30) // Objectif d'habitudes par mois
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  achievements      UserAchievement[]
-  streakHistory     StreakHistory[]
-
-  @@map("user_gamification")
+  id                   String    @id @default(cuid())
+  userId               String    @unique
+  currentStreak        Int       @default(0)
+  longestStreak        Int       @default(0)
+  lastActivityDate     DateTime?
+  points               Int       @default(0)
+  level                Int       @default(1)
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  totalHabitsCompleted Int       @default(0)
+  totalPoints          Int       @default(0)
+  user                 User      @relation(fields: [userId], references: [id])
 }
 
 model Achievement {
-  id          String   @id @default(cuid())
-  name        String   @db.VarChar(255)
-  description String   @db.Text
-  icon        String   @db.VarChar(50) // Nom de l'icône (ex: "trophy", "fire", "star")
-  category    String   @db.VarChar(50) // "streak", "completion", "consistency", "milestone"
-  condition   String   @db.Text // Condition JSON pour débloquer l'achievement
-  points      Int      @default(0) // Points accordés pour cet achievement
-  rarity      String   @db.VarChar(20) @default("common") // "common", "rare", "epic", "legendary"
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id          String            @id @default(cuid())
+  name        String            @unique
+  description String
+  type        String
+  threshold   Int
+  points      Int
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
   users       UserAchievement[]
-
-  @@map("achievements")
 }
 
 model UserAchievement {
@@ -318,56 +297,71 @@ model UserAchievement {
   userId        String
   achievementId String
   unlockedAt    DateTime    @default(now())
-  user          UserGamification @relation(fields: [userId], references: [userId], onDelete: Cascade)
-  achievement   Achievement @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+  achievement   Achievement @relation(fields: [achievementId], references: [id])
 
   @@unique([userId, achievementId])
-  @@map("user_achievements")
+  @@index([userId])
+  @@index([achievementId])
 }
 
 model StreakHistory {
   id        String   @id @default(cuid())
   userId    String
-  date      DateTime @db.Date
-  streakCount Int
-  habitsCompleted Int @default(0)
-  totalHabitsForDay Int @default(0)
+  date      DateTime
+  type      String
+  streak    Int
   createdAt DateTime @default(now())
-  user      UserGamification @relation(fields: [userId], references: [userId], onDelete: Cascade)
 
   @@unique([userId, date])
   @@index([userId])
   @@index([date])
-  @@map("streak_history")
 }
 
 model NotificationSettings {
-  id                    String   @id @default(cuid())
-  userId                String   @unique
-  streakReminders       Boolean  @default(true)
-  achievementNotifications Boolean @default(true)
-  dailyMotivation       Boolean  @default(true)
-  weeklyProgress        Boolean  @default(true)
-  pushEnabled           Boolean  @default(false)
-  emailEnabled          Boolean  @default(true)
-  reminderTime          String   @default("09:00") // Format HH:MM
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
-  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                String   @id @default(cuid())
+  userId            String   @unique
+  isEnabled         Boolean  @default(true)
+  emailEnabled      Boolean  @default(true)
+  pushEnabled       Boolean  @default(true)
+  whatsappEnabled   Boolean  @default(false)
+  whatsappNumber    String?
+  startHour         Int      @default(9)
+  endHour           Int      @default(18)
+  allowedDays       Int[]    @default([1, 2, 3, 4, 5])
+  notificationTypes String[] @default(["TASK_DUE", "HABIT_REMINDER", "DAILY_SUMMARY"])
+  morningReminder   Boolean  @default(true)
+  taskReminder      Boolean  @default(true)
+  habitReminder     Boolean  @default(true)
+  motivation        Boolean  @default(true)
+  dailySummary      Boolean  @default(true)
+  reminderTime      String   @default("09:00")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  user              User     @relation(fields: [userId], references: [id])
 
-  @@map("notification_settings")
+  @@index([userId])
+  @@map("user_notification_preferences")
 }
 
 model WaitlistEntry {
-  id          String   @id @default(cuid())
-  email       String   @unique
-  phone       String?
-  motivation  String?  @db.Text
-  status      String   @default("pas_paye") // "pas_paye", "paye"
-  currentStep Int      @default(1) // 1: email, 2: phone+motivation, 3: paiement
-  stripeSessionId String? // ID de session Stripe pour le paiement
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id              String   @id @default(cuid())
+  email           String   @unique
+  phone           String?
+  motivation      String?
+  status          String   @default("pas_paye")
+  currentStep     Int      @default(1)
+  stripeSessionId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
+  @@index([email])
+  @@index([status])
+  @@index([createdAt])
   @@map("waitlist_entries")
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  ADMIN
+  USER
 }

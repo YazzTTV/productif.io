@@ -13,9 +13,24 @@ import {
   Eye,
   Download,
   Shield,
-  AlertTriangle
+  AlertTriangle,
+  Trash2,
+  Plus
 } from "lucide-react"
 import { useRouter } from "next/navigation"
+import { useToast } from "@/components/ui/use-toast"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
 
 interface WaitlistEntry {
   id: string
@@ -45,12 +60,21 @@ interface User {
 }
 
 export default function AdminWaitlistPage() {
+  const { toast } = useToast()
   const [entries, setEntries] = useState<WaitlistEntry[]>([])
   const [stats, setStats] = useState<WaitlistStats | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const [user, setUser] = useState<User | null>(null)
   const [authLoading, setAuthLoading] = useState(true)
+  const [deleting, setDeleting] = useState<string | null>(null)
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
+  const [newEntry, setNewEntry] = useState({
+    email: "",
+    phone: "",
+    motivation: "",
+    currentStep: 2
+  })
   const router = useRouter()
 
   // Vérifier l'authentification et le rôle
@@ -143,6 +167,85 @@ export default function AdminWaitlistPage() {
     )
   }
 
+  const handleDelete = async (id: string) => {
+    if (!confirm("Êtes-vous sûr de vouloir supprimer cette entrée ?")) {
+      return
+    }
+
+    setDeleting(id)
+    try {
+      const response = await fetch(`/api/waitlist/${id}`, {
+        method: "DELETE"
+      })
+
+      if (!response.ok) {
+        throw new Error("Erreur lors de la suppression")
+      }
+
+      toast({
+        title: "Succès",
+        description: "L'entrée a été supprimée avec succès",
+      })
+
+      // Actualiser les données
+      fetchData()
+    } catch (err) {
+      console.error("Erreur suppression:", err)
+      toast({
+        title: "Erreur",
+        description: "Impossible de supprimer l'entrée",
+        variant: "destructive"
+      })
+    } finally {
+      setDeleting(null)
+    }
+  }
+
+  const handleAdd = async () => {
+    try {
+      const response = await fetch("/api/waitlist", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          ...newEntry,
+          step: newEntry.currentStep
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error("Erreur lors de l'ajout")
+      }
+
+      toast({
+        title: "Succès",
+        description: "L'entrée a été ajoutée avec succès",
+      })
+
+      // Réinitialiser le formulaire
+      setNewEntry({
+        email: "",
+        phone: "",
+        motivation: "",
+        currentStep: 2
+      })
+      
+      // Fermer le dialogue
+      setIsAddDialogOpen(false)
+
+      // Actualiser les données
+      fetchData()
+    } catch (err) {
+      console.error("Erreur ajout:", err)
+      toast({
+        title: "Erreur",
+        description: "Impossible d'ajouter l'entrée",
+        variant: "destructive"
+      })
+    }
+  }
+
   if (authLoading) {
     return (
       <div className="container mx-auto p-6">
@@ -194,6 +297,58 @@ export default function AdminWaitlistPage() {
           <p className="text-gray-600 mt-1">Gestion de la waitlist Productif.io</p>
         </div>
         <div className="flex gap-2">
+          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="h-4 w-4 mr-2" />
+                Ajouter
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Ajouter une entrée</DialogTitle>
+                <DialogDescription>
+                  Ajoutez manuellement une nouvelle entrée à la waitlist
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={newEntry.email}
+                    onChange={(e) => setNewEntry({ ...newEntry, email: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="phone">Téléphone</Label>
+                  <Input
+                    id="phone"
+                    type="tel"
+                    value={newEntry.phone}
+                    onChange={(e) => setNewEntry({ ...newEntry, phone: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="motivation">Motivation</Label>
+                  <Textarea
+                    id="motivation"
+                    value={newEntry.motivation}
+                    onChange={(e) => setNewEntry({ ...newEntry, motivation: e.target.value })}
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
+                  Annuler
+                </Button>
+                <Button onClick={handleAdd}>
+                  Ajouter
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
           <Button onClick={() => fetchData()} variant="outline">
             <Eye className="h-4 w-4 mr-2" />
             Actualiser
@@ -201,143 +356,136 @@ export default function AdminWaitlistPage() {
         </div>
       </div>
 
-      {/* Statistiques */}
-      {stats && (
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">
-                <Users className="h-4 w-4 inline mr-1" />
-                Total
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.total}</div>
-            </CardContent>
-          </Card>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              Total Inscrits
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats?.total || 0}</div>
+          </CardContent>
+        </Card>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-green-600">
-                <CreditCard className="h-4 w-4 inline mr-1" />
-                Payés
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">{stats.payes}</div>
-            </CardContent>
-          </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <CreditCard className="h-5 w-5" />
+              Statut Paiement
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-1">
+              <div className="flex justify-between">
+                <span className="text-green-600">Payés</span>
+                <span className="font-bold">{stats?.payes || 0}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-red-600">Non payés</span>
+                <span className="font-bold">{stats?.pasPayes || 0}</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-red-600">
-                <Clock className="h-4 w-4 inline mr-1" />
-                Pas payés
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-red-600">{stats.pasPayes}</div>
-            </CardContent>
-          </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Clock className="h-5 w-5" />
+              Par Étape
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-1">
+              <div className="flex justify-between">
+                <span>Étape 1</span>
+                <span className="font-bold">{stats?.etape1 || 0}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Étape 2</span>
+                <span className="font-bold">{stats?.etape2 || 0}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Étape 3</span>
+                <span className="font-bold">{stats?.etape3 || 0}</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-blue-600">
-                Étape 1
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-blue-600">{stats.etape1}</div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-yellow-600">
-                Étape 2
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-yellow-600">{stats.etape2}</div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-green-600">
-                Étape 3
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">{stats.etape3}</div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {/* Liste des entrées */}
       <Card>
         <CardHeader>
-          <CardTitle>Entrées Waitlist ({entries.length})</CardTitle>
+          <CardTitle>Liste des inscrits</CardTitle>
           <CardDescription>
-            Liste de toutes les inscriptions à la waitlist
+            Tous les utilisateurs inscrits sur la waitlist
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            {entries.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
-                Aucune entrée dans la waitlist
-              </div>
-            ) : (
-              entries.map((entry) => (
-                <div 
-                  key={entry.id} 
-                  className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50"
-                >
-                  <div className="flex-1">
-                    <div className="flex items-center gap-4">
-                      <div>
-                        <div className="font-medium flex items-center gap-2">
-                          <Mail className="h-4 w-4 text-gray-400" />
-                          {entry.email}
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b">
+                  <th className="text-left p-2">Date</th>
+                  <th className="text-left p-2">Email</th>
+                  <th className="text-left p-2">Téléphone</th>
+                  <th className="text-left p-2">Motivation</th>
+                  <th className="text-center p-2">Statut</th>
+                  <th className="text-center p-2">Étape</th>
+                  <th className="text-center p-2">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {entries.map((entry) => (
+                  <tr key={entry.id} className="border-b">
+                    <td className="p-2 whitespace-nowrap">
+                      {formatDate(entry.createdAt)}
+                    </td>
+                    <td className="p-2">
+                      <div className="flex items-center gap-2">
+                        <Mail className="h-4 w-4" />
+                        {entry.email}
+                      </div>
+                    </td>
+                    <td className="p-2">
+                      {entry.phone ? (
+                        <div className="flex items-center gap-2">
+                          <Phone className="h-4 w-4" />
+                          {entry.phone}
                         </div>
-                        {entry.phone && (
-                          <div className="text-sm text-gray-600 flex items-center gap-2 mt-1">
-                            <Phone className="h-3 w-3" />
-                            {entry.phone}
-                          </div>
-                        )}
-                        {entry.motivation && (
-                          <div className="text-sm text-gray-600 mt-1 max-w-md truncate">
-                            <strong>Motivation:</strong> {entry.motivation}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center gap-4">
-                    <div className="text-center">
-                      <div className="text-sm text-gray-500">Étape</div>
-                      {getStepBadge(entry.currentStep)}
-                    </div>
-                    
-                    <div className="text-center">
-                      <div className="text-sm text-gray-500">Statut</div>
+                      ) : (
+                        <span className="text-gray-400">-</span>
+                      )}
+                    </td>
+                    <td className="p-2">
+                      {entry.motivation || <span className="text-gray-400">-</span>}
+                    </td>
+                    <td className="p-2 text-center">
                       {getStatusBadge(entry.status)}
-                    </div>
-                    
-                    <div className="text-center min-w-[120px]">
-                      <div className="text-sm text-gray-500">Créé le</div>
-                      <div className="text-sm font-medium">
-                        {formatDate(entry.createdAt)}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))
-            )}
+                    </td>
+                    <td className="p-2 text-center">
+                      {getStepBadge(entry.currentStep)}
+                    </td>
+                    <td className="p-2 text-center">
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => handleDelete(entry.id)}
+                        disabled={deleting === entry.id}
+                      >
+                        {deleting === entry.id ? (
+                          <div className="animate-spin rounded-full h-4 w-4 border-2 border-white" />
+                        ) : (
+                          <Trash2 className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </CardContent>
       </Card>

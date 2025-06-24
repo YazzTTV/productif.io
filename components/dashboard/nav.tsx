@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useState, useEffect } from "react"
-import { LayoutDashboard, CheckSquare, Clock, BarChart, Settings, FolderKanban, Heart, Target, Book, Users, Building2, LineChart, Trophy, Mail } from "lucide-react"
+import { LayoutDashboard, CheckSquare, Clock, BarChart, Settings, FolderKanban, Heart, Target, Book, Users, Building2, LineChart, Trophy, Mail, Bot } from "lucide-react"
 import { buttonVariants } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { cn } from "@/lib/utils"
@@ -324,6 +324,21 @@ export function DashboardNav({ viewAsMode = false, viewAsUserId, onNavItemClick 
         </Link>
       )}
 
+      <Link
+        href={getHref("/dashboard/onboarding")}
+        className={cn(
+          buttonVariants({
+            variant: isActive("/dashboard/onboarding") ? "secondary" : "ghost",
+            size: "default",
+          }),
+          "justify-start w-full"
+        )}
+        onClick={handleNavClick}
+      >
+        <Bot className="mr-2 h-4 w-4" />
+        <span className="truncate">Assistant IA</span>
+      </Link>
+
       {showAdminMenu && (
         <>
           <div className="h-px bg-border my-2" />
@@ -452,20 +467,29 @@ export function DashboardNav({ viewAsMode = false, viewAsUserId, onNavItemClick 
       )}
       
       {showSettings && (
-        <Link
-          href="/dashboard/settings"
-          className={cn(
-            buttonVariants({
-              variant: pathname === "/dashboard/settings" ? "secondary" : "ghost",
-              size: "default",
-            }),
-            "justify-start w-full"
-          )}
-          onClick={handleNavClick}
-        >
-          <Settings className="mr-2 h-4 w-4" />
-          <span className="truncate">{t('settings')}</span>
-        </Link>
+        <div className="mt-4">
+          <div className="px-3">
+            <h2 className="mb-2 px-4 text-lg font-semibold tracking-tight">
+              {t('settings')}
+            </h2>
+            <div className="space-y-1">
+              <Link
+                href="/dashboard/settings"
+                className={cn(
+                  buttonVariants({
+                    variant: pathname?.startsWith("/dashboard/settings") ? "secondary" : "ghost",
+                    size: "default",
+                  }),
+                  "justify-start w-full"
+                )}
+                onClick={handleNavClick}
+              >
+                <Settings className="mr-2 h-4 w-4" />
+                <span className="truncate">{t('settings')}</span>
+              </Link>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

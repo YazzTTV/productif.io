@@ -5,9 +5,12 @@ out
 build
 
 # Fichiers de logs et temporaires
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
+npm-debug.log
+.env
+.env.*
+.git
+.gitignore
+README.md
 .pnpm-debug.log*
 *.log
 
@@ -27,9 +30,9 @@ docker-compose.yml
 .dockerignore
 
 # Autres fichiers à ignorer
-README.md
 backups
 .vercel
 *.md
 tsconfig.tsbuildinfo
 .DS_Store 
+dist 

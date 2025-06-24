@@ -157,7 +157,7 @@ export function LeaderboardCompact() {
                 <div className="flex items-center gap-2 text-xs text-gray-500">
                   <div className="flex items-center gap-1">
                     <Star className="h-2.5 w-2.5" />
-                    <span>{entry.totalPoints.toLocaleString()}</span>
+                    <span>{entry.points.toLocaleString()}</span>
                   </div>
                   <span>•</span>
                   <span>{entry.currentStreak}j streak</span>
