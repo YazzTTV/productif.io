@@ -1,0 +1,42 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("MONGODB_URI")
+}
+
+model User {
+  id                    String                    @id @default(cuid()) @map("_id")
+  email                 String                    @unique
+  notificationHistory   NotificationHistory[]
+  notificationSettings  UserNotificationPreference?
+}
+
+model NotificationHistory {
+  id           String    @id @default(cuid()) @map("_id")
+  userId       String
+  type         String
+  content      String
+  scheduledFor DateTime
+  sentAt       DateTime?
+  status       String    @default("pending")
+  error        String?
+  user         User      @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}
+
+model UserNotificationPreference {
+  id               String   @id @default(cuid()) @map("_id")
+  userId           String   @unique
+  whatsappEnabled  Boolean  @default(false)
+  whatsappNumber   String?
+  morningReminder  Boolean  @default(true)
+  taskReminder     Boolean  @default(true)
+  habitReminder    Boolean  @default(true)
+  motivation       Boolean  @default(true)
+  dailySummary     Boolean  @default(true)
+  user             User     @relation(fields: [userId], references: [id])
+} 

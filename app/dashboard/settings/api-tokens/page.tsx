@@ -29,14 +29,6 @@ import {
   FormMessage,
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from "@/components/ui/select"
 import {
   Table,
   TableBody,
@@ -45,35 +37,15 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Checkbox } from "@/components/ui/checkbox"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
-
-// Liste des scopes disponibles
-const availableScopes = [
-  { id: "habits:read", label: "Lecture des habitudes" },
-  { id: "habits:write", label: "Écriture des habitudes" },
-  { id: "tasks:read", label: "Lecture des tâches" },
-  { id: "tasks:write", label: "Écriture des tâches" },
-  { id: "projects:read", label: "Lecture des projets" },
-  { id: "projects:write", label: "Écriture des projets" },
-  { id: "objectives:read", label: "Lecture des objectifs" },
-  { id: "objectives:write", label: "Écriture des objectifs" },
-  { id: "processes:read", label: "Lecture des processus" },
-  { id: "processes:write", label: "Écriture des processus" },
-]
 
 // Schéma de validation du formulaire
 const formSchema = z.object({
   name: z.string().min(3, {
     message: "Le nom doit comporter au moins 3 caractères.",
-  }),
-  description: z.string().optional(),
-  scopes: z.array(z.string()).min(1, {
-    message: "Sélectionnez au moins un scope.",
-  }),
-  expiresAt: z.string().optional(),
+  })
 })
 
 type Token = {
@@ -97,8 +69,6 @@ export default function ApiTokensPage() {
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: "",
-      description: "",
-      scopes: [],
     },
   })
   
@@ -158,13 +128,15 @@ export default function ApiTokensPage() {
       toast.error("Impossible de créer le token")
     }
   }
-  
+
+  const closeDialog = () => {
+    setIsOpen(false)
+    setNewToken(null)
+    form.reset()
+  }
+
   // Supprimer un token
   const deleteToken = async (id: string) => {
-    if (!confirm("Êtes-vous sûr de vouloir révoquer ce token ?")) {
-      return
-    }
-    
     try {
       const response = await fetch(`/api/tokens/${id}`, {
         method: "DELETE",
@@ -175,29 +147,11 @@ export default function ApiTokensPage() {
       }
       
       setTokens(tokens.filter(token => token.id !== id))
-      toast.success("Token révoqué avec succès")
+      toast.success("Token supprimé avec succès")
     } catch (error) {
       console.error("Erreur:", error)
-      toast.error("Impossible de révoquer le token")
+      toast.error("Impossible de supprimer le token")
     }
-  }
-  
-  // Fermer le dialogue et réinitialiser le token
-  const closeDialog = () => {
-    setIsOpen(false)
-    setTimeout(() => setNewToken(null), 300) // Réinitialiser après la fermeture
-  }
-  
-  // Formater la date
-  const formatDate = (dateString: string | null) => {
-    if (!dateString) return "N/A"
-    return new Date(dateString).toLocaleDateString("fr-FR", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit"
-    })
   }
   
   return (
@@ -245,7 +199,7 @@ export default function ApiTokensPage() {
                 <DialogHeader>
                   <DialogTitle>Créer un nouveau token API</DialogTitle>
                   <DialogDescription>
-                    Créez un token pour permettre aux agents IA d'accéder à votre compte.
+                    Créez un token pour permettre aux agents IA d'accéder à votre compte. Le token aura toutes les permissions et n'expirera jamais.
                   </DialogDescription>
                 </DialogHeader>
                 <Form {...form}>
@@ -262,96 +216,6 @@ export default function ApiTokensPage() {
                           <FormDescription>
                             Un nom descriptif pour identifier ce token.
                           </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={form.control}
-                      name="description"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Description (optionnelle)</FormLabel>
-                          <FormControl>
-                            <Textarea 
-                              placeholder="Ce token est utilisé pour..." 
-                              {...field} 
-                              value={field.value || ""} 
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={form.control}
-                      name="expiresAt"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Date d'expiration (optionnelle)</FormLabel>
-                          <FormControl>
-                            <Input 
-                              type="datetime-local" 
-                              {...field} 
-                              value={field.value || ""} 
-                            />
-                          </FormControl>
-                          <FormDescription>
-                            Laissez vide pour un token sans date d'expiration.
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={form.control}
-                      name="scopes"
-                      render={() => (
-                        <FormItem>
-                          <div className="mb-4">
-                            <FormLabel>Permissions</FormLabel>
-                            <FormDescription>
-                              Sélectionnez les permissions à accorder à ce token.
-                            </FormDescription>
-                          </div>
-                          <div className="grid grid-cols-2 gap-2">
-                            {availableScopes.map((scope) => (
-                              <FormField
-                                key={scope.id}
-                                control={form.control}
-                                name="scopes"
-                                render={({ field }) => {
-                                  return (
-                                    <FormItem
-                                      key={scope.id}
-                                      className="flex flex-row items-start space-x-3 space-y-0"
-                                    >
-                                      <FormControl>
-                                        <Checkbox
-                                          checked={field.value?.includes(scope.id)}
-                                          onCheckedChange={(checked) => {
-                                            return checked
-                                              ? field.onChange([...field.value, scope.id])
-                                              : field.onChange(
-                                                  field.value?.filter(
-                                                    (value) => value !== scope.id
-                                                  )
-                                                )
-                                          }}
-                                        />
-                                      </FormControl>
-                                      <FormLabel className="font-normal">
-                                        {scope.label}
-                                      </FormLabel>
-                                    </FormItem>
-                                  )
-                                }}
-                              />
-                            ))}
-                          </div>
                           <FormMessage />
                         </FormItem>
                       )}
@@ -397,57 +261,40 @@ export default function ApiTokensPage() {
           </CardContent>
         </Card>
       ) : (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Nom</TableHead>
-              <TableHead>Permissions</TableHead>
-              <TableHead>Dernière utilisation</TableHead>
-              <TableHead>Expiration</TableHead>
-              <TableHead>Créé le</TableHead>
-              <TableHead></TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {tokens.map((token) => (
-              <TableRow key={token.id}>
-                <TableCell>
-                  <div className="font-medium">{token.name}</div>
-                  {token.description && (
-                    <div className="text-xs text-gray-500">{token.description}</div>
-                  )}
-                </TableCell>
-                <TableCell>
-                  <div className="flex flex-wrap gap-1">
-                    {token.scopes.map((scope) => (
-                      <Badge key={scope} variant="outline" className="text-xs">
-                        {scope}
-                      </Badge>
-                    ))}
-                  </div>
-                </TableCell>
-                <TableCell>
-                  {token.lastUsed ? formatDate(token.lastUsed) : "Jamais"}
-                </TableCell>
-                <TableCell>
-                  {token.expiresAt ? formatDate(token.expiresAt) : "Jamais"}
-                </TableCell>
-                <TableCell>
-                  {formatDate(token.createdAt)}
-                </TableCell>
-                <TableCell>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => deleteToken(token.id)}
-                  >
-                    <Trash2 className="h-4 w-4 text-red-500" />
-                  </Button>
-                </TableCell>
+        <div className="rounded-md border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Nom</TableHead>
+                <TableHead>Dernière utilisation</TableHead>
+                <TableHead>Créé le</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {tokens.map((token) => (
+                <TableRow key={token.id}>
+                  <TableCell className="font-medium">{token.name}</TableCell>
+                  <TableCell>
+                    {token.lastUsed ? new Date(token.lastUsed).toLocaleString('fr-FR') : 'Jamais'}
+                  </TableCell>
+                  <TableCell>
+                    {new Date(token.createdAt).toLocaleString('fr-FR')}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => deleteToken(token.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
       )}
     </div>
   )

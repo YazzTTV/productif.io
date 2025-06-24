@@ -1,0 +1,332 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  ADMIN
+  USER
+}
+
+model User {
+  id                 String                 @id @default(cuid())
+  name               String?
+  email              String                 @unique
+  password           String
+  role               String                 @default("USER")
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+  habits             Habit[]
+  missions           Mission[]
+  processes          Process[]
+  projects           Project[]
+  sessions           Session[]
+  tasks              Task[]
+  timeEntries        TimeEntry[]
+  warMapEvents       WarMapEvent[]
+  companies          UserCompany[] // Relation avec les entreprises
+  managedCompany     Company?          @relation("CompanyAdmin", fields: [managedCompanyId], references: [id])
+  managedCompanyId   String?
+  apiTokens          ApiToken[] // Tokens API pour agents IA
+  
+  // Relations de gamification
+  gamification       UserGamification?
+  notificationSettings NotificationSettings?
+
+  // Champs Stripe
+  stripeCustomerId     String?   @unique
+  stripeSubscriptionId String?   @unique
+  subscriptionStatus   String?
+  trialEndsAt          DateTime?
+}
+
+model Company {
+  id             String        @id @default(cuid())
+  name           String
+  description    String?
+  logo           String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  users          UserCompany[] // Relation avec les utilisateurs
+  administrators User[]        @relation("CompanyAdmin")
+}
+
+model UserCompany {
+  id        String   @id @default(cuid())
+  userId    String
+  companyId String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, companyId])
+  @@index([userId])
+  @@index([companyId])
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Project {
+  id           String        @id @default(cuid())
+  name         String
+  description  String?
+  color        String?
+  userId       String
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  user         User          @relation(fields: [userId], references: [id])
+  tasks        Task[]
+  timeEntries  TimeEntry[]
+  warMapEvents WarMapEvent[]
+}
+
+model Process {
+  id          String   @id @default(cuid())
+  name        String
+  description String
+  userId      String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tasks       Task[]   @relation("TaskProcess")
+
+  @@index([userId])
+}
+
+model Task {
+  id           String      @id @default(cuid())
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  title        String
+  description  String?
+  dueDate      DateTime?
+  userId       String
+  projectId    String?
+  completed    Boolean     @default(false)
+  order        Int         @default(500)
+  scheduledFor DateTime?
+  processId    String?
+  priority     Int?
+  energyLevel  Int?
+  process      Process?    @relation("TaskProcess", fields: [processId], references: [id])
+  project      Project?    @relation(fields: [projectId], references: [id])
+  user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  timeEntries  TimeEntry[]
+
+  @@index([userId])
+  @@index([projectId])
+  @@index([processId])
+}
+
+model TimeEntry {
+  id          String    @id @default(cuid())
+  startTime   DateTime
+  endTime     DateTime?
+  userId      String
+  taskId      String?
+  projectId   String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  description String?
+  project     Project?  @relation(fields: [projectId], references: [id])
+  task        Task?     @relation(fields: [taskId], references: [id])
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([taskId])
+  @@index([projectId])
+}
+
+model Habit {
+  id          String       @id @default(cuid())
+  name        String       
+  description String?      
+  color       String?      // Format hexadécimal: #RRGGBB
+  frequency   String       // 'daily', 'weekly', 'monthly'
+  daysOfWeek  String[]     @default([]) // ["monday", "wednesday", "friday"]
+  userId      String
+  order       Int          @default(0) // Nouvel attribut pour l'ordre d'affichage
+  user        User         @relation(fields: [userId], references: [id])
+  entries     HabitEntry[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([userId])
+}
+
+model HabitEntry {
+  id        String   @id @default(cuid())
+  habitId   String
+  habit     Habit    @relation(fields: [habitId], references: [id], onDelete: Cascade)
+  date      DateTime
+  completed Boolean  @default(false)
+  note      String?
+  rating    Int?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([habitId, date])
+  @@index([habitId])
+  @@index([date])
+}
+
+model Mission {
+  id         String      @id @default(cuid())
+  title      String
+  quarter    Int
+  year       Int
+  userId     String
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+  current    Float       @default(0)
+  progress   Float       @default(0)
+  target     Float       @default(100)
+  user       User        @relation(fields: [userId], references: [id])
+  objectives Objective[]
+
+  @@unique([userId, quarter, year])
+}
+
+model Objective {
+  id        String            @id @default(cuid())
+  title     String
+  missionId String
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  current   Float             @default(0)
+  target    Float             @default(100)
+  progress  Float             @default(0)
+  mission   Mission           @relation(fields: [missionId], references: [id])
+  actions   ObjectiveAction[]
+}
+
+model ObjectiveAction {
+  id          String      @id @default(cuid())
+  title       String
+  objectiveId String
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  progress    Float       @default(0)
+  current     Float       @default(0)
+  target      Float       @default(100)
+  initiative  Initiative?
+  objective   Objective   @relation(fields: [objectiveId], references: [id])
+}
+
+model Initiative {
+  id                String          @id @default(cuid())
+  title             String
+  description       String?
+  objectiveActionId String          @unique
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  objectiveAction   ObjectiveAction @relation(fields: [objectiveActionId], references: [id])
+}
+
+model WarMapEvent {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  date        DateTime
+  userId      String
+  projectId   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  project     Project? @relation(fields: [projectId], references: [id])
+  user        User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([projectId])
+}
+
+model ApiToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  name      String
+  userId    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model UserGamification {
+  id                String   @id @default(cuid())
+  userId           String   @unique
+  user             User     @relation(fields: [userId], references: [id])
+  currentStreak    Int      @default(0)
+  longestStreak    Int      @default(0)
+  lastActivityDate DateTime?
+  points           Int      @default(0)
+  level            Int      @default(1)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model Achievement {
+  id          String            @id @default(cuid())
+  name        String            @unique
+  description String
+  type        String // 'streak', 'tasks', 'habits', etc.
+  threshold   Int // Valeur à atteindre pour débloquer
+  points      Int // Points gagnés lors du déblocage
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  users       UserAchievement[]
+}
+
+model UserAchievement {
+  id            String      @id @default(cuid())
+  userId        String
+  achievementId String
+  unlockedAt    DateTime    @default(now())
+  achievement   Achievement @relation(fields: [achievementId], references: [id])
+
+  @@unique([userId, achievementId])
+  @@index([userId])
+  @@index([achievementId])
+}
+
+model StreakHistory {
+  id        String   @id @default(cuid())
+  userId    String
+  date      DateTime
+  type      String // 'start', 'continue', 'break'
+  streak    Int
+  createdAt DateTime @default(now())
+
+  @@unique([userId, date])
+  @@index([userId])
+  @@index([date])
+}
+
+model NotificationSettings {
+  id                String   @id @default(cuid())
+  userId           String   @unique
+  user             User     @relation(fields: [userId], references: [id])
+  emailEnabled     Boolean  @default(true)
+  pushEnabled      Boolean  @default(true)
+  morningReminder  Boolean  @default(true)
+  taskReminder     Boolean  @default(true)
+  habitReminder    Boolean  @default(true)
+  motivation       Boolean  @default(true)
+  dailySummary     Boolean  @default(true)
+  reminderTime     String   @default("09:00") // Format HH:mm
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+} 

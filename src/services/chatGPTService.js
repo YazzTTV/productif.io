@@ -2,12 +2,28 @@ const OpenAI = require('openai');
 
 class ChatGPTService {
     constructor() {
+        try {
+            if (!process.env.OPENAI_API_KEY) {
+                console.warn('⚠️ OPENAI_API_KEY non configurée. Les fonctionnalités ChatGPT seront désactivées.');
+                this.openai = null;
+                return;
+            }
+            
         this.openai = new OpenAI({
             apiKey: process.env.OPENAI_API_KEY,
         });
+        } catch (error) {
+            console.error('❌ Erreur lors de l\'initialisation de ChatGPT:', error.message);
+            this.openai = null;
+        }
     }
 
     async generateResponse(message, context = []) {
+        if (!this.openai) {
+            console.warn('⚠️ ChatGPT non initialisé. Impossible de générer une réponse.');
+            throw new Error('ChatGPT non disponible');
+        }
+
         try {
             const completion = await this.openai.chat.completions.create({
                 model: "gpt-3.5-turbo",
@@ -28,6 +44,11 @@ class ChatGPTService {
 
     async analyzeMessage(message) {
         try {
+            if (!this.openai) {
+                console.warn('⚠️ ChatGPT non initialisé. Retour à l\'intention par défaut CHAT');
+                return 'CHAT';
+            }
+
             console.log('🤖 Analyse du message par ChatGPT:', message);
             
             const prompt = `

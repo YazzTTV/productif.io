@@ -3,25 +3,33 @@ FROM node:18
 
 WORKDIR /app
 
-# Copier les fichiers de dépendances
+# Copy package files
 COPY package*.json ./
 COPY pnpm-lock.yaml ./
 COPY .npmrc ./
+COPY prisma ./prisma/
 
-# Installer PNPM
+# Install pnpm
 RUN npm install -g pnpm
 
-# Installer les dépendances
+# Install dependencies
 RUN pnpm install
 
-# Copier le reste des fichiers du projet
-COPY . .
-
-# Générer les types Prisma
+# Generate Prisma client
 RUN npx prisma generate
 
-# Exposer le port
-EXPOSE 3000
+# Copy the rest of the application
+COPY . .
 
-# Commande de démarrage
-CMD ["pnpm", "run", "dev"] 
+# Expose the port the app runs on
+EXPOSE 3001
+
+# Add healthcheck
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost:3001/health || exit 1
+
+# Install curl for healthcheck
+RUN apt-get update && apt-get install -y curl
+
+# Start the WhatsApp server
+CMD ["pnpm", "start:whatsapp"] 

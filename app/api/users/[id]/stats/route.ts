@@ -363,23 +363,30 @@ export async function GET(
     console.log("Début de l'analyse de corrélation habits-notes avec plage de dates");
     
     // Récupérer toutes les notes de journée de l'utilisateur dans la plage
-    const dailyRatings = await prisma.$queryRaw`
-      SELECT 
-        he.date,
-        he.rating,
-        he.note
-      FROM "habit_entries" he
-      JOIN "habits" h ON he."habitId" = h.id
-      WHERE h."userId" = ${id}
-        AND he.rating IS NOT NULL
-        AND he.rating >= 0
-        AND he.rating <= 10
-        AND he.date >= ${startDate}
-        AND he.date <= ${endDate}
-      ORDER BY he.date DESC
-    `;
+    const dailyRatings = await prisma.habitEntry.findMany({
+      where: {
+        habit: {
+          userId: id
+        },
+        rating: {
+          not: null,
+          gte: 0,
+          lte: 10
+        },
+        date: {
+          gte: startDate,
+          lte: endDate
+        }
+      },
+      include: {
+        habit: true
+      },
+      orderBy: {
+        date: 'desc'
+      }
+    });
 
-    console.log("Nombre d'entrées avec notes trouvées:", (dailyRatings as any[]).length);
+    console.log("Nombre d'entrées avec notes trouvées:", dailyRatings.length);
 
     // Récupérer toutes les habitudes de l'utilisateur
     const userHabits = await prisma.habit.findMany({
@@ -407,7 +414,7 @@ export async function GET(
     const ratingsByDate = new Map();
     
     // Créer un map des notes par date
-    (dailyRatings as any[]).forEach((rating: any) => {
+    dailyRatings.forEach((rating: any) => {
       const dateKey = new Date(rating.date).toDateString();
       ratingsByDate.set(dateKey, rating.rating);
     });

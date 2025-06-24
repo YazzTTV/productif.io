@@ -37,7 +37,7 @@ class AIService {
             // Pattern pour marquer une tâche comme terminée
             const completeTaskPattern = /^✅\s+(.+)/;
             const completeTaskMatch = message.match(completeTaskPattern);
-
+            
             if (completeTaskMatch) {
                 const taskTitle = completeTaskMatch[1].trim();
                 return await this.handleMarkTaskComplete(user, taskTitle);
@@ -167,12 +167,12 @@ class AIService {
 
     async analyzeIntent(message, user) {
         try {
-            console.log('📝 Analyse du message:', message);
-
+        console.log('📝 Analyse du message:', message);
+        
             // Pattern pour détecter "j'ai fait/fais X"
             const completionPattern = /j['']ai\s+fai[ts]\s+(.+)/i;
             const match = message.match(completionPattern);
-
+        
             if (match) {
                 const itemsString = match[1].trim();
                 // Séparer les items par virgule, "et", ou point-virgule
@@ -182,74 +182,74 @@ class AIService {
                     .filter(item => item.length > 0);
                 
                 console.log('✏️ Items séparés:', items);
-                
-                // Extraire la date du message
-                let targetDate = new Date();
-                const lowerMessage = message.toLowerCase();
-                
-                // Détecter les dates spécifiques
-                const datePatterns = [
-                    // Hier
-                    {
-                        pattern: /hier/i,
-                        handler: () => {
-                            const date = new Date();
-                            date.setDate(date.getDate() - 1);
-                            return date;
-                        }
-                    },
-                    // Format: le 16 juin
-                    {
-                        pattern: /le (\d{1,2})\s+(janvier|février|mars|avril|mai|juin|juillet|août|septembre|octobre|novembre|décembre)/i,
-                        handler: (match) => {
-                            const day = parseInt(match[1]);
-                            const monthMap = {
-                                'janvier': 0, 'février': 1, 'mars': 2, 'avril': 3,
-                                'mai': 4, 'juin': 5, 'juillet': 6, 'août': 7,
-                                'septembre': 8, 'octobre': 9, 'novembre': 10, 'décembre': 11
-                            };
-                            const month = monthMap[match[2].toLowerCase()];
-                            const date = new Date();
-                            date.setDate(day);
-                            date.setMonth(month);
-                            return date;
-                        }
-                    },
-                    // Format: dd/mm
-                    {
-                        pattern: /(\d{1,2})\/(\d{1,2})/,
-                        handler: (match) => {
-                            const day = parseInt(match[1]);
-                            const month = parseInt(match[2]) - 1;
-                            const date = new Date();
-                            date.setDate(day);
-                            date.setMonth(month);
-                            return date;
-                        }
-                    }
-                ];
 
-                // Chercher une date dans le message
-                for (const { pattern, handler } of datePatterns) {
-                    const match = lowerMessage.match(pattern);
-                    if (match) {
-                        targetDate = handler(match);
-                        break;
-                    }
+        // Extraire la date du message
+        let targetDate = new Date();
+        const lowerMessage = message.toLowerCase();
+        
+        // Détecter les dates spécifiques
+        const datePatterns = [
+            // Hier
+            {
+                pattern: /hier/i,
+                handler: () => {
+                    const date = new Date();
+                    date.setDate(date.getDate() - 1);
+                    return date;
                 }
-                
-                // Convertir en format YYYY-MM-DD
-                const dateStr = targetDate.toISOString().split('T')[0];
-                console.log('📅 Date cible:', dateStr);
-                
-                return {
-                    intent: 'MARK_COMPLETE',
-                    data: {
-                        items: items,
-                        date: dateStr
-                    }
-                };
+            },
+            // Format: le 16 juin
+            {
+                pattern: /le (\d{1,2})\s+(janvier|février|mars|avril|mai|juin|juillet|août|septembre|octobre|novembre|décembre)/i,
+                handler: (match) => {
+                    const day = parseInt(match[1]);
+                    const monthMap = {
+                        'janvier': 0, 'février': 1, 'mars': 2, 'avril': 3,
+                        'mai': 4, 'juin': 5, 'juillet': 6, 'août': 7,
+                        'septembre': 8, 'octobre': 9, 'novembre': 10, 'décembre': 11
+                    };
+                    const month = monthMap[match[2].toLowerCase()];
+                    const date = new Date();
+                    date.setDate(day);
+                    date.setMonth(month);
+                    return date;
+                }
+            },
+            // Format: dd/mm
+            {
+                pattern: /(\d{1,2})\/(\d{1,2})/,
+                handler: (match) => {
+                    const day = parseInt(match[1]);
+                    const month = parseInt(match[2]) - 1;
+                    const date = new Date();
+                    date.setDate(day);
+                    date.setMonth(month);
+                    return date;
+                }
             }
+        ];
+
+        // Chercher une date dans le message
+        for (const { pattern, handler } of datePatterns) {
+            const match = lowerMessage.match(pattern);
+            if (match) {
+                targetDate = handler(match);
+                break;
+            }
+        }
+        
+        // Convertir en format YYYY-MM-DD
+        const dateStr = targetDate.toISOString().split('T')[0];
+                console.log('📅 Date cible:', dateStr);
+
+            return {
+                intent: 'MARK_COMPLETE',
+                data: {
+                        items: items,
+                    date: dateStr
+                }
+            };
+        }
 
             // Si ce n'est pas un message de complétion, utiliser ChatGPT
             const analysis = await chatGPTService.analyzeMessage(message);
@@ -257,25 +257,25 @@ class AIService {
 
             // Si ChatGPT détecte MARK_COMPLETE, extraire les items
             if (analysis === 'MARK_COMPLETE') {
-                const itemMatch = message.match(/(?:fait|fais)\s+(.+)/i);
-                if (itemMatch) {
+            const itemMatch = message.match(/(?:fait|fais)\s+(.+)/i);
+            if (itemMatch) {
                     const itemsString = itemMatch[1].trim();
                     const items = itemsString
                         .split(/[,;]\s*|\s+et\s+/)
                         .map(item => item.trim())
                         .filter(item => item.length > 0);
                     
-                    return {
-                        intent: 'MARK_COMPLETE',
-                        data: {
+                return {
+                    intent: 'MARK_COMPLETE',
+                    data: {
                             items: items,
                             date: new Date().toISOString().split('T')[0]
-                        }
-                    };
-                }
+                    }
+                };
             }
+        }
 
-            return {
+        return {
                 intent: analysis,
                 data: {}
             };
@@ -284,7 +284,7 @@ class AIService {
             return {
                 intent: 'CHAT',
                 data: {}
-            };
+        };
         }
     }
 
@@ -440,7 +440,7 @@ class AIService {
             for (const item of items) {
                 // Trouver l'habitude correspondante
                 const habit = this.findBestMatchingHabit(habits, item);
-
+                
                 if (!habit) {
                     console.log('❌ Aucune habitude trouvée pour:', item);
                     notFoundHabits.push(item);
@@ -468,12 +468,12 @@ class AIService {
             }
             if (notFoundHabits.length > 0) {
                 response += `\n❌ Habitudes non trouvées :\n${notFoundHabits.map(h => `• ${h}`).join('\n')}`;
-            }
+                }
 
-            return {
+                return {
                 response: response || "Aucune habitude n'a été marquée comme terminée.",
-                contextual: true
-            };
+                    contextual: true
+                };
         } catch (error) {
             console.error('Erreur dans handleMarkComplete:', error);
             return {

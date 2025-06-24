@@ -55,7 +55,7 @@ export function RegisterForm() {
         email,
         password,
         redirect: true,
-        callbackUrl: '/dashboard'
+        callbackUrl: '/dashboard/onboarding'
       })
 
     } catch (error) {
