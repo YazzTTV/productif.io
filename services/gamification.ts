@@ -2,11 +2,10 @@ import { prisma } from "@/lib/prisma"
 import { startOfDay, subDays, isAfter, isBefore, differenceInDays } from "date-fns"
 
 export interface GamificationStats {
-  totalPoints: number
+  points: number
   level: number
   currentStreak: number
   longestStreak: number
-  totalHabitsCompleted: number
   pointsToNextLevel: number
   recentAchievements: Achievement[]
 }
@@ -15,9 +14,8 @@ export interface Achievement {
   id: string
   name: string
   description: string
-  icon: string
-  category: string
-  rarity: string
+  type: string
+  threshold: number
   points: number
   unlockedAt?: Date
 }
@@ -26,12 +24,10 @@ export interface LeaderboardEntry {
   userId: string
   userName: string
   userEmail: string
-  totalPoints: number
+  points: number
   level: number
   currentStreak: number
   longestStreak: number
-  totalHabitsCompleted: number
-  achievements: number
   rank: number
 }
 
@@ -75,11 +71,10 @@ export class GamificationService {
       await prisma.userGamification.create({
         data: {
           userId,
-          totalPoints: 0,
+          points: 0,
           level: 1,
           currentStreak: 0,
-          longestStreak: 0,
-          totalHabitsCompleted: 0
+          longestStreak: 0
         }
       })
     }
@@ -199,47 +194,55 @@ export class GamificationService {
       pointsEarned += Math.floor(pointsEarned * GamificationService.POINTS.STREAK_BONUS_MULTIPLIER * newStreak)
     }
 
-    // Bonus jour parfait
-    const isPerfectDay = todayHabits.length > 0 && completedTodayHabits.length === todayHabits.length
+    // Bonus de jour parfait
+    const isPerfectDay = completedTodayHabits.length === todayHabits.length && todayHabits.length > 0
     if (isPerfectDay) {
       pointsEarned += GamificationService.POINTS.PERFECT_DAY_BONUS
     }
 
     // Calculer le nouveau total de points et niveau
-    const newTotalPoints = userGamification.totalPoints + pointsEarned
+    const newPoints = userGamification.points + pointsEarned
     const oldLevel = userGamification.level
-    const newLevel = this.calculateLevel(newTotalPoints)
-    const levelUp = newLevel > oldLevel
+    const newLevel = this.calculateLevel(newPoints)
 
     // Mettre à jour les données de gamification
     await prisma.userGamification.update({
       where: { userId },
       data: {
-        totalPoints: newTotalPoints,
+        points: newPoints,
         level: newLevel,
         currentStreak: newStreak,
         longestStreak: Math.max(userGamification.longestStreak, newStreak),
-        totalHabitsCompleted: userGamification.totalHabitsCompleted + 1
+        lastActivityDate: new Date()
       }
     })
 
-    // Enregistrer l'historique du streak
-    await this.recordStreakHistory(userId, normalizedDate, newStreak, completedTodayHabits.length, todayHabits.length)
-
-    // Vérifier les nouveaux achievements
-    const achievements = await this.checkAchievements(userId, {
+    // Vérifier les nouveaux succès
+    const newAchievements = await this.checkAchievements(userId, {
       streak: newStreak,
       oldStreak,
-      totalPoints: newTotalPoints,
-      totalHabitsCompleted: userGamification.totalHabitsCompleted + 1,
-      levelUp,
+      points: newPoints,
+      levelUp: newLevel > oldLevel,
       perfectDay: isPerfectDay
     })
 
+    // Ajouter les points des succès
+    if (newAchievements.length > 0) {
+      const achievementPoints = newAchievements.reduce((total, achievement) => total + achievement.points, 0)
+      await prisma.userGamification.update({
+        where: { userId },
+        data: {
+          points: {
+            increment: achievementPoints
+          }
+        }
+      })
+    }
+
     return {
       pointsEarned,
-      newAchievements: achievements,
-      levelUp
+      newAchievements,
+      levelUp: newLevel > oldLevel
     }
   }
 
@@ -273,71 +276,44 @@ export class GamificationService {
     })
   }
 
-  // Enregistrer l'historique du streak
-  private async recordStreakHistory(userId: string, date: Date, streakCount: number, habitsCompleted: number, totalHabitsForDay: number) {
-    await prisma.streakHistory.upsert({
-      where: {
-        userId_date: {
-          userId,
-          date: date
-        }
-      },
-      update: {
-        streakCount,
-        habitsCompleted,
-        totalHabitsForDay
-      },
-      create: {
-        userId,
-        date: date,
-        streakCount,
-        habitsCompleted,
-        totalHabitsForDay
-      }
-    })
-  }
-
   // Vérifier et débloquer les achievements
   private async checkAchievements(userId: string, context: {
     streak: number
     oldStreak: number
-    totalPoints: number
-    totalHabitsCompleted: number
+    points: number
     levelUp: boolean
     perfectDay: boolean
   }): Promise<Achievement[]> {
+    const achievements = await prisma.achievement.findMany()
     const newAchievements: Achievement[] = []
 
-    // Récupérer tous les achievements disponibles
-    const allAchievements = await prisma.achievement.findMany()
+    for (const achievement of achievements) {
+      // Vérifier si l'achievement est déjà débloqué
+      const alreadyUnlocked = await prisma.userAchievement.findUnique({
+        where: {
+          userId_achievementId: {
+            userId,
+            achievementId: achievement.id
+          }
+        }
+      })
 
-    // Récupérer les achievements déjà débloqués
-    const unlockedAchievements = await prisma.userAchievement.findMany({
-      where: { userId },
-      select: { achievementId: true }
-    })
+      if (alreadyUnlocked) {
+        continue
+      }
 
-    const unlockedIds = new Set(unlockedAchievements.map(ua => ua.achievementId))
-
-    for (const achievement of allAchievements) {
-      if (unlockedIds.has(achievement.id)) continue
-
-      const condition = JSON.parse(achievement.condition)
+      // Vérifier si l'achievement doit être débloqué
       let shouldUnlock = false
 
-      // Vérifier les conditions selon la catégorie
-      switch (achievement.category) {
+      switch (achievement.type) {
         case 'streak':
-          shouldUnlock = context.streak >= (condition.streakDays || 0)
+          shouldUnlock = context.streak >= achievement.threshold
           break
-        case 'completion':
-          shouldUnlock = context.totalHabitsCompleted >= (condition.totalHabits || 0)
+        case 'level':
+          shouldUnlock = context.levelUp && context.points >= achievement.threshold
           break
-        case 'consistency':
-          shouldUnlock = context.perfectDay && (condition.perfectDay || false)
-          break
-        case 'milestone':
-          shouldUnlock = context.totalPoints >= (condition.totalPoints || 0)
+        case 'perfect_day':
+          shouldUnlock = context.perfectDay
           break
       }
 
@@ -354,21 +330,10 @@ export class GamificationService {
           id: achievement.id,
           name: achievement.name,
           description: achievement.description,
-          icon: achievement.icon,
-          category: achievement.category,
-          rarity: achievement.rarity,
+          type: achievement.type,
+          threshold: achievement.threshold,
           points: achievement.points,
           unlockedAt: new Date()
-        })
-
-        // Ajouter les points de l'achievement
-        await prisma.userGamification.update({
-          where: { userId },
-          data: {
-            totalPoints: {
-              increment: achievement.points
-            }
-          }
         })
       }
     }
@@ -383,15 +348,7 @@ export class GamificationService {
     const userGamification = await prisma.userGamification.findUnique({
       where: { userId },
       include: {
-        achievements: {
-          include: {
-            achievement: true
-          },
-          orderBy: {
-            unlockedAt: 'desc'
-          },
-          take: 5
-        }
+        user: true
       }
     })
 
@@ -399,51 +356,25 @@ export class GamificationService {
       throw new Error("Impossible de récupérer les données de gamification")
     }
 
-    // Recalculer le streak actuel pour s'assurer qu'il est à jour
     const currentStreak = await this.calculateCurrentStreak(userId)
-
-    // Mettre à jour le streak si nécessaire
-    if (currentStreak !== userGamification.currentStreak) {
-      await prisma.userGamification.update({
-        where: { userId },
-        data: {
-          currentStreak,
-          longestStreak: Math.max(userGamification.longestStreak, currentStreak)
-        }
-      })
-    }
-
-    const pointsToNextLevel = this.calculatePointsToNextLevel(userGamification.totalPoints)
-
-    const recentAchievements = userGamification.achievements.map(ua => ({
-      id: ua.achievement.id,
-      name: ua.achievement.name,
-      description: ua.achievement.description,
-      icon: ua.achievement.icon,
-      category: ua.achievement.category,
-      rarity: ua.achievement.rarity,
-      points: ua.achievement.points,
-      unlockedAt: ua.unlockedAt
-    }))
+    const pointsToNextLevel = this.calculatePointsToNextLevel(userGamification.points)
 
     return {
-      totalPoints: userGamification.totalPoints,
+      points: userGamification.points,
       level: userGamification.level,
       currentStreak,
-      longestStreak: Math.max(userGamification.longestStreak, currentStreak),
-      totalHabitsCompleted: userGamification.totalHabitsCompleted,
+      longestStreak: userGamification.longestStreak,
       pointsToNextLevel,
-      recentAchievements
+      recentAchievements: []
     }
   }
 
-  // Obtenir le classement des utilisateurs (leaderboard)
+  // Obtenir le classement
   async getLeaderboard(limit: number = 50, userId?: string): Promise<{
     leaderboard: LeaderboardEntry[]
     userRank?: number
     totalUsers: number
   }> {
-    // Récupérer toutes les données de gamification avec les utilisateurs
     const allUserGamification = await prisma.userGamification.findMany({
       include: {
         user: {
@@ -452,45 +383,34 @@ export class GamificationService {
             name: true,
             email: true
           }
-        },
-        achievements: true
+        }
       },
       orderBy: [
-        { totalPoints: 'desc' },
+        { points: 'desc' },
         { level: 'desc' },
-        { longestStreak: 'desc' },
-        { totalHabitsCompleted: 'desc' }
+        { longestStreak: 'desc' }
       ]
     })
 
-    // Formater les données pour le leaderboard avec le rang
     const leaderboard: LeaderboardEntry[] = allUserGamification.map((userGamif, index) => ({
       userId: userGamif.userId,
       userName: userGamif.user.name || userGamif.user.email.split('@')[0],
       userEmail: userGamif.user.email,
-      totalPoints: userGamif.totalPoints,
+      points: userGamif.points,
       level: userGamif.level,
       currentStreak: userGamif.currentStreak,
       longestStreak: userGamif.longestStreak,
-      totalHabitsCompleted: userGamif.totalHabitsCompleted,
-      achievements: userGamif.achievements.length,
       rank: index + 1
     }))
 
-    // Trouver le rang de l'utilisateur actuel si spécifié
-    let userRank: number | undefined
-    if (userId) {
-      const userEntry = leaderboard.find(entry => entry.userId === userId)
-      userRank = userEntry?.rank
-    }
-
-    // Limiter le nombre de résultats
-    const limitedLeaderboard = leaderboard.slice(0, limit)
+    const userRank = userId
+      ? leaderboard.findIndex(entry => entry.userId === userId) + 1
+      : undefined
 
     return {
-      leaderboard: limitedLeaderboard,
+      leaderboard: leaderboard.slice(0, limit),
       userRank,
-      totalUsers: allUserGamification.length
+      totalUsers: leaderboard.length
     }
   }
 } 

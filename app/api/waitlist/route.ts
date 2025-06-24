@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { getAuthUser } from "@/lib/auth"
 
 export async function POST(request: Request) {
   try {
@@ -37,13 +38,12 @@ export async function POST(request: Request) {
         })
       }
     } else if (step === 2) {
-      // Étape 2: Ajout du téléphone et motivation
-      if (!phone || !motivation) {
-        return NextResponse.json({ error: "Téléphone et motivation requis" }, { status: 400 })
-      }
-
+      // Étape 2: Ajout du téléphone et de la motivation
       if (!waitlistEntry) {
-        return NextResponse.json({ error: "Email non trouvé" }, { status: 404 })
+        return NextResponse.json(
+          { error: "Email non trouvé dans la waitlist" },
+          { status: 404 }
+        )
       }
 
       waitlistEntry = await prisma.waitlistEntry.update({
@@ -57,13 +57,9 @@ export async function POST(request: Request) {
       })
     }
 
-    return NextResponse.json({
-      success: true,
-      data: waitlistEntry
-    })
-
+    return NextResponse.json(waitlistEntry)
   } catch (error) {
-    console.error("Erreur waitlist:", error)
+    console.error("Erreur création/mise à jour waitlist:", error)
     return NextResponse.json(
       { error: "Erreur interne du serveur" },
       { status: 500 }
@@ -73,7 +69,27 @@ export async function POST(request: Request) {
 
 export async function GET() {
   try {
+    // Vérifier l'authentification et les permissions
+    const user = await getAuthUser()
+    if (!user || user.role !== "SUPER_ADMIN") {
+      return NextResponse.json(
+        { error: "Non autorisé" },
+        { status: 401 }
+      )
+    }
+
     const entries = await prisma.waitlistEntry.findMany({
+      select: {
+        id: true,
+        email: true,
+        phone: true,
+        motivation: true,
+        status: true,
+        currentStep: true,
+        stripeSessionId: true,
+        createdAt: true,
+        updatedAt: true
+      },
       orderBy: { createdAt: 'desc' }
     })
 

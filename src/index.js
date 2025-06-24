@@ -2,19 +2,29 @@ require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const whatsappService = require('./services/whatsappService');
+const notificationsRouter = require('./routes/notifications');
+const notificationScheduler = require('./services/notifications/scheduler');
 
 const app = express();
 app.use(express.json());
 
 // Connexion à MongoDB
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/productif-io', {
-    useNewUrlParser: true,
-    useUnifiedTopology: true
-}).then(() => {
-    console.log('Connecté à MongoDB');
-}).catch((error) => {
-    console.error('Erreur de connexion à MongoDB:', error);
-});
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/productif';
+console.log('Tentative de connexion à MongoDB sur:', MONGODB_URI.replace(/mongodb:\/\/[^@]+@/, 'mongodb://****@'));
+
+mongoose.connect(MONGODB_URI)
+    .then(() => {
+        console.log('Connecté à MongoDB');
+        
+        // Démarrer le planificateur de notifications
+        notificationScheduler.start();
+    })
+    .catch((error) => {
+        console.error('Erreur de connexion à MongoDB:', error);
+    });
+
+// Routes
+app.use('/api/notifications', notificationsRouter);
 
 // Webhook pour recevoir les messages WhatsApp
 app.post('/webhook', async (req, res) => {
@@ -74,8 +84,16 @@ app.get('/test', async (req, res) => {
     }
 });
 
-const port = process.env.PORT || 3000;
+// Route de healthcheck pour Railway
+app.get('/health', (req, res) => {
+    res.status(200).json({ status: 'ok' });
+});
+
+const port = process.env.PORT || 3001;
 app.listen(port, () => {
     console.log(`Serveur démarré sur le port ${port}`);
-    console.log(`Webhook URL: ${process.env.WEBHOOK_URL || 'http://localhost:' + port}/webhook`);
+    const webhookUrl = process.env.NODE_ENV === 'production' 
+        ? `${process.env.RAILWAY_PUBLIC_DOMAIN}/webhook`
+        : `http://localhost:${port}/webhook`;
+    console.log(`Webhook URL: ${webhookUrl}`);
 }); 

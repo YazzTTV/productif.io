@@ -6,6 +6,7 @@ import { ThemeProvider } from "@/components/theme-provider"
 import { Providers } from "./providers"
 import { Analytics } from '@vercel/analytics/next'
 import { MobileInit } from "@/components/mobile-init"
+import { Toaster } from 'react-hot-toast'
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -29,6 +30,7 @@ export default function RootLayout({
           </ThemeProvider>
         </Providers>
         <Analytics />
+        <Toaster />
       </body>
     </html>
   )

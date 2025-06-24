@@ -18,11 +18,10 @@ import {
 import Link from "next/link"
 
 interface GamificationStats {
-  totalPoints: number
+  points: number
   level: number
   currentStreak: number
   longestStreak: number
-  totalHabitsCompleted: number
   pointsToNextLevel: number
   recentAchievements: Achievement[]
 }
@@ -31,9 +30,8 @@ interface Achievement {
   id: string
   name: string
   description: string
-  icon: string
-  category: string
-  rarity: string
+  type: string
+  threshold: number
   points: number
   unlockedAt?: Date
 }
@@ -46,12 +44,12 @@ const RARITY_COLORS = {
 }
 
 const LEVEL_COLORS = {
-  1: "text-gray-600",
-  2: "text-green-600", 
-  3: "text-blue-600",
-  4: "text-purple-600",
-  5: "text-yellow-600"
-}
+  1: 'text-gray-600',
+  2: 'text-blue-600',
+  3: 'text-green-600',
+  4: 'text-purple-600',
+  5: 'text-yellow-600',
+} as const
 
 const getIconComponent = (iconName: string) => {
   const icons: Record<string, any> = {
@@ -133,7 +131,7 @@ export function GamificationOverview() {
   }
 
   const levelProgress = stats.pointsToNextLevel > 0 
-    ? ((stats.totalPoints % 100) / (stats.totalPoints + stats.pointsToNextLevel)) * 100
+    ? ((stats.points % 100) / (stats.points + stats.pointsToNextLevel)) * 100
     : 100
 
   return (
@@ -155,7 +153,7 @@ export function GamificationOverview() {
                 <span className="text-2xl font-bold">Niveau {stats.level}</span>
               </div>
               <p className="text-sm text-gray-500">
-                {stats.totalPoints.toLocaleString()} points
+                {stats.points.toLocaleString()} points
               </p>
             </div>
             <div className="text-right">
@@ -192,9 +190,9 @@ export function GamificationOverview() {
             <div className="text-center p-3 bg-blue-50 rounded-lg">
               <Target className="h-6 w-6 text-blue-500 mx-auto mb-1" />
               <div className="text-2xl font-bold text-blue-700">
-                {stats.totalHabitsCompleted}
+                {stats.points}
               </div>
-              <div className="text-xs text-blue-600">Habitudes complétées</div>
+              <div className="text-xs text-blue-600">Points totaux</div>
             </div>
           </div>
 
@@ -226,37 +224,31 @@ export function GamificationOverview() {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {stats.recentAchievements.slice(0, 3).map((achievement) => {
-                const IconComponent = getIconComponent(achievement.icon)
-                return (
-                  <div key={achievement.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                    <div className="flex-shrink-0">
-                      <IconComponent className="h-6 w-6 text-yellow-600" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="font-medium text-sm truncate">
-                          {achievement.name}
-                        </p>
-                        <Badge 
-                          variant="outline" 
-                          className={`text-xs ${RARITY_COLORS[achievement.rarity as keyof typeof RARITY_COLORS]}`}
-                        >
-                          {achievement.rarity}
-                        </Badge>
-                      </div>
-                      <p className="text-xs text-gray-500 truncate">
-                        {achievement.description}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-xs font-medium text-green-600">
-                        +{achievement.points}
-                      </p>
-                    </div>
+              {stats.recentAchievements.slice(0, 3).map((achievement) => (
+                <div key={achievement.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                  <div className="flex-shrink-0">
+                    <Star className="h-6 w-6 text-yellow-600" />
                   </div>
-                )
-              })}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium text-sm truncate">
+                        {achievement.name}
+                      </p>
+                      <Badge variant="outline" className="text-xs">
+                        {achievement.type}
+                      </Badge>
+                    </div>
+                    <p className="text-xs text-gray-500 truncate">
+                      {achievement.description}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs font-medium text-green-600">
+                      +{achievement.points}
+                    </p>
+                  </div>
+                </div>
+              ))}
             </div>
             
             <div className="mt-4">

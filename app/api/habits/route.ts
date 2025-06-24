@@ -30,73 +30,37 @@ export async function GET() {
       return NextResponse.json({ error: "Non authentifié" }, { status: 401 })
     }
 
-    // Vérifier et créer les habitudes par défaut
-    for (const defaultHabit of DEFAULT_HABITS) {
-      const existingHabit = await prisma.habit.findFirst({
-        where: {
-          userId: user.id,
-          name: defaultHabit.name,
-        },
-      })
-
-      if (!existingHabit) {
-        // Créer l'habitude par défaut si elle n'existe pas
-        await prisma.habit.create({
-          data: {
-            ...defaultHabit,
-            userId: user.id,
-          },
-        });
-      }
-    }
-
-    // 1. Récupérer toutes les habitudes avec Prisma
+    // Obtenir la date du jour
+    const today = new Date()
+    // Normaliser à minuit puis mettre à midi pour éviter les problèmes de fuseau horaire
+    const normalizedDate = startOfDay(today)
+    normalizedDate.setHours(12, 0, 0, 0)
+    
+    // Obtenir le jour en anglais pour le filtrage
+    const currentDayOfWeek = today.toLocaleDateString("en-US", { weekday: "long" }).toLowerCase()
+    
+    // Récupérer toutes les habitudes de l'utilisateur avec leurs entrées pour aujourd'hui
     const habits = await prisma.habit.findMany({
       where: {
         userId: user.id,
       },
       include: {
         entries: {
-          orderBy: {
-            date: "desc",
-          },
-          take: 30,
-        },
-      },
-      orderBy: [
-        {
-          order: "asc" // Tri principal par le champ order
-        },
-        {
-          createdAt: "desc" // Tri secondaire par date de création
+          where: {
+            date: {
+              gte: startOfDay(subDays(today, 7)),
+              lte: endOfDay(today)
+            }
+          }
         }
-      ],
-    });
+      },
+      orderBy: {
+        order: 'asc'
+      }
+    })
 
-    // 2. Pour chaque habitude, récupérer les entrées avec note et rating
-    for (const habit of habits) {
-      // Utiliser une méthode alternative pour récupérer les entrées avec les champs manquants
-      const entries = await prisma.$queryRaw`
-        SELECT 
-          id, 
-          "habitId", 
-          date, 
-          completed, 
-          note, 
-          rating, 
-          "createdAt", 
-          "updatedAt"
-        FROM "habit_entries" 
-        WHERE "habitId" = ${habit.id}
-        ORDER BY date DESC 
-        LIMIT 30
-      `;
-
-      // @ts-expect-error - Ignorer l'erreur TypeScript pour les propriétés note et rating
-      habit.entries = entries;
-    }
-
-    return NextResponse.json(habits);
+    // Retourner les habitudes avec leurs entrées
+    return NextResponse.json(habits)
   } catch (error) {
     console.error("Erreur lors de la récupération des habitudes:", error)
     return NextResponse.json(
