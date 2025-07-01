@@ -1,6 +1,6 @@
 [build]
 builder = "DOCKERFILE"
-dockerfilePath = "Dockerfile.ai"
+dockerfilePath = "Dockerfile.scheduler"
 
 [deploy]
 healthcheckPath = "/health"

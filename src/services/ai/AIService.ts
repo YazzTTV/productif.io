@@ -328,6 +328,71 @@ export class AIService {
                 console.log('❌ Pas de match regex pour la détection directe');
             }
 
+            // Détection spéciale pour les habitudes particulières
+            const messageLower = message.toLowerCase();
+            
+            // Récupérer les habitudes de l'utilisateur
+            const userWithHabits = await this.prisma.user.findUnique({
+                where: { id: user.id },
+                include: { habits: true }
+            });
+            
+            if (userWithHabits?.habits) {
+                // Détection "j'ai appris" pour l'habitude apprentissage
+                if (messageLower.includes('j\'ai appris') || messageLower.includes('jai appris')) {
+                    console.log('🔍 Détection spéciale: phrase d\'apprentissage trouvée');
+                    const apprentissageHabit = userWithHabits.habits.find((h: any) => 
+                        h.name.toLowerCase() === 'apprentissage'
+                    );
+                    
+                    if (apprentissageHabit) {
+                        console.log('🔥 Habitude apprentissage trouvée, traitement spécial');
+                        try {
+                            const specialResponse = await this.specialHabitsHandler.startSpecialHabitCompletion(
+                                user.id,
+                                phoneNumber,
+                                apprentissageHabit.name,
+                                apprentissageHabit.id
+                            );
+                            
+                            return {
+                                response: specialResponse,
+                                contextual: true
+                            };
+                        } catch (error) {
+                            console.error('❌ Erreur lors du traitement de l\'apprentissage:', error);
+                        }
+                    }
+                }
+                
+                // Détection "note de la journée" ou "note de sa journée"
+                if (messageLower.includes('note de la journée') || messageLower.includes('note de sa journée')) {
+                    console.log('🔍 Détection spéciale: phrase de note de journée trouvée');
+                    const noteHabit = userWithHabits.habits.find((h: any) => 
+                        h.name.toLowerCase() === 'note de sa journée'
+                    );
+                    
+                    if (noteHabit) {
+                        console.log('🔥 Habitude note de sa journée trouvée, traitement spécial');
+                        try {
+                            const specialResponse = await this.specialHabitsHandler.startSpecialHabitCompletion(
+                                user.id,
+                                phoneNumber,
+                                noteHabit.name,
+                                noteHabit.id
+                            );
+                            
+                            return {
+                                response: specialResponse,
+                                contextual: true
+                            };
+                        } catch (error) {
+                            console.error('❌ Erreur lors du traitement de la note de journée:', error);
+                        }
+                    }
+                }
+            }
+
             console.log('🔍 Analyse du message avec GPT');
             
             const prompt = `
@@ -426,6 +491,142 @@ export class AIService {
                     "action": "completer_habitude",
                     "details": {
                         "nom": "lecture"
+                    }
+                }]
+            }
+
+            RÈGLES SPÉCIALES POUR L'HABITUDE APPRENTISSAGE :
+            Si le message contient "j'ai appris" ou "appris" dans n'importe quelle position, c'est TOUJOURS l'habitude "apprentissage"
+
+            Message: "j'ai appris à faire du React aujourd'hui"
+            {
+                "actions": [{
+                    "action": "completer_habitude",
+                    "details": {
+                        "nom": "apprentissage"
+                    }
+                }]
+            }
+
+            Message: "aujourd'hui j'ai appris à faire du React et du Python"
+            {
+                "actions": [{
+                    "action": "completer_habitude",
+                    "details": {
+                        "nom": "apprentissage"
+                    }
+                }]
+            }
+
+            Message: "j'ai appris le Python"
+            {
+                "actions": [{
+                    "action": "completer_habitude",
+                    "details": {
+                        "nom": "apprentissage"
+                    }
+                }]
+            }
+
+            Message: "j'ai appris les bases de la photographie"
+            {
+                "actions": [{
+                    "action": "completer_habitude",
+                    "details": {
+                        "nom": "apprentissage"
+                    }
+                }]
+            }
+
+            Message: "j'ai appris comment utiliser Git"
+            {
+                "actions": [{
+                    "action": "completer_habitude",
+                    "details": {
+                        "nom": "apprentissage"
+                    }
+                }]
+            }
+
+            Message: "j'ai appris de nouvelles techniques"
+            {
+                "actions": [{
+                    "action": "completer_habitude",
+                    "details": {
+                        "nom": "apprentissage"
+                    }
+                }]
+            }
+
+            Message: "hier j'ai appris JavaScript"
+            {
+                "actions": [{
+                    "action": "completer_habitude",
+                    "details": {
+                        "nom": "apprentissage"
+                    }
+                }]
+            }
+
+            Message: "ce matin j'ai appris la guitare"
+            {
+                "actions": [{
+                    "action": "completer_habitude",
+                    "details": {
+                        "nom": "apprentissage"
+                    }
+                }]
+            }
+
+            RÈGLES SPÉCIALES POUR L'HABITUDE NOTE DE SA JOURNÉE :
+            Si le message contient "note de la journée" ou "note de sa journée", c'est TOUJOURS l'habitude "note de sa journée"
+
+            Message: "note de la journée, 7 sur 10, c'était vraiment un putain de banger"
+            {
+                "actions": [{
+                    "action": "completer_habitude",
+                    "details": {
+                        "nom": "note de sa journée"
+                    }
+                }]
+            }
+
+            Message: "note de sa journée, 8/10, super journée"
+            {
+                "actions": [{
+                    "action": "completer_habitude",
+                    "details": {
+                        "nom": "note de sa journée"
+                    }
+                }]
+            }
+
+            Message: "aujourd'hui note de la journée 5 sur 10"
+            {
+                "actions": [{
+                    "action": "completer_habitude",
+                    "details": {
+                        "nom": "note de sa journée"
+                    }
+                }]
+            }
+
+            Message: "note de sa journée 9/10 excellente journée"
+            {
+                "actions": [{
+                    "action": "completer_habitude",
+                    "details": {
+                        "nom": "note de sa journée"
+                    }
+                }]
+            }
+
+            Message: "note de la journée : 6 sur 10"
+            {
+                "actions": [{
+                    "action": "completer_habitude",
+                    "details": {
+                        "nom": "note de sa journée"
                     }
                 }]
             }
