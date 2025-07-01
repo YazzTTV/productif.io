@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
@@ -6,22 +6,46 @@ import { useRouter } from 'next/navigation';
 
 interface NotificationPreferences {
     isEnabled: boolean;
+    emailEnabled: boolean;
+    pushEnabled: boolean;
     whatsappEnabled: boolean;
     whatsappNumber?: string;
     startHour: number;
     endHour: number;
     allowedDays: number[];
     notificationTypes: string[];
+    morningReminder: boolean;
+    taskReminder: boolean;
+    habitReminder: boolean;
+    motivation: boolean;
+    dailySummary: boolean;
+    morningTime: string;
+    noonTime: string;
+    afternoonTime: string;
+    eveningTime: string;
+    nightTime: string;
 }
 
 const defaultPreferences: NotificationPreferences = {
     isEnabled: true,
+    emailEnabled: true,
+    pushEnabled: true,
     whatsappEnabled: false,
     whatsappNumber: '',
     startHour: 9,
     endHour: 18,
     allowedDays: [1, 2, 3, 4, 5],
-    notificationTypes: ['TASK_DUE', 'HABIT_REMINDER', 'DAILY_SUMMARY']
+    notificationTypes: ['TASK_DUE', 'HABIT_REMINDER', 'DAILY_SUMMARY'],
+    morningReminder: true,
+    taskReminder: true,
+    habitReminder: true,
+    motivation: true,
+    dailySummary: true,
+    morningTime: '08:00',
+    noonTime: '12:00',
+    afternoonTime: '14:00',
+    eveningTime: '18:00',
+    nightTime: '22:00'
 };
 
 interface NotificationSettingsProps {
@@ -33,18 +57,18 @@ const NotificationSettings: React.FC<NotificationSettingsProps> = ({ userId, pre
     const router = useRouter();
     const [preferences, setPreferences] = useState<NotificationPreferences>(() => {
         const mergedPreferences = {
-            ...defaultPreferences,
-            ...(initialPreferences || {})
+            ...defaultPreferences,  // D'abord les valeurs par défaut
+            ...(initialPreferences || {}),  // Ensuite les préférences initiales pour écraser les valeurs par défaut
         };
         
         // S'assurer que les tableaux sont correctement initialisés
         return {
             ...mergedPreferences,
-            allowedDays: Array.isArray(mergedPreferences.allowedDays) 
-                ? mergedPreferences.allowedDays 
+            allowedDays: Array.isArray(initialPreferences?.allowedDays) 
+                ? initialPreferences.allowedDays 
                 : defaultPreferences.allowedDays,
-            notificationTypes: Array.isArray(mergedPreferences.notificationTypes)
-                ? mergedPreferences.notificationTypes
+            notificationTypes: Array.isArray(initialPreferences?.notificationTypes)
+                ? initialPreferences.notificationTypes
                 : defaultPreferences.notificationTypes
         };
     });
@@ -54,8 +78,8 @@ const NotificationSettings: React.FC<NotificationSettingsProps> = ({ userId, pre
     useEffect(() => {
         if (initialPreferences) {
             setPreferences({
-                ...defaultPreferences,
-                ...initialPreferences,
+                ...defaultPreferences,  // D'abord les valeurs par défaut
+                ...(initialPreferences || {}),  // Ensuite les préférences initiales pour écraser les valeurs par défaut
                 allowedDays: Array.isArray(initialPreferences.allowedDays)
                     ? initialPreferences.allowedDays
                     : defaultPreferences.allowedDays,
@@ -82,8 +106,8 @@ const NotificationSettings: React.FC<NotificationSettingsProps> = ({ userId, pre
             const data = await response.json();
             if (data && Object.keys(data).length > 0) {
                 setPreferences({
-                    ...defaultPreferences,
-                    ...data,
+                    ...defaultPreferences,  // D'abord les valeurs par défaut
+                    ...data,  // Ensuite les données de la base pour écraser les valeurs par défaut
                     allowedDays: Array.isArray(data.allowedDays)
                         ? data.allowedDays
                         : defaultPreferences.allowedDays,
@@ -133,6 +157,12 @@ const NotificationSettings: React.FC<NotificationSettingsProps> = ({ userId, pre
                 ...prev,
                 [name]: parseInt(value)
             }));
+        } else if (name.endsWith('Time')) {
+            // Gérer spécifiquement les champs d'heure (morningTime, noonTime, etc.)
+            setPreferences(prev => ({
+                ...prev,
+                [name]: value
+            }));
         } else {
             setPreferences(prev => ({
                 ...prev,
@@ -157,7 +187,7 @@ const NotificationSettings: React.FC<NotificationSettingsProps> = ({ userId, pre
                     : defaultPreferences.notificationTypes
             };
 
-            // 1. Sauvegarder dans PostgreSQL
+            // Sauvegarder dans PostgreSQL
             const response = await fetch('/api/notifications/preferences', {
                 method: 'POST',
                 headers: {
@@ -172,20 +202,6 @@ const NotificationSettings: React.FC<NotificationSettingsProps> = ({ userId, pre
 
             if (!response.ok) {
                 throw new Error('Erreur lors de la sauvegarde');
-            }
-
-            // 2. Forcer la synchronisation avec MongoDB
-            const syncResponse = await fetch('/api/notifications/sync', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': 'Bearer ' + document.cookie.replace(/(?:(?:^|.*;\s*)auth_token\s*=\s*([^;]*).*$)|^.*$/, "$1")
-                },
-                credentials: 'include'
-            });
-
-            if (!syncResponse.ok) {
-                console.warn('Erreur lors de la synchronisation avec MongoDB:', await syncResponse.text());
             }
 
             toast.success('Préférences enregistrées !');
@@ -374,6 +390,162 @@ const NotificationSettings: React.FC<NotificationSettingsProps> = ({ userId, pre
                                 <span>{label}</span>
                             </label>
                         ))}
+                    </div>
+                </div>
+
+                {/* Canaux de notification */}
+                <div className="space-y-4">
+                    <h3 className="text-lg font-semibold">Canaux de notification</h3>
+                    <div className="space-y-2">
+                        <label className="flex items-center space-x-2">
+                            <input
+                                type="checkbox"
+                                name="emailEnabled"
+                                checked={preferences.emailEnabled}
+                                onChange={handleChange}
+                                className="form-checkbox h-5 w-5 text-blue-600"
+                            />
+                            <span>Email</span>
+                        </label>
+                        <label className="flex items-center space-x-2">
+                            <input
+                                type="checkbox"
+                                name="pushEnabled"
+                                checked={preferences.pushEnabled}
+                                onChange={handleChange}
+                                className="form-checkbox h-5 w-5 text-blue-600"
+                            />
+                            <span>Notifications push</span>
+                        </label>
+                    </div>
+                </div>
+
+                {/* Types de rappels */}
+                <div className="space-y-4">
+                    <h3 className="text-lg font-semibold">Types de rappels</h3>
+                    <div className="space-y-2">
+                        <label className="flex items-center space-x-2">
+                            <input
+                                type="checkbox"
+                                name="morningReminder"
+                                checked={preferences.morningReminder}
+                                onChange={handleChange}
+                                className="form-checkbox h-5 w-5 text-blue-600"
+                            />
+                            <span>Rappel matinal</span>
+                        </label>
+                        <label className="flex items-center space-x-2">
+                            <input
+                                type="checkbox"
+                                name="taskReminder"
+                                checked={preferences.taskReminder}
+                                onChange={handleChange}
+                                className="form-checkbox h-5 w-5 text-blue-600"
+                            />
+                            <span>Rappel des tâches</span>
+                        </label>
+                        <label className="flex items-center space-x-2">
+                            <input
+                                type="checkbox"
+                                name="habitReminder"
+                                checked={preferences.habitReminder}
+                                onChange={handleChange}
+                                className="form-checkbox h-5 w-5 text-blue-600"
+                            />
+                            <span>Rappel des habitudes</span>
+                        </label>
+                        <label className="flex items-center space-x-2">
+                            <input
+                                type="checkbox"
+                                name="motivation"
+                                checked={preferences.motivation}
+                                onChange={handleChange}
+                                className="form-checkbox h-5 w-5 text-blue-600"
+                            />
+                            <span>Messages de motivation</span>
+                        </label>
+                        <label className="flex items-center space-x-2">
+                            <input
+                                type="checkbox"
+                                name="dailySummary"
+                                checked={preferences.dailySummary}
+                                onChange={handleChange}
+                                className="form-checkbox h-5 w-5 text-blue-600"
+                            />
+                            <span>Résumé quotidien</span>
+                        </label>
+                    </div>
+                </div>
+
+                {/* Horaires des notifications */}
+                <div className="space-y-4">
+                    <h3 className="text-lg font-semibold">Horaires des notifications</h3>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">
+                                Rappel matinal
+                            </label>
+                            <input
+                                type="time"
+                                name="morningTime"
+                                value={preferences.morningTime}
+                                onChange={handleChange}
+                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">
+                                Vérification de midi
+                            </label>
+                            <input
+                                type="time"
+                                name="noonTime"
+                                value={preferences.noonTime}
+                                onChange={handleChange}
+                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">
+                                Rappel de l'après-midi
+                            </label>
+                            <input
+                                type="time"
+                                name="afternoonTime"
+                                value={preferences.afternoonTime}
+                                onChange={handleChange}
+                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">
+                                Planification du soir
+                            </label>
+                            <input
+                                type="time"
+                                name="eveningTime"
+                                value={preferences.eveningTime}
+                                onChange={handleChange}
+                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">
+                                Vérification de nuit
+                            </label>
+                            <input
+                                type="time"
+                                name="nightTime"
+                                value={preferences.nightTime}
+                                onChange={handleChange}
+                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                            />
+                        </div>
                     </div>
                 </div>
 

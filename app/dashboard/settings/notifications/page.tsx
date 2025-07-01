@@ -9,12 +9,24 @@ import { NotificationSettings as PrismaNotificationSettings } from "@prisma/clie
 function mapPrismaToFrontend(preferences: PrismaNotificationSettings) {
   return {
     isEnabled: preferences.isEnabled,
+    emailEnabled: preferences.emailEnabled,
+    pushEnabled: preferences.pushEnabled,
     whatsappEnabled: preferences.whatsappEnabled,
     whatsappNumber: preferences.whatsappNumber || undefined,
     startHour: preferences.startHour,
     endHour: preferences.endHour,
     allowedDays: preferences.allowedDays,
-    notificationTypes: preferences.notificationTypes
+    notificationTypes: preferences.notificationTypes,
+    morningReminder: preferences.morningReminder,
+    taskReminder: preferences.taskReminder,
+    habitReminder: preferences.habitReminder,
+    motivation: preferences.motivation,
+    dailySummary: preferences.dailySummary,
+    morningTime: preferences.morningTime,
+    noonTime: preferences.noonTime,
+    afternoonTime: preferences.afternoonTime,
+    eveningTime: preferences.eveningTime,
+    nightTime: preferences.nightTime
   }
 }
 
@@ -38,10 +50,8 @@ export default async function NotificationsPage() {
     })
 
     // Si aucune préférence n'existe, créer avec les valeurs par défaut
-    const userPreferences = preferences || await prisma.notificationSettings.upsert({
-      where: { userId },
-      update: {},
-      create: {
+    const userPreferences = preferences || await prisma.notificationSettings.create({
+      data: {
         userId,
         isEnabled: true,
         emailEnabled: true,
@@ -57,7 +67,11 @@ export default async function NotificationsPage() {
         habitReminder: true,
         motivation: true,
         dailySummary: true,
-        reminderTime: "09:00"
+        morningTime: "08:00",
+        noonTime: "12:00",
+        afternoonTime: "14:00",
+        eveningTime: "18:00",
+        nightTime: "22:00"
       }
     })
 
@@ -68,14 +82,7 @@ export default async function NotificationsPage() {
       </div>
     )
   } catch (error) {
-    console.error("Erreur lors du chargement des préférences:", error)
-    return (
-      <div className="container mx-auto px-4 py-8">
-        <h1 className="text-2xl font-bold mb-6">Paramètres des notifications</h1>
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
-          Une erreur est survenue lors du chargement de vos préférences. Veuillez réessayer plus tard.
-        </div>
-      </div>
-    )
+    console.error("Erreur lors de la récupération des préférences de notification:", error)
+    redirect("/login")
   }
 } 

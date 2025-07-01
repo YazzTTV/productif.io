@@ -1,6 +1,6 @@
 [build]
 builder = "DOCKERFILE"
-dockerfilePath = "Dockerfile.scheduler"
+dockerfilePath = "Dockerfile.ai"
 
 [deploy]
 healthcheckPath = "/health"
@@ -9,4 +9,7 @@ restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 10
 
 [deploy.env]
-NODE_ENV = "production" 
+NODE_ENV = "production"
+DATABASE_URL = "${{Postgres.DATABASE_URL}}"
+OPENAI_API_KEY = "${{Secrets.OPENAI_API_KEY}}"
+WHATSAPP_VERIFY_TOKEN = "${{Secrets.WHATSAPP_VERIFY_TOKEN}}" 

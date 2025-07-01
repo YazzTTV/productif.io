@@ -6,28 +6,48 @@ import { verify } from "jsonwebtoken"
 const publicRoutes = ["/", "/login", "/register", "/api/auth/login", "/api/auth/register"]
 
 export function middleware(request: NextRequest) {
-  // Vérifier si la route est publique
-  if (publicRoutes.some(route => request.nextUrl.pathname.startsWith(route))) {
-    return NextResponse.next()
-  }
-
-  // Récupérer le token depuis les cookies
-  const token = request.cookies.get("auth_token")?.value
-
-  if (!token) {
-    // Rediriger vers la page de login si pas de token
-    return NextResponse.redirect(new URL("/login", request.url))
-  }
-
   try {
-    // Vérifier le token
-    verify(token, process.env.JWT_SECRET || "fallback_secret")
-    return NextResponse.next()
-  } catch (error) {
-    // Rediriger vers la page de login si le token est invalide
-    return NextResponse.redirect(new URL("/login", request.url))
+    // Vérifier si la route est publique
+    if (publicRoutes.some(route => request.nextUrl.pathname.startsWith(route))) {
+      return NextResponse.next()
     }
+
+    // Récupérer le token depuis les cookies
+    const token = request.cookies.get("auth_token")?.value
+
+    if (!token) {
+      console.log("No auth token found, redirecting to login")
+      // Rediriger vers la page de login si pas de token
+      const loginUrl = new URL("/login", request.url)
+      loginUrl.searchParams.set("redirect", request.nextUrl.pathname)
+      return NextResponse.redirect(loginUrl)
+    }
+
+    try {
+      // Vérifier le token
+      verify(token, process.env.JWT_SECRET || "fallback_secret")
+      
+      // Ajouter l'en-tête X-Auth-Token pour les requêtes API
+      if (request.nextUrl.pathname.startsWith("/api/")) {
+        const response = NextResponse.next()
+        response.headers.set("X-Auth-Token", token)
+        return response
+      }
+      
+      return NextResponse.next()
+    } catch (error) {
+      console.error("Invalid token:", error)
+      // Supprimer les cookies d'authentification
+      const response = NextResponse.redirect(new URL("/login", request.url))
+      response.cookies.delete("auth_token")
+      response.cookies.delete("auth_status")
+      return response
+    }
+  } catch (error) {
+    console.error("Middleware error:", error)
+    return NextResponse.redirect(new URL("/login", request.url))
   }
+}
 
 // Configurer les chemins qui doivent passer par le middleware
 export const config = {

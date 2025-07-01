@@ -1,6 +1,6 @@
-const whatsappService = require('./whatsappService');
-const NotificationScheduler = require('./NotificationScheduler');
-const express = require('express');
+import whatsappService from './whatsappService.js';
+import NotificationScheduler from './NotificationScheduler.js';
+import express from 'express';
 
 const app = express();
 
@@ -30,7 +30,7 @@ async function startSchedulerService() {
         console.log('✅ Planificateur démarré');
 
         // 3. Démarrer le serveur pour le healthcheck
-        const port = process.env.PORT || 3001; // Port différent de l'agent WhatsApp
+        const port = process.env.PORT || 3002; // Port différent de l'agent IA (3001)
         app.listen(port, () => {
             console.log(`🌐 Serveur de monitoring démarré sur le port ${port}`);
         });
