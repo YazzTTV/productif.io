@@ -7,12 +7,16 @@ WORKDIR /app
 COPY package*.json ./
 COPY pnpm-lock.yaml ./
 COPY .npmrc ./
+COPY prisma ./prisma/
 
 # Install pnpm
 RUN npm install -g pnpm
 
 # Install dependencies
 RUN pnpm install
+
+# Generate Prisma client
+RUN npx prisma generate
 
 # Copy the rest of the application
 COPY . .

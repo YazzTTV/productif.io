@@ -1,3 +1,5 @@
+"use client"
+
 import { useState, useEffect } from 'react';
 import { apiService } from '../services/api';
 import { Storage } from '@capacitor/storage';
