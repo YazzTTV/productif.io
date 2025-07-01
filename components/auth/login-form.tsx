@@ -21,13 +21,13 @@ export function LoginForm() {
     setSuccess(false)
     
     try {
-      // Appel réel à l'API d'authentification
       const response = await fetch("/api/auth/login", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ email, password }),
+        credentials: "include", // Important pour les cookies
       })
 
       const data = await response.json()
@@ -36,18 +36,15 @@ export function LoginForm() {
         throw new Error(data.error || "Échec de la connexion")
       }
 
-      // Connexion réussie
       setSuccess(true)
-      console.log("Connexion réussie:", data)
       
-      // Attendre un peu pour que les cookies soient bien définis avant la redirection
-      setTimeout(() => {
-        // Utiliser window.location.href pour forcer un rechargement complet de la page
-        window.location.href = "/dashboard"
-      }, 1500)
+      // Redirection immédiate vers le tableau de bord
+      router.push("/dashboard")
+      router.refresh() // Rafraîchir les données du côté serveur
+      
     } catch (error) {
       console.error("Erreur de connexion:", error)
-      setError(error instanceof Error ? error.message : "Une erreur est survenue")
+      setError(error instanceof Error ? error.message : "Une erreur est survenue lors de la connexion")
     } finally {
       setIsLoading(false)
     }

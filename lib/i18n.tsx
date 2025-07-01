@@ -1,3 +1,5 @@
+"use client"
+
 import { useEffect, createContext, useContext, useState, ReactNode } from 'react';
 
 // Types des traductions

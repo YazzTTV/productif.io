@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { compare } from "bcryptjs"
 import { prisma } from "@/lib/prisma"
 import { createToken, createSession } from "@/lib/auth"
+import { getCookieConfig, getClientCookieConfig } from "@/lib/cookie-config"
 
 export async function POST(req: Request) {
   try {
@@ -41,38 +42,23 @@ export async function POST(req: Request) {
     const { password: _, ...userWithoutPassword } = user
 
     // Créer la réponse
-    const response = new NextResponse(
-      JSON.stringify({
+    const response = NextResponse.json(
+      {
         success: true,
         user: userWithoutPassword,
-      }),
+      },
       {
         status: 200,
-        headers: {
-          "Content-Type": "application/json",
-        },
       }
     )
 
-    // Définir le cookie avec les bonnes options pour l'environnement de production
-    const isProduction = process.env.NODE_ENV === "production"
-    
-    response.cookies.set("auth_token", token, {
-      httpOnly: true,
-      secure: isProduction, // Sécurisé en production
-      sameSite: "lax",
-      path: "/",
-      maxAge: 60 * 60 * 24 * 7, // 7 jours
-    })
+    // Obtenir les configurations des cookies
+    const cookieConfig = getCookieConfig(req)
+    const clientCookieConfig = getClientCookieConfig(req)
 
-    // Ajouter un second cookie non-httpOnly pour vérification côté client
-    response.cookies.set("auth_status", "logged_in", {
-      httpOnly: false, 
-      secure: isProduction,
-      sameSite: "lax",
-      path: "/",
-      maxAge: 60 * 60 * 24 * 7, // 7 jours
-    })
+    // Définir les cookies avec les nouvelles configurations
+    response.cookies.set("auth_token", token, cookieConfig)
+    response.cookies.set("auth_status", "logged_in", clientCookieConfig)
 
     console.log("Login successful, token set:", token)
     return response

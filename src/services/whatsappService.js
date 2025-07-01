@@ -1,156 +1,106 @@
-const axios = require('axios');
-const whatsappConfig = require('../config/whatsapp');
-const aiService = require('./aiService');
-const notificationService = require('./notifications/notificationService');
-const { MongoClient } = require('mongodb');
-
+import { PrismaClient } from '@prisma/client';
+import fetch from 'node-fetch';
+import NotificationLogger from './NotificationLogger.js';
 class WhatsAppService {
     constructor() {
-        this.axios = axios.create({
-            baseURL: whatsappConfig.baseUrl,
-            headers: {
-                'Authorization': `Bearer ${whatsappConfig.accessToken}`,
-                'Content-Type': 'application/json'
-            }
-        });
-        this.mongoClient = new MongoClient(process.env.MONGODB_URI);
+        // Vérifier les variables d'environnement
+        console.log('Variables d\'environnement WhatsApp :');
+        console.log('WHATSAPP_APP_ID:', process.env.WHATSAPP_APP_ID ? '✅' : '❌');
+        console.log('WHATSAPP_APP_SECRET:', process.env.WHATSAPP_APP_SECRET ? '✅' : '❌');
+        console.log('WHATSAPP_ACCESS_TOKEN:', process.env.WHATSAPP_ACCESS_TOKEN ? '✅' : '❌');
+        console.log('WHATSAPP_BUSINESS_ACCOUNT_ID:', process.env.WHATSAPP_BUSINESS_ACCOUNT_ID ? '✅' : '❌');
+        console.log('WHATSAPP_VERIFY_TOKEN:', process.env.WHATSAPP_VERIFY_TOKEN ? '✅' : '❌');
+        console.log('WHATSAPP_PHONE_NUMBER_ID:', process.env.WHATSAPP_PHONE_NUMBER_ID ? '✅' : '❌');
+        // Configuration de l'API WhatsApp
+        const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+        this.apiUrl = `https://graph.facebook.com/v17.0/${phoneNumberId}`;
+        this.token = process.env.WHATSAPP_ACCESS_TOKEN || '';
+        this.prisma = new PrismaClient();
+        console.log('Configuration WhatsApp :');
+        console.log('API_URL:', this.apiUrl);
+        console.log('PHONE_NUMBER_ID:', phoneNumberId);
+        console.log('🔍 Configuration WhatsApp chargée');
+        console.log('🔗 URL de l\'API configurée:', this.apiUrl);
+        console.log('🔑 Token configuré:', this.token ? `${this.token.substring(0, 10)}...` : '❌');
     }
-
-    async sendMessage(to, message) {
+    formatPhoneNumber(phoneNumber) {
+        // Supprimer tous les caractères non numériques
+        let cleaned = phoneNumber.replace(/\D/g, '');
+        // Si le numéro commence par un 0, le remplacer par 33
+        if (cleaned.startsWith('0')) {
+            cleaned = '33' + cleaned.substring(1);
+        }
+        return cleaned;
+    }
+    async sendMessage(phoneNumber, message) {
         try {
-            // Nettoyer le numéro de téléphone
-            const cleanPhoneNumber = to.replace(/\D/g, '');
-            
-            const response = await this.axios.post(
-                `/${whatsappConfig.apiVersion}/${whatsappConfig.phoneNumberId}/messages`,
-                {
-                    messaging_product: "whatsapp",
-                    to: cleanPhoneNumber,
-                    type: "text",
-                    text: { 
+            NotificationLogger.logWhatsAppSending(phoneNumber, message);
+            const response = await fetch(`${this.apiUrl}/messages`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.token}`
+                },
+                body: JSON.stringify({
+                    messaging_product: 'whatsapp',
+                    to: this.formatPhoneNumber(phoneNumber),
+                    type: 'text',
+                    text: {
                         preview_url: false,
-                        body: message 
+                        body: message
                     }
-                }
-            );
-            return response.data;
-        } catch (error) {
-            console.error('Error sending WhatsApp message:', error.response?.data || error.message);
+                })
+            });
+            const responseText = await response.text();
+            NotificationLogger.logWhatsAppResponse(response.status, responseText);
+            if (!response.ok) {
+                throw new Error(`WhatsApp API error: ${response.status} ${response.statusText}\n${responseText}`);
+            }
+            return JSON.parse(responseText);
+        }
+        catch (error) {
+            NotificationLogger.logError('Envoi WhatsApp', error);
             throw error;
         }
     }
-
-    async handleIncomingMessage(message) {
-        try {
-            const userId = message.from;
-            const messageText = message.text.body;
-
-            console.log(`Message reçu de ${userId}: ${messageText}`);
-
-            // Traiter le message avec l'agent IA
-            const aiResponse = await aiService.processMessage(userId, messageText);
-            console.log('Réponse de l\'IA:', aiResponse);
-
-            // Envoyer la réponse
-            await this.sendMessage(userId, aiResponse.response);
-
-            return {
-                success: true,
-                response: aiResponse
-            };
-        } catch (error) {
-            console.error('Erreur lors du traitement du message:', error);
-            // Envoyer un message d'erreur à l'utilisateur
-            await this.sendMessage(message.from, 
-                "Désolé, j'ai rencontré une erreur lors du traitement de votre message. " +
-                "Pouvez-vous réessayer dans quelques instants ?"
-            );
-            return {
-                success: false,
-                error: error.message
-            };
-        }
-    }
-
-    async getBusinessProfile() {
-        try {
-            const response = await this.axios.get(
-                `/${whatsappConfig.apiVersion}/phone_numbers/${whatsappConfig.phoneNumberId}`
-            );
-            return response.data;
-        } catch (error) {
-            console.error('Error getting business profile:', error.response?.data || error.message);
-            throw error;
-        }
-    }
-
-    /**
-     * Envoie une notification via WhatsApp ou Web
-     */
     async sendNotification(notification) {
         try {
-            const { userId, type, content } = notification;
-
-            // Vérifier si la notification peut être envoyée
-            const canSend = await notificationService.canSendNotification(
-                userId,
-                type,
-                new Date()
-            );
-
-            if (!canSend) {
-                console.log(`Notification non envoyée pour l'utilisateur ${userId} (préférences non satisfaites)`);
-                return null;
-            }
-
-            // Récupérer les préférences de notification de l'utilisateur
-            await this.mongoClient.connect();
-            const db = this.mongoClient.db('plannificateur');
-            const preferences = await db.collection('UserNotificationPreference').findOne({
-                userId
+            NotificationLogger.logNotificationProcessing(notification);
+            const user = await this.prisma.user.findUnique({
+                where: { id: notification.userId },
+                include: {
+                    notificationSettings: true
+                }
             });
-
-            // Si WhatsApp est activé et un numéro est configuré
-            if (preferences?.whatsappEnabled && preferences?.whatsappNumber) {
-                try {
-                    // Envoyer via WhatsApp
-                    const result = await this.sendMessage(preferences.whatsappNumber, content);
-                    if (result) {
-                        await notificationService.markAsSent(notification.id);
-                        return result;
-                    }
-                } catch (error) {
-                    console.error('Erreur lors de l\'envoi WhatsApp, tentative de notification web:', error);
-                }
+            if (!user || !user.notificationSettings?.whatsappEnabled || !user.notificationSettings?.whatsappNumber) {
+                NotificationLogger.logError('Configuration WhatsApp', new Error('WhatsApp non configuré pour l\'utilisateur'));
+                return;
             }
-
-            // Par défaut ou en cas d'échec de WhatsApp, envoyer une notification web
-            if (preferences?.pushEnabled !== false) { // Activé par défaut
-                try {
-                    // Envoyer une notification web
-                    const webNotification = new Notification(type, {
-                        body: content,
-                        icon: '/icon.png'
-                    });
-                    
-                    await notificationService.markAsSent(notification.id);
-                    return { success: true, method: 'web' };
-                } catch (error) {
-                    console.error('Erreur lors de l\'envoi de la notification web:', error);
-                    throw error;
+            await this.sendMessage(user.notificationSettings.whatsappNumber, notification.content);
+            // Mettre à jour le statut de la notification
+            await this.prisma.notificationHistory.update({
+                where: { id: notification.id },
+                data: {
+                    status: 'sent',
+                    sentAt: new Date()
                 }
-            }
-
-            console.log(`Aucune méthode de notification disponible pour l'utilisateur ${userId}`);
-            return null;
-        } catch (error) {
-            console.error('Erreur lors de l\'envoi de la notification:', error);
-            await notificationService.markAsFailed(notification.id, error);
+            });
+        }
+        catch (error) {
+            NotificationLogger.logError('Envoi de notification', error);
+            // Marquer la notification comme échouée
+            await this.prisma.notificationHistory.update({
+                where: { id: notification.id },
+                data: {
+                    status: 'failed',
+                    error: error instanceof Error ? error.message : 'Unknown error'
+                }
+            });
             throw error;
-        } finally {
-            await this.mongoClient.close();
         }
     }
 }
-
-module.exports = new WhatsAppService(); 
+// Créer une instance unique
+const whatsappService = new WhatsAppService();
+// Exporter l'instance
+export default whatsappService;

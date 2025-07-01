@@ -1,13 +1,13 @@
-import { auth } from "@clerk/nextjs";
 import { NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
+import { getAuthUser } from "@/lib/auth";
 
 const prisma = new PrismaClient();
 
 export async function PUT(req: Request) {
   try {
-    const { userId } = auth();
-    if (!userId) {
+    const user = await getAuthUser();
+    if (!user) {
       return new NextResponse("Non autorisé", { status: 401 });
     }
 
@@ -30,8 +30,8 @@ export async function PUT(req: Request) {
     }
 
     // Mettre à jour ou créer les préférences
-    const preferences = await prisma.userNotificationPreference.upsert({
-      where: { userId },
+    const preferences = await prisma.notificationSettings.upsert({
+      where: { userId: user.id },
       update: {
         isEnabled,
         preferredHours,
@@ -44,7 +44,7 @@ export async function PUT(req: Request) {
         dailySummary
       },
       create: {
-        userId,
+        userId: user.id,
         isEnabled,
         preferredHours,
         preferredDays,
@@ -66,13 +66,13 @@ export async function PUT(req: Request) {
 
 export async function GET(req: Request) {
   try {
-    const { userId } = auth();
-    if (!userId) {
+    const user = await getAuthUser();
+    if (!user) {
       return new NextResponse("Non autorisé", { status: 401 });
     }
 
-    const preferences = await prisma.userNotificationPreference.findUnique({
-      where: { userId }
+    const preferences = await prisma.notificationSettings.findUnique({
+      where: { userId: user.id }
     });
 
     if (!preferences) {

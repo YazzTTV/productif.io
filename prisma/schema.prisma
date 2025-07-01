@@ -12,6 +12,7 @@ model User {
   name                 String?
   email                String                @unique
   password             String
+  whatsappNumber       String?               @unique
   createdAt            DateTime              @default(now())
   updatedAt            DateTime              @updatedAt
   managedCompanyId     String?
@@ -33,6 +34,8 @@ model User {
   apiTokens            ApiToken[]
   habits               Habit[]
   notificationSettings NotificationSettings?
+  notificationHistory  NotificationHistory[]
+  whatsappConversations WhatsAppConversation[]
 }
 
 model Company {
@@ -85,16 +88,30 @@ model Project {
 }
 
 model Process {
-  id          String   @id @default(cuid())
+  id          String        @id @default(cuid())
   name        String
   description String
   userId      String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tasks       Task[]   @relation("TaskProcess")
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tasks       Task[]        @relation("TaskProcess")
+  steps       ProcessStep[]
 
   @@index([userId])
+}
+
+model ProcessStep {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  order       Int
+  processId   String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  process     Process  @relation(fields: [processId], references: [id], onDelete: Cascade)
+
+  @@index([processId])
 }
 
 model Task {
@@ -317,30 +334,52 @@ model StreakHistory {
   @@index([date])
 }
 
-model NotificationSettings {
-  id                String   @id @default(cuid())
-  userId            String   @unique
-  isEnabled         Boolean  @default(true)
-  emailEnabled      Boolean  @default(true)
-  pushEnabled       Boolean  @default(true)
-  whatsappEnabled   Boolean  @default(false)
-  whatsappNumber    String?
-  startHour         Int      @default(9)
-  endHour           Int      @default(18)
-  allowedDays       Int[]    @default([1, 2, 3, 4, 5])
-  notificationTypes String[] @default(["TASK_DUE", "HABIT_REMINDER", "DAILY_SUMMARY"])
-  morningReminder   Boolean  @default(true)
-  taskReminder      Boolean  @default(true)
-  habitReminder     Boolean  @default(true)
-  motivation        Boolean  @default(true)
-  dailySummary      Boolean  @default(true)
-  reminderTime      String   @default("09:00")
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-  user              User     @relation(fields: [userId], references: [id])
+model NotificationHistory {
+  id           String    @id @default(cuid())
+  userId       String
+  type         String
+  content      String
+  scheduledFor DateTime
+  sentAt       DateTime?
+  status       String    @default("pending")
+  error        String?
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  settings     NotificationSettings? @relation(fields: [settingsId], references: [id])
+  settingsId   String?
 
   @@index([userId])
-  @@map("user_notification_preferences")
+  @@map("notification_history")
+}
+
+model NotificationSettings {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  isEnabled       Boolean  @default(true)
+  emailEnabled    Boolean  @default(true)
+  pushEnabled     Boolean  @default(true)
+  whatsappEnabled Boolean  @default(false)
+  whatsappNumber  String?
+  startHour       Int      @default(9)
+  endHour         Int      @default(18)
+  allowedDays     Int[]    @default([1, 2, 3, 4, 5])
+  notificationTypes String[] @default([])
+  morningReminder Boolean  @default(true)
+  taskReminder    Boolean  @default(true)
+  habitReminder   Boolean  @default(true)
+  motivation      Boolean  @default(true)
+  dailySummary    Boolean  @default(true)
+  morningTime     String   @default("08:00")
+  noonTime        String   @default("12:00")
+  afternoonTime   String   @default("14:00")
+  eveningTime     String   @default("18:00")
+  nightTime       String   @default("22:00")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notificationHistory NotificationHistory[]
+
+  @@index([userId])
+  @@map("notification_settings")
 }
 
 model WaitlistEntry {
@@ -358,6 +397,30 @@ model WaitlistEntry {
   @@index([status])
   @@index([createdAt])
   @@map("waitlist_entries")
+}
+
+model WhatsAppConversation {
+  id          String   @id @default(cuid())
+  userId      String
+  phoneNumber String
+  messages    WhatsAppMessage[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([phoneNumber])
+}
+
+model WhatsAppMessage {
+  id              String   @id @default(cuid())
+  conversationId  String
+  content         String
+  isFromUser      Boolean
+  createdAt       DateTime @default(now())
+  conversation    WhatsAppConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
 }
 
 enum UserRole {

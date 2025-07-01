@@ -1,19 +1,29 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getAuthUser } from '@/lib/auth';
-import { NotificationSettings } from '@prisma/client';
-import { MongoClient } from 'mongodb';
-
-const MONGODB_URI = 'mongodb://mongo:BNWcsOVckHnMvSQtljpUYzaLqlSgbZSa@tramway.proxy.rlwy.net:42059/plannificateur?authSource=admin';
+import { NotificationSettings, Prisma } from '@prisma/client';
 
 interface NotificationPreferences {
     isEnabled: boolean;
+    emailEnabled: boolean;
+    pushEnabled: boolean;
     whatsappEnabled: boolean;
     whatsappNumber?: string;
     startHour: number;
     endHour: number;
     allowedDays: number[];
     notificationTypes: string[];
+    morningReminder: boolean;
+    taskReminder: boolean;
+    habitReminder: boolean;
+    motivation: boolean;
+    dailySummary: boolean;
+    reminderTime: string;
+    morningTime: string;
+    noonTime: string;
+    afternoonTime: string;
+    eveningTime: string;
+    nightTime: string;
 }
 
 // GET /api/notifications/preferences
@@ -40,23 +50,56 @@ export async function GET(request: Request) {
             where: { userId }
         });
 
+        // Construire la liste des types de notifications activés
+        const notificationTypes = [];
+        if (preferences?.taskReminder) notificationTypes.push('TASK_DUE');
+        if (preferences?.habitReminder) notificationTypes.push('HABIT_REMINDER');
+        if (preferences?.motivation) notificationTypes.push('MOTIVATION');
+        if (preferences?.dailySummary) notificationTypes.push('DAILY_SUMMARY');
+
         // Mapper les données du schéma vers le format attendu par le frontend
         const mappedPreferences: NotificationPreferences = preferences ? {
             isEnabled: preferences.isEnabled,
+            emailEnabled: preferences.emailEnabled,
+            pushEnabled: preferences.pushEnabled,
             whatsappEnabled: preferences.whatsappEnabled,
             whatsappNumber: preferences.whatsappNumber || '',
             startHour: preferences.startHour,
             endHour: preferences.endHour,
             allowedDays: preferences.allowedDays,
-            notificationTypes: preferences.notificationTypes
+            notificationTypes: notificationTypes,
+            morningReminder: preferences.morningReminder,
+            taskReminder: preferences.taskReminder,
+            habitReminder: preferences.habitReminder,
+            motivation: preferences.motivation,
+            dailySummary: preferences.dailySummary,
+            reminderTime: preferences.reminderTime,
+            morningTime: preferences.morningTime,
+            noonTime: preferences.noonTime,
+            afternoonTime: preferences.afternoonTime,
+            eveningTime: preferences.eveningTime,
+            nightTime: preferences.nightTime
         } : {
             isEnabled: true,
+            emailEnabled: true,
+            pushEnabled: true,
             whatsappEnabled: false,
             whatsappNumber: '',
             startHour: 9,
             endHour: 18,
             allowedDays: [1, 2, 3, 4, 5],
-            notificationTypes: ['TASK_DUE', 'HABIT_REMINDER', 'DAILY_SUMMARY']
+            notificationTypes: ['TASK_DUE', 'HABIT_REMINDER', 'DAILY_SUMMARY'],
+            morningReminder: true,
+            taskReminder: true,
+            habitReminder: true,
+            motivation: true,
+            dailySummary: true,
+            reminderTime: '09:00',
+            morningTime: '08:00',
+            noonTime: '12:00',
+            afternoonTime: '14:00',
+            eveningTime: '18:00',
+            nightTime: '22:00'
         };
 
         return NextResponse.json(mappedPreferences);
@@ -86,24 +129,30 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Non autorisé' }, { status: 403 });
         }
 
-        // Mapper les données du frontend vers le schéma Prisma
-        const prismaData: Partial<NotificationSettings> = {
+        // Synchroniser les types de notifications avec les champs booléens
+        const notificationTypes = incomingPreferences.notificationTypes || [];
+        const prismaData = {
             isEnabled: incomingPreferences.isEnabled,
-            emailEnabled: incomingPreferences.isEnabled,
-            pushEnabled: incomingPreferences.isEnabled,
+            emailEnabled: incomingPreferences.emailEnabled,
+            pushEnabled: incomingPreferences.pushEnabled,
             whatsappEnabled: incomingPreferences.whatsappEnabled,
             whatsappNumber: incomingPreferences.whatsappNumber,
             startHour: incomingPreferences.startHour,
             endHour: incomingPreferences.endHour,
             allowedDays: incomingPreferences.allowedDays,
-            notificationTypes: incomingPreferences.notificationTypes,
-            morningReminder: true,
-            taskReminder: true,
-            habitReminder: true,
-            motivation: true,
-            dailySummary: true,
-            reminderTime: "09:00"
-        };
+            notificationTypes: notificationTypes,
+            morningReminder: incomingPreferences.morningReminder,
+            taskReminder: incomingPreferences.taskReminder,
+            habitReminder: incomingPreferences.habitReminder,
+            motivation: incomingPreferences.motivation,
+            dailySummary: incomingPreferences.dailySummary,
+            reminderTime: incomingPreferences.reminderTime,
+            morningTime: incomingPreferences.morningTime,
+            noonTime: incomingPreferences.noonTime,
+            afternoonTime: incomingPreferences.afternoonTime,
+            eveningTime: incomingPreferences.eveningTime,
+            nightTime: incomingPreferences.nightTime
+        } as const;
 
         // Mettre à jour ou créer les préférences dans PostgreSQL
         const updatedPreferences = await prisma.notificationSettings.upsert({
@@ -114,39 +163,6 @@ export async function POST(request: Request) {
                 ...prismaData
             }
         });
-
-        // Synchroniser directement avec MongoDB
-        try {
-            const mongoClient = new MongoClient(MONGODB_URI);
-            await mongoClient.connect();
-
-            const db = mongoClient.db('plannificateur');
-            
-            // Mapper les préférences pour MongoDB
-            const mongoPreferences = {
-                userId: user.id,
-                whatsappEnabled: updatedPreferences.whatsappEnabled,
-                whatsappNumber: updatedPreferences.whatsappNumber,
-                morningReminder: updatedPreferences.morningReminder,
-                taskReminder: updatedPreferences.taskReminder,
-                habitReminder: updatedPreferences.habitReminder,
-                motivation: updatedPreferences.motivation,
-                dailySummary: updatedPreferences.dailySummary,
-                allowedDays: updatedPreferences.allowedDays
-            };
-
-            // Mettre à jour ou créer les préférences dans MongoDB
-            await db.collection('UserNotificationPreference').updateOne(
-                { userId: user.id },
-                { $set: mongoPreferences },
-                { upsert: true }
-            );
-
-            await mongoClient.close();
-        } catch (error) {
-            console.error('Erreur lors de la synchronisation avec MongoDB:', error);
-            // On continue même si la synchronisation échoue
-        }
 
         return NextResponse.json(updatedPreferences);
     } catch (error) {
