@@ -295,10 +295,21 @@ export class SpecialHabitsHandler {
     console.log('📅 Date cible pour enregistrement:', utcTargetDate.toISOString());
     console.log('📅 Date cible locale:', utcTargetDate.toLocaleDateString('fr-FR'));
 
-    await this.prisma.habitEntry.create({
-      data: {
+    await this.prisma.habitEntry.upsert({
+      where: {
+        habitId_date: {
+          habitId,
+          date: utcTargetDate
+        }
+      },
+      create: {
         habitId,
         date: utcTargetDate,
+        completed: true,
+        note: data.note,
+        rating: data.rating
+      },
+      update: {
         completed: true,
         note: data.note,
         rating: data.rating
