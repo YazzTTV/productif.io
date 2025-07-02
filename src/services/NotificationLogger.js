@@ -1,88 +1,286 @@
-import { format } from 'date-fns';
-import { fr } from 'date-fns/locale';
+import { v4 as uuidv4 } from 'uuid';
+
 class NotificationLogger {
-    static logNotificationCreation(notification) {
-        console.log('\n📝 CRÉATION DE NOTIFICATION');
-        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-        console.log(`ID: ${notification.id}`);
-        console.log(`Type: ${notification.type}`);
-        console.log(`Utilisateur: ${notification.userId}`);
-        console.log(`Planifiée pour: ${format(notification.scheduledFor, 'PPPp', { locale: fr })}`);
-        console.log(`Status: ${notification.status}`);
-        console.log('Content:');
-        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-        console.log(notification.content);
-        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+    constructor() {
+        this.sessionId = uuidv4();
+        this.logCount = 0;
     }
-    static logNotificationProcessing(notification) {
-        console.log('\n🔄 TRAITEMENT DE NOTIFICATION');
-        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-        console.log(`ID: ${notification.id}`);
-        console.log(`Type: ${notification.type}`);
-        console.log(`Utilisateur: ${notification.user.email}`);
-        console.log(`Planifiée pour: ${format(notification.scheduledFor, 'PPPp', { locale: fr })}`);
-        console.log(`Status actuel: ${notification.status}`);
-        if (notification.error) {
-            console.log(`Erreur précédente: ${notification.error}`);
-        }
-        console.log('Content:');
-        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-        console.log(notification.content);
-        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+
+    // Logger avec timestamp ultra-précis
+    log(level, action, data = {}) {
+        this.logCount++;
+        const now = new Date();
+        const timestamp = now.toISOString();
+        const nanoseconds = (now.getTime() % 1000).toString().padStart(3, '0');
+        
+        const logEntry = {
+            timestamp: `${timestamp}.${nanoseconds}`,
+            session: this.sessionId,
+            sequence: this.logCount,
+            level,
+            action,
+            pid: process.pid,
+            memory: process.memoryUsage(),
+            ...data
+        };
+
+        console.log(`[${logEntry.timestamp}] [${level}] [${action}] ${JSON.stringify(logEntry)}`);
+        return logEntry;
     }
-    static logNotificationSettings(settings) {
-        console.log('\n⚙️ PARAMÈTRES DE NOTIFICATION');
-        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-        console.log(`Notifications activées: ${settings.isEnabled ? '✅' : '❌'}`);
-        console.log(`WhatsApp: ${settings.whatsappEnabled ? '✅' : '❌'}`);
-        console.log(`Numéro WhatsApp: ${settings.whatsappNumber || '❌'}`);
-        console.log(`Plage horaire: ${settings.startHour}h-${settings.endHour}h`);
-        console.log('\nHoraires des notifications:');
-        console.log(`Matin: ${settings.morningTime}`);
-        console.log(`Midi: ${settings.noonTime}`);
-        console.log(`Après-midi: ${settings.afternoonTime}`);
-        console.log(`Soir: ${settings.eveningTime}`);
-        console.log(`Nuit: ${settings.nightTime}`);
-        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
-    }
-    static logWhatsAppSending(phoneNumber, message) {
-        console.log('\n📱 ENVOI WHATSAPP');
-        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-        console.log(`Numéro: ${phoneNumber}`);
-        console.log('Message:');
-        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-        console.log(message);
-        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
-    }
-    static logWhatsAppResponse(status, response) {
-        console.log('\n📬 RÉPONSE WHATSAPP');
-        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-        console.log(`Status: ${status}`);
-        console.log('Réponse:');
-        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-        console.log(typeof response === 'string' ? response : JSON.stringify(response, null, 2));
-        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
-    }
-    static logError(context, error) {
-        console.error('\n❌ ERREUR');
-        console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-        console.error(`Contexte: ${context}`);
-        console.error(`Message: ${error.message}`);
-        if (error.stack) {
-            console.error('Stack trace:');
-            console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-            console.error(error.stack);
-        }
-        console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
-    }
-    static logSchedulerStatus(jobs) {
-        console.log('\n🔔 ÉTAT DU PLANIFICATEUR');
-        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-        console.log(`Jobs actifs: ${jobs.size}`);
-        jobs.forEach((job, name) => {
-            console.log(`- ${name}: ${job.running ? '✅' : '❌'}`);
+
+    // === CRÉATION DE NOTIFICATION ===
+    logNotificationCreation(data) {
+        return this.log('INFO', 'NOTIFICATION_CREATION_START', {
+            notificationId: data.notificationId,
+            userId: data.userId,
+            type: data.type,
+            scheduledFor: data.scheduledFor,
+            currentTime: new Date().toISOString()
         });
-        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+    }
+
+    logNotificationDuplicateCheckStart(data) {
+        return this.log('DEBUG', 'DUPLICATE_CHECK_START', {
+            notificationId: data.notificationId,
+            userId: data.userId,
+            type: data.type,
+            checkStart: Date.now()
+        });
+    }
+
+    logNotificationDuplicateDetected(data) {
+        return this.log('WARN', 'DUPLICATE_DETECTED', {
+            notificationId: data.notificationId,
+            existingId: data.existingId,
+            existingScheduledFor: data.existingScheduledFor,
+            newScheduledFor: data.newScheduledFor,
+            duplicateCheckDuration: data.duplicateCheckDuration,
+            timeDifference: data.timeDifference
+        });
+    }
+
+    logNotificationDuplicatePassed(data) {
+        return this.log('SUCCESS', 'DUPLICATE_CHECK_PASSED', {
+            notificationId: data.notificationId,
+            duplicateCheckDuration: data.duplicateCheckDuration
+        });
+    }
+
+    logNotificationTransactionStart(data) {
+        return this.log('DEBUG', 'DB_TRANSACTION_START', {
+            notificationId: data.notificationId,
+            userId: data.userId,
+            type: data.type,
+            transactionStart: Date.now()
+        });
+    }
+
+    logNotificationCreated(data) {
+        return this.log('SUCCESS', 'NOTIFICATION_CREATED', {
+            notificationId: data.notificationId,
+            dbId: data.dbId,
+            transactionDuration: data.transactionDuration,
+            totalDuration: data.totalDuration,
+            status: data.status
+        });
+    }
+
+    logNotificationError(data) {
+        return this.log('ERROR', 'NOTIFICATION_ERROR', {
+            notificationId: data.notificationId,
+            error: data.error,
+            stack: data.stack,
+            totalDuration: data.totalDuration
+        });
+    }
+
+    // === TRAITEMENT DES NOTIFICATIONS ===
+    logNotificationProcessingStart(notification) {
+        return this.log('INFO', 'NOTIFICATION_PROCESSING_START', {
+            notificationId: notification.id,
+            type: notification.type,
+            userId: notification.userId,
+            scheduledFor: notification.scheduledFor,
+            status: notification.status,
+            processingStart: Date.now()
+        });
+    }
+
+    logNotificationContentGeneration(data) {
+        return this.log('DEBUG', 'CONTENT_GENERATION', {
+            notificationId: data.notificationId,
+            contentLength: data.contentLength,
+            generationDuration: data.generationDuration,
+            hasHabits: data.hasHabits,
+            habitCount: data.habitCount
+        });
+    }
+
+    // === ENVOI WHATSAPP ===
+    logWhatsAppSendStart(data) {
+        return this.log('INFO', 'WHATSAPP_SEND_START', {
+            sendId: data.sendId,
+            notificationId: data.notificationId,
+            phoneNumber: data.phoneNumber,
+            messageLength: data.messageLength,
+            sendStart: Date.now()
+        });
+    }
+
+    logWhatsAppRequestStart(data) {
+        return this.log('DEBUG', 'WHATSAPP_REQUEST_START', {
+            sendId: data.sendId,
+            notificationId: data.notificationId,
+            url: data.url,
+            payloadSize: JSON.stringify(data.payload).length,
+            requestStart: Date.now()
+        });
+    }
+
+    logWhatsAppResponse(data) {
+        return this.log('DEBUG', 'WHATSAPP_RESPONSE_RECEIVED', {
+            sendId: data.sendId,
+            notificationId: data.notificationId,
+            status: data.status,
+            statusText: data.statusText,
+            requestDuration: data.requestDuration,
+            responseLength: data.responseLength,
+            headers: data.headers
+        });
+    }
+
+    logWhatsAppSuccess(data) {
+        return this.log('SUCCESS', 'WHATSAPP_MESSAGE_SENT', {
+            sendId: data.sendId,
+            notificationId: data.notificationId,
+            whatsappMessageId: data.whatsappMessageId,
+            whatsappWaId: data.whatsappWaId,
+            requestDuration: data.requestDuration,
+            totalDuration: data.totalDuration
+        });
+    }
+
+    logWhatsAppError(data) {
+        return this.log('ERROR', 'WHATSAPP_SEND_ERROR', {
+            sendId: data.sendId,
+            notificationId: data.notificationId,
+            error: data.error,
+            stack: data.stack,
+            totalDuration: data.totalDuration
+        });
+    }
+
+    // === SCHEDULER EVENTS ===
+    logSchedulerJobStart(data) {
+        return this.log('INFO', 'SCHEDULER_JOB_START', {
+            jobId: data.jobId,
+            jobType: data.jobType,
+            userId: data.userId,
+            scheduledTime: data.scheduledTime,
+            actualTime: new Date().toISOString(),
+            delay: data.delay
+        });
+    }
+
+    logSchedulerJobEnd(data) {
+        return this.log('INFO', 'SCHEDULER_JOB_END', {
+            jobId: data.jobId,
+            success: data.success,
+            duration: data.duration,
+            notificationsProcessed: data.notificationsProcessed
+        });
+    }
+
+    // === SYSTÈME RÉACTIF ===
+    logReactiveEvent(data) {
+        return this.log('INFO', 'REACTIVE_EVENT', {
+            eventType: data.eventType,
+            userId: data.userId,
+            changes: data.changes,
+            priority: data.priority,
+            timestamp: new Date().toISOString()
+        });
+    }
+
+    logDatabaseWatcherScan(data) {
+        return this.log('DEBUG', 'DATABASE_WATCHER_SCAN', {
+            scanId: data.scanId,
+            usersChecked: data.usersChecked,
+            changesDetected: data.changesDetected,
+            scanDuration: data.scanDuration
+        });
+    }
+
+    // === MÉTRIQUES PERFORMANCE ===
+    logPerformanceMetrics(data) {
+        return this.log('METRICS', 'PERFORMANCE_METRICS', {
+            action: data.action,
+            duration: data.duration,
+            memoryBefore: data.memoryBefore,
+            memoryAfter: data.memoryAfter,
+            cpuUsage: process.cpuUsage()
+        });
+    }
+
+    // === CONCURRENCE ET RACE CONDITIONS ===
+    logConcurrencyEvent(data) {
+        return this.log('WARN', 'CONCURRENCY_EVENT', {
+            event: data.event,
+            threadId: process.pid,
+            userId: data.userId,
+            conflictType: data.conflictType,
+            timestamp: new Date().toISOString()
+        });
+    }
+
+    // === RETRY ET RECOVERY ===
+    logRetryAttempt(data) {
+        return this.log('WARN', 'RETRY_ATTEMPT', {
+            operation: data.operation,
+            attempt: data.attempt,
+            maxAttempts: data.maxAttempts,
+            error: data.error,
+            nextRetryIn: data.nextRetryIn
+        });
+    }
+
+    // === MÉTHODES LEGACY (pour compatibilité) ===
+    logNotificationStart(notification) {
+        return this.logNotificationProcessingStart(notification);
+    }
+
+    logNotificationSent(data) {
+        return this.log('SUCCESS', 'NOTIFICATION_SENT_LEGACY', data);
+    }
+
+    logError(operation, error) {
+        return this.log('ERROR', 'OPERATION_ERROR', {
+            operation,
+            error: error.message,
+            stack: error.stack
+        });
+    }
+
+    // === MONITORING SYSTÈME ===
+    logSystemHealth() {
+        const memUsage = process.memoryUsage();
+        const cpuUsage = process.cpuUsage();
+        
+        return this.log('METRICS', 'SYSTEM_HEALTH', {
+            memory: {
+                rss: memUsage.rss,
+                heapTotal: memUsage.heapTotal,
+                heapUsed: memUsage.heapUsed,
+                external: memUsage.external
+            },
+            cpu: {
+                user: cpuUsage.user,
+                system: cpuUsage.system
+            },
+            uptime: process.uptime(),
+            pid: process.pid
+        });
     }
 }
-export default NotificationLogger;
+
+export default new NotificationLogger();

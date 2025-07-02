@@ -4,6 +4,7 @@ import NotificationService from './NotificationService.js';
 import NotificationLogger from './NotificationLogger.js';
 import EventManager from '../../lib/EventManager.js';
 import ReactiveSchedulerManager from '../../lib/ReactiveSchedulerManager.js';
+import { v4 as uuidv4 } from 'uuid';
 
 class NotificationScheduler {
     constructor(whatsappService, prisma) {
@@ -13,12 +14,22 @@ class NotificationScheduler {
         this.whatsappService = whatsappService;
         this.eventManager = EventManager.getInstance();
         this.isStarted = false;
+        this.isRunning = false;
+        this.schedulerId = uuidv4();
+        this.jobCounter = 0;
         
         // Initialiser le système réactif
         this.reactiveManager = new ReactiveSchedulerManager(this, this.prisma);
         
         // Configurer les listeners d'événements
         this.setupEventListeners();
+        
+        // Log de démarrage
+        NotificationLogger.log('INFO', 'SCHEDULER_INIT', {
+            schedulerId: this.schedulerId,
+            pid: process.pid,
+            initTime: new Date().toISOString()
+        });
     }
 
     setupEventListeners() {
@@ -514,6 +525,313 @@ class NotificationScheduler {
             reactiveSystem: this.reactiveManager ? this.reactiveManager.getSystemStatus() : null,
             jobs: Array.from(this.jobs.keys())
         };
+    }
+
+    scheduleNotificationsForUser(user) {
+        const scheduleStart = Date.now();
+        const scheduleId = uuidv4();
+        
+        NotificationLogger.log('INFO', 'SCHEDULE_USER_START', {
+            scheduleId,
+            schedulerId: this.schedulerId,
+            userId: user.id,
+            userEmail: user.email,
+            hasSettings: !!user.notificationSettings,
+            scheduleStart
+        });
+
+        if (!user.notificationSettings?.isEnabled) {
+            NotificationLogger.log('WARN', 'SCHEDULE_USER_DISABLED', {
+                scheduleId,
+                userId: user.id,
+                reason: 'notifications_disabled'
+            });
+            return;
+        }
+
+        const settings = user.notificationSettings;
+        const times = [
+            { type: 'MORNING_REMINDER', time: settings.morningTime },
+            { type: 'NOON_CHECK', time: settings.noonTime },
+            { type: 'AFTERNOON_REMINDER', time: settings.afternoonTime },
+            { type: 'EVENING_PLANNING', time: settings.eveningTime },
+            { type: 'NIGHT_HABITS_CHECK', time: settings.nightTime }
+        ];
+
+        let scheduledJobs = 0;
+        let skippedJobs = 0;
+
+        times.forEach(({ type, time }) => {
+            const jobId = `${user.id}-${time}`;
+            const jobStart = Date.now();
+            
+            NotificationLogger.log('DEBUG', 'SCHEDULE_JOB_START', {
+                scheduleId,
+                jobId,
+                type,
+                time,
+                userId: user.id,
+                jobStart
+            });
+
+            try {
+                // Vérifier si le job existe déjà
+                if (this.jobs.has(jobId)) {
+                    NotificationLogger.log('WARN', 'SCHEDULE_JOB_EXISTS', {
+                        scheduleId,
+                        jobId,
+                        type,
+                        action: 'skipping'
+                    });
+                    skippedJobs++;
+                    return;
+                }
+
+                const [hour, minute] = time.split(':').map(Number);
+                const cronExpression = `${minute} ${hour} * * *`;
+
+                const job = cron.schedule(cronExpression, async () => {
+                    const jobExecutionId = uuidv4();
+                    const executionStart = Date.now();
+                    
+                    NotificationLogger.logSchedulerJobStart({
+                        jobId: jobExecutionId,
+                        jobType: type,
+                        userId: user.id,
+                        scheduledTime: `${hour}:${minute}`,
+                        actualTime: new Date().toISOString(),
+                        delay: this.calculateDelay(hour, minute)
+                    });
+
+                    try {
+                        await this.processScheduledNotification(user.id, type, jobExecutionId);
+                        
+                        NotificationLogger.logSchedulerJobEnd({
+                            jobId: jobExecutionId,
+                            success: true,
+                            duration: Date.now() - executionStart,
+                            notificationsProcessed: 1
+                        });
+                    } catch (error) {
+                        NotificationLogger.logSchedulerJobEnd({
+                            jobId: jobExecutionId,
+                            success: false,
+                            duration: Date.now() - executionStart,
+                            error: error.message
+                        });
+                    }
+                }, {
+                    scheduled: false,
+                    timezone: 'Europe/Paris'
+                });
+
+                job.start();
+                this.jobs.set(jobId, {
+                    job,
+                    type,
+                    userId: user.id,
+                    time,
+                    cronExpression,
+                    createdAt: new Date(),
+                    executionCount: 0
+                });
+
+                const jobDuration = Date.now() - jobStart;
+                scheduledJobs++;
+
+                NotificationLogger.log('SUCCESS', 'SCHEDULE_JOB_CREATED', {
+                    scheduleId,
+                    jobId,
+                    type,
+                    cronExpression,
+                    jobDuration,
+                    totalJobs: this.jobs.size
+                });
+
+            } catch (error) {
+                NotificationLogger.log('ERROR', 'SCHEDULE_JOB_ERROR', {
+                    scheduleId,
+                    jobId,
+                    type,
+                    error: error.message,
+                    stack: error.stack
+                });
+            }
+        });
+
+        const scheduleDuration = Date.now() - scheduleStart;
+        
+        NotificationLogger.log('SUCCESS', 'SCHEDULE_USER_COMPLETE', {
+            scheduleId,
+            userId: user.id,
+            scheduledJobs,
+            skippedJobs,
+            totalJobs: this.jobs.size,
+            scheduleDuration
+        });
+    }
+
+    async processScheduledNotification(userId, type, jobExecutionId) {
+        const processStart = Date.now();
+        
+        NotificationLogger.log('INFO', 'PROCESS_NOTIFICATION_START', {
+            jobExecutionId,
+            userId,
+            type,
+            processStart,
+            schedulerId: this.schedulerId
+        });
+
+        try {
+            // Vérification de concurrence
+            const concurrencyCheck = await this.checkConcurrency(userId, type);
+            if (concurrencyCheck.hasConflict) {
+                NotificationLogger.logConcurrencyEvent({
+                    event: 'CONCURRENT_PROCESSING_DETECTED',
+                    userId,
+                    conflictType: type,
+                    existingJob: concurrencyCheck.existingJob
+                });
+                return;
+            }
+
+            // Marquer comme en cours de traitement
+            await this.markProcessingStart(userId, type, jobExecutionId);
+
+            const user = await this.getUserWithSettings(userId);
+            if (!user) {
+                NotificationLogger.log('ERROR', 'USER_NOT_FOUND', {
+                    jobExecutionId,
+                    userId
+                });
+                return;
+            }
+
+            const notificationData = await this.createNotificationData(user, type, jobExecutionId);
+            const notification = await NotificationService.createNotification(
+                userId,
+                type,
+                notificationData.content,
+                notificationData.scheduledFor
+            );
+
+            if (!notification) {
+                NotificationLogger.log('WARN', 'NOTIFICATION_NOT_CREATED', {
+                    jobExecutionId,
+                    userId,
+                    type,
+                    reason: 'duplicate_or_error'
+                });
+                return;
+            }
+
+            await this.processNotification(notification, jobExecutionId);
+
+            const processDuration = Date.now() - processStart;
+            NotificationLogger.log('SUCCESS', 'PROCESS_NOTIFICATION_COMPLETE', {
+                jobExecutionId,
+                notificationId: notification.id,
+                processDuration
+            });
+
+        } catch (error) {
+            const processDuration = Date.now() - processStart;
+            NotificationLogger.log('ERROR', 'PROCESS_NOTIFICATION_ERROR', {
+                jobExecutionId,
+                userId,
+                type,
+                error: error.message,
+                stack: error.stack,
+                processDuration
+            });
+        } finally {
+            await this.markProcessingEnd(userId, type, jobExecutionId);
+        }
+    }
+
+    calculateDelay(scheduledHour, scheduledMinute) {
+        const now = new Date();
+        const scheduled = new Date();
+        scheduled.setHours(scheduledHour, scheduledMinute, 0, 0);
+        
+        if (scheduled < now) {
+            scheduled.setDate(scheduled.getDate() + 1);
+        }
+        
+        return scheduled.getTime() - now.getTime();
+    }
+
+    async checkConcurrency(userId, type) {
+        // Implémentation simple de détection de concurrence
+        const key = `${userId}-${type}`;
+        const now = Date.now();
+        
+        if (this.processingJobs && this.processingJobs.has(key)) {
+            const existingJob = this.processingJobs.get(key);
+            const age = now - existingJob.startTime;
+            
+            if (age < 30000) { // 30 secondes de timeout
+                return {
+                    hasConflict: true,
+                    existingJob: existingJob
+                };
+            } else {
+                // Job trop vieux, probablement bloqué
+                this.processingJobs.delete(key);
+            }
+        }
+        
+        return { hasConflict: false };
+    }
+
+    async markProcessingStart(userId, type, jobExecutionId) {
+        if (!this.processingJobs) {
+            this.processingJobs = new Map();
+        }
+        
+        const key = `${userId}-${type}`;
+        this.processingJobs.set(key, {
+            jobExecutionId,
+            startTime: Date.now(),
+            userId,
+            type
+        });
+        
+        NotificationLogger.log('DEBUG', 'PROCESSING_MARKED_START', {
+            key,
+            jobExecutionId,
+            activeProcessingJobs: this.processingJobs.size
+        });
+    }
+
+    async markProcessingEnd(userId, type, jobExecutionId) {
+        if (!this.processingJobs) return;
+        
+        const key = `${userId}-${type}`;
+        const existing = this.processingJobs.get(key);
+        
+        if (existing && existing.jobExecutionId === jobExecutionId) {
+            this.processingJobs.delete(key);
+            
+            NotificationLogger.log('DEBUG', 'PROCESSING_MARKED_END', {
+                key,
+                jobExecutionId,
+                duration: Date.now() - existing.startTime,
+                activeProcessingJobs: this.processingJobs.size
+            });
+        }
+    }
+
+    async processNotification(notification, jobExecutionId) {
+        // Implementation of processNotification method
+    }
+
+    async createNotificationData(user, type, jobExecutionId) {
+        // Implementation of createNotificationData method
+    }
+
+    async getUserWithSettings(userId) {
+        // Implementation of getUserWithSettings method
     }
 }
 
