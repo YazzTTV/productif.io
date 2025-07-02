@@ -3,6 +3,8 @@ import WhatsAppService from './whatsappService.js';
 import NotificationLogger from './NotificationLogger.js';
 import NotificationContentBuilder from './NotificationContentBuilder.js';
 import { getNotificationTitle } from './notification-titles.js';
+import fetch from 'node-fetch';
+import { v4 as uuidv4 } from 'uuid';
 
 class NotificationService {
     constructor() {
@@ -119,13 +121,31 @@ class NotificationService {
         return message;
     }
     async createNotification(userId, type, content, scheduledFor) {
+        const notificationId = uuidv4();
+        const startTime = Date.now();
+        
+        NotificationLogger.logNotificationCreation({
+            notificationId,
+            userId,
+            type,
+            scheduledFor: scheduledFor.toISOString()
+        });
+
         try {
-            // Vérifier s'il existe déjà une notification en attente du même type à la même heure
+            // Vérification anti-duplicate AVANT création
+            const duplicateCheckStart = Date.now();
+            
+            NotificationLogger.logNotificationDuplicateCheckStart({
+                notificationId,
+                userId,
+                type,
+                scheduledFor: scheduledFor.toISOString()
+            });
+
             const existingNotification = await this.prisma.notificationHistory.findFirst({
                 where: {
-                    userId,
-                    type,
-                    status: 'pending',
+                    userId: userId,
+                    type: type,
                     scheduledFor: {
                         gte: new Date(scheduledFor.getTime() - 60000), // 1 minute avant
                         lte: new Date(scheduledFor.getTime() + 60000)  // 1 minute après
@@ -133,11 +153,33 @@ class NotificationService {
                 }
             });
 
+            const duplicateCheckDuration = Date.now() - duplicateCheckStart;
+            
             if (existingNotification) {
-                console.log(`   ⚠️ DOUBLON DÉTECTÉ: Une notification ${type} existe déjà pour ${userId} à ${scheduledFor.toLocaleTimeString()}`);
-                console.log(`   🔄 Notification existante: ${existingNotification.id} (planifiée pour ${existingNotification.scheduledFor.toLocaleTimeString()})`);
-                return existingNotification;
+                NotificationLogger.logNotificationDuplicateDetected({
+                    notificationId,
+                    existingId: existingNotification.id,
+                    existingScheduledFor: existingNotification.scheduledFor.toISOString(),
+                    newScheduledFor: scheduledFor.toISOString(),
+                    duplicateCheckDuration,
+                    timeDifference: Math.abs(existingNotification.scheduledFor.getTime() - scheduledFor.getTime())
+                });
+                return null;
             }
+
+            NotificationLogger.logNotificationDuplicatePassed({
+                notificationId,
+                duplicateCheckDuration
+            });
+
+            // Création en base avec transaction
+            const transactionStart = Date.now();
+            
+            NotificationLogger.logNotificationTransactionStart({
+                notificationId,
+                userId,
+                type
+            });
 
             const notification = await this.prisma.notificationHistory.create({
                 data: {
@@ -148,11 +190,30 @@ class NotificationService {
                     status: 'pending'
                 }
             });
-            NotificationLogger.logNotificationCreation(notification);
+
+            const transactionDuration = Date.now() - transactionStart;
+            const totalDuration = Date.now() - startTime;
+
+            NotificationLogger.logNotificationCreated({
+                notificationId,
+                dbId: notification.id,
+                transactionDuration,
+                totalDuration,
+                status: notification.status
+            });
+
             return notification;
-        }
-        catch (error) {
-            NotificationLogger.logError('Création de notification', error);
+
+        } catch (error) {
+            const totalDuration = Date.now() - startTime;
+            
+            NotificationLogger.logNotificationError({
+                notificationId,
+                error: error.message,
+                stack: error.stack,
+                totalDuration
+            });
+            
             throw error;
         }
     }
@@ -300,4 +361,116 @@ class NotificationService {
         }
     }
 }
+
+// Générateur d'ID unique pour chaque notification
+function generateNotificationId() {
+    return `notif_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+}
+
+// Logger avec timestamp précis
+function logWithTimestamp(level, message, data = {}) {
+    const timestamp = new Date().toISOString();
+    const milliseconds = new Date().getMilliseconds().toString().padStart(3, '0');
+    console.log(`[${timestamp}.${milliseconds}] [${level}] ${message}`, data ? JSON.stringify(data) : '');
+}
+
+async function sendWhatsAppMessage(phoneNumber, message, notificationId = null) {
+    const sendId = uuidv4();
+    const startTime = Date.now();
+    
+    logWithTimestamp('INFO', '📱 DÉBUT ENVOI WHATSAPP', {
+        sendId,
+        notificationId,
+        phoneNumber,
+        messageLength: message.length,
+        thread: process.pid
+    });
+
+    try {
+        const requestStart = Date.now();
+        
+        // Préparation de la requête
+        const whatsappPayload = {
+            messaging_product: "whatsapp",
+            to: phoneNumber,
+            type: "text",
+            text: { body: message }
+        };
+
+        logWithTimestamp('DEBUG', '🔄 ENVOI REQUÊTE WHATSAPP - DÉBUT', {
+            sendId,
+            notificationId,
+            url: `${process.env.WHATSAPP_API_URL}/messages`,
+            payload: whatsappPayload
+        });
+
+        const response = await fetch(`${process.env.WHATSAPP_API_URL}/messages`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(whatsappPayload)
+        });
+
+        const requestDuration = Date.now() - requestStart;
+        const responseText = await response.text();
+        
+        logWithTimestamp('DEBUG', '📬 RÉPONSE WHATSAPP REÇUE', {
+            sendId,
+            notificationId,
+            status: response.status,
+            statusText: response.statusText,
+            requestDuration,
+            responseLength: responseText.length,
+            headers: Object.fromEntries(response.headers.entries())
+        });
+
+        if (!response.ok) {
+            logWithTimestamp('ERROR', '❌ ERREUR RESPONSE WHATSAPP', {
+                sendId,
+                notificationId,
+                status: response.status,
+                response: responseText,
+                requestDuration
+            });
+            throw new Error(`WhatsApp API error: ${response.status} - ${responseText}`);
+        }
+
+        const responseData = JSON.parse(responseText);
+        const totalDuration = Date.now() - startTime;
+
+        logWithTimestamp('SUCCESS', '✅ MESSAGE WHATSAPP ENVOYÉ', {
+            sendId,
+            notificationId,
+            whatsappMessageId: responseData.messages?.[0]?.id,
+            whatsappWaId: responseData.contacts?.[0]?.wa_id,
+            requestDuration,
+            totalDuration,
+            responseData
+        });
+
+        return {
+            success: true,
+            messageId: responseData.messages?.[0]?.id,
+            waId: responseData.contacts?.[0]?.wa_id,
+            sendId,
+            duration: totalDuration
+        };
+
+    } catch (error) {
+        const totalDuration = Date.now() - startTime;
+        
+        logWithTimestamp('ERROR', '❌ ERREUR ENVOI WHATSAPP', {
+            sendId,
+            notificationId,
+            error: error.message,
+            stack: error.stack,
+            totalDuration
+        });
+        
+        throw error;
+    }
+}
+
 export default new NotificationService();
