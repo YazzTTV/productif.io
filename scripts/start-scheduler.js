@@ -90,7 +90,7 @@ console.log('PHONE_NUMBER_ID:', whatsappService.PHONE_NUMBER_ID);
 
 // Démarrer le planificateur
 console.log('🚀 Démarrage du planificateur de notifications...');
-const scheduler = new NotificationScheduler(prisma);
+const scheduler = new NotificationScheduler(whatsappService, prisma);
 
 try {
   await scheduler.start();

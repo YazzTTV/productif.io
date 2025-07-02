@@ -30,13 +30,28 @@ class NotificationLogger {
 
     // === CRÉATION DE NOTIFICATION ===
     logNotificationCreation(data) {
-        return this.log('INFO', 'NOTIFICATION_CREATION_START', {
-            notificationId: data.notificationId,
-            userId: data.userId,
-            type: data.type,
-            scheduledFor: data.scheduledFor,
-            currentTime: new Date().toISOString()
-        });
+        // Gérer le format legacy où on passe directement l'objet notification
+        if (data && data.id && data.type && data.userId) {
+            // Format legacy: data est un objet notification complet
+            return this.log('INFO', 'NOTIFICATION_CREATION_LEGACY', {
+                notificationId: data.id,
+                type: data.type,
+                userId: data.userId,
+                scheduledFor: data.scheduledFor,
+                status: data.status,
+                content: data.content?.substring(0, 100) + (data.content?.length > 100 ? '...' : ''),
+                currentTime: new Date().toISOString()
+            });
+        } else {
+            // Nouveau format: data contient les propriétés structurées
+            return this.log('INFO', 'NOTIFICATION_CREATION_START', {
+                notificationId: data.notificationId,
+                userId: data.userId,
+                type: data.type,
+                scheduledFor: data.scheduledFor,
+                currentTime: new Date().toISOString()
+            });
+    }
     }
 
     logNotificationDuplicateCheckStart(data) {
@@ -92,7 +107,7 @@ class NotificationLogger {
             stack: data.stack,
             totalDuration: data.totalDuration
         });
-    }
+        }
 
     // === TRAITEMENT DES NOTIFICATIONS ===
     logNotificationProcessingStart(notification) {
@@ -137,16 +152,27 @@ class NotificationLogger {
         });
     }
 
-    logWhatsAppResponse(data) {
-        return this.log('DEBUG', 'WHATSAPP_RESPONSE_RECEIVED', {
-            sendId: data.sendId,
-            notificationId: data.notificationId,
-            status: data.status,
-            statusText: data.statusText,
-            requestDuration: data.requestDuration,
-            responseLength: data.responseLength,
-            headers: data.headers
-        });
+    logWhatsAppResponse(status, response) {
+        // Si appelé avec le nouveau format (un seul paramètre objet)
+        if (typeof status === 'object' && status.sendId) {
+            return this.log('DEBUG', 'WHATSAPP_RESPONSE_RECEIVED', {
+                sendId: status.sendId,
+                notificationId: status.notificationId,
+                status: status.status,
+                statusText: status.statusText,
+                requestDuration: status.requestDuration,
+                responseLength: status.responseLength,
+                headers: status.headers
+            });
+        } else {
+            // Format legacy: deux paramètres séparés
+            return this.log('INFO', 'WHATSAPP_RESPONSE_LEGACY', {
+                status,
+                responseType: typeof response,
+                responseLength: typeof response === 'string' ? response.length : JSON.stringify(response).length,
+                success: status >= 200 && status < 300
+            });
+        }
     }
 
     logWhatsAppSuccess(data) {
@@ -249,8 +275,35 @@ class NotificationLogger {
         return this.logNotificationProcessingStart(notification);
     }
 
+    logNotificationProcessing(notification) {
+        return this.logNotificationProcessingStart(notification);
+    }
+
     logNotificationSent(data) {
         return this.log('SUCCESS', 'NOTIFICATION_SENT_LEGACY', data);
+    }
+
+    logNotificationSettings(settings) {
+        return this.log('INFO', 'NOTIFICATION_SETTINGS', {
+            isEnabled: settings?.isEnabled,
+            whatsappEnabled: settings?.whatsappEnabled,
+            whatsappNumber: !!settings?.whatsappNumber,
+            morningTime: settings?.morningTime,
+            noonTime: settings?.noonTime,
+            afternoonTime: settings?.afternoonTime,
+            eveningTime: settings?.eveningTime,
+            nightTime: settings?.nightTime,
+            startHour: settings?.startHour,
+            endHour: settings?.endHour
+        });
+    }
+
+    logWhatsAppSending(phoneNumber, message) {
+        return this.log('INFO', 'WHATSAPP_SENDING_LEGACY', {
+            phoneNumber,
+            messageLength: message?.length || 0,
+            messagePreview: message?.substring(0, 100) + (message?.length > 100 ? '...' : '')
+        });
     }
 
     logError(operation, error) {

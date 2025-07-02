@@ -181,7 +181,7 @@ export async function POST(request: Request) {
         try {
             console.log(`🔄 Notification du scheduler pour l'utilisateur ${userId}...`);
             
-            const schedulerResponse = await fetch('http://localhost:3001/api/update-user', {
+            const schedulerResponse = await fetch('http://localhost:3002/api/update-user', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
