@@ -78,8 +78,16 @@ async function startAIService() {
                 }
 
                 if (req.body.object === 'whatsapp_business_account') {
+                    const webhookData = req.body.entry?.[0]?.changes?.[0]?.value;
+                    
+                    // 🛡️ FILTRAGE DES WEBHOOKS DE STATUT (delivered, read, etc.)
+                    if (webhookData?.statuses) {
+                        console.log('ℹ️ Webhook de statut ignoré (delivered/read/etc.):', JSON.stringify(req.body, null, 2));
+                        return res.sendStatus(200);
+                    }
+                    
                     // Vérification de la présence des messages
-                    if (!req.body.entry?.[0]?.changes?.[0]?.value?.messages) {
+                    if (!webhookData?.messages) {
                         console.log('ℹ️ Requête WhatsApp reçue mais pas de message:', JSON.stringify(req.body, null, 2));
                         return res.sendStatus(200);
                     }

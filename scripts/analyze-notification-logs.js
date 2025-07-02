@@ -22,7 +22,12 @@ class NotificationLogAnalyzer {
             
             if (source === 'railway') {
                 console.log('📥 Récupération des logs Railway...');
-                logData = execSync(`railway logs --tail 1000`, { encoding: 'utf8' });
+                try {
+                    logData = execSync(`railway logs`, { encoding: 'utf8' });
+                } catch (railwayError) {
+                    console.log('⚠️ Erreur Railway, tentative avec logs locaux...');
+                    logData = this.readLocalLogs();
+                }
             } else {
                 console.log('📁 Lecture des logs locaux...');
                 // Placeholder pour les logs locaux

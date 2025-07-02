@@ -179,9 +179,16 @@ class NotificationScheduler {
      * Arrête toutes les tâches d'un utilisateur spécifique
      */
     async stopUserTasks(userId) {
-        console.log(`   🔍 Recherche des tâches pour l'utilisateur ${userId}...`);
+        const stopId = `STOP_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        console.log(`\n🚨🚨🚨 STOP_TASKS_${stopId}: ARRÊT DES TÂCHES DÉTECTÉ 🚨🚨🚨`);
+        console.log(`⏰ Timestamp précis: ${new Date().toISOString()}`);
+        console.log(`👤 UserId: ${userId}`);
+        console.log(`📊 Jobs actuels AVANT arrêt: ${this.jobs.size}`);
+        console.log(`📋 Clés actuelles: ${Array.from(this.jobs.keys()).join(', ')}`);
+        console.log(`🔍 Stack trace: ${new Error().stack.split('\n').slice(1, 4).join(' -> ')}`);
         
         const userJobs = Array.from(this.jobs.keys()).filter(jobId => jobId.startsWith(`${userId}-`));
+        console.log(`📊 Jobs utilisateur trouvés: ${userJobs.length} [${userJobs.join(', ')}]`);
         
         if (userJobs.length === 0) {
             console.log(`   ℹ️ Aucune tâche trouvée pour cet utilisateur`);
@@ -200,6 +207,22 @@ class NotificationScheduler {
         }
         
         console.log(`   ✅ ${userJobs.length} tâches arrêtées pour l'utilisateur ${userId}`);
+        
+        // VÉRIFICATION POST-ARRÊT
+        const remainingJobs = Array.from(this.jobs.keys()).filter(jobId => jobId.startsWith(`${userId}-`));
+        console.log(`🔍 VÉRIFICATION POST-ARRÊT:`);
+        console.log(`   📊 Jobs restants pour cet utilisateur: ${remainingJobs.length}`);
+        console.log(`   📋 Jobs restants: [${remainingJobs.join(', ')}]`);
+        console.log(`   📊 Total jobs après arrêt: ${this.jobs.size}`);
+        
+        if (remainingJobs.length > 0) {
+            console.log(`🚨🚨🚨 ALERTE: JOBS NON ARRÊTÉS DÉTECTÉS! 🚨🚨🚨`);
+            remainingJobs.forEach(jobId => {
+                const job = this.jobs.get(jobId);
+                console.log(`   ⚠️ Job fantôme: ${jobId} - État: ${job ? 'actif' : 'undefined'}`);
+            });
+        }
+        console.log(`🚨🚨🚨 FIN STOP_TASKS_${stopId} 🚨🚨🚨\n`);
     }
 
     async start() {
@@ -358,6 +381,24 @@ class NotificationScheduler {
     }
 
     scheduleDailyNotification(userId, time, callback) {
+        const scheduleId = `SCHEDULE_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        const jobId = `${userId}-${time}`;
+        
+        console.log(`\n🚨🚨🚨 SCHEDULE_TASK_${scheduleId}: CRÉATION DE TÂCHE DÉTECTÉE 🚨🚨🚨`);
+        console.log(`⏰ Timestamp précis: ${new Date().toISOString()}`);
+        console.log(`👤 UserId: ${userId}`);
+        console.log(`🕐 Time: ${time}`);
+        console.log(`🆔 JobId: ${jobId}`);
+        console.log(`📊 Jobs actuels AVANT création: ${this.jobs.size}`);
+        console.log(`🔍 Job déjà existant? ${this.jobs.has(jobId) ? 'OUI ⚠️' : 'NON ✅'}`);
+        console.log(`🔍 Stack trace: ${new Error().stack.split('\n').slice(1, 4).join(' -> ')}`);
+        
+        if (this.jobs.has(jobId)) {
+            console.log(`🚨🚨🚨 ALERTE: TENTATIVE DE CRÉATION D'UN JOB DÉJÀ EXISTANT! 🚨🚨🚨`);
+            console.log(`   🆔 Job existant: ${jobId}`);
+            console.log(`   📊 Ceci pourrait causer des duplicatas!`);
+        }
+        
         const [hours, minutes] = time.split(':').map(Number);
         const cronExpression = `${minutes} ${hours} * * *`;
 
@@ -368,32 +409,50 @@ class NotificationScheduler {
         }
 
         const job = cron.schedule(cronExpression, async () => {
+            const execId = `EXEC_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            console.log(`\n🔥🔥🔥 CRON_EXECUTION_${execId}: TÂCHE CRON DÉCLENCHÉE 🔥🔥🔥`);
+            console.log(`⏰ Timestamp précis: ${new Date().toISOString()}`);
+            console.log(`🆔 JobId: ${jobId}`);
+            console.log(`👤 UserId: ${userId}`);
+            console.log(`🕐 Time: ${time}`);
+            console.log(`📊 Jobs actifs actuels: ${this.jobs.size}`);
             try {
                 const now = new Date();
+                console.log(`🔄 Appel du callback pour ${jobId}...`);
                 await callback(now);
+                console.log(`✅ Callback terminé pour ${jobId}`);
             }
             catch (error) {
+                console.log(`❌ Erreur dans callback pour ${jobId}:`, error.message);
                 NotificationLogger.logError('Exécution de la tâche planifiée', error);
             }
+            console.log(`🔥🔥🔥 FIN CRON_EXECUTION_${execId} 🔥🔥🔥\n`);
         });
 
-        const jobId = `${userId}-${time}`;
         this.jobs.set(jobId, job);
         console.log(`   ➕ Nouvelle tâche: ${jobId} (${cronExpression})`);
+        console.log(`📊 Jobs actuels APRÈS création: ${this.jobs.size}`);
+        console.log(`🔍 Job bien créé? ${this.jobs.has(jobId) ? 'OUI ✅' : 'NON ❌'}`);
+        console.log(`🚨🚨🚨 FIN SCHEDULE_TASK_${scheduleId} 🚨🚨🚨\n`);
     }
 
     scheduleNotificationProcessing() {
-        // Vérifier et traiter les notifications toutes les minutes
-        const job = cron.schedule('* * * * *', async () => {
-            try {
-                await this.processNotifications();
-            }
-            catch (error) {
-                NotificationLogger.logError('Traitement des notifications', error);
-            }
-        });
-        this.jobs.set('processNotifications', job);
-        console.log('🔄 Tâche de traitement des notifications planifiée (toutes les minutes)');
+        // ⚠️ DÉSACTIVÉ TEMPORAIREMENT POUR ÉVITER LES DOUBLONS
+        // Le scheduler individuel suffit, pas besoin du processor global
+        console.log('⚠️ Processor global désactivé - scheduler individuel utilisé uniquement');
+        return;
+        
+        // ANCIEN CODE COMMENTÉ :
+        // const job = cron.schedule('* * * * *', async () => {
+        //     try {
+        //         await this.processNotifications();
+        //     }
+        //     catch (error) {
+        //         NotificationLogger.logError('Traitement des notifications', error);
+        //     }
+        // });
+        // this.jobs.set('processNotifications', job);
+        // console.log('🔄 Tâche de traitement des notifications planifiée (toutes les minutes)');
     }
 
     async processNotifications() {

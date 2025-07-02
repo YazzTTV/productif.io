@@ -3,7 +3,8 @@ const express = require('express');
 const mongoose = require('mongoose');
 const whatsappService = require('./services/whatsappService');
 const notificationsRouter = require('./routes/notifications');
-const notificationScheduler = require('./services/notifications/scheduler');
+// DÉSACTIVÉ : Ancien planificateur qui causait des conflits et duplicatas
+// const notificationScheduler = require('./services/notifications/scheduler');
 
 const app = express();
 app.use(express.json());
@@ -16,8 +17,9 @@ mongoose.connect(MONGODB_URI)
     .then(() => {
         console.log('Connecté à MongoDB');
         
-        // Démarrer le planificateur de notifications
-        notificationScheduler.start();
+        // DÉSACTIVÉ : Ancien planificateur qui causait des conflits avec le nouveau système
+        // notificationScheduler.start();
+        console.log('ℹ️ ANCIEN PLANIFICATEUR DÉSACTIVÉ - Utilisation du nouveau système sur port 3002');
     })
     .catch((error) => {
         console.error('Erreur de connexion à MongoDB:', error);
