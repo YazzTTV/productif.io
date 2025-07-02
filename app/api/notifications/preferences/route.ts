@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getAuthUser } from '@/lib/auth';
 import { NotificationSettings, Prisma } from '@prisma/client';
+import EventManager from '@/lib/EventManager';
 
 interface NotificationPreferences {
     isEnabled: boolean;
@@ -18,7 +19,6 @@ interface NotificationPreferences {
     habitReminder: boolean;
     motivation: boolean;
     dailySummary: boolean;
-    reminderTime: string;
     morningTime: string;
     noonTime: string;
     afternoonTime: string;
@@ -73,7 +73,6 @@ export async function GET(request: Request) {
             habitReminder: preferences.habitReminder,
             motivation: preferences.motivation,
             dailySummary: preferences.dailySummary,
-            reminderTime: preferences.reminderTime,
             morningTime: preferences.morningTime,
             noonTime: preferences.noonTime,
             afternoonTime: preferences.afternoonTime,
@@ -94,7 +93,6 @@ export async function GET(request: Request) {
             habitReminder: true,
             motivation: true,
             dailySummary: true,
-            reminderTime: '09:00',
             morningTime: '08:00',
             noonTime: '12:00',
             afternoonTime: '14:00',
@@ -129,6 +127,11 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Non autorisé' }, { status: 403 });
         }
 
+        // Récupérer les anciennes préférences pour comparaison
+        const oldPreferences = await prisma.notificationSettings.findUnique({
+            where: { userId }
+        });
+
         // Synchroniser les types de notifications avec les champs booléens
         const notificationTypes = incomingPreferences.notificationTypes || [];
         const prismaData = {
@@ -146,7 +149,6 @@ export async function POST(request: Request) {
             habitReminder: incomingPreferences.habitReminder,
             motivation: incomingPreferences.motivation,
             dailySummary: incomingPreferences.dailySummary,
-            reminderTime: incomingPreferences.reminderTime,
             morningTime: incomingPreferences.morningTime,
             noonTime: incomingPreferences.noonTime,
             afternoonTime: incomingPreferences.afternoonTime,
@@ -163,6 +165,44 @@ export async function POST(request: Request) {
                 ...prismaData
             }
         });
+
+        // Émettre un événement de mise à jour des préférences
+        const eventManager = EventManager.getInstance();
+        eventManager.emitPreferencesUpdate({
+            userId,
+            oldPreferences: oldPreferences || null,
+            newPreferences: updatedPreferences,
+            timestamp: new Date()
+        });
+
+        console.log(`📡 Événement de mise à jour émis pour l'utilisateur ${userId}`);
+
+        // NOUVEAU : Notifier le scheduler par HTTP (communication inter-processus)
+        try {
+            console.log(`🔄 Notification du scheduler pour l'utilisateur ${userId}...`);
+            
+            const schedulerResponse = await fetch('http://localhost:3001/api/update-user', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    userId,
+                    oldPreferences: oldPreferences || null,
+                    newPreferences: updatedPreferences,
+                    timestamp: new Date()
+                })
+            });
+
+            if (schedulerResponse.ok) {
+                console.log(`✅ Scheduler notifié avec succès pour ${userId}`);
+            } else {
+                console.log(`⚠️ Échec de notification du scheduler: ${schedulerResponse.status}`);
+            }
+        } catch (error) {
+            console.log(`❌ Erreur lors de la notification du scheduler:`, error);
+            // On continue même si le scheduler n'est pas accessible
+        }
 
         return NextResponse.json(updatedPreferences);
     } catch (error) {

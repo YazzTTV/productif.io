@@ -120,6 +120,25 @@ class NotificationService {
     }
     async createNotification(userId, type, content, scheduledFor) {
         try {
+            // Vérifier s'il existe déjà une notification en attente du même type à la même heure
+            const existingNotification = await this.prisma.notificationHistory.findFirst({
+                where: {
+                    userId,
+                    type,
+                    status: 'pending',
+                    scheduledFor: {
+                        gte: new Date(scheduledFor.getTime() - 60000), // 1 minute avant
+                        lte: new Date(scheduledFor.getTime() + 60000)  // 1 minute après
+                    }
+                }
+            });
+
+            if (existingNotification) {
+                console.log(`   ⚠️ DOUBLON DÉTECTÉ: Une notification ${type} existe déjà pour ${userId} à ${scheduledFor.toLocaleTimeString()}`);
+                console.log(`   🔄 Notification existante: ${existingNotification.id} (planifiée pour ${existingNotification.scheduledFor.toLocaleTimeString()})`);
+                return existingNotification;
+            }
+
             const notification = await this.prisma.notificationHistory.create({
                 data: {
                     userId,
