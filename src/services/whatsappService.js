@@ -3,9 +3,6 @@ import fetch from 'node-fetch';
 import NotificationLogger from './NotificationLogger.js';
 import { v4 as uuidv4 } from 'uuid';
 
-// Cache global pour éviter les duplicatas WhatsApp
-const globalMessageCache = new Set();
-
 class WhatsAppService {
     constructor() {
         this.serviceId = uuidv4();
@@ -88,75 +85,18 @@ class WhatsAppService {
     }
 
     async sendMessage(phoneNumber, message, notificationId = null) {
-        // 🚨 LOGGING TEMPORAIRE EXTRÊME POUR TRAQUER LES DUPLICATAS
-        const extremeLogId = `EXTREME_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        const callStack = new Error().stack.split('\n').slice(1, 8);
-        console.log(`\n🚨🚨🚨 EXTREME_LOG_${extremeLogId}: APPEL sendMessage DÉTECTÉ 🚨🚨🚨`);
-        console.log(`⏰ Timestamp précis: ${new Date().toISOString()}`);
-        console.log(`📱 Numéro: ${phoneNumber}`);
-        console.log(`💬 Message length: ${message.length}`);
-        console.log(`🔢 NotificationId: ${notificationId}`);
-        console.log(`🆔 Service ID: ${this.serviceId}`);
-        console.log(`📊 Stack trace complet:`);
-        callStack.forEach((line, index) => {
-            console.log(`   ${index + 1}. ${line.trim()}`);
-        });
-        console.log(`🔍 Appel depuis: ${callStack[0] ? callStack[0].trim() : 'unknown'}`);
-        console.log(`🚨🚨🚨 DÉBUT DU TRAITEMENT EXTREME_LOG_${extremeLogId} 🚨🚨🚨\n`);
-
         const sendId = uuidv4();
         const requestStart = Date.now();
         this.requestCounter++;
         
-        // 🛡️ DÉDUPLICATION GLOBALE : Créer une référence unique SANS timestamp
-        const cleanPhone = this.formatPhoneNumber(phoneNumber);
-        // Utiliser une fenêtre de 5 minutes pour la déduplication
-        const timeWindow = Math.floor(Date.now() / (5 * 60 * 1000)); // 5 minutes
-        const messageHash = Buffer.from(`${cleanPhone}_${message}_${timeWindow}`).toString('base64').substring(0, 16);
-        const uniqueReference = `SCHED_${messageHash}`;
-        
-        // 🚨 LOGGING EXTRÊME DE DÉDUPLICATION
-        console.log(`\n🛡️ EXTREME_DEDUP_${extremeLogId}:`);
-        console.log(`   🏷️ Reference: ${uniqueReference}`);
-        console.log(`   ⏰ TimeWindow: ${timeWindow}`);
-        console.log(`   📱 CleanPhone: ${cleanPhone}`);
-        console.log(`   📋 Cache has ref: ${globalMessageCache.has(uniqueReference)}`);
-        console.log(`   📊 Cache size: ${globalMessageCache.size}`);
-        
-        // Vérifier si ce message a déjà été envoyé dans cette fenêtre de temps
-        if (globalMessageCache.has(uniqueReference)) {
-            console.log(`🚨 DUPLICATA BLOQUÉ: ${uniqueReference}`);
-            NotificationLogger.log('WARN', 'WHATSAPP_DUPLICATE_BLOCKED', {
-                sendId,
-                notificationId,
-                phoneNumber: cleanPhone,
-                reference: uniqueReference,
-                messageLength: message.length,
-                timeWindow,
-                reason: 'global_deduplication_5min_window'
-            });
-            return { blocked: true, reason: 'duplicate_blocked', reference: uniqueReference };
-        }
-        
-        // Marquer le message comme en cours d'envoi
-        globalMessageCache.add(uniqueReference);
-        console.log(`✅ AJOUTÉ AU CACHE: ${uniqueReference} (nouveau cache size: ${globalMessageCache.size})`);
-        
-        // Nettoyer le cache automatiquement après 10 minutes
-        setTimeout(() => {
-            globalMessageCache.delete(uniqueReference);
-        }, 10 * 60 * 1000);
-        
-        // Log de début d'envoi avec référence
+        // Log de début d'envoi
         NotificationLogger.logWhatsAppSendStart({
             sendId,
             notificationId,
             phoneNumber,
             messageLength: message.length,
             requestNumber: this.requestCounter,
-            serviceId: this.serviceId,
-            uniqueReference,
-            timeWindow
+            serviceId: this.serviceId
         });
 
         // Vérification de concurrence pour le même numéro
@@ -181,14 +121,14 @@ class WhatsAppService {
             // Formater le numéro de téléphone
             const formattedPhone = this.formatPhoneNumber(phoneNumber);
             
-            // Préparer le payload avec référence
+            // Préparer le payload
             const payload = {
                 messaging_product: 'whatsapp',
                 to: formattedPhone,
                 type: 'text',
                 text: {
                     preview_url: false,
-                    body: `${message}\n\n_Ref: ${uniqueReference}_`
+                    body: message
                 }
             };
 
@@ -198,8 +138,7 @@ class WhatsAppService {
                 notificationId,
                 url: `${this.apiUrl}/messages`,
                 payload,
-                formattedPhone,
-                uniqueReference
+                formattedPhone
             });
 
             const httpStart = Date.now();
@@ -248,24 +187,20 @@ class WhatsAppService {
             const responseData = JSON.parse(responseText);
             const totalDuration = Date.now() - requestStart;
 
-            // Log de succès avec référence
+            // Log de succès
             NotificationLogger.logWhatsAppSuccess({
                 sendId,
                 notificationId,
                 whatsappMessageId: responseData.messages?.[0]?.id,
                 whatsappWaId: responseData.contacts?.[0]?.wa_id,
                 requestDuration: httpDuration,
-                totalDuration,
-                uniqueReference
+                totalDuration
             });
 
             return responseData;
 
         } catch (error) {
             const totalDuration = Date.now() - requestStart;
-            
-            // Retirer de la cache en cas d'erreur
-            globalMessageCache.delete(uniqueReference);
             
             NotificationLogger.logWhatsAppError({
                 sendId,

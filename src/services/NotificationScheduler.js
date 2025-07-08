@@ -437,22 +437,16 @@ class NotificationScheduler {
     }
 
     scheduleNotificationProcessing() {
-        // ⚠️ DÉSACTIVÉ TEMPORAIREMENT POUR ÉVITER LES DOUBLONS
-        // Le scheduler individuel suffit, pas besoin du processor global
-        console.log('⚠️ Processor global désactivé - scheduler individuel utilisé uniquement');
-        return;
-        
-        // ANCIEN CODE COMMENTÉ :
-        // const job = cron.schedule('* * * * *', async () => {
-        //     try {
-        //         await this.processNotifications();
-        //     }
-        //     catch (error) {
-        //         NotificationLogger.logError('Traitement des notifications', error);
-        //     }
-        // });
-        // this.jobs.set('processNotifications', job);
-        // console.log('🔄 Tâche de traitement des notifications planifiée (toutes les minutes)');
+        const job = cron.schedule('* * * * *', async () => {
+            try {
+                await this.processNotifications();
+            }
+            catch (error) {
+                NotificationLogger.logError('Traitement des notifications', error);
+            }
+        });
+        this.jobs.set('processNotifications', job);
+        console.log('🔄 Tâche de traitement des notifications planifiée (toutes les minutes)');
     }
 
     async processNotifications() {

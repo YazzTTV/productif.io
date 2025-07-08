@@ -1,8 +1,5 @@
 import axios from 'axios';
 
-// 🛡️ DÉDUPLICATION GLOBALE : Cache des messages envoyés
-const messageSent = new Set<string>();
-
 export class WhatsAppService {
     private apiUrl: string;
     private accessToken: string;
@@ -29,32 +26,9 @@ export class WhatsAppService {
             // Nettoyer le numéro de téléphone
             const cleanPhoneNumber = to.replace(/\D/g, '');
             
-            // 🛡️ DÉDUPLICATION : Créer une référence unique SANS timestamp
-            // Utiliser une fenêtre de 5 minutes pour la déduplication
-            const timeWindow = Math.floor(Date.now() / (5 * 60 * 1000)); // 5 minutes
-            const messageHash = Buffer.from(`${cleanPhoneNumber}_${message}_${timeWindow}`).toString('base64').substring(0, 16);
-            const uniqueReference = `AI_${messageHash}`;
-            
-            // Vérifier si ce message a déjà été envoyé dans cette fenêtre de temps
-            if (messageSent.has(uniqueReference)) {
-                console.log('🛡️ DUPLICATA BLOQUÉ (Agent IA):', {
-                    to: cleanPhoneNumber,
-                    messagePreview: message.substring(0, 50) + '...',
-                    uniqueReference,
-                    timeWindow,
-                    reason: 'Message identique dans la fenêtre de 5 minutes'
-                });
-                return;
-            }
-            
-            // Marquer le message comme envoyé
-            messageSent.add(uniqueReference);
-            
             console.log('📤 Envoi du message WhatsApp (Agent IA):', {
                 to: cleanPhoneNumber,
-                messageLength: message.length,
-                uniqueReference,
-                timeWindow
+                messageLength: message.length
             });
 
             const response = await axios.post(
@@ -66,7 +40,7 @@ export class WhatsAppService {
                     type: 'text',
                     text: {
                         preview_url: false,
-                        body: `${message}\n\n_Ref: ${uniqueReference}_`
+                        body: message
                     }
                 },
                 {
@@ -78,15 +52,8 @@ export class WhatsAppService {
             );
 
             console.log('✅ Message envoyé avec succès (Agent IA):', {
-                whatsappMessageId: response.data.messages?.[0]?.id,
-                uniqueReference
+                whatsappMessageId: response.data.messages?.[0]?.id
             });
-            
-            // Nettoyer le cache après 10 minutes
-            setTimeout(() => {
-                messageSent.delete(uniqueReference);
-                console.log('🧹 Cache nettoyé pour:', uniqueReference);
-            }, 10 * 60 * 1000);
 
         } catch (error: unknown) {
             if (axios.isAxiosError(error)) {

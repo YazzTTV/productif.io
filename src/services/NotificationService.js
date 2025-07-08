@@ -122,7 +122,6 @@ class NotificationService {
     }
     async createNotification(userId, type, content, scheduledFor) {
         const notificationId = uuidv4();
-        const startTime = Date.now();
         
         NotificationLogger.logNotificationCreation({
             notificationId,
@@ -132,122 +131,30 @@ class NotificationService {
         });
 
         try {
-            // NOUVELLE APPROCHE: Transaction atomique avec gestion de contraintes uniques
-            const transactionStart = Date.now();
-            
-            NotificationLogger.logNotificationTransactionStart({
-                notificationId,
-                userId,
-                type
-            });
-
-            // Utiliser une transaction avec retry pour gérer les conditions de course
-            const notification = await this.prisma.$transaction(async (prisma) => {
-                // Vérification finale dans la transaction pour sécurité supplémentaire
-                const existingNotification = await prisma.notificationHistory.findFirst({
-                    where: {
-                        userId: userId,
-                        type: type,
-                        scheduledFor: {
-                            gte: new Date(scheduledFor.getTime() - 30000), // 30 secondes avant
-                            lte: new Date(scheduledFor.getTime() + 30000)  // 30 secondes après
-                        }
-                    }
-                });
-
-                if (existingNotification) {
-                    NotificationLogger.logNotificationDuplicateDetected({
-                        notificationId,
-                        existingId: existingNotification.id,
-                        existingScheduledFor: existingNotification.scheduledFor.toISOString(),
-                        newScheduledFor: scheduledFor.toISOString(),
-                        duplicateCheckDuration: Date.now() - transactionStart,
-                        timeDifference: Math.abs(existingNotification.scheduledFor.getTime() - scheduledFor.getTime())
-                    });
-                    return null;
-                }
-
-                // Création atomique avec gestion des erreurs de contrainte unique
-                try {
-                    const newNotification = await prisma.notificationHistory.create({
-                        data: {
-                            userId,
-                            type,
-                            content,
-                            scheduledFor,
-                            status: 'pending'
-                        }
-                    });
-                    
-                    return newNotification;
-                } catch (error) {
-                    // Si erreur de contrainte unique, c'est qu'un autre processus a créé la notification
-                    if (error.code === 'P2002') {
-                        NotificationLogger.log('WARN', 'NOTIFICATION_CONSTRAINT_VIOLATION', {
-                            notificationId,
-                            userId,
-                            type,
-                            error: 'Contrainte unique violée - notification déjà créée par un autre processus'
-                        });
-                        return null;
-                    }
-                    throw error;
-                }
-            }, {
-                maxWait: 5000, // Attendre maximum 5 secondes
-                timeout: 10000, // Timeout de 10 secondes
-                isolationLevel: 'Serializable' // Isolation maximale
-            });
-
-            const transactionDuration = Date.now() - transactionStart;
-            const totalDuration = Date.now() - startTime;
-
-            if (!notification) {
-                NotificationLogger.log('INFO', 'NOTIFICATION_CREATION_SKIPPED', {
-                    notificationId,
+            const notification = await this.prisma.notificationHistory.create({
+                data: {
                     userId,
                     type,
-                    reason: 'duplicate_detected_in_transaction',
-                    totalDuration
-                });
-                return null;
-            }
+                    content,
+                    scheduledFor,
+                    status: 'pending'
+                }
+            });
 
             NotificationLogger.logNotificationCreated({
                 notificationId,
                 dbId: notification.id,
-                transactionDuration,
-                totalDuration,
                 status: notification.status
-            });
-
-            NotificationLogger.logNotificationDuplicatePassed({
-                notificationId,
-                duplicateCheckDuration: transactionDuration
             });
 
             return notification;
 
         } catch (error) {
-            const totalDuration = Date.now() - startTime;
-            
             NotificationLogger.logNotificationError({
                 notificationId,
                 error: error.message,
-                stack: error.stack,
-                totalDuration
+                stack: error.stack
             });
-            
-            // Si c'est une erreur de contrainte, ne pas la propager
-            if (error.code === 'P2002') {
-                NotificationLogger.log('INFO', 'NOTIFICATION_DUPLICATE_HANDLED', {
-                    notificationId,
-                    userId,
-                    type,
-                    message: 'Duplicata géré par contrainte unique'
-                });
-                return null;
-            }
             
             throw error;
         }

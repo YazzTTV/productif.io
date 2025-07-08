@@ -51,35 +51,10 @@ class NotificationLogger {
                 scheduledFor: data.scheduledFor,
                 currentTime: new Date().toISOString()
             });
-    }
-    }
-
-    logNotificationDuplicateCheckStart(data) {
-        return this.log('DEBUG', 'DUPLICATE_CHECK_START', {
-            notificationId: data.notificationId,
-            userId: data.userId,
-            type: data.type,
-            checkStart: Date.now()
-        });
+        }
     }
 
-    logNotificationDuplicateDetected(data) {
-        return this.log('WARN', 'DUPLICATE_DETECTED', {
-            notificationId: data.notificationId,
-            existingId: data.existingId,
-            existingScheduledFor: data.existingScheduledFor,
-            newScheduledFor: data.newScheduledFor,
-            duplicateCheckDuration: data.duplicateCheckDuration,
-            timeDifference: data.timeDifference
-        });
-    }
 
-    logNotificationDuplicatePassed(data) {
-        return this.log('SUCCESS', 'DUPLICATE_CHECK_PASSED', {
-            notificationId: data.notificationId,
-            duplicateCheckDuration: data.duplicateCheckDuration
-        });
-    }
 
     logNotificationTransactionStart(data) {
         return this.log('DEBUG', 'DB_TRANSACTION_START', {
@@ -107,7 +82,7 @@ class NotificationLogger {
             stack: data.stack,
             totalDuration: data.totalDuration
         });
-        }
+    }
 
     // === TRAITEMENT DES NOTIFICATIONS ===
     logNotificationProcessingStart(notification) {

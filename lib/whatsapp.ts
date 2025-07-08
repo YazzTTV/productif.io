@@ -1,9 +1,6 @@
 import { whatsappConfig } from '@/config/whatsapp';
 import axios, { AxiosError } from 'axios';
 
-// Cache pour éviter les duplicatas
-const messageSent = new Set<string>();
-
 class WhatsAppService {
     private axios;
     private baseUrl = 'https://graph.facebook.com';
@@ -44,33 +41,10 @@ class WhatsAppService {
             // Nettoyer le numéro de téléphone
             const cleanPhoneNumber = to.replace(/\D/g, '');
             
-            // 🛡️ DÉDUPLICATION : Créer une référence unique SANS timestamp
-            // Utiliser une fenêtre de 5 minutes pour la déduplication
-            const timeWindow = Math.floor(Date.now() / (5 * 60 * 1000)); // 5 minutes
-            const messageHash = Buffer.from(`${cleanPhoneNumber}_${message}_${timeWindow}`).toString('base64').substring(0, 16);
-            const uniqueReference = `PRODUCTIF_${messageHash}`;
-            
-            // Vérifier si ce message a déjà été envoyé dans cette fenêtre de temps
-            if (messageSent.has(uniqueReference)) {
-                console.log('🛡️ DUPLICATA BLOQUÉ:', {
-                    to: cleanPhoneNumber,
-                    reference: uniqueReference,
-                    messageLength: message.length,
-                    timeWindow,
-                    reason: 'global_deduplication_5min_window'
-                });
-                return { blocked: true, reason: 'duplicate_blocked', reference: uniqueReference };
-            }
-            
-            // Marquer le message comme envoyé
-            messageSent.add(uniqueReference);
-            
             console.log('📤 Envoi du message WhatsApp:', {
                 to: cleanPhoneNumber,
                 phoneNumberId: whatsappConfig.phoneNumberId,
-                messageLength: message.length,
-                uniqueReference,
-                timeWindow
+                messageLength: message.length
             });
 
             const response = await this.axios.post(
@@ -81,20 +55,12 @@ class WhatsAppService {
                     type: "text",
                     text: { 
                         preview_url: false,
-                        body: `${message}\n\n_Ref: ${uniqueReference}_`
+                        body: message
                     }
                 }
             );
 
-            console.log('✅ Message envoyé avec succès:', {
-                ...response.data,
-                uniqueReference
-            });
-            
-            // Nettoyer le cache automatiquement après 10 minutes
-            setTimeout(() => {
-                messageSent.delete(uniqueReference);
-            }, 10 * 60 * 1000);
+            console.log('✅ Message envoyé avec succès:', response.data);
             
             return response.data;
         } catch (error) {
