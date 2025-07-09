@@ -11,11 +11,9 @@ interface Achievement {
   id: string
   name: string
   description: string
-  icon: string
-  category: string
-  rarity: string
+  type: string
   points: number
-  condition: any
+  threshold: number
   unlocked: boolean
   unlockedAt?: string
 }
@@ -27,40 +25,37 @@ interface AchievementsData {
   totalAvailable: number
 }
 
-const CATEGORY_ICONS = {
-  streak: Calendar,
-  completion: Target,
-  consistency: Star,
-  milestone: Trophy,
-  special: Award
+const TYPE_ICONS = {
+  STREAK: Calendar,
+  HABITS: Target,
+  PERFECT_DAY: Star,
+  POINTS: Trophy,
+  TASKS: Zap,
+  OBJECTIVES: Award
 }
 
-const CATEGORY_NAMES = {
-  streak: "Séries",
-  completion: "Complétion",
-  consistency: "Régularité",
-  milestone: "Étapes",
-  special: "Spéciaux"
+const TYPE_NAMES = {
+  STREAK: "Séries",
+  HABITS: "Habitudes",
+  PERFECT_DAY: "Régularité",
+  POINTS: "Points",
+  TASKS: "Tâches",
+  OBJECTIVES: "Objectifs"
 }
 
-const RARITY_COLORS = {
-  common: "bg-gray-100 text-gray-800",
-  rare: "bg-blue-100 text-blue-800",
-  epic: "bg-purple-100 text-purple-800",
-  legendary: "bg-yellow-100 text-yellow-800"
-}
-
-const RARITY_NAMES = {
-  common: "Commun",
-  rare: "Rare",
-  epic: "Épique",
-  legendary: "Légendaire"
+const TYPE_COLORS = {
+  STREAK: "bg-blue-100 text-blue-800",
+  HABITS: "bg-green-100 text-green-800",
+  PERFECT_DAY: "bg-yellow-100 text-yellow-800",
+  POINTS: "bg-purple-100 text-purple-800",
+  TASKS: "bg-orange-100 text-orange-800",
+  OBJECTIVES: "bg-indigo-100 text-indigo-800"
 }
 
 export default function AchievementsPage() {
   const [data, setData] = useState<AchievementsData | null>(null)
   const [loading, setLoading] = useState(true)
-  const [selectedCategory, setSelectedCategory] = useState<string>("all")
+  const [selectedType, setSelectedType] = useState<string>("all")
 
   useEffect(() => {
     fetchAchievements()
@@ -108,20 +103,14 @@ export default function AchievementsPage() {
 
   const completionPercentage = Math.round((data.totalUnlocked / data.totalAvailable) * 100)
 
-  const getAchievementIcon = (iconName: string) => {
-    switch (iconName) {
-      case "🔥": return <Zap className="h-6 w-6 text-orange-500" />
-      case "🎯": return <Target className="h-6 w-6 text-blue-500" />
-      case "⭐": return <Star className="h-6 w-6 text-yellow-500" />
-      case "🏆": return <Trophy className="h-6 w-6 text-yellow-600" />
-      case "📅": return <Calendar className="h-6 w-6 text-green-500" />
-      default: return <Award className="h-6 w-6 text-gray-500" />
-    }
+  const getAchievementIcon = (type: string) => {
+    const Icon = TYPE_ICONS[type as keyof typeof TYPE_ICONS] || Award
+    return <Icon className="h-6 w-6" />
   }
 
-  const filteredAchievements = selectedCategory === "all" 
+  const filteredAchievements = selectedType === "all" 
     ? data.achievements 
-    : data.grouped[selectedCategory] || []
+    : data.grouped[selectedType] || []
 
   return (
     <div className="container mx-auto py-6">
@@ -159,22 +148,20 @@ export default function AchievementsPage() {
           </CardContent>
         </Card>
 
-        {/* Filtres par catégorie */}
-        <Tabs value={selectedCategory} onValueChange={setSelectedCategory}>
-          <TabsList className="grid w-full grid-cols-6">
+        {/* Filtres par type */}
+        <Tabs value={selectedType} onValueChange={setSelectedType}>
+          <TabsList className="grid w-full grid-cols-7">
             <TabsTrigger value="all">Tous</TabsTrigger>
-            {Object.entries(CATEGORY_NAMES).map(([key, name]) => (
+            {Object.entries(TYPE_NAMES).map(([key, name]) => (
               <TabsTrigger key={key} value={key}>
                 {name}
               </TabsTrigger>
             ))}
           </TabsList>
 
-          <TabsContent value={selectedCategory} className="mt-6">
+          <TabsContent value={selectedType} className="mt-6">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredAchievements.map((achievement) => {
-                const CategoryIcon = CATEGORY_ICONS[achievement.category as keyof typeof CATEGORY_ICONS] || Award
-                
                 return (
                   <Card 
                     key={achievement.id} 
@@ -187,15 +174,15 @@ export default function AchievementsPage() {
                     <CardHeader className="pb-3">
                       <div className="flex items-start justify-between">
                         <div className="flex items-center gap-3">
-                          {getAchievementIcon(achievement.icon)}
+                          {getAchievementIcon(achievement.type)}
                           <div>
                             <CardTitle className="text-lg">{achievement.name}</CardTitle>
                             <div className="flex items-center gap-2 mt-1">
                               <Badge 
                                 variant="secondary" 
-                                className={RARITY_COLORS[achievement.rarity as keyof typeof RARITY_COLORS]}
+                                className={TYPE_COLORS[achievement.type as keyof typeof TYPE_COLORS]}
                               >
-                                {RARITY_NAMES[achievement.rarity as keyof typeof RARITY_NAMES]}
+                                {TYPE_NAMES[achievement.type as keyof typeof TYPE_NAMES]}
                               </Badge>
                               <span className="text-sm text-gray-500">
                                 {achievement.points} pts
@@ -221,12 +208,9 @@ export default function AchievementsPage() {
                       )}
                       {!achievement.unlocked && (
                         <div className="mt-3">
-                          <div className="text-xs text-gray-500 mb-1">Condition:</div>
+                          <div className="text-xs text-gray-500 mb-1">Objectif :</div>
                           <div className="text-xs text-gray-700">
-                            {achievement.condition.streakDays && `Maintenir un streak de ${achievement.condition.streakDays} jours`}
-                            {achievement.condition.totalHabits && `Compléter ${achievement.condition.totalHabits} habitudes`}
-                            {achievement.condition.perfectDay && "Réaliser une journée parfaite"}
-                            {achievement.condition.totalPoints && `Atteindre ${achievement.condition.totalPoints} points`}
+                            {achievement.threshold} {achievement.type === 'POINTS' ? 'points' : ''}
                           </div>
                         </div>
                       )}
