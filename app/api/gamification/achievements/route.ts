@@ -12,7 +12,7 @@ export async function GET() {
     // Récupérer tous les achievements
     const allAchievements = await prisma.achievement.findMany({
       orderBy: [
-        { category: 'asc' },
+        { type: 'asc' },
         { points: 'asc' }
       ]
     })
@@ -35,22 +35,20 @@ export async function GET() {
         id: achievement.id,
         name: achievement.name,
         description: achievement.description,
-        icon: achievement.icon,
-        category: achievement.category,
-        rarity: achievement.rarity,
+        type: achievement.type,
         points: achievement.points,
-        condition: JSON.parse(achievement.condition),
+        threshold: achievement.threshold,
         unlocked: unlockedIds.has(achievement.id),
         unlockedAt: userAchievement?.unlockedAt || null
       }
     })
 
-    // Grouper par catégorie
+    // Grouper par type
     const groupedAchievements = achievementsWithStatus.reduce((acc, achievement) => {
-      if (!acc[achievement.category]) {
-        acc[achievement.category] = []
+      if (!acc[achievement.type]) {
+        acc[achievement.type] = []
       }
-      acc[achievement.category].push(achievement)
+      acc[achievement.type].push(achievement)
       return acc
     }, {} as Record<string, typeof achievementsWithStatus>)
 
