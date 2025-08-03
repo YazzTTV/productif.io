@@ -25,14 +25,18 @@ android {
 
     signingConfigs {
         release {
-            storeFile file("../productif-keystore.jks")
-            storePassword System.getenv("KEYSTORE_PASSWORD")
+            storeFile file("../keystore-productif.jks")
+            storePassword "password"
             keyAlias "productif"
-            keyPassword System.getenv("KEY_PASSWORD")
+            keyPassword "password"
         }
     }
 
     buildTypes {
+        debug {
+            signingConfig signingConfigs.release
+            minifyEnabled false
+        }
         release {
             signingConfig signingConfigs.release
             minifyEnabled true

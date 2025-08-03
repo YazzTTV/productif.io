@@ -103,7 +103,7 @@ export function AchievementNotification({ achievements, onClose }: AchievementNo
         initial={{ opacity: 0, scale: 0.8, y: 50 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.8, y: 50 }}
-        className="fixed bottom-4 right-4 z-50 max-w-sm"
+        className="fixed bottom-32 right-4 z-50 max-w-sm"
       >
         <Card className={`border-2 shadow-lg ${RARITY_COLORS[currentAchievement.rarity as keyof typeof RARITY_COLORS]} relative overflow-hidden`}>
           {/* Effet de brillance pour les achievements rares */}

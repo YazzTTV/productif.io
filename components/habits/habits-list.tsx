@@ -339,7 +339,7 @@ export function HabitsList({ habits: initialHabits }: HabitsListProps) {
       )}
       
       {actionsQueue.length > 0 && (
-        <div className="fixed bottom-4 right-4 bg-primary text-white px-4 py-2 rounded-md shadow-lg">
+        <div className="fixed bottom-32 right-4 bg-primary text-white px-4 py-2 rounded-md shadow-lg">
           {processingQueue ? 
             "Synchronisation en cours..." : 
             `${actionsQueue.length} modification${actionsQueue.length > 1 ? 's' : ''} en attente`
