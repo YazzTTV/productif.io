@@ -32,7 +32,10 @@ export default function DashboardLayout({
       {/* Composant de déconnexion automatique */}
       <AutoLogout />
       
-      <div className="flex min-h-screen flex-col">
+      <div className={cn(
+        "flex flex-col",
+        isNativeMobile ? "ios-viewport-fix" : "min-h-screen"
+      )}>
         <header className={cn(
           "bg-card border-b border-border shadow z-20 sticky top-0",
           isNativeMobile && "pt-safe-area-inset-top"
@@ -66,7 +69,10 @@ export default function DashboardLayout({
           {/* Mobile sidebar backdrop */}
           {sidebarOpen && (
             <div 
-              className="fixed inset-0 bg-black/80 z-10 md:hidden"
+              className={cn(
+                "fixed inset-0 bg-black/80 md:hidden",
+                isNativeMobile ? "z-[9997]" : "z-10"
+              )}
               onClick={() => setSidebarOpen(false)}
             />
           )}
@@ -74,11 +80,12 @@ export default function DashboardLayout({
           {/* Sidebar */}
           <aside 
             className={cn(
-              "fixed md:static inset-y-0 left-0 z-20 w-64 transform transition-transform duration-200 ease-in-out bg-card border-r border-border overflow-y-auto",
+              "fixed md:static inset-y-0 left-0 transform transition-transform duration-200 ease-in-out bg-card border-r border-border overflow-y-auto",
               sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0",
               "md:h-[calc(100vh-4rem)] md:sticky md:top-16",
-              isNativeMobile ? "pt-24" : "pt-20",
-              "md:pt-0"
+              isNativeMobile ? "pt-24 pb-24 z-[9998]" : "pt-20 z-20",
+              "md:pt-0 w-64",
+              isNativeMobile && sidebarOpen ? "h-[calc(100vh-160px)]" : ""
             )}
           >
             <div className="px-2 py-2">
@@ -87,14 +94,19 @@ export default function DashboardLayout({
           </aside>
 
           {/* Main content */}
-          <main className="flex-1 p-4 sm:p-6 bg-background w-full overflow-auto pb-24 md:pb-6">
+          <main className={cn(
+            "flex-1 p-4 sm:p-6 bg-background w-full md:pb-6",
+            isNativeMobile 
+              ? "ios-content-wrapper pb-6" 
+              : "overflow-auto pb-28"
+          )}>
             <div className="mx-auto max-w-7xl">
               {children}
             </div>
           </main>
         </div>
 
-        <footer className="bg-card border-t border-border z-10">
+        <footer className="bg-card border-t border-border z-10 hidden md:block">
           <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
             <p className="text-center text-sm text-muted-foreground">
               &copy; {new Date().getFullYear()} productif.io. {locale === 'fr' ? 'Tous droits réservés.' : 'All rights reserved.'}
@@ -102,7 +114,7 @@ export default function DashboardLayout({
           </div>
         </footer>
         
-        {/* Navigation mobile globale */}
+        {/* Navigation mobile globale - fixe en bas de l'écran */}
         <MobileNav />
       </div>
     </ClientAuthProvider>

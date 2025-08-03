@@ -296,7 +296,7 @@ export function MobileHabitsCards({
       )}
 
       {/* Bouton flottant pour ajouter une habitude */}
-      <div className="fixed bottom-20 right-4 z-50">
+      <div className="fixed bottom-32 right-4 z-50">
           <Link href="/dashboard/habits/new">
             <Button 
             className="rounded-full bg-green-500 hover:bg-green-600 shadow-lg px-4 py-3 h-auto"

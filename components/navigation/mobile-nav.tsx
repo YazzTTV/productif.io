@@ -3,10 +3,17 @@
 import { useRouter, usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import { useEffect, useState } from "react"
+import { Capacitor } from '@capacitor/core'
 
 export function MobileNav() {
   const router = useRouter()
   const pathname = usePathname()
+  const [isNative, setIsNative] = useState(false)
+
+  useEffect(() => {
+    setIsNative(Capacitor.isNativePlatform())
+  }, [])
 
   const navItems = [
     {
@@ -57,16 +64,39 @@ export function MobileNav() {
   }
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-gray-200/60 px-6 py-3 pb-8 shadow-lg z-50 md:hidden">
-      <div className="flex items-center justify-around max-w-md mx-auto">
+    <nav 
+      className={cn(
+        "bg-white/98 backdrop-blur-xl border-t border-gray-200/80 px-4 py-2 pb-safe-area-inset-bottom shadow-2xl md:hidden supports-[backdrop-filter]:bg-white/90",
+        isNative 
+          ? "mobile-nav-native h-20" 
+          : "fixed bottom-0 left-0 right-0 z-[9999]"
+      )}
+      style={isNative ? {
+        position: 'fixed',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        zIndex: 9999,
+        height: '80px',
+        transform: 'translateZ(0)',
+        backfaceVisibility: 'hidden'
+      } : {
+        position: 'fixed',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        zIndex: 9999
+      }}
+    >
+      <div className="flex items-center justify-around max-w-sm mx-auto gap-1">
         {navItems.map((item) => (
           <Button
             key={item.path}
             variant="ghost"
             onClick={() => router.push(item.path)}
             className={cn(
-              "flex flex-col items-center space-y-2 px-4 py-3 rounded-2xl transition-all duration-200",
-              "hover:bg-green-50 active:scale-95",
+              "flex flex-col items-center space-y-1 px-3 py-2 rounded-xl transition-all duration-200",
+              "hover:bg-green-50 active:scale-95 min-h-[60px] justify-center",
               isActive(item.path)
                 ? "text-green-600 bg-green-50" 
                 : "text-gray-500 hover:text-green-600"
@@ -84,6 +114,6 @@ export function MobileNav() {
           </Button>
         ))}
       </div>
-    </div>
+    </nav>
   )
 } 

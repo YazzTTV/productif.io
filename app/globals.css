@@ -242,3 +242,41 @@ body {
     padding-bottom: env(safe-area-inset-bottom);
   }
 }
+
+/* Navigation fixe pour application native */
+.mobile-nav-native {
+  position: fixed !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  z-index: 999999 !important;
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  will-change: transform;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+/* Forcer la position pour iOS WebView */
+@supports (-webkit-overflow-scrolling: touch) {
+  .mobile-nav-native {
+    position: absolute !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+  }
+}
+
+/* Viewport fix pour les appareils iOS */
+.ios-viewport-fix {
+  position: relative;
+  height: 100vh;
+  height: 100dvh; /* Dynamic viewport height */
+  overflow: hidden;
+}
+
+.ios-content-wrapper {
+  height: calc(100% - 80px); /* Réserver l'espace pour la navigation */
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
