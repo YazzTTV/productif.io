@@ -46,6 +46,7 @@ export async function POST(req: Request) {
       {
         success: true,
         user: userWithoutPassword,
+        token: token, // Ajouter le token pour l'app mobile
       },
       {
         status: 200,
