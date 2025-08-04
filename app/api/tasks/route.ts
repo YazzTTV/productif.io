@@ -36,6 +36,7 @@ export async function GET(request: Request) {
     const companyIdParam = searchParams.get('companyId')
     const dateParam = searchParams.get('date')
     const debug = searchParams.get('debug') === '1'
+    const userOnly = searchParams.get('userOnly') === 'true'
     
     // Pour le debug uniquement
     if (debug) {
@@ -68,8 +69,12 @@ export async function GET(request: Request) {
     let shouldFilterByCompany = false
     let targetCompanyId = null
     
+    // Si userOnly est spécifié, forcer le filtrage par utilisateur uniquement
+    if (userOnly) {
+      shouldFilterByCompany = false
+    }
     // Si l'utilisateur est ADMIN ou SUPER_ADMIN et qu'un ID d'entreprise est spécifié
-    if ((userRole === 'ADMIN' || userRole === 'SUPER_ADMIN')) {
+    else if ((userRole === 'ADMIN' || userRole === 'SUPER_ADMIN')) {
       if (companyIdParam && companyIdParam.trim() !== '') {
         // Utiliser l'ID d'entreprise spécifié dans la requête
         shouldFilterByCompany = true
