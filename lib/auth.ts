@@ -61,6 +61,54 @@ export async function getAuthUser() {
   }
 }
 
+// Nouvelle fonction pour l'authentification mobile (avec header Authorization)
+export async function getAuthUserFromRequest(req: NextRequest) {
+  try {
+    let token: string | null = null
+
+    // 1. Essayer de récupérer le token depuis le header Authorization (mobile)
+    const authHeader = req.headers.get("authorization")
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      token = authHeader.substring(7) // Enlever "Bearer "
+      console.log("Token found in Authorization header")
+    }
+
+    // 2. Si pas de token dans le header, essayer les cookies (web)
+    if (!token) {
+      token = req.cookies.get("auth_token")?.value
+      if (token) {
+        console.log("Token found in cookies")
+      }
+    }
+
+    if (!token) {
+      console.log("No token found in header or cookies")
+      return null
+    }
+
+    const decoded = await verifyToken(token)
+    if (!decoded || !decoded.userId) {
+      console.log("Invalid token or no userId in token")
+      return null
+    }
+
+    // Vérifier si l'utilisateur existe
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.userId },
+    })
+
+    if (!user) {
+      console.log("User not found in database")
+      return null
+    }
+
+    return user
+  } catch (error) {
+    console.error("Error in getAuthUserFromRequest:", error)
+    return null
+  }
+}
+
 export async function createSession(userId: string, token: string) {
   const expiresAt = new Date()
   expiresAt.setDate(expiresAt.getDate() + 7)
