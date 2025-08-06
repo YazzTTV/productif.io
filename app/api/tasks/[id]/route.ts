@@ -227,40 +227,31 @@ export async function PATCH(
 
 // DELETE /api/tasks/[id] - Supprimer une tâche
 export async function DELETE(
-  request: Request,
+  request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
     // Récupérer l'ID de la tâche
     const { id } = params
 
-    const cookieStore = await cookies()
-    const token = cookieStore.get("auth_token")?.value
-
-    if (!token) {
+    // Authentification (supporte cookies ET Authorization header)
+    const user = await getAuthUserFromRequest(request)
+    if (!user) {
       return NextResponse.json(
         { error: "Non authentifié" },
         { status: 401 }
       )
     }
 
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json(
-        { error: "Non authentifié" },
-        { status: 401 }
-      )
-    }
-
-    const userId = decoded.userId
+    const userId = user.id
 
     // Récupérer les informations de l'utilisateur pour vérifier son rôle
-    const user = await prisma.user.findUnique({
+    const userInfo = await prisma.user.findUnique({
       where: { id: userId },
       select: { role: true, managedCompanyId: true }
     })
 
-    const isAdmin = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN'
+    const isAdmin = userInfo?.role === 'ADMIN' || userInfo?.role === 'SUPER_ADMIN'
 
     const task = await prisma.task.findUnique({
       where: {
@@ -278,8 +269,8 @@ export async function DELETE(
     // Obtenir l'entreprise de l'utilisateur
     let userCompanyId: string | null = null;
     
-    if (isAdmin && user?.managedCompanyId) {
-      userCompanyId = user.managedCompanyId;
+    if (isAdmin && userInfo?.managedCompanyId) {
+      userCompanyId = userInfo.managedCompanyId;
     } else {
       // Pour les utilisateurs normaux
       const userCompany = await prisma.userCompany.findFirst({
