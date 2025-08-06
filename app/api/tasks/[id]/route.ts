@@ -1,6 +1,5 @@
-import { NextResponse } from "next/server"
-import { cookies } from "next/headers"
-import { verifyToken } from "@/lib/auth"
+import { NextRequest, NextResponse } from "next/server"
+import { getAuthUserFromRequest } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { calculateTaskOrder } from "@/lib/tasks"
 import { localDateToUTC } from "@/lib/date-utils"
@@ -108,35 +107,29 @@ export async function GET(
 
 // PATCH /api/tasks/[id] - Mettre à jour une tâche
 export async function PATCH(
-  request: Request,
+  request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
     // Récupérer l'ID de la tâche
     const { id } = params
 
-    const cookieStore = await cookies()
-    const token = cookieStore.get("auth_token")?.value
-
-    if (!token) {
+    // Authentification (supporte cookies ET Authorization header)
+    const user = await getAuthUserFromRequest(request)
+    if (!user) {
       return new Response("Non authentifié", { status: 401 })
     }
 
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return new Response("Non authentifié", { status: 401 })
-    }
-
-    const userId = decoded.userId
+    const userId = user.id
     const { title, description, priority, energyLevel, dueDate, projectId, completed } = await request.json()
 
     // Récupérer les informations de l'utilisateur pour vérifier son rôle
-    const user = await prisma.user.findUnique({
+    const userInfo = await prisma.user.findUnique({
       where: { id: userId },
       select: { role: true, managedCompanyId: true }
     })
 
-    const isAdmin = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN'
+    const isAdmin = userInfo?.role === 'ADMIN' || userInfo?.role === 'SUPER_ADMIN'
 
     // Récupérer la tâche pour vérification
     const existingTask = await prisma.task.findUnique({
@@ -153,12 +146,12 @@ export async function PATCH(
       // Autorisation OK
     }
     // Cas 2: L'utilisateur est admin et gère une entreprise
-    else if (isAdmin && user?.managedCompanyId) {
+    else if (isAdmin && userInfo?.managedCompanyId) {
       // Vérifier que l'utilisateur assigné à la tâche appartient à l'entreprise gérée par l'admin
       const userBelongsToManagedCompany = await prisma.userCompany.findFirst({
         where: {
           userId: existingTask.userId,
-          companyId: user.managedCompanyId
+          companyId: userInfo.managedCompanyId
         }
       })
 
