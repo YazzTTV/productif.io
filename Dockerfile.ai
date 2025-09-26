@@ -1,5 +1,5 @@
 # Dockerfile for AI agent service
-FROM node:18
+FROM node:22
 
 WORKDIR /app
 
@@ -11,7 +11,7 @@ COPY prisma ./prisma/
 # Install dependencies
 RUN npm ci
 
-# Generate Prisma client
+# Generate Prisma client (using local dev dependency)
 RUN npx prisma generate
 
 # Copy the rest of the application
