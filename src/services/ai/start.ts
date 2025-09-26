@@ -1,11 +1,19 @@
 import { fileURLToPath } from 'url';
-import { dirname } from 'path';
+import { dirname, resolve } from 'path';
+import { existsSync } from 'fs';
 import { config } from 'dotenv';
 
 // Configuration de dotenv avec le chemin correct
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+// Charger .env par défaut
 config();
+
+// Charger .env.local si présent (ne pas écraser les variables déjà définies)
+const envLocalPath = resolve(process.cwd(), '.env.local');
+if (existsSync(envLocalPath)) {
+    config({ path: envLocalPath });
+}
 
 import { PrismaClient } from '@prisma/client';
 import { AIService } from './AIService';
@@ -14,7 +22,8 @@ import { VoiceTranscriptionService } from './VoiceTranscriptionService';
 import express, { Request, Response } from 'express';
 
 const app = express();
-const port = process.env.PORT || 3001;
+// Railway fournit PORT. En local, on utilise AI_PORT ou 3001.
+const port = Number(process.env.PORT || process.env.AI_PORT) || 3001;
 
 async function startAIService() {
     const prisma = new PrismaClient();
