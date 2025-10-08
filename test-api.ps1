@@ -3,6 +3,6 @@ $token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbklkIjoiMTBkZDQwMTYyZDM4Y
 $headers = @{
     "Authorization" = "Bearer $token"
 }
-
+ 
 $response = Invoke-RestMethod -Uri "https://productif-io-1-m2edizrwt-noahs-projects-6c1762cf.vercel.app/api/debug/ids/user-team" -Headers $headers -Method Get
 $response | ConvertTo-Json -Depth 10 

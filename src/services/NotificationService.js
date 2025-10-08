@@ -62,12 +62,14 @@ class NotificationService {
             }
             // Vérifier les canaux de notification disponibles
             const settings = notification.user.notificationSettings;
-            if (!settings?.whatsappEnabled || !notification.user.whatsappNumber) {
+            const userPhoneNumber = notification.user.whatsappNumber || settings?.whatsappNumber;
+
+            if (!settings?.whatsappEnabled || !userPhoneNumber) {
                 NotificationLogger.logError('Configuration WhatsApp', new Error('WhatsApp non configuré pour l\'utilisateur'));
                 return;
             }
             // Tentative d'envoi WhatsApp
-            await this.whatsappService.sendMessage(notification.user.whatsappNumber, this.formatWhatsAppMessage(notification));
+            await this.whatsappService.sendMessage(userPhoneNumber, this.formatWhatsAppMessage(notification));
             // Vérifier si la notification existe toujours
             const existingNotification = await this.prisma.notificationHistory.findUnique({
                 where: { id: notification.id }
@@ -111,7 +113,19 @@ class NotificationService {
         if (!settings)
             return false;
         const hour = date.getHours();
-        return hour >= settings.startHour && hour <= settings.endHour;
+
+        const start = Math.max(0, Math.min(23, Number(settings.startHour ?? 0)));
+        let end = Number(settings.endHour ?? 24);
+        if (end === 0) end = 24;
+        end = Math.max(1, Math.min(24, end));
+
+        if (start < end) {
+            return hour >= start && hour < end; // [start, end)
+        } else if (start > end) {
+            return hour >= start || hour < end; // wrap minuit
+        } else {
+            return start === 0; // 0->0 : 24/24
+        }
     }
     formatWhatsAppMessage(notification) {
         const title = getNotificationTitle(notification.type);

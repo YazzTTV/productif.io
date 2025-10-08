@@ -126,9 +126,34 @@ class NotificationService {
 
   private canSendNotification(settings: any, date: Date): boolean {
     if (!settings) return false
-    
-    const hour = date.getHours()
-    return hour >= settings.startHour && hour <= settings.endHour
+
+    // Utiliser la timezone utilisateur si disponible, sinon défaut Europe/Paris
+    const timeZone = settings.timezone || process.env.DEFAULT_TIMEZONE || 'Europe/Paris'
+
+    // Convertir la date fournie en heure de la timezone pour comparaison
+    const parts = new Intl.DateTimeFormat('fr-FR', {
+      hour: '2-digit',
+      hour12: false,
+      timeZone
+    }).formatToParts(date)
+
+    const hourPart = parts.find(p => p.type === 'hour')
+    const hour = hourPart ? parseInt(hourPart.value, 10) : date.getHours()
+
+    const start = Math.max(0, Math.min(23, Number(settings.startHour ?? 0)))
+    let end = Number(settings.endHour ?? 24)
+    if (end === 0) end = 24
+    end = Math.max(1, Math.min(24, end))
+
+    // Fenêtre [start, end) avec gestion du wrap minuit
+    if (start < end) {
+      return hour >= start && hour < end
+    } else if (start > end) {
+      return hour >= start || hour < end
+    } else {
+      // start == end : interprétation "24/24" si start==0==end
+      return start === 0
+    }
   }
 
   private formatWhatsAppMessage(notification: any): string {
