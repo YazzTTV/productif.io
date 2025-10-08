@@ -34,7 +34,7 @@ android {
 
     buildTypes {
         debug {
-            signingConfig signingConfigs.release
+            // Utilise le keystore de debug par défaut pour le développement
             minifyEnabled false
         }
         release {
