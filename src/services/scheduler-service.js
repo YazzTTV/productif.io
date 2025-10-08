@@ -134,8 +134,8 @@ async function startSchedulerService() {
         console.log('✅ Planificateur démarré');
 
         // 3. Démarrer le serveur pour le healthcheck
-        // Utiliser UNIQUEMENT SCHEDULER_PORT pour éviter toute collision avec PORT (réservé à d'autres services)
-        const port = Number(process.env.SCHEDULER_PORT) || 3002; // Port différent de l'agent IA (3001)
+        // Sur Railway, l'application doit écouter sur PORT. On garde un fallback pour l'exécution locale.
+        const port = Number(process.env.PORT || process.env.SCHEDULER_PORT) || 3002;
         app.listen(port, () => {
             console.log(`🌐 Serveur de monitoring démarré sur le port ${port}`);
             console.log(`📊 Status disponible sur http://localhost:${port}/status`);

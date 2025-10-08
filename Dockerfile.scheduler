@@ -17,12 +17,13 @@ RUN npx prisma generate
 # Copy the rest of the application
 COPY . .
 
-# Expose the port the app runs on
-EXPOSE 3002
+ARG PORT=3002
+ENV PORT=$PORT
+EXPOSE $PORT
 
-# Add healthcheck
+# Add healthcheck using dynamic PORT
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost:3002/health || exit 1
+  CMD curl -fsS http://localhost:$PORT/health || exit 1
 
 # Install curl for healthcheck
 RUN apt-get update && apt-get install -y curl
