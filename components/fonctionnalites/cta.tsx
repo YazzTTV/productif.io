@@ -55,7 +55,16 @@ export function FonctionnalitesCTA() {
           
           <Button 
             className="w-full bg-green-500 hover:bg-green-600 text-white text-lg py-6 h-auto"
-            onClick={() => window.location.href = '/waitlist'}
+            onClick={() => {
+              const params = new URLSearchParams()
+              const keep: string[] = ["utm_source","utm_medium","utm_campaign","utm_content","utm_term","ref"]
+              keep.forEach(k => {
+                const v = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get(k) : null
+                if (v) params.set(k, v)
+              })
+              params.set('offer','early-access')
+              window.location.href = `/onboarding?${params.toString()}`
+            }}
           >
             Rejoindre la waitlist pour 1€
           </Button>

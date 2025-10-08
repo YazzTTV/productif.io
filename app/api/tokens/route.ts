@@ -19,7 +19,9 @@ const ALL_PERMISSIONS = [
   'objectives:read',
   'objectives:write',
   'processes:read',
-  'processes:write'
+  'processes:write',
+  'deepwork:read',
+  'deepwork:write'
 ]
 
 // Liste tous les tokens API de l'utilisateur authentifié

@@ -132,6 +132,14 @@ export async function POST(request: Request) {
             where: { userId }
         });
 
+        // Normalisation des bornes horaires
+        // - Interpréter endHour=0 comme fin de journée (24)
+        // - Contraindre les valeurs dans [0,24] pour end et [0,23] pour start
+        const normalizedStart = Math.max(0, Math.min(23, Number(incomingPreferences.startHour ?? 0)));
+        let normalizedEnd = Number(incomingPreferences.endHour ?? 24);
+        if (normalizedEnd === 0) normalizedEnd = 24;
+        normalizedEnd = Math.max(1, Math.min(24, normalizedEnd));
+
         // Synchroniser les types de notifications avec les champs booléens
         const notificationTypes = incomingPreferences.notificationTypes || [];
         const prismaData = {
@@ -140,8 +148,8 @@ export async function POST(request: Request) {
             pushEnabled: incomingPreferences.pushEnabled,
             whatsappEnabled: incomingPreferences.whatsappEnabled,
             whatsappNumber: incomingPreferences.whatsappNumber,
-            startHour: incomingPreferences.startHour,
-            endHour: incomingPreferences.endHour,
+            startHour: normalizedStart,
+            endHour: normalizedEnd,
             allowedDays: incomingPreferences.allowedDays,
             notificationTypes: notificationTypes,
             morningReminder: incomingPreferences.morningReminder,
@@ -181,7 +189,9 @@ export async function POST(request: Request) {
         try {
             console.log(`🔄 Notification du scheduler pour l'utilisateur ${userId}...`);
             
-            const schedulerResponse = await fetch('http://localhost:3002/api/update-user', {
+            const schedulerBase = process.env.SCHEDULER_URL || 'http://localhost:3002';
+            const schedulerUrl = `${schedulerBase.replace(/\/$/, '')}/api/update-user`;
+            const schedulerResponse = await fetch(schedulerUrl, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

@@ -27,6 +27,7 @@ model User {
   sessions             Session[]
   tasks                Task[]
   timeEntries          TimeEntry[]
+  deepWorkSessions     DeepWorkSession[]
   managedCompany       Company?              @relation("CompanyAdmin", fields: [managedCompanyId], references: [id])
   companies            UserCompany[]
   gamification         UserGamification?
@@ -152,10 +153,29 @@ model TimeEntry {
   project     Project?  @relation(fields: [projectId], references: [id])
   task        Task?     @relation(fields: [taskId], references: [id])
   user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deepWorkSession DeepWorkSession?
 
   @@index([userId])
   @@index([taskId])
   @@index([projectId])
+}
+
+model DeepWorkSession {
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  timeEntryId    String   @unique
+  timeEntry      TimeEntry @relation(fields: [timeEntryId], references: [id], onDelete: Cascade)
+  plannedDuration Int
+  status         String   @default("active") // active, paused, completed, cancelled
+  type           String   @default("deepwork") // deepwork, focus, pomodoro
+  interruptions  Int      @default(0)
+  notes          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([userId, status])
+  @@index([userId, createdAt])
 }
 
 model Habit {

@@ -59,6 +59,23 @@ async function startSchedulerService() {
             }
         });
 
+        // Endpoint pour déclencher immédiatement le traitement des notifications
+        app.post('/api/process-now', async (req, res) => {
+            try {
+                if (!scheduler) {
+                    return res.status(503).json({ error: 'Scheduler non disponible' });
+                }
+
+                console.log('\n⚡ Déclenchement manuel du traitement des notifications');
+                await scheduler.processNotifications();
+                const status = scheduler.getStatus();
+                return res.json({ success: true, activeJobs: status.activeJobs });
+            } catch (error) {
+                console.error('Erreur process-now:', error);
+                return res.status(500).json({ error: 'Erreur lors du traitement immédiat' });
+            }
+        });
+
         // NOUVEAU : Endpoint pour recevoir les mises à jour de préférences depuis l'API Next.js
         app.post('/api/update-user', async (req, res) => {
             try {
@@ -117,7 +134,8 @@ async function startSchedulerService() {
         console.log('✅ Planificateur démarré');
 
         // 3. Démarrer le serveur pour le healthcheck
-        const port = process.env.PORT || 3002; // Port différent de l'agent IA (3001)
+        // Utiliser UNIQUEMENT SCHEDULER_PORT pour éviter toute collision avec PORT (réservé à d'autres services)
+        const port = Number(process.env.SCHEDULER_PORT) || 3002; // Port différent de l'agent IA (3001)
         app.listen(port, () => {
             console.log(`🌐 Serveur de monitoring démarré sur le port ${port}`);
             console.log(`📊 Status disponible sur http://localhost:${port}/status`);

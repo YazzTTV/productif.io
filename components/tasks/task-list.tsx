@@ -127,7 +127,7 @@ export function TaskList({ tasks: initialTasks = [], onTaskUpdate, onTaskDelete 
       later: [] as Task[],
     }
 
-    return tasks.reduce((groups, task) => {
+    const sortedGroups = tasks.reduce((groups, task) => {
       if (!task.dueDate) {
         groups.noDueDate.push(task)
       } else {
@@ -146,6 +146,39 @@ export function TaskList({ tasks: initialTasks = [], onTaskUpdate, onTaskDelete 
       }
       return groups
     }, initialGroups)
+
+    // Fonction de tri: non complétée d'abord, puis priorité (4->0), puis énergie (3->0), puis échéance
+    const comparator = (a: Task, b: Task) => {
+      if (a.completed !== b.completed) {
+        return a.completed ? 1 : -1
+      }
+
+      const pa = a.priority ?? -1
+      const pb = b.priority ?? -1
+      if (pa !== pb) {
+        return pb - pa
+      }
+
+      const ea = a.energyLevel ?? -1
+      const eb = b.energyLevel ?? -1
+      if (ea !== eb) {
+        return eb - ea
+      }
+
+      if (a.dueDate && b.dueDate) {
+        return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()
+      }
+      return 0
+    }
+
+    sortedGroups.noDueDate.sort(comparator)
+    sortedGroups.overdue.sort(comparator)
+    sortedGroups.today.sort(comparator)
+    sortedGroups.tomorrow.sort(comparator)
+    sortedGroups.thisWeek.sort(comparator)
+    sortedGroups.later.sort(comparator)
+
+    return sortedGroups
   }
 
   const groupedTasks = groupTasks(tasks)

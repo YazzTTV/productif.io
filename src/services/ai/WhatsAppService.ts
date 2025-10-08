@@ -6,8 +6,9 @@ export class WhatsAppService {
     private phoneNumberId: string;
 
     constructor() {
+        // Utiliser une valeur par défaut si non fournie pour éviter un crash au démarrage
         if (!process.env.WHATSAPP_API_URL) {
-            throw new Error('WHATSAPP_API_URL is not defined');
+            console.warn('WHATSAPP_API_URL is not defined, defaulting to https://graph.facebook.com/v17.0');
         }
         if (!process.env.WHATSAPP_ACCESS_TOKEN) {
             throw new Error('WHATSAPP_ACCESS_TOKEN is not defined');
@@ -16,7 +17,7 @@ export class WhatsAppService {
             throw new Error('WHATSAPP_PHONE_NUMBER_ID is not defined');
         }
 
-        this.apiUrl = process.env.WHATSAPP_API_URL;
+        this.apiUrl = process.env.WHATSAPP_API_URL || 'https://graph.facebook.com/v17.0';
         this.accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
         this.phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
     }

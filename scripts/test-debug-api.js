@@ -47,5 +47,5 @@ async function testDebugApi() {
 // Exécuter le test
 testDebugApi().catch(error => {
   console.error('\n❌ Erreur fatale:', error);
-  process.exit(1);
-}); 
+    process.exit(1);
+  });

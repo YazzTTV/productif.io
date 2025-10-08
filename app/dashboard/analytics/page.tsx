@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma"
 import { TimeByProjectChart } from "@/components/analytics/time-by-project-chart"
 import { TimeByDayChart } from "@/components/analytics/time-by-day-chart"
 import { AnalyticsSummary } from "@/components/analytics/analytics-summary"
+import { DeepWorkSummary } from "@/components/analytics/deepwork-summary"
 import { USER_TIMEZONE } from "@/lib/date-utils"
 
 export default async function AnalyticsPage() {
@@ -189,6 +190,42 @@ export default async function AnalyticsPage() {
   // Log des statistiques pour débogage
   console.log(`[ANALYTICS] Statistiques calculées:`, JSON.stringify(stats))
 
+  // 4. Deep Work: calcul (7 jours et total)
+  const deepWorkLast7DaysRaw = await prisma.$queryRaw`
+    SELECT COALESCE(SUM(EXTRACT(EPOCH FROM (te."endTime" - te."startTime"))/3600), 0) as total_hours
+    FROM "DeepWorkSession" dws
+    JOIN "TimeEntry" te ON te.id = dws."timeEntryId"
+    WHERE dws."userId" = ${userId}
+      AND dws.status = 'completed'
+      AND te."endTime" IS NOT NULL
+      AND te."startTime" >= NOW() - INTERVAL '7 days'
+  `
+  const deepWorkAllTimeRaw = await prisma.$queryRaw`
+    SELECT 
+      COALESCE(SUM(EXTRACT(EPOCH FROM (te."endTime" - te."startTime"))/3600), 0) as total_hours,
+      COUNT(*) as sessions
+    FROM "DeepWorkSession" dws
+    JOIN "TimeEntry" te ON te.id = dws."timeEntryId"
+    WHERE dws."userId" = ${userId}
+      AND dws.status = 'completed'
+      AND te."endTime" IS NOT NULL
+  `
+  const deepWorkSessionsThisWeekRaw = await prisma.$queryRaw`
+    SELECT COUNT(*) as sessions
+    FROM "DeepWorkSession" dws
+    JOIN "TimeEntry" te ON te.id = dws."timeEntryId"
+    WHERE dws."userId" = ${userId}
+      AND dws.status = 'completed'
+      AND te."endTime" IS NOT NULL
+      AND te."startTime" >= NOW() - INTERVAL '7 days'
+  `
+
+  const weekHours = Number((deepWorkLast7DaysRaw as any)[0]?.total_hours || 0)
+  const allTimeHours = Number((deepWorkAllTimeRaw as any)[0]?.total_hours || 0)
+  const allTimeSessions = Number((deepWorkAllTimeRaw as any)[0]?.sessions || 0)
+  const sessionsThisWeek = Number((deepWorkSessionsThisWeekRaw as any)[0]?.sessions || 0)
+  const avgSessionMinutes = allTimeSessions > 0 ? (allTimeHours * 60) / allTimeSessions : null
+
   return (
     <div className="max-w-7xl mx-auto">
       <div className="mb-6">
@@ -197,6 +234,16 @@ export default async function AnalyticsPage() {
       </div>
 
       <AnalyticsSummary stats={stats} />
+
+      {/* Deep Work summary */}
+      <div className="mt-6">
+        <DeepWorkSummary 
+          weekHours={weekHours} 
+          allTimeHours={allTimeHours} 
+          sessionsThisWeek={sessionsThisWeek} 
+          avgSessionMinutes={avgSessionMinutes ?? undefined}
+        />
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
         <TimeByProjectChart data={timeByProject} />
