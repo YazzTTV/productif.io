@@ -1,0 +1,59 @@
+# Dependencies
+node_modules/
+node_modules 2/
+node_modules 3/
+
+# Expo
+.expo/
+dist/
+web-build/
+
+# Native
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Metro
+.metro-health-check*
+
+# debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# macOS
+.DS_Store
+*.pem
+
+# local env files
+.env*.local
+
+# typescript
+*.tsbuildinfo
+
+# @generated expo cli
+export/
+
+# temporary files created by Metro to check the health of the file watcher
+.metro-health-check*
+
+# iOS
+ios/build/
+ios/Pods/
+ios/*.xcworkspace
+ios/*.xcodeproj
+
+# Android
+android/build/
+android/app/build/
+android/.gradle/
+android/local.properties
+android/app/release/
+android/app/debug/
+android/app/release-config.gradle
+
+# Temporary files
+temp-app/

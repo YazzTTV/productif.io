@@ -1,0 +1,163 @@
+:root {
+  --primary-color: #22c55e;
+  --text-color: #1f2937;
+  --border-color: #e5e7eb;
+  --background-color: #f3f4f6;
+  --nav-height: 4rem;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  background-color: var(--background-color);
+  color: var(--text-color);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.main-content {
+  flex: 1;
+  padding-bottom: var(--nav-height);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: var(--nav-height);
+  background-color: white;
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  border-top: 1px solid var(--border-color);
+  padding: 0.5rem;
+  z-index: 1000;
+}
+
+.nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-decoration: none;
+  color: #6b7280;
+  font-size: 0.75rem;
+  gap: 0.25rem;
+}
+
+.nav-item.active {
+  color: var(--primary-color);
+}
+
+.nav-icon {
+  width: 1.5rem;
+  height: 1.5rem;
+}
+
+.home {
+  padding: 2rem 1rem;
+  text-align: center;
+}
+
+.home h1 {
+  font-size: 1.5rem;
+  margin-bottom: 1rem;
+  color: var(--text-color);
+}
+
+.home p {
+  color: #6b7280;
+  line-height: 1.5;
+}
+
+.profile {
+  padding: 2rem 1rem;
+}
+
+.profile h1 {
+  font-size: 1.5rem;
+  margin-bottom: 1rem;
+  color: var(--text-color);
+}
+
+.profile p {
+  color: #6b7280;
+}
+
+.loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 200px;
+  color: #6b7280;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.fade-in {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+/* Safe area insets for iOS */
+@supports (padding: max(0px)) {
+  .bottom-nav {
+    padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+    height: calc(var(--nav-height) + env(safe-area-inset-bottom));
+  }
+
+  .main-content {
+    padding-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom));
+  }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --text-color: #f3f4f6;
+    --border-color: #374151;
+    --background-color: #111827;
+  }
+
+  body {
+    background-color: var(--background-color);
+  }
+
+  .bottom-nav {
+    background-color: #1f2937;
+  }
+
+  .task-card,
+  .habit-card {
+    background-color: #1f2937;
+  }
+
+  .nav-item {
+    color: #9ca3af;
+  }
+
+  .status-select {
+    background-color: #374151;
+    color: #f3f4f6;
+  }
+} 
