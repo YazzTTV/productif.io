@@ -129,6 +129,27 @@ Voir les logs :
 docker compose logs -f
 ```
 
+## Déploiement Railway (Scheduler et Agent IA)
+
+### Basculer la config Railway
+Utilisez le script pour pointer `railway.toml` sur le bon service:
+
+```powershell
+./scripts/railway-switch-config.ps1 -target scheduler   # ou -target ai
+```
+
+### Scheduler
+1) `./scripts/railway-switch-config.ps1 -target scheduler`
+2) `railway link` (choisir le projet et service scheduler)
+3) `railway up`
+
+### Agent IA
+1) `./scripts/railway-switch-config.ps1 -target ai`
+2) `railway link` (choisir le projet et créer/choisir service IA)
+3) `railway up`
+
+Variables requises (dans Railway): `DATABASE_URL`, `OPENAI_API_KEY`, `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`. Optionnel: `AI_PORT` (3001 par défaut), `NEXT_PUBLIC_APP_URL`.
+
 Accéder au shell dans le conteneur :
 
 ```bash

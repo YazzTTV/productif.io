@@ -21,7 +21,9 @@ const ALL_PERMISSIONS = [
   'processes:read',
   'processes:write',
   'deepwork:read',
-  'deepwork:write'
+  'deepwork:write',
+  'journal:read',
+  'journal:write'
 ]
 
 // Liste tous les tokens API de l'utilisateur authentifié

@@ -14,7 +14,11 @@ const ALL_PERMISSIONS = [
   'objectives:read',
   'objectives:write',
   'processes:read',
-  'processes:write'
+  'processes:write',
+  'journal:read',
+  'journal:write',
+  'deepwork:read',
+  'deepwork:write'
 ];
 
 export async function POST(req: Request) {

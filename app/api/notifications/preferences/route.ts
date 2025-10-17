@@ -20,6 +20,8 @@ interface NotificationPreferences {
     motivation: boolean;
     dailySummary: boolean;
     morningTime: string;
+  improvementReminder: boolean;
+  improvementTime: string;
     noonTime: string;
     afternoonTime: string;
     eveningTime: string;
@@ -74,6 +76,8 @@ export async function GET(request: Request) {
             motivation: preferences.motivation,
             dailySummary: preferences.dailySummary,
             morningTime: preferences.morningTime,
+            improvementReminder: preferences.improvementReminder,
+            improvementTime: preferences.improvementTime,
             noonTime: preferences.noonTime,
             afternoonTime: preferences.afternoonTime,
             eveningTime: preferences.eveningTime,
@@ -94,6 +98,8 @@ export async function GET(request: Request) {
             motivation: true,
             dailySummary: true,
             morningTime: '08:00',
+            improvementReminder: false,
+            improvementTime: '08:30',
             noonTime: '12:00',
             afternoonTime: '14:00',
             eveningTime: '18:00',
@@ -158,6 +164,8 @@ export async function POST(request: Request) {
             motivation: incomingPreferences.motivation,
             dailySummary: incomingPreferences.dailySummary,
             morningTime: incomingPreferences.morningTime,
+            improvementReminder: incomingPreferences.improvementReminder,
+            improvementTime: incomingPreferences.improvementTime,
             noonTime: incomingPreferences.noonTime,
             afternoonTime: incomingPreferences.afternoonTime,
             eveningTime: incomingPreferences.eveningTime,
@@ -188,27 +196,38 @@ export async function POST(request: Request) {
         // NOUVEAU : Notifier le scheduler par HTTP (communication inter-processus)
         try {
             console.log(`🔄 Notification du scheduler pour l'utilisateur ${userId}...`);
-            
-            const schedulerBase = process.env.SCHEDULER_URL || 'http://localhost:3002';
-            const schedulerUrl = `${schedulerBase.replace(/\/$/, '')}/api/update-user`;
-            const schedulerResponse = await fetch(schedulerUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    userId,
-                    oldPreferences: oldPreferences || null,
-                    newPreferences: updatedPreferences,
-                    timestamp: new Date()
-                })
-            });
 
-            if (schedulerResponse.ok) {
-                console.log(`✅ Scheduler notifié avec succès pour ${userId}`);
-            } else {
-                console.log(`⚠️ Échec de notification du scheduler: ${schedulerResponse.status}`);
+            const bases = [
+                process.env.SCHEDULER_URL || 'http://localhost:3002',
+                'http://localhost:3002',
+                'http://127.0.0.1:3002'
+            ].filter((v, i, a) => a.indexOf(v) === i);
+
+            let notified = false;
+            for (const base of bases) {
+                const schedulerUrl = `${base.replace(/\/$/, '')}/api/update-user`;
+                try {
+                    const resp = await fetch(schedulerUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            userId,
+                            oldPreferences: oldPreferences || null,
+                            newPreferences: updatedPreferences,
+                            timestamp: new Date()
+                        })
+                    });
+                    if (resp.ok) {
+                        console.log(`✅ Scheduler notifié avec succès via ${base}`);
+                        notified = true;
+                        break;
+                    }
+                    console.log(`⚠️ Notification via ${base} échouée: ${resp.status}`);
+                } catch (err) {
+                    console.log(`⚠️ Erreur de connexion scheduler via ${base}:`, err);
+                }
             }
+            if (!notified) console.log('⚠️ Aucune URL de scheduler n\'a répondu.');
         } catch (error) {
             console.log(`❌ Erreur lors de la notification du scheduler:`, error);
             // On continue même si le scheduler n'est pas accessible
