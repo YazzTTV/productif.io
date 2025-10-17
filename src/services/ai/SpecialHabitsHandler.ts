@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { generateApiToken } from '../../../lib/api-token.ts'
 
 interface ConversationState {
   userId: string;
@@ -258,6 +259,40 @@ export class SpecialHabitsHandler {
       rating: state.tempData.rating 
     }, state.tempData.targetDate);
     
+    // Déclenchement du journaling une fois l'habitude enregistrée
+    try {
+      const required = ['journal:read', 'journal:write', 'deepwork:read', 'deepwork:write', 'tasks:read', 'tasks:write']
+      const existing = await this.prisma.apiToken.findFirst({
+        where: { userId: state.userId, scopes: { hasEvery: required } },
+        orderBy: { createdAt: 'desc' }
+      })
+      const token = existing?.token || (await generateApiToken({
+        name: 'Agent IA (Deep Work + Journal)',
+        userId: state.userId,
+        scopes: required
+      })).token
+
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+      const payload = {
+        transcription: finalNote,
+        date: (state.tempData.targetDate || new Date()).toISOString()
+      }
+
+      console.log('📔 Journaling (habit Note de sa journée) POST', { appUrl, path: '/api/journal/agent' })
+      const resp = await fetch(`${appUrl}/api/journal/agent`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      })
+      const txt = await resp.text()
+      console.log('📔 Journaling (habit) response', { status: resp.status, textLength: txt.length })
+    } catch (e) {
+      console.error('Erreur envoi au journal agent (habit Note de sa journée):', e)
+    }
+
     this.conversationStates.delete(conversationKey);
     
     const summaryText = summary !== 'non' && summary.length > 3 

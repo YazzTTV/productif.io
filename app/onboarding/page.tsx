@@ -1,12 +1,17 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { Suspense, useEffect, useMemo, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
+import { Separator } from "@/components/ui/separator"
+import { signIn } from "next-auth/react"
+
+export const dynamic = 'force-dynamic'
 
 type Feature = {
   title: string
@@ -81,7 +86,7 @@ function useAuthInfo() {
   return auth
 }
 
-export default function OnboardingPage() {
+function OnboardingContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
 
@@ -99,6 +104,7 @@ export default function OnboardingPage() {
   const [loading, setLoading] = useState<boolean>(false)
   const [error, setError] = useState<string>("")
   const [emailFallback, setEmailFallback] = useState<string>("")
+  const [password, setPassword] = useState<string>("")
 
   const [answers, setAnswers] = useState<Questionnaire>({
     mainGoal: "",
@@ -258,7 +264,7 @@ export default function OnboardingPage() {
       <Card className="w-full max-w-2xl">
         <CardHeader>
           <CardTitle>
-            {step === 1 && "Bienvenue — Authentification"}
+            {step === 1 && "Connexion / Inscription"}
             {step === 2 && "Découvre les fonctionnalités clés"}
             {step === 3 && "Ils en parlent"}
             {step === 4 && "Parlons de toi"}
@@ -272,34 +278,75 @@ export default function OnboardingPage() {
           )}
 
           {step === 1 && (
-            <div className="space-y-4">
+            <div className="space-y-6">
               {auth.isAuthenticated ? (
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-muted-foreground text-center">
                   Connecté en tant que <span className="font-medium">{auth.email}</span>
                 </p>
               ) : (
-                <div className="space-y-4">
+                <div className="space-y-5">
+                  <div className="flex flex-col items-center gap-2">
+                    <div className="h-9 w-9 rounded-md bg-emerald-500 text-white grid place-items-center font-bold">P</div>
+                    <div className="text-lg font-semibold">Productif</div>
+                    <p className="text-xs text-muted-foreground text-center">Track, Analyze & Dominate Your Market.</p>
+                  </div>
+
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => signIn("google", { callbackUrl: "/onboarding" })}
+                  >
+                    Continuer avec Google
+                  </Button>
+
+                  <div className="flex items-center gap-2">
+                    <Separator className="flex-1" />
+                    <span className="text-[11px] text-muted-foreground">OU</span>
+                    <Separator className="flex-1" />
+                  </div>
+
                   <div className="grid gap-3">
-                    <Label htmlFor="email">Ton email</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      placeholder="toi@exemple.com"
-                      value={emailFallback}
-                      onChange={(e) => setEmailFallback(e.target.value)}
-                    />
+                    <div className="grid gap-2">
+                      <Label htmlFor="email">Email</Label>
+                      <Input
+                        id="email"
+                        type="email"
+                        placeholder="toi@exemple.com"
+                        value={emailFallback}
+                        onChange={(e) => setEmailFallback(e.target.value)}
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="password">Mot de passe</Label>
+                      <Input
+                        id="password"
+                        type="password"
+                        placeholder="••••••••"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                      />
+                    </div>
+                    <Button
+                      className="w-full"
+                      onClick={() => router.push(`/register?redirect=/onboarding${emailFallback ? `&email=${encodeURIComponent(emailFallback)}` : ""}`)}
+                    >
+                      S'inscrire avec l'email
+                    </Button>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <Button variant="outline" onClick={() => router.push("/login?redirect=/onboarding")}>Se connecter</Button>
-                    <Button variant="outline" onClick={() => router.push("/register?redirect=/onboarding")}>Créer un compte</Button>
-                  </div>
-                  <p className="text-xs text-muted-foreground">Ou continue sans compte avec ton email.</p>
+
+                  <p className="text-center text-sm text-muted-foreground">
+                    Déjà un compte ? {""}
+                    <Link href="/login?redirect=/onboarding" className="underline underline-offset-4">Se connecter</Link>
+                  </p>
+
+                  <p className="text-[11px] text-muted-foreground text-center">
+                    En continuant, vous acceptez nos {""}
+                    <Link href="/terms" className="underline underline-offset-4">Conditions d'utilisation</Link> {""}
+                    et notre {""}
+                    <Link href="/privacy-policy" className="underline underline-offset-4">Politique de confidentialité</Link>.
+                  </p>
                 </div>
               )}
-              <div className="flex justify-between">
-                <div />
-                <Button onClick={next}>Continuer</Button>
-              </div>
             </div>
           )}
 
@@ -423,6 +470,14 @@ export default function OnboardingPage() {
         </CardFooter>
       </Card>
     </div>
+  )
+}
+
+export default function OnboardingPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen w-full flex items-center justify-center p-8">Chargement…</div>}>
+      <OnboardingContent />
+    </Suspense>
   )
 }
 
