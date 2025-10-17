@@ -37,6 +37,8 @@ model User {
   notificationSettings NotificationSettings?
   notificationHistory  NotificationHistory[]
   whatsappConversations WhatsAppConversation[]
+  journalEntries       JournalEntry[]
+  dailyInsights        DailyInsight[]
 }
 
 model Company {
@@ -384,11 +386,13 @@ model NotificationSettings {
   allowedDays     Int[]    @default([1, 2, 3, 4, 5])
   notificationTypes String[] @default([])
   morningReminder Boolean  @default(true)
+  improvementReminder Boolean @default(false)
   taskReminder    Boolean  @default(true)
   habitReminder   Boolean  @default(true)
   motivation      Boolean  @default(true)
   dailySummary    Boolean  @default(true)
   morningTime     String   @default("08:00")
+  improvementTime String   @default("08:30")
   noonTime        String   @default("12:00")
   afternoonTime   String   @default("14:00")
   eveningTime     String   @default("18:00")
@@ -447,4 +451,55 @@ enum UserRole {
   SUPER_ADMIN
   ADMIN
   USER
+}
+
+/// Journal quotidien de l'utilisateur (entrée par jour)
+model JournalEntry {
+  id             String        @id @default(cuid())
+  userId         String
+  user           User          @relation(fields: [userId], references: [id])
+  date           DateTime      @default(now())
+
+  // Contenu / médias
+  audioId        String?       // ID média WhatsApp (optionnel si non conservé)
+  audioUrl       String?       // URL de stockage externe (S3/R2) si utilisé
+  transcription  String?       @db.Text
+
+  // Analyse IA
+  sentiment      String?
+  themes         Json?
+  highlights     String[]
+  improvements   String[]
+
+  // Statut de traitement
+  processed       Boolean       @default(false)
+  processingError String?
+
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@index([userId, date])
+  @@unique([userId, date])
+}
+
+/// Insight quotidien généré à partir des entrées de journal récentes
+model DailyInsight {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id])
+  date            DateTime @default(now())
+
+  // Recommandations et axes de focus
+  recommendations String[]
+  focusAreas      String[]
+
+  // Méta
+  basedOnDays     Int      @default(7)
+  journalEntries  String[] // IDs de JournalEntry utilisés pour la génération
+  sent            Boolean  @default(false)
+  sentAt          DateTime?
+  createdAt       DateTime @default(now())
+
+  @@index([userId, date])
+  @@unique([userId, date])
 }

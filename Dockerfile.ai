@@ -1,31 +1,34 @@
-# Dockerfile for AI agent service
 FROM node:22
 
 WORKDIR /app
 
+# System dependencies required for native modules and healthcheck
+RUN apt-get update && apt-get install -y \
+  curl \
+  python3 \
+  make \
+  g++ \
+  && rm -rf /var/lib/apt/lists/*
+
 # Copy package files
 COPY package*.json ./
-COPY .npmrc ./
 COPY prisma ./prisma/
 
-# Install dependencies
-RUN npm ci
+# Install dependencies (bypass peer conflicts from mobile packages)
+RUN npm ci --legacy-peer-deps
 
-# Generate Prisma client (using local dev dependency)
+# Generate Prisma client
 RUN npx prisma generate
 
 # Copy the rest of the application
 COPY . .
 
-# Expose the port the app runs on
-EXPOSE 3001
+ARG PORT=3001
+ENV PORT=$PORT
+EXPOSE $PORT
 
-# Add healthcheck
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost:3001/health || exit 1
+  CMD curl -fsS http://localhost:$PORT/health || exit 1
 
-# Install curl for healthcheck
-RUN apt-get update && apt-get install -y curl
-
-# Start the AI agent service
-CMD ["npm", "run", "start:ai"] 
+# Start: run migrations then launch the AI service
+CMD ["sh", "-lc", "npx prisma migrate deploy && npm run start:ai"]

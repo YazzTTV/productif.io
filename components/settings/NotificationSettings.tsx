@@ -20,6 +20,8 @@ interface NotificationPreferences {
     motivation: boolean;
     dailySummary: boolean;
     morningTime: string;
+    improvementReminder: boolean;
+    improvementTime: string;
     noonTime: string;
     afternoonTime: string;
     eveningTime: string;
@@ -42,6 +44,8 @@ const defaultPreferences: NotificationPreferences = {
     motivation: true,
     dailySummary: true,
     morningTime: '08:00',
+    improvementReminder: false,
+    improvementTime: '08:30',
     noonTime: '12:00',
     afternoonTime: '14:00',
     eveningTime: '18:00',
@@ -437,6 +441,16 @@ const NotificationSettings: React.FC<NotificationSettingsProps> = ({ userId, pre
                         <label className="flex items-center space-x-2">
                             <input
                                 type="checkbox"
+                                name="improvementReminder"
+                                checked={preferences.improvementReminder}
+                                onChange={handleChange}
+                                className="form-checkbox h-5 w-5 text-blue-600"
+                            />
+                            <span>Rappel Amélioration</span>
+                        </label>
+                        <label className="flex items-center space-x-2">
+                            <input
+                                type="checkbox"
                                 name="taskReminder"
                                 checked={preferences.taskReminder}
                                 onChange={handleChange}
@@ -490,6 +504,19 @@ const NotificationSettings: React.FC<NotificationSettingsProps> = ({ userId, pre
                                 type="time"
                                 name="morningTime"
                                 value={preferences.morningTime}
+                                onChange={handleChange}
+                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">
+                                Rappel Amélioration
+                            </label>
+                            <input
+                                type="time"
+                                name="improvementTime"
+                                value={preferences.improvementTime}
                                 onChange={handleChange}
                                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                             />

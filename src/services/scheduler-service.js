@@ -134,7 +134,7 @@ async function startSchedulerService() {
         console.log('✅ Planificateur démarré');
 
         // 3. Démarrer le serveur pour le healthcheck
-        // Sur Railway, l'application doit écouter sur PORT. On garde un fallback pour l'exécution locale.
+        // Railway fournit PORT; local on peut utiliser SCHEDULER_PORT ou 3002
         const port = Number(process.env.PORT || process.env.SCHEDULER_PORT) || 3002;
         app.listen(port, () => {
             console.log(`🌐 Serveur de monitoring démarré sur le port ${port}`);

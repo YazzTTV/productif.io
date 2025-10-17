@@ -20,16 +20,29 @@ import { AIService } from './AIService';
 import { WhatsAppService } from './WhatsAppService';
 import { VoiceTranscriptionService } from './VoiceTranscriptionService';
 import express, { Request, Response } from 'express';
+import { generateApiToken } from '../../../lib/api-token.ts';
 
 const app = express();
-// Railway fournit PORT. En local, on utilise AI_PORT ou 3001.
-const port = Number(process.env.PORT || process.env.AI_PORT) || 3001;
+// En prod (Railway), utiliser PORT. En local, AI_PORT (ou 3001)
+const port = Number(process.env.PORT || process.env.AI_PORT || '3001');
 
 async function startAIService() {
     const prisma = new PrismaClient();
     const aiService = new AIService();
     const whatsappService = new WhatsAppService();
     const voiceService = new VoiceTranscriptionService();
+
+    // Helper: get or create API token with journaling scopes
+    async function getOrCreateApiTokenForUser(userId: string): Promise<string> {
+        const required = ['deepwork:read', 'deepwork:write', 'tasks:read', 'tasks:write', 'journal:read', 'journal:write']
+        const existing = await prisma.apiToken.findFirst({
+            where: { userId, scopes: { hasEvery: required } },
+            orderBy: { createdAt: 'desc' }
+        })
+        if (existing?.token) return existing.token
+        const { token } = await generateApiToken({ name: 'Agent IA (Deep Work + Journal)', userId, scopes: required })
+        return token
+    }
 
     try {
         console.log('🚀 Démarrage du service IA...');
@@ -113,11 +126,117 @@ async function startAIService() {
                     console.log('📱 Message reçu de', from, '- Type:', messageType);
 
                     let textToProcess = '';
+                    let userIdForToken: string | null = null;
 
                     if (messageType === 'text') {
                         // Message texte classique
                         textToProcess = message.text?.body || '';
                         console.log('📝 Texte:', textToProcess);
+
+                        // Commandes journaling (résumé / conseils)
+                        try {
+                            const lowerCmd = (textToProcess || '').toLowerCase();
+                            const phone = String(from).replace(/\D/g, '');
+                            const user = await prisma.user.findFirst({ where: { whatsappNumber: { equals: phone } } });
+                            if (user?.id) {
+                                const apiToken = await getOrCreateApiTokenForUser(user.id);
+                                const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+
+                                // Résumé des 7 derniers jours
+                                if ((lowerCmd.includes('résumé') || lowerCmd.includes('resume')) && lowerCmd.includes('journal')) {
+                                    const resp = await fetch(`${appUrl}/api/journal/agent?days=7`, {
+                                        headers: { 'Authorization': `Bearer ${apiToken}` }
+                                    });
+                                    const data = await resp.json().catch(() => ({}));
+                                    const entries = Array.isArray(data.entries) ? data.entries : [];
+                                    if (entries.length === 0) {
+                                        await whatsappService.sendMessage(from, "📔 Tu n'as pas encore d'entrées de journal.\n\nEnvoie-moi un vocal ce soir pour commencer ! 🎙️");
+                                    } else {
+                                        let msg = `📊 **Tes 7 derniers jours**\n\n`;
+                                        entries.forEach((entry: any) => {
+                                            const date = new Date(entry.date).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' });
+                                            const emoji = entry.sentiment === 'positive' ? '😊' : entry.sentiment === 'negative' ? '😔' : '😐';
+                                            msg += `${emoji} **${date}**\n`;
+                                            if (entry.highlights?.length > 0) msg += `✨ ${entry.highlights[0]}\n`;
+                                            msg += `\n`;
+                                        });
+                                        await whatsappService.sendMessage(from, msg);
+                                    }
+                                    return res.sendStatus(200);
+                                }
+
+                                // Conseils du jour
+                                if (lowerCmd.includes('conseil')) {
+                                    const resp = await fetch(`${appUrl}/api/journal/insights`, {
+                                        headers: { 'Authorization': `Bearer ${apiToken}` }
+                                    });
+                                    const data = await resp.json().catch(() => ({}));
+                                    const insight = data.insight;
+                                    if (!insight || !Array.isArray(insight.recommendations) || insight.recommendations.length === 0) {
+                                        await whatsappService.sendMessage(from, "💡 Continue à noter tes journées pendant quelques jours, je pourrai ensuite te donner des conseils personnalisés ! 📈");
+                                    } else {
+                                        let messageOut = `🌅 **Tes axes d'amélioration**\n\n`;
+                                        if (Array.isArray(insight.focusAreas) && insight.focusAreas.length > 0) {
+                                            messageOut += `🎯 **Concentre-toi sur :**\n`;
+                                            for (const area of insight.focusAreas) messageOut += `• ${area}\n`;
+                                            messageOut += `\n`;
+                                        }
+                                        messageOut += `💡 **Mes recommandations :**\n`;
+                                        insight.recommendations.forEach((rec: string, idx: number) => { messageOut += `${idx + 1}. ${rec}\n`; });
+                                        await whatsappService.sendMessage(from, messageOut);
+                                    }
+                                    return res.sendStatus(200);
+                                }
+                            }
+                        } catch (e) {
+                            console.error('Erreur commandes journaling (texte):', e);
+                        }
+
+                        // Déclencheur explicite pour le journal (sans impacter les autres fonctionnalités)
+                        const lower = (textToProcess || '').toLowerCase();
+                        const journalTriggers = [
+                            'note de sa journée',
+                            'note de ma journée',
+                            'journal de ma journée',
+                            'journal de sa journée',
+                            'journal de la journée',
+                            'journal de journée',
+                            'journal journée',
+                            'habitude note de sa journée',
+                            'habitude note de ma journée'
+                        ];
+                        const hasJournalTrigger = journalTriggers.some(t => lower.includes(t));
+
+                        if (hasJournalTrigger) {
+                            try {
+                                const phone = String(from).replace(/\D/g, '');
+                                const user = await prisma.user.findFirst({ where: { whatsappNumber: { equals: phone } } });
+                                if (user?.id) {
+                                    const apiToken = await getOrCreateApiTokenForUser(user.id);
+                                    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+                                    const payload = { transcription: textToProcess, date: new Date().toISOString() };
+                                    console.log('📔 Journaling (text) POST', { appUrl, path: '/api/journal/agent' });
+                                    const resp = await fetch(`${appUrl}/api/journal/agent`, {
+                                        method: 'POST',
+                                        headers: {
+                                            'Authorization': `Bearer ${apiToken}`,
+                                            'Content-Type': 'application/json'
+                                        },
+                                        body: JSON.stringify(payload)
+                                    });
+                                    const text = await resp.text();
+                                    console.log('📔 Journaling (text) response', { status: resp.status, textLength: text.length });
+
+                                    await whatsappService.sendMessage(
+                                        from,
+                                        "📔 Journal noté. Je l'analyse et te donnerai des insights demain matin 🌅\n\nTu peux aussi écrire 'résumé journal' ou 'conseils du jour'."
+                                    );
+                                    return res.sendStatus(200);
+                                }
+                            } catch (e) {
+                                console.error('Erreur journal via texte:', e);
+                            }
+                        }
                     } else if (messageType === 'audio') {
                         // Message vocal - transcription nécessaire
                         console.log('🎙️ Message vocal détecté');
@@ -141,6 +260,34 @@ async function startAIService() {
                                     from, 
                                     `🎙️ *Message vocal reçu et transcrit :*\n\n"${textToProcess}"\n\n_Traitement en cours..._`
                                 );
+
+                                // Tenter d'associer l'utilisateur par numéro WhatsApp
+                                const phone = String(from).replace(/\D/g, '');
+                                const user = await prisma.user.findFirst({ where: { whatsappNumber: { equals: phone } } });
+                                if (user?.id) {
+                                    userIdForToken = user.id;
+                                    try {
+                                        const apiToken = await getOrCreateApiTokenForUser(user.id);
+                                        const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+                                        const payload = {
+                                            transcription: textToProcess,
+                                            date: new Date().toISOString()
+                                        };
+                                        console.log('📔 Journaling (audio) POST', { appUrl, path: '/api/journal/agent' });
+                                        const resp = await fetch(`${appUrl}/api/journal/agent`, {
+                                            method: 'POST',
+                                            headers: {
+                                                'Authorization': `Bearer ${apiToken}`,
+                                                'Content-Type': 'application/json'
+                                            },
+                                            body: JSON.stringify(payload)
+                                        });
+                                        const text = await resp.text();
+                                        console.log('📔 Journaling (audio) response', { status: resp.status, textLength: text.length });
+                                    } catch (e) {
+                                        console.error('Erreur envoi au journal agent (audio):', e);
+                                    }
+                                }
                             } else {
                                 console.error('❌ Erreur de transcription:', transcriptionResult.error);
                                 await whatsappService.sendMessage(
