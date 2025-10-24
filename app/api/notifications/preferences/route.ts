@@ -182,6 +182,26 @@ export async function POST(request: Request) {
             }
         });
 
+        // Si l'heure d'amélioration change, réinitialiser le flag 'sent' du DailyInsight du jour
+        if (oldPreferences?.improvementTime !== incomingPreferences.improvementTime) {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            
+            await prisma.dailyInsight.updateMany({
+                where: {
+                    userId,
+                    date: today,
+                    sent: true
+                },
+                data: {
+                    sent: false,
+                    sentAt: null
+                }
+            });
+            
+            console.log(`🔄 Heure d'amélioration modifiée (${oldPreferences?.improvementTime} → ${incomingPreferences.improvementTime}), notification réinitialisée`);
+        }
+
         // Émettre un événement de mise à jour des préférences
         const eventManager = EventManager.getInstance();
         eventManager.emitPreferencesUpdate({
