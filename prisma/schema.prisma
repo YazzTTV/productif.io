@@ -16,10 +16,24 @@ model User {
   createdAt            DateTime              @default(now())
   updatedAt            DateTime              @updatedAt
   managedCompanyId     String?
+  
+  // Free Trial
+  trialStartDate       DateTime?
+  trialEndDate         DateTime?
+  trialStatus          String?               @default("active") // active, expired, converted
+  
+  // Subscription
+  subscriptionStatus   String?               @default("trial") // trial, active, cancelled, expired
+  subscriptionTier     String?               // starter, pro, enterprise
   stripeCustomerId     String?               @unique
   stripeSubscriptionId String?               @unique
-  subscriptionStatus   String?
-  trialEndsAt          DateTime?
+  subscriptionEndDate  DateTime?
+  
+  // Historique
+  convertedAt          DateTime?             // Date de conversion trial → paid
+  cancelledAt          DateTime?
+  trialEndsAt          DateTime?             // Keep for backward compatibility
+  
   role                 String                @default("USER")
   missions             Mission[]
   processes            Process[]
@@ -39,6 +53,11 @@ model User {
   whatsappConversations WhatsAppConversation[]
   journalEntries       JournalEntry[]
   dailyInsights        DailyInsight[]
+  behaviorCheckIns     BehaviorCheckIn[]
+  behaviorPatterns     BehaviorPattern[]
+  checkInSchedule      CheckInSchedule?
+  conversationState    UserConversationState?
+  trialNotifications   TrialNotification[]
 }
 
 model Company {
@@ -502,4 +521,85 @@ model DailyInsight {
 
   @@index([userId, date])
   @@unique([userId, date])
+}
+
+/// Modèles pour l'analyse comportementale continue (Feature 3)
+
+/// Check-in comportemental individuel
+model BehaviorCheckIn {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  timestamp   DateTime @default(now())
+  type        String   // mood, focus, motivation, energy, stress
+  value       Int      // Score 1-10
+  note        String?
+  context     Json?    // Contexte (activité en cours, etc.)
+  triggeredBy String   // scheduled, manual, event-based
+  createdAt   DateTime @default(now())
+
+  @@index([userId, timestamp])
+  @@index([userId, type, timestamp])
+}
+
+/// Pattern comportemental analysé sur une période
+model BehaviorPattern {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  startDate       DateTime
+  endDate         DateTime
+  patterns        Json     // { "morning_focus": 8.5, "afternoon_dip": true, ... }
+  avgMood         Float?
+  avgFocus        Float?
+  avgMotivation   Float?
+  avgEnergy       Float?
+  avgStress       Float?
+  insights        String[]
+  recommendations String[]
+  correlations    Json?    // Ex: { "focus_vs_sleep": 0.7, "mood_vs_exercise": 0.6 }
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([userId, startDate])
+}
+
+/// Configuration des check-ins automatiques
+model CheckInSchedule {
+  id           String   @id @default(cuid())
+  userId       String   @unique
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  enabled      Boolean  @default(true)
+  frequency    String   @default("3x_daily") // 3x_daily, hourly, custom
+  schedules    Json     // [{ time: "09:00", types: ["mood", "energy"] }, ...]
+  randomize    Boolean  @default(true) // Varier les horaires de ±15min
+  skipWeekends Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+/// État conversationnel pour les interactions WhatsApp
+model UserConversationState {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  state     String   // awaiting_checkin_mood, awaiting_deepwork_duration, etc.
+  data      Json?    // Données contextuelles
+  expiresAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+/// Notifications de rappel pour les périodes d'essai
+model TrialNotification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String   // reminder_3days, reminder_1day, expired
+  sentAt    DateTime @default(now())
+  channel   String   // email, whatsapp, in_app
+  createdAt DateTime @default(now())
+  
+  @@index([userId, type])
+  @@index([sentAt])
 }

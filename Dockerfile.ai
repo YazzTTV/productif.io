@@ -2,6 +2,9 @@ FROM node:22
 
 WORKDIR /app
 
+# Set timezone for consistency
+ENV TZ=Europe/Paris
+
 # System dependencies required for native modules and healthcheck
 RUN apt-get update && apt-get install -y \
   curl \
@@ -12,6 +15,7 @@ RUN apt-get update && apt-get install -y \
 
 # Copy package files
 COPY package*.json ./
+COPY .npmrc ./
 COPY prisma ./prisma/
 
 # Install dependencies (bypass peer conflicts from mobile packages)

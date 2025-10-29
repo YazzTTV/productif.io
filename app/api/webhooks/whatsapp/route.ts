@@ -3,6 +3,9 @@ import { prisma } from '@/lib/prisma'
 import { handleDeepWorkCommand } from '@/lib/agent/handlers/deepwork.handler'
 import { generateApiToken } from '@/lib/api-token'
 import { handleJournalVoiceNote, handleJournalTextCommand } from '@/lib/agent/handlers/journal.handler'
+import { handleBehaviorCheckInCommand } from '@/lib/agent/handlers/behavior.handler'
+import { TrialService } from '@/lib/trial/TrialService'
+import { sendWhatsAppMessage } from '@/lib/whatsapp'
 
 // GET: Verification endpoint for WhatsApp webhook (optional)
 export async function GET(req: NextRequest) {
@@ -19,14 +22,14 @@ export async function GET(req: NextRequest) {
 
 // Helper: get or create an API token for the user with required scopes
 async function getOrCreateApiTokenForUser(userId: string): Promise<string> {
-  const required = ['deepwork:read', 'deepwork:write', 'tasks:read', 'tasks:write', 'journal:read', 'journal:write']
+  const required = ['deepwork:read', 'deepwork:write', 'tasks:read', 'tasks:write', 'journal:read', 'journal:write', 'behavior:read', 'behavior:write']
   const existing = await prisma.apiToken.findFirst({
     where: { userId, scopes: { hasEvery: required } },
     orderBy: { createdAt: 'desc' }
   })
   if (existing?.token) return existing.token
 
-  const name = 'Agent IA (Deep Work + Journal)'
+  const name = 'Agent IA (Deep Work + Journal + Behavior)'
   const { token } = await generateApiToken({ name, userId, scopes: required })
   return token
 }
@@ -71,6 +74,36 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ status: 'ignored', reason: 'user not found for phone' })
     }
 
+    // Vérifier l'accès (trial ou subscription)
+    const accessCheck = await TrialService.hasAccess(user.id)
+    
+    if (!accessCheck.hasAccess) {
+      // Message personnalisé selon le statut
+      let message = '🚨 *Ton essai gratuit est terminé !*\n\n'
+      message += 'Pour continuer à utiliser Productif.io :\n\n'
+      message += `👉 ${process.env.NEXT_PUBLIC_APP_URL}/upgrade\n\n`
+      message += '💡 *Offre spéciale :* Commencez maintenant et profitez de toutes les fonctionnalités.\n\n'
+      message += 'À très bientôt ! 💙'
+      
+      await sendWhatsAppMessage(phoneNumber, message)
+      return new NextResponse('OK', { status: 200 })
+    }
+    
+    // Afficher un rappel si trial actif avec peu de jours restants
+    if (accessCheck.status === 'trial_active' && accessCheck.trialDaysLeft !== undefined && accessCheck.trialDaysLeft <= 2) {
+      // Vérifier si un rappel a déjà été envoyé aujourd'hui
+      const today = new Date().toDateString()
+      const alreadyReminded = await TrialService.hasNotificationBeenSent(user.id, `whatsapp-reminder-${today}`)
+      
+      if (!alreadyReminded) {
+        let reminderMessage = `⏰ *Rappel :* Plus que ${accessCheck.trialDaysLeft} jour${accessCheck.trialDaysLeft > 1 ? 's' : ''} d'essai gratuit !\n\n`
+        reminderMessage += `Pense à t'abonner : ${process.env.NEXT_PUBLIC_APP_URL}/upgrade`
+        
+        await sendWhatsAppMessage(phoneNumber, reminderMessage)
+        await TrialService.recordNotificationSent(user.id, `whatsapp-reminder-${today}`, 'whatsapp')
+      }
+    }
+
     // Ensure we have an API token for calling internal Deep Work API
     const apiToken = await getOrCreateApiTokenForUser(user.id)
 
@@ -84,7 +117,11 @@ export async function POST(req: NextRequest) {
     const journalHandled = await handleJournalTextCommand(messageText, user.id, phoneNumber, apiToken)
     if (journalHandled) return new NextResponse('OK', { status: 200 })
 
-    // 3) Delegate to Deep Work conversational handler
+    // 3) Text → Behavior commands
+    const behaviorHandled = await handleBehaviorCheckInCommand(messageText, user.id, phoneNumber, apiToken)
+    if (behaviorHandled) return new NextResponse('OK', { status: 200 })
+
+    // 4) Delegate to Deep Work conversational handler
     const handled = await handleDeepWorkCommand(messageText, user.id, phoneNumber, apiToken)
     if (handled) return new NextResponse('OK', { status: 200 })
 

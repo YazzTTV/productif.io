@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyApiToken, hasRequiredScopes } from '@/lib/api-token'
+import { TrialService } from '@/lib/trial/TrialService'
 
 export interface ApiAuthOptions {
   requiredScopes?: string[]
+  checkTrial?: boolean // Activer la vérification du trial
 }
 
 /**
@@ -46,6 +48,28 @@ export async function apiAuth(
         { error: 'Permissions insuffisantes', requiredScopes: options.requiredScopes },
         { status: 403 }
       )
+    }
+  }
+
+  // Vérifier le trial (si activé)
+  if (options.checkTrial !== false) { // Par défaut, vérifier le trial
+    const accessCheck = await TrialService.hasAccess(decoded.userId)
+    
+    if (!accessCheck.hasAccess) {
+      return NextResponse.json(
+        { 
+          error: accessCheck.reason || 'Accès expiré. Abonnez-vous pour continuer.',
+          status: accessCheck.status,
+          upgradeUrl: `${process.env.NEXT_PUBLIC_APP_URL}/upgrade`
+        },
+        { status: 403 }
+      )
+    }
+    
+    // Ajouter les infos de trial dans les headers
+    req.headers.set('x-trial-status', accessCheck.status)
+    if (accessCheck.trialDaysLeft !== undefined) {
+      req.headers.set('x-trial-days-left', accessCheck.trialDaysLeft.toString())
     }
   }
 

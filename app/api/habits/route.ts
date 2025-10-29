@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { startOfDay, endOfDay, subDays } from "date-fns"
+import { startOfDay } from "date-fns"
 import { getAuthUser } from "@/lib/auth"
 
 // Habitudes par défaut
@@ -39,18 +39,15 @@ export async function GET() {
     // Obtenir le jour en anglais pour le filtrage
     const currentDayOfWeek = today.toLocaleDateString("en-US", { weekday: "long" }).toLowerCase()
     
-    // Récupérer toutes les habitudes de l'utilisateur avec leurs entrées pour aujourd'hui
+    // Récupérer toutes les habitudes de l'utilisateur avec toutes leurs entrées historiques
     const habits = await prisma.habit.findMany({
       where: {
         userId: user.id,
       },
       include: {
         entries: {
-          where: {
-            date: {
-              gte: startOfDay(subDays(today, 7)),
-              lte: endOfDay(today)
-            }
+          orderBy: {
+            date: 'desc'
           }
         }
       },

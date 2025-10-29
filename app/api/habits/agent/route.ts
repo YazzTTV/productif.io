@@ -6,7 +6,8 @@ import { apiAuth } from '@/middleware/api-auth'
 export async function GET(req: NextRequest) {
   // Vérifier l'authentification API
   const authResponse = await apiAuth(req, {
-    requiredScopes: ['habits:read']
+    requiredScopes: ['habits:read'],
+    checkTrial: false
   })
   
   // Si l'authentification a échoué, retourner la réponse d'erreur
