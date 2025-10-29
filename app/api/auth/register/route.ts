@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { hash } from "bcryptjs"
 import { prisma } from "@/lib/prisma"
 import { v4 as uuidv4 } from "uuid"
+import { TrialService } from "@/lib/trial/TrialService"
 
 export async function POST(req: Request) {
   try {
@@ -48,6 +49,9 @@ export async function POST(req: Request) {
         }
       })
       
+      // Initialiser le trial gratuit de 7 jours
+      await TrialService.initializeTrial(user.id)
+      
       let companyData = null
       
       // Si une entreprise est fournie, créer l'entreprise et établir les relations
@@ -81,8 +85,8 @@ export async function POST(req: Request) {
         {
           success: true,
           message: company 
-            ? "Compte utilisateur et entreprise créés avec succès" 
-            : "Utilisateur créé avec succès",
+            ? "Compte utilisateur et entreprise créés avec succès ! Profitez de 7 jours d'essai gratuit." 
+            : "Compte créé avec succès ! Profitez de 7 jours d'essai gratuit.",
           user,
           company: companyData
         },

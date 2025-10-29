@@ -11,7 +11,7 @@ function normalizeToDay(date: Date): Date {
 }
 
 export async function GET(req: NextRequest) {
-  const authResponse = await apiAuth(req, { requiredScopes: ['journal:read'] })
+  const authResponse = await apiAuth(req, { requiredScopes: ['journal:read'], checkTrial: false })
   if (authResponse) return authResponse
 
   try {
@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const authResponse = await apiAuth(req, { requiredScopes: ['journal:write'] })
+  const authResponse = await apiAuth(req, { requiredScopes: ['journal:write'], checkTrial: false })
   if (authResponse) return authResponse
 
   try {

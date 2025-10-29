@@ -1,8 +1,8 @@
 "use client"
 
 import { useEffect, useState } from 'react'
-import { useSearchParams } from 'next/navigation'
-import { CheckCircle2, Sparkles, Trophy, Crown, ArrowRight, Gift } from 'lucide-react'
+import { useSearchParams, useRouter } from 'next/navigation'
+import { CheckCircle2, Sparkles, Trophy, Crown, ArrowRight, Gift, Bot, Zap, MessageSquare, Target } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -10,13 +10,61 @@ import Link from 'next/link'
 
 export default function ThankYouContent() {
   const searchParams = useSearchParams()
+  const router = useRouter()
   const success = searchParams?.get('success')
   const [isAnimated, setIsAnimated] = useState(false)
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null)
   
   useEffect(() => {
-    // Animation d'entrée
-    setTimeout(() => setIsAnimated(true), 100)
-  }, [])
+    // Vérifier l'authentification
+    fetch('/api/auth/me')
+      .then(res => {
+        if (res.ok) {
+          setIsAuthenticated(true)
+          // Animation d'entrée
+          setTimeout(() => setIsAnimated(true), 100)
+        } else {
+          setIsAuthenticated(false)
+          // Rediriger vers login après 2 secondes
+          setTimeout(() => {
+            router.push('/login?message=Veuillez vous reconnecter&redirect=/dashboard')
+          }, 2000)
+        }
+      })
+      .catch(() => {
+        setIsAuthenticated(false)
+        setTimeout(() => {
+          router.push('/login?message=Veuillez vous reconnecter&redirect=/dashboard')
+        }, 2000)
+      })
+  }, [router])
+  
+  // Afficher un loader pendant la vérification
+  if (isAuthenticated === null) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-green-50 via-blue-50 to-purple-50 flex items-center justify-center p-4">
+        <div className="text-center">
+          <CheckCircle2 className="w-20 h-20 text-green-500 mx-auto mb-4 animate-pulse" />
+          <h1 className="text-4xl font-bold text-gray-900 mb-2">Vérification...</h1>
+          <p className="text-xl text-gray-600">Merci pour votre confiance !</p>
+        </div>
+      </div>
+    )
+  }
+  
+  // Afficher un message de redirection si non authentifié
+  if (isAuthenticated === false) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-green-50 via-blue-50 to-purple-50 flex items-center justify-center p-4">
+        <div className="text-center">
+          <CheckCircle2 className="w-20 h-20 text-green-500 mx-auto mb-4" />
+          <h1 className="text-4xl font-bold text-gray-900 mb-2">Paiement confirmé ! ✅</h1>
+          <p className="text-xl text-gray-600 mb-4">Redirection vers la connexion...</p>
+          <p className="text-sm text-gray-500">Vous allez être redirigé dans un instant</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 via-blue-50 to-purple-50 flex items-center justify-center p-4">
@@ -50,30 +98,30 @@ export default function ThankYouContent() {
           </CardHeader>
           
           <CardContent className="space-y-6">
-            {/* Avantages Premium */}
+            {/* Avantages Premium (version WOW) */}
             <div className="grid md:grid-cols-2 gap-4">
-              <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-lg border border-blue-200">
-                <Trophy className="w-8 h-8 text-blue-600 mb-2" />
-                <h3 className="font-semibold text-blue-900 mb-1">Fonctionnalités avancées</h3>
-                <p className="text-sm text-blue-700">Projets illimités, analyses détaillées, rapports personnalisés</p>
+              <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-4 rounded-lg border border-purple-200">
+                <Bot className="w-8 h-8 text-purple-600 mb-2" />
+                <h3 className="font-semibold text-purple-900 mb-1">Assistant IA proactif</h3>
+                <p className="text-sm text-purple-700">Un coach qui anticipe tes blocages et propose le prochain meilleur pas.</p>
               </div>
               
-              <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-4 rounded-lg border border-purple-200">
-                <Sparkles className="w-8 h-8 text-purple-600 mb-2" />
-                <h3 className="font-semibold text-purple-900 mb-1">Gamification Premium</h3>
-                <p className="text-sm text-purple-700">Classements, achievements exclusifs, défis personnalisés</p>
+              <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-lg border border-blue-200">
+                <Target className="w-8 h-8 text-blue-600 mb-2" />
+                <h3 className="font-semibold text-blue-900 mb-1">Plan Focus quotidien</h3>
+                <p className="text-sm text-blue-700">Un plan d’action clair en 1 clic, aligné sur tes objectifs.</p>
+              </div>
+              
+              <div className="bg-gradient-to-br from-amber-50 to-amber-100 p-4 rounded-lg border border-amber-200">
+                <Zap className="w-8 h-8 text-amber-600 mb-2" />
+                <h3 className="font-semibold text-amber-900 mb-1">Routines intelligentes</h3>
+                <p className="text-sm text-amber-700">Automations + rappels dynamiques pour garder le rythme sans y penser.</p>
               </div>
               
               <div className="bg-gradient-to-br from-green-50 to-green-100 p-4 rounded-lg border border-green-200">
-                <Gift className="w-8 h-8 text-green-600 mb-2" />
-                <h3 className="font-semibold text-green-900 mb-1">Période d'essai</h3>
-                <p className="text-sm text-green-700">7 jours gratuits pour explorer toutes les fonctionnalités</p>
-              </div>
-              
-              <div className="bg-gradient-to-br from-orange-50 to-orange-100 p-4 rounded-lg border border-orange-200">
-                <ArrowRight className="w-8 h-8 text-orange-600 mb-2" />
-                <h3 className="font-semibold text-orange-900 mb-1">Support prioritaire</h3>
-                <p className="text-sm text-orange-700">Assistance rapide et personnalisée</p>
+                <MessageSquare className="w-8 h-8 text-green-600 mb-2" />
+                <h3 className="font-semibold text-green-900 mb-1">WhatsApp en temps réel</h3>
+                <p className="text-sm text-green-700">Ton copilote te guide, célèbre tes wins et te relance au bon moment.</p>
               </div>
             </div>
 
@@ -121,7 +169,7 @@ export default function ThankYouContent() {
                 Vous avez des questions ? Notre équipe est là pour vous aider !
               </p>
               <Button variant="ghost" size="sm" asChild>
-                <Link href="mailto:support@productif.io">
+                <Link href="mailto:contact@productif.io">
                   Contacter le support
                 </Link>
               </Button>

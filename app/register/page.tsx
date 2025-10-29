@@ -1,6 +1,9 @@
+"use client"
+
+import { Suspense } from "react"
 import { RegisterForm } from "@/components/auth/register-form"
 
-export default function RegisterPage() {
+function RegisterContent() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-12 sm:px-6 lg:px-8">
       <div className="w-full max-w-md space-y-8">
@@ -16,6 +19,18 @@ export default function RegisterPage() {
         <RegisterForm />
       </div>
     </div>
+  )
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+        <div className="text-center">Chargement...</div>
+      </div>
+    }>
+      <RegisterContent />
+    </Suspense>
   )
 }
 

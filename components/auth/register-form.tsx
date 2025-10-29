@@ -1,8 +1,8 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { useState, useEffect } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -11,13 +11,22 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Building2 } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { signIn } from "next-auth/react"
 
 export function RegisterForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
   const [isCompanyAccount, setIsCompanyAccount] = useState(false)
+  const [email, setEmail] = useState("")
+
+  // Récupérer l'email depuis les paramètres URL
+  useEffect(() => {
+    const emailParam = searchParams.get('email')
+    if (emailParam) {
+      setEmail(emailParam)
+    }
+  }, [searchParams])
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -50,13 +59,24 @@ export function RegisterForm() {
         throw new Error(data.error || "Une erreur est survenue lors de l'inscription")
       }
 
-      // Connexion automatique
-      const signInResult = await signIn("credentials", {
-        email,
-        password,
-        redirect: true,
-        callbackUrl: '/dashboard/onboarding'
+      // Connexion automatique après l'inscription
+      const loginResponse = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
       })
+
+      const loginData = await loginResponse.json()
+
+      if (!loginResponse.ok) {
+        throw new Error(loginData.error || "Erreur lors de la connexion automatique")
+      }
+
+      // Rediriger vers l'onboarding ou le dashboard (rechargement complet pour garantir les cookies)
+      const urlParams = new URLSearchParams(window.location.search)
+      const redirectPath = urlParams.get('redirect') || '/onboarding'
+      console.log('Inscription + connexion réussies, redirection vers', redirectPath)
+      window.location.assign(redirectPath)
 
     } catch (error) {
       console.error("Erreur complète:", error)
@@ -96,6 +116,8 @@ export function RegisterForm() {
               id="email"
               name="email"
               type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               required
               disabled={isLoading}
             />
