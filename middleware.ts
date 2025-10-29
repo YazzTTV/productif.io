@@ -1,11 +1,29 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 import { verify } from "jsonwebtoken"
+import { TrialService } from "@/lib/trial/TrialService"
 
 // Définir les routes publiques qui ne nécessitent pas d'authentification
-const publicRoutes = ["/", "/login", "/register", "/api/auth/login", "/api/auth/register"]
+const publicRoutes = [
+  "/", 
+  "/login", 
+  "/register", 
+  "/onboarding",
+  "/upgrade", 
+  "/api/auth/login", 
+  "/api/auth/register",
+  "/api/webhooks/stripe",
+  "/merci",
+  "/pricing",
+  "/tarifs",
+  "/cgv",
+  "/legal",
+  "/privacy-policy",
+  "/terms",
+  "/refund-policy"
+]
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   try {
     // Vérifier si la route est publique
     if (publicRoutes.some(route => request.nextUrl.pathname.startsWith(route))) {
@@ -25,7 +43,27 @@ export function middleware(request: NextRequest) {
 
     try {
       // Vérifier le token
-      verify(token, process.env.JWT_SECRET || "fallback_secret")
+      const decoded = verify(token, process.env.JWT_SECRET || "fallback_secret") as { userId: string }
+      
+      // Vérifier le trial pour les routes dashboard
+      if (request.nextUrl.pathname.startsWith("/dashboard")) {
+        const accessCheck = await TrialService.hasAccess(decoded.userId)
+        
+        if (!accessCheck.hasAccess) {
+          // Rediriger vers la page d'upgrade si le trial est expiré
+          return NextResponse.redirect(new URL("/upgrade", request.url))
+        }
+        
+        // Ajouter les infos de trial dans les headers
+        const response = NextResponse.next()
+        response.headers.set("X-Trial-Status", accessCheck.status)
+        
+        if (accessCheck.trialDaysLeft !== undefined) {
+          response.headers.set("X-Trial-Days-Left", accessCheck.trialDaysLeft.toString())
+        }
+        
+        return response
+      }
       
       // Ajouter l'en-tête X-Auth-Token pour les requêtes API
       if (request.nextUrl.pathname.startsWith("/api/")) {

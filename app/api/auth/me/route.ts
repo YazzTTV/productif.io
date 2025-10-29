@@ -1,11 +1,34 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getAuthUserFromRequest } from "@/lib/auth"
+import { getAuthUserFromRequest, verifyToken } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+
+async function minimalUserFromToken(req: NextRequest) {
+  try {
+    const authHeader = req.headers.get("authorization")
+    let token: string | null = null
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      token = authHeader.substring(7)
+    } else {
+      token = req.cookies.get("auth_token")?.value || null
+    }
+    if (!token) return null
+    const decoded = await verifyToken(token)
+    if (!decoded) return null
+    return { id: decoded.userId, email: decoded.email }
+  } catch {
+    return null
+  }
+}
 
 export async function GET(req: NextRequest) {
   try {
     const user = await getAuthUserFromRequest(req)
     if (!user) {
+      // Fallback: tenter un retour minimal basé sur le JWT pour ne pas casser l'UI
+      const minimal = await minimalUserFromToken(req)
+      if (minimal) {
+        return NextResponse.json({ user: { id: minimal.id ?? null, email: minimal.email ?? "" } })
+      }
       return NextResponse.json({ error: "Non authentifié" }, { status: 401 })
     }
 
@@ -46,7 +69,15 @@ export async function GET(req: NextRequest) {
         companyName: userCompany?.company?.name || null
       }
     })
-  } catch (error) {
+  } catch (error: any) {
+    // Si la base renvoie une erreur de quota, renvoyer un utilisateur minimal pour ne pas casser l'UX
+    const message = String(error?.message || "")
+    if (message.includes("exceeded the data transfer quota")) {
+      const minimal = await minimalUserFromToken(req)
+      if (minimal) {
+        return NextResponse.json({ user: { id: minimal.id ?? null, email: minimal.email ?? "" } })
+      }
+    }
     console.error("Erreur lors de la récupération des informations utilisateur:", error)
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 })
   }

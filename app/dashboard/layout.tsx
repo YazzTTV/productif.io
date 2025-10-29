@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { Capacitor } from '@capacitor/core'
 import { MobileNav } from "@/components/navigation/mobile-nav"
+import { TrialBanner } from "@/components/trial/TrialBanner"
 
 export default function DashboardLayout({
   children,
@@ -64,6 +65,9 @@ export default function DashboardLayout({
             </div>
           </div>
         </header>
+
+        {/* Bannière de rappel du trial */}
+        <TrialBanner />
 
         <div className="flex flex-1 relative">
           {/* Mobile sidebar backdrop */}

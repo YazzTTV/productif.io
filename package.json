@@ -11,7 +11,7 @@
     "dev:whatsapp": "nodemon src/index.js",
     "dev:scheduler": "nodemon src/services/scheduler-service.js",
     "schedule-morning": "node src/scripts/schedule-morning-reminders.js",
-    "build": "npx prisma generate && next build",
+    "build": "npx prisma generate && npx prisma migrate deploy && next build",
     "prisma:seed": "npx tsx prisma/seed.ts",
     "build:capacitor": "rm -rf app/api && cp next.config.capacitor.mjs next.config.mjs && next build && git checkout next.config.mjs && git checkout app/api",
     "build:mobile": "cp next.config.mobile.mjs next.config.mjs && next build && npx cap sync && git checkout next.config.mjs",
