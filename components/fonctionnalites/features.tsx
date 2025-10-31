@@ -7,39 +7,39 @@ export function FonctionnalitesFeatures() {
   return (
     <section className="container mx-auto px-4 py-20 bg-gray-50">
       <h2 className="text-3xl md:text-4xl font-bold text-gray-900 text-center mb-16">
-        Des fonctionnalités <span className="text-green-500">conçues pour toi</span>
+        Features <span className="text-green-500">designed for you</span>
       </h2>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
         <FeatureCard 
           icon={<Brain className="w-14 h-14 text-green-500" />}
-          title="Organisation intelligente"
-          description="L'IA analyse tes tâches, tes habitudes et ton emploi du temps pour créer un planning optimal qui respecte tes préférences et ton rythme."
+          title="Intelligent organization"
+          description="AI analyzes your tasks, habits, and schedule to create an optimal plan that respects your preferences and rhythm."
         />
         <FeatureCard 
           icon={<MessageSquare className="w-14 h-14 text-green-500" />}
-          title="Assistant WhatsApp intégré"
-          description="Ton assistant personnel te guide tout au long de la journée via WhatsApp, t'envoyant des rappels intelligents et des encouragements au bon moment."
+          title="Built-in WhatsApp assistant"
+          description="Your personal assistant guides you throughout the day via WhatsApp, sending smart reminders and encouragement at the right time."
         />
         <FeatureCard 
           icon={<Clock className="w-14 h-14 text-green-500" />}
-          title="Gestion du temps optimisée"
-          description="Suivi précis du temps passé sur chaque tâche, avec analyses pour identifier où tu es le plus productif et où tu peux optimiser."
+          title="Optimized time management"
+          description="Accurate tracking of time spent on each task, with insights to identify where you’re most productive and where to optimize."
         />
         <FeatureCard 
           icon={<BarChart3 className="w-14 h-14 text-green-500" />}
-          title="Habitudes qui se maintiennent"
-          description="Système de suivi et de renforcement des habitudes qui s'adapte à ta vie réelle, avec des rappels contextuels au moment opportun."
+          title="Habits that stick"
+          description="A habit tracking and reinforcement system that adapts to your real life, with contextual reminders at the right moment."
         />
         <FeatureCard 
           icon={<Zap className="w-14 h-14 text-green-500" />}
-          title="Objectifs atteignables"
-          description="Décomposition intelligente de tes grands objectifs en tâches actionables, avec suivi automatique de ta progression."
+          title="Achievable goals"
+          description="Smart breakdown of your big goals into actionable tasks, with automatic progress tracking."
         />
         <FeatureCard 
           icon={<CheckCircle2 className="w-14 h-14 text-green-500" />}
-          title="Tableaux de bord personnalisés"
-          description="Visualisation claire de ta progression, tes habitudes et tes objectifs sans surcharge d'information."
+          title="Personalized dashboards"
+          description="Clear visualization of your progress, habits, and goals without information overload."
         />
       </div>
     </section>

@@ -18,12 +18,12 @@ export function HeroWithLocalVideo() {
   return (
     <section className="container mx-auto px-4 py-20 text-center relative">
       <h1 className="text-4xl md:text-6xl font-bold text-gray-900 max-w-4xl mx-auto leading-tight">
-        Arrête de t'organiser. <span className="text-green-500">Laisse l'IA le faire pour toi.</span>
+        Stop trying to organize everything. <span className="text-green-500">Let AI do it for you.</span>
       </h1>
       <div className="w-full max-w-2xl mx-auto h-1 bg-gradient-to-r from-transparent via-green-500 to-transparent my-6"></div>
       <p className="text-gray-600 text-xl max-w-2xl mx-auto mb-8">
-        Ton cerveau mérite mieux que des to-do lists. Productif.io s'occupe de tout.
-        <span className="block mt-2 font-medium">Rejoins la waitlist exclusive (1€) et sécurise ton accès à vie pour un tarif préférentiel.</span>
+        Your brain deserves better than endless to-do lists. Productif.io handles it for you.
+        <span className="block mt-2 font-medium">Join the exclusive waitlist (€1) and lock in lifetime access at a preferential rate.</span>
       </p>
       <Button 
         className="bg-green-500 hover:bg-green-600 text-white text-lg px-8 py-6 h-auto"
@@ -38,9 +38,9 @@ export function HeroWithLocalVideo() {
           window.location.href = `/onboarding?${params.toString()}`
         }}
       >
-        Sécurise ta place pour 1€
+        Start Now for Free
       </Button>
-      <p className="text-sm text-gray-500 mt-2">Seulement 150 places disponibles</p>
+      <p className="text-sm text-gray-500 mt-2">Only 150 spots available</p>
 
       <div className="mt-16 relative">
         <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl overflow-hidden shadow-lg border border-gray-200">

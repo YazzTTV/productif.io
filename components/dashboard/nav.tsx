@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useState, useEffect } from "react"
-import { LayoutDashboard, CheckSquare, Clock, BarChart, Settings, FolderKanban, Heart, Target, Book, Users, Building2, LineChart, Trophy, Mail, Bot } from "lucide-react"
+import { LayoutDashboard, CheckSquare, Clock, BarChart, Settings, FolderKanban, Heart, Target, Book, Users, Building2, LineChart, Trophy, Mail, Bot, Lock } from "lucide-react"
 import { buttonVariants } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { cn } from "@/lib/utils"
@@ -42,6 +42,7 @@ export function DashboardNav({ viewAsMode = false, viewAsUserId, onNavItemClick 
   const [companyName, setCompanyName] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const { t } = useLocale()
+  const [trialExpired, setTrialExpired] = useState(false)
 
   useEffect(() => {
     const fetchUserRole = async () => {
@@ -76,6 +77,17 @@ export function DashboardNav({ viewAsMode = false, viewAsUserId, onNavItemClick 
     }
 
     fetchUserRole()
+    // Vérifier le statut du trial pour afficher les cadenas
+    const checkTrial = async () => {
+      try {
+        const res = await fetch('/api/user/trial-status')
+        if (res.ok) {
+          const data = await res.json()
+          setTrialExpired(data.status === 'trial_expired')
+        }
+      } catch {}
+    }
+    checkTrial()
   }, [viewAsMode, viewAsUserId])
 
   // Déterminer si le lien est actif en tenant compte du mode visualisation
@@ -111,7 +123,12 @@ export function DashboardNav({ viewAsMode = false, viewAsUserId, onNavItemClick 
   const showSettings = !viewAsMode
 
   // Fonction pour gérer le clic sur un élément de navigation
-  const handleNavClick = () => {
+  const handleNavClick = (e?: React.MouseEvent) => {
+    if (trialExpired) {
+      e?.preventDefault()
+      window.location.href = '/upgrade'
+      return
+    }
     if (onNavItemClick) {
       onNavItemClick();
     }
@@ -178,6 +195,7 @@ export function DashboardNav({ viewAsMode = false, viewAsUserId, onNavItemClick 
       >
         <LayoutDashboard className="mr-2 h-4 w-4" />
         <span className="truncate">{t('dashboard')}</span>
+        {trialExpired && <Lock className="ml-auto h-4 w-4 opacity-70" />}
       </Link>
       
       <Link
@@ -193,6 +211,7 @@ export function DashboardNav({ viewAsMode = false, viewAsUserId, onNavItemClick 
       >
         <CheckSquare className="mr-2 h-4 w-4" />
         <span className="truncate">{t('tasks')}</span>
+        {trialExpired && <Lock className="ml-auto h-4 w-4 opacity-70" />}
       </Link>
       
       <Link
@@ -208,6 +227,7 @@ export function DashboardNav({ viewAsMode = false, viewAsUserId, onNavItemClick 
       >
         <FolderKanban className="mr-2 h-4 w-4" />
         <span className="truncate">{t('projects')}</span>
+        {trialExpired && <Lock className="ml-auto h-4 w-4 opacity-70" />}
       </Link>
       
       <Link
@@ -223,6 +243,7 @@ export function DashboardNav({ viewAsMode = false, viewAsUserId, onNavItemClick 
       >
         <Heart className="mr-2 h-4 w-4" />
         <span className="truncate">{t('habits')}</span>
+        {trialExpired && <Lock className="ml-auto h-4 w-4 opacity-70" />}
       </Link>
       
       <Link
@@ -238,6 +259,7 @@ export function DashboardNav({ viewAsMode = false, viewAsUserId, onNavItemClick 
       >
         <Trophy className="mr-2 h-4 w-4" />
         <span className="truncate">Achievements</span>
+        {trialExpired && <Lock className="ml-auto h-4 w-4 opacity-70" />}
       </Link>
       
       <Link
@@ -253,6 +275,7 @@ export function DashboardNav({ viewAsMode = false, viewAsUserId, onNavItemClick 
       >
         <Users className="mr-2 h-4 w-4" />
         <span className="truncate">Classement</span>
+        {trialExpired && <Lock className="ml-auto h-4 w-4 opacity-70" />}
       </Link>
       
       {!viewAsMode && (
@@ -269,6 +292,7 @@ export function DashboardNav({ viewAsMode = false, viewAsUserId, onNavItemClick 
         >
           <Book className="mr-2 h-4 w-4" />
           <span className="truncate">{t('monEspace')}</span>
+          {trialExpired && <Lock className="ml-auto h-4 w-4 opacity-70" />}
         </Link>
       )}
       
@@ -286,6 +310,7 @@ export function DashboardNav({ viewAsMode = false, viewAsUserId, onNavItemClick 
         >
           <Clock className="mr-2 h-4 w-4" />
           <span className="truncate">{t('time')}</span>
+          {trialExpired && <Lock className="ml-auto h-4 w-4 opacity-70" />}
         </Link>
       )}
       
@@ -302,6 +327,7 @@ export function DashboardNav({ viewAsMode = false, viewAsUserId, onNavItemClick 
       >
         <Target className="mr-2 h-4 w-4" />
         <span className="truncate">{t('objectives')}</span>
+        {trialExpired && <Lock className="ml-auto h-4 w-4 opacity-70" />}
       </Link>
       
       {/* Lien vers la page entreprise pour les membres USER */}
@@ -321,6 +347,7 @@ export function DashboardNav({ viewAsMode = false, viewAsUserId, onNavItemClick 
         >
           <LineChart className="mr-2 h-4 w-4" />
           <span className="truncate">{t('analytics')}</span>
+          {trialExpired && <Lock className="ml-auto h-4 w-4 opacity-70" />}
         </Link>
       )}
 
@@ -337,6 +364,7 @@ export function DashboardNav({ viewAsMode = false, viewAsUserId, onNavItemClick 
       >
         <Bot className="mr-2 h-4 w-4" />
         <span className="truncate">Assistant IA</span>
+        {trialExpired && <Lock className="ml-auto h-4 w-4 opacity-70" />}
       </Link>
 
       {showAdminMenu && (

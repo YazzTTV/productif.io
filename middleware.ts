@@ -1,21 +1,35 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
-import { verify } from "jsonwebtoken"
 import { TrialService } from "@/lib/trial/TrialService"
+
+function decodeJwtPayload(token: string): any | null {
+  try {
+    const parts = token.split('.')
+    if (parts.length !== 3) return null
+    // base64url → base64
+    const b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/')
+    const json = atob(b64)
+    return JSON.parse(json)
+  } catch {
+    return null
+  }
+}
 
 // Définir les routes publiques qui ne nécessitent pas d'authentification
 const publicRoutes = [
-  "/", 
   "/login", 
   "/register", 
   "/onboarding",
   "/upgrade", 
+  "/api/auth", 
   "/api/auth/login", 
   "/api/auth/register",
   "/api/webhooks/stripe",
   "/merci",
   "/pricing",
   "/tarifs",
+  "/tarification",
+  "/fonctionnalites",
   "/cgv",
   "/legal",
   "/privacy-policy",
@@ -25,6 +39,25 @@ const publicRoutes = [
 
 export async function middleware(request: NextRequest) {
   try {
+    // Autoriser la home page explicitement
+    if (request.nextUrl.pathname === "/") {
+      return NextResponse.next()
+    }
+
+    // Autoriser les requêtes API munies d'un header Authorization Bearer (flows machine-to-machine)
+    if (request.nextUrl.pathname.startsWith("/api/")) {
+      const authHeader = request.headers.get("authorization") || ""
+      if (authHeader.toLowerCase().startsWith("bearer ")) {
+        return NextResponse.next()
+      }
+    }
+
+    // Laisser passer les ressources statiques (fichiers du dossier public: /file.ext)
+    // Heuristique: si le chemin contient un point, on considère que c'est un fichier
+    if (request.nextUrl.pathname.includes('.') && !request.nextUrl.pathname.endsWith('.html')) {
+      return NextResponse.next()
+    }
+
     // Vérifier si la route est publique
     if (publicRoutes.some(route => request.nextUrl.pathname.startsWith(route))) {
       return NextResponse.next()
@@ -42,28 +75,14 @@ export async function middleware(request: NextRequest) {
     }
 
     try {
-      // Vérifier le token
-      const decoded = verify(token, process.env.JWT_SECRET || "fallback_secret") as { userId: string }
-      
-      // Vérifier le trial pour les routes dashboard
-      if (request.nextUrl.pathname.startsWith("/dashboard")) {
-        const accessCheck = await TrialService.hasAccess(decoded.userId)
-        
-        if (!accessCheck.hasAccess) {
-          // Rediriger vers la page d'upgrade si le trial est expiré
-          return NextResponse.redirect(new URL("/upgrade", request.url))
-        }
-        
-        // Ajouter les infos de trial dans les headers
-        const response = NextResponse.next()
-        response.headers.set("X-Trial-Status", accessCheck.status)
-        
-        if (accessCheck.trialDaysLeft !== undefined) {
-          response.headers.set("X-Trial-Days-Left", accessCheck.trialDaysLeft.toString())
-        }
-        
-        return response
+      // Décoder le token (Edge runtime, sans vérification crypto)
+      const payload = decodeJwtPayload(token) as { userId?: string } | null
+      if (!payload?.userId) {
+        throw new Error("invalid token payload")
       }
+      
+      // Ne plus vérifier le trial côté middleware (Edge runtime). La gestion se fait côté client/API.
+      // On laisse passer le dashboard, l'overlay client gère le blocage UI.
       
       // Ajouter l'en-tête X-Auth-Token pour les requêtes API
       if (request.nextUrl.pathname.startsWith("/api/")) {

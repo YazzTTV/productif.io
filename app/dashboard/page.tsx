@@ -8,6 +8,7 @@ import { HabitHeatmap } from "@/components/dashboard/habit-heatmap"
 import HabitStats from "@/components/dashboard/habit-stats"
 import { GamificationOverview } from "@/components/gamification/gamification-overview"
 import { LeaderboardCompact } from "@/components/gamification/leaderboard-compact"
+import { LockedCard } from "@/components/trial/LockedCard"
 import { FitbitMobileDashboard } from "@/components/dashboard/fitbit-mobile-dashboard"
 
 export const dynamic = 'force-dynamic'
@@ -58,11 +59,15 @@ export default async function DashboardPage() {
           </div>
 
           {/* Métriques d'aperçu global */}
-          <OverviewMetrics />
+          <LockedCard>
+            <OverviewMetrics />
+          </LockedCard>
 
           {/* Graphiques et suivi */}
           <div className="grid grid-cols-1 md:grid-cols-1 gap-4 sm:gap-6">
-            <HabitStats className="lg:col-span-1" />
+            <LockedCard>
+              <HabitStats className="lg:col-span-1" />
+            </LockedCard>
           </div>
 
           {/* Grille responsive pour les modules */}
@@ -70,18 +75,28 @@ export default async function DashboardPage() {
             {/* Première rangée - 2 colonnes principales */}
             <div className="lg:col-span-2 space-y-4 sm:space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-            <RecentTasks />
-            <GamificationOverview />
+            <LockedCard>
+              <RecentTasks />
+            </LockedCard>
+            <LockedCard>
+              <GamificationOverview />
+            </LockedCard>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-            <ProjectsList projects={projects} />
-            <HabitHeatmap />
+            <LockedCard>
+              <ProjectsList projects={projects} />
+            </LockedCard>
+            <LockedCard>
+              <HabitHeatmap />
+            </LockedCard>
               </div>
             </div>
             
             {/* Colonne latérale - Leaderboard */}
             <div className="lg:col-span-1">
-              <LeaderboardCompact />
+              <LockedCard>
+                <LeaderboardCompact />
+              </LockedCard>
             </div>
           </div>
         </div>

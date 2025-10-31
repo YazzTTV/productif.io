@@ -3,6 +3,7 @@
 import Image from "next/image"
 import { Star } from "lucide-react"
 import { useState, useEffect, useRef } from "react"
+import { Button } from "@/components/ui/button"
 
 export function Testimonials() {
   // Suppression des états et des refs qui ne sont plus nécessaires
@@ -11,9 +12,9 @@ export function Testimonials() {
   return (
     <section className="container mx-auto px-4 py-20">
       <div className="text-center mb-16">
-        <span className="text-green-500">— Témoignages</span>
+        <span className="text-green-500">— Testimonials</span>
         <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mt-2">
-          Ils ont adopté <span className="text-green-500">Productif.io</span>
+          They chose <span className="text-green-500">Productif.io</span>
         </h2>
       </div>
 
@@ -22,18 +23,31 @@ export function Testimonials() {
           name="Gaetan Silgado"
           role="Infopreneur"
           image="/testimonials/gaetan-silgado.jpg"
-          content="En tant qu'infopreneur, Productif.io m'a permis de m'organiser et de travailler sans distraction. Résultat : j'ai pu générer beaucoup plus de chiffre d'affaires en restant concentré sur l'essentiel."
+          content="As an infopreneur, Productif.io helped me organize and work without distractions. As a result, I generated much more revenue by staying focused on what matters."
           verified
           className="min-h-[420px] flex flex-col"
         />
         <BenjaminVideoTestimonial className="min-h-[420px] flex flex-col" />
         <TestimonialCard
           name="Sabrina"
-          role="Media Buyer en freelance"
+          role="Freelance Media Buyer"
           image="/testimonials/sabrina.jpg"
-          content="Je viens de l'essayer et c'est parfait. J'ADORE comment l'application organise mes tâches et me permet de suivre mes habitudes. C'est vraiment intuitif !"
+          content="I just tried it and it’s perfect. I LOVE how the app organizes my tasks and helps me track my habits. It’s truly intuitive!"
           className="min-h-[420px] flex flex-col"
         />
+      </div>
+      <div className="mt-10 text-center">
+        <Button 
+          className="bg-green-500 hover:bg-green-600 text-white px-6 py-3"
+          onClick={() => {
+            const params = new URLSearchParams()
+            params.set('offer','early-access')
+            params.set('billing','monthly')
+            window.location.href = `/onboarding?${params.toString()}`
+          }}
+        >
+          Start Now for Free
+        </Button>
       </div>
     </section>
   )

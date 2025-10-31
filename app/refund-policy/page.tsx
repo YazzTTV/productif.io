@@ -4,96 +4,96 @@ import Link from 'next/link';
 export default function RefundPolicy() {
   return (
     <div className="container mx-auto px-4 py-12 max-w-4xl">
-      <h1 className="text-3xl font-bold mb-8">Politique de Remboursement</h1>
-      <p className="text-sm text-gray-500 mb-8">Dernière mise à jour: {new Date().toLocaleDateString()}</p>
+      <h1 className="text-3xl font-bold mb-8">Refund Policy</h1>
+      <p className="text-sm text-gray-500 mb-8">Last updated: {new Date().toLocaleDateString()}</p>
 
       <section className="mb-10">
         <h2 className="text-2xl font-semibold mb-4">Introduction</h2>
         <p className="mb-4">
-          Chez productif.io, nous nous engageons à offrir un service de qualité et à garantir la satisfaction de nos clients. Cette politique de remboursement définit les conditions dans lesquelles nous proposons des remboursements pour nos services.
+          At productif.io, we strive to provide quality service and ensure customer satisfaction. This refund policy sets out the conditions under which we offer refunds for our services.
         </p>
       </section>
 
       <section className="mb-10">
-        <h2 className="text-2xl font-semibold mb-4">Période d'essai</h2>
+        <h2 className="text-2xl font-semibold mb-4">Trial period</h2>
         <p className="mb-4">
-          Nous offrons une période d'essai gratuite de 14 jours pour tous nos nouveaux utilisateurs. Durant cette période, vous pouvez explorer toutes les fonctionnalités de notre plateforme sans engagement. Aucune carte de crédit n'est requise pour la période d'essai.
+          We offer a 14‑day free trial for all new users. During this period, you can explore all features of our platform with no commitment. No credit card is required for the trial.
         </p>
       </section>
 
       <section className="mb-10">
-        <h2 className="text-2xl font-semibold mb-4">Politique de remboursement pour les abonnements mensuels</h2>
+        <h2 className="text-2xl font-semibold mb-4">Refund policy for monthly subscriptions</h2>
         <p className="mb-4">
-          Si vous êtes insatisfait de nos services, vous pouvez demander un remboursement dans les 14 jours suivant la date de votre premier paiement de 150€ pour l'abonnement mensuel. Après cette période de 14 jours, nous ne proposons pas de remboursements pour les abonnements mensuels en cours.
+          If you are dissatisfied with our services, you may request a refund within 14 days of the date of your first payment for the monthly subscription. After this 14‑day period, we do not offer refunds for ongoing monthly subscriptions.
         </p>
         <p className="mb-4">
-          Veuillez noter que l'annulation de votre abonnement mensuel vous permet de continuer à utiliser nos services jusqu'à la fin de la période de facturation actuelle, mais empêche le renouvellement automatique pour le mois suivant.
-        </p>
-      </section>
-
-      <section className="mb-10">
-        <h2 className="text-2xl font-semibold mb-4">Politique de remboursement pour les abonnements annuels</h2>
-        <p className="mb-4">
-          Pour les abonnements annuels, nous offrons un remboursement complet si la demande est faite dans les 30 jours suivant la date du paiement. Après cette période de 30 jours, nous pouvons offrir un remboursement partiel au prorata des mois non utilisés, à notre discrétion.
+          Please note that canceling your monthly subscription allows you to continue using our services until the end of the current billing period but prevents automatic renewal for the following month.
         </p>
       </section>
 
       <section className="mb-10">
-        <h2 className="text-2xl font-semibold mb-4">Comment demander un remboursement</h2>
+        <h2 className="text-2xl font-semibold mb-4">Refund policy for annual subscriptions</h2>
         <p className="mb-4">
-          Pour demander un remboursement, veuillez nous contacter à productifio@gmail.com avec les informations suivantes :
+          For annual subscriptions, we offer a full refund if the request is made within 30 days of the payment date. After this 30‑day period, we may offer a partial refund prorated for unused months, at our discretion.
+        </p>
+      </section>
+
+      <section className="mb-10">
+        <h2 className="text-2xl font-semibold mb-4">How to request a refund</h2>
+        <p className="mb-4">
+          To request a refund, please contact us at productifio@gmail.com with the following information:
         </p>
         <ul className="list-disc pl-8 mb-4 space-y-2">
-          <li>Votre nom et adresse email associés à votre compte</li>
-          <li>La date de votre achat</li>
-          <li>La raison de votre demande de remboursement</li>
+          <li>Your name and account email address</li>
+          <li>Your purchase date</li>
+          <li>The reason for your refund request</li>
         </ul>
         <p className="mb-4">
-          Nous examinerons votre demande et vous répondrons dans un délai de 5 jours ouvrables.
+          We will review your request and respond within 5 business days.
         </p>
       </section>
 
       <section className="mb-10">
         <h2 className="text-2xl font-semibold mb-4">Exceptions</h2>
         <p className="mb-4">
-          Nous nous réservons le droit de refuser les demandes de remboursement dans les cas suivants :
+          We reserve the right to refuse refund requests in the following cases:
         </p>
         <ul className="list-disc pl-8 mb-4 space-y-2">
-          <li>Utilisation abusive de notre service</li>
-          <li>Violation de nos Conditions Générales d'Utilisation</li>
-          <li>Demandes de remboursement répétées de la part du même client</li>
-          <li>Problèmes liés à des facteurs externes comme les complications de connexion Internet, incompatibilités de navigateurs, ou autres problèmes techniques qui ne sont pas directement liés à notre service</li>
+          <li>Abusive use of our service</li>
+          <li>Violation of our Terms of Use</li>
+          <li>Repeated refund requests from the same customer</li>
+          <li>Issues due to external factors such as internet connectivity problems, browser incompatibilities, or other technical issues not directly related to our service</li>
         </ul>
       </section>
 
       <section className="mb-10">
-        <h2 className="text-2xl font-semibold mb-4">Délais de remboursement</h2>
+        <h2 className="text-2xl font-semibold mb-4">Refund timelines</h2>
         <p className="mb-4">
-          Une fois votre remboursement approuvé, il sera traité dans un délai de 10 jours ouvrables. Le temps nécessaire pour que le montant apparaisse sur votre compte dépend de votre institution financière et peut prendre jusqu'à 10 jours supplémentaires.
+          Once your refund is approved, it will be processed within 10 business days. The time it takes for the amount to appear in your account depends on your financial institution and may take up to 10 additional days.
         </p>
       </section>
 
       <section className="mb-10">
-        <h2 className="text-2xl font-semibold mb-4">Modifications de cette politique</h2>
+        <h2 className="text-2xl font-semibold mb-4">Changes to this policy</h2>
         <p className="mb-4">
-          Nous nous réservons le droit de modifier cette politique de remboursement à tout moment. Les modifications entreront en vigueur dès leur publication sur notre site web. Nous vous encourageons à consulter régulièrement cette page pour rester informé des éventuelles mises à jour.
+          We reserve the right to modify this refund policy at any time. Changes will take effect upon publication on our website. We encourage you to check this page regularly to stay informed of updates.
         </p>
       </section>
 
       <section className="mb-10">
         <h2 className="text-2xl font-semibold mb-4">Contact</h2>
         <p className="mb-4">
-          Si vous avez des questions concernant notre politique de remboursement, veuillez nous contacter à :
+          If you have any questions regarding our refund policy, please contact us at:
         </p>
         <p className="mb-4">
           Email: productifio@gmail.com<br />
-          Adresse: 397 bis route de montpellier, 34730 Prade-le-Lez, France
+          Address: 397 bis route de montpellier, 34730 Prade‑le‑Lez, France
         </p>
       </section>
 
       <div className="mt-12 border-t pt-8">
         <Link href="/" className="text-blue-600 hover:text-blue-800">
-          Retour à l'accueil
+          Back to home
         </Link>
       </div>
     </div>

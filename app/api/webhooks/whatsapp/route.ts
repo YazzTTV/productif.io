@@ -4,6 +4,7 @@ import { handleDeepWorkCommand } from '@/lib/agent/handlers/deepwork.handler'
 import { generateApiToken } from '@/lib/api-token'
 import { handleJournalVoiceNote, handleJournalTextCommand } from '@/lib/agent/handlers/journal.handler'
 import { handleBehaviorCheckInCommand } from '@/lib/agent/handlers/behavior.handler'
+import { handleTaskPlanningCommand } from '@/lib/agent/handlers/task-planning.handler'
 import { TrialService } from '@/lib/trial/TrialService'
 import { sendWhatsAppMessage } from '@/lib/whatsapp'
 
@@ -29,7 +30,7 @@ async function getOrCreateApiTokenForUser(userId: string): Promise<string> {
   })
   if (existing?.token) return existing.token
 
-  const name = 'Agent IA (Deep Work + Journal + Behavior)'
+  const name = 'Agent IA (Deep Work + Journal + Behavior + Task Planning)'
   const { token } = await generateApiToken({ name, userId, scopes: required })
   return token
 }
@@ -113,15 +114,19 @@ export async function POST(req: NextRequest) {
       return new NextResponse('OK', { status: 200 })
     }
 
-    // 2) Text → Journal commands
+    // 2) Text → Task Planning commands (doit être avant les autres pour intercepter les demandes de planification)
+    const planningHandled = await handleTaskPlanningCommand(messageText, user.id, phoneNumber, apiToken)
+    if (planningHandled) return new NextResponse('OK', { status: 200 })
+
+    // 3) Text → Journal commands
     const journalHandled = await handleJournalTextCommand(messageText, user.id, phoneNumber, apiToken)
     if (journalHandled) return new NextResponse('OK', { status: 200 })
 
-    // 3) Text → Behavior commands
+    // 4) Text → Behavior commands
     const behaviorHandled = await handleBehaviorCheckInCommand(messageText, user.id, phoneNumber, apiToken)
     if (behaviorHandled) return new NextResponse('OK', { status: 200 })
 
-    // 4) Delegate to Deep Work conversational handler
+    // 5) Delegate to Deep Work conversational handler
     const handled = await handleDeepWorkCommand(messageText, user.id, phoneNumber, apiToken)
     if (handled) return new NextResponse('OK', { status: 200 })
 
