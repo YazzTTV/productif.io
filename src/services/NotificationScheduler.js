@@ -363,20 +363,9 @@ class NotificationScheduler {
      * Vérifie si un horaire est valide pour planification (pas trop proche du moment actuel)
      */
     isValidSchedulingTime(scheduleTime, currentTime) {
-        const [scheduleHour, scheduleMin] = scheduleTime.split(':').map(Number);
-        const [currentHour, currentMin] = currentTime.split(':').map(Number);
-        
-        const scheduleMinutes = scheduleHour * 60 + scheduleMin;
-        const currentMinutes = currentHour * 60 + currentMin;
-        
-        // Si l'horaire est dans moins de 2 minutes, on considère que c'est trop proche
-        const minuteDiff = scheduleMinutes - currentMinutes;
-        
-        if (minuteDiff >= 0 && minuteDiff < 2) {
-            console.log(`   ⚠️ Horaire ${scheduleTime} trop proche (dans ${minuteDiff}min) - ignoré`);
-            return false;
-        }
-        
+        // Autoriser désormais la planification même si l'horaire est imminent
+        // Node-cron gère correctement une première exécution à la prochaine minute
+        // et nous évitons de rater des tests manuels après modification des préférences.
         return true;
     }
 

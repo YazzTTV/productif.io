@@ -7,7 +7,7 @@ export function Faq() {
     <section className="container mx-auto px-4 py-20">
       <div className="text-center mb-16">
         <h2 className="text-3xl md:text-4xl font-bold text-gray-900">
-          Questions Fréquentes <span className="text-green-500">👋</span>
+          Frequently Asked Questions <span className="text-green-500">👋</span>
         </h2>
       </div>
 
@@ -15,48 +15,46 @@ export function Faq() {
         <Accordion type="single" collapsible className="w-full">
           <AccordionItem value="item-1" className="border-b border-gray-200">
             <AccordionTrigger className="px-6 py-4 text-gray-900 hover:text-green-500 hover:no-underline">
-              En quoi Productif.io est différent des autres outils de productivité ?
+              How is Productif.io different from other productivity tools?
             </AccordionTrigger>
             <AccordionContent className="px-6 pb-4 text-gray-600">
-              La plupart des outils te demandent de t'adapter à eux. Productif.io fait l'inverse: il s'adapte à toi, à ton rythme, à tes priorités réelles. Et surtout, notre assistant IA vient à toi via WhatsApp — pas besoin d'ouvrir une app de plus. Il te guide tout au long de ta journée avec des rappels intelligents, adaptés à ton contexte.
+              Most tools force you to adapt to them. Productif.io does the opposite: it adapts to you, your rhythm, and your real priorities. And most importantly, our AI assistant comes to you via WhatsApp — no need to open yet another app. It guides you throughout your day with smart, context-aware reminders.
             </AccordionContent>
           </AccordionItem>
 
           <AccordionItem value="item-2" className="border-b border-gray-200">
             <AccordionTrigger className="px-6 py-4 text-gray-900 hover:text-green-500 hover:no-underline">
-              Comment fonctionne l'offre waitlist à 1€ ?
+              How does the €1 waitlist offer work?
             </AccordionTrigger>
             <AccordionContent className="px-6 pb-4 text-gray-600">
-              En payant 1€, tu réserves ta place dans notre waitlist exclusive limitée à 150 personnes. Ce petit investissement symbolique nous permet de filtrer les personnes réellement intéressées. Lors du lancement officiel, tu auras accès en priorité à notre offre Lifetime exceptionnelle à un tarif préférentiel. Ce tarif ne changera jamais pour toi, même quand nous augmenterons nos prix à l'avenir.
+              By paying €1, you reserve your spot on our exclusive waitlist limited to 150 people. This small symbolic investment helps us filter for genuinely interested users. At the official launch, you’ll get priority access to our exceptional Lifetime offer at a preferential rate. This price will never change for you, even if we increase prices in the future.
             </AccordionContent>
           </AccordionItem>
 
           <AccordionItem value="item-3" className="border-b border-gray-200">
             <AccordionTrigger className="px-6 py-4 text-gray-900 hover:text-green-500 hover:no-underline">
-              Comment fonctionne l'assistant WhatsApp ?
+              How does the WhatsApp assistant work?
             </AccordionTrigger>
             <AccordionContent className="px-6 pb-4 text-gray-600">
-              Tu reçois des messages personnalisés qui te guident tout au long de ta journée. Rappels de tâches au bon moment, check-ins pour tes habitudes, réorganisation de planning en fonction des imprévus... tout passe par une conversation naturelle. C'est comme avoir un assistant personnel dans ta poche, qui comprend ton contexte et t'aide à rester focalisé sur ce qui compte vraiment.
+              You receive personalized messages guiding you throughout your day. Task reminders at the right moment, habit check-ins, planning reorganization when things change… everything happens through a natural conversation. It’s like having a personal assistant in your pocket that understands your context and helps you stay focused on what truly matters.
             </AccordionContent>
           </AccordionItem>
 
           <AccordionItem value="item-4" className="border-b border-gray-200">
             <AccordionTrigger className="px-6 py-4 text-gray-900 hover:text-green-500 hover:no-underline">
-              Mes données sont-elles sécurisées ?
+              Is my data secure?
             </AccordionTrigger>
             <AccordionContent className="px-6 pb-4 text-gray-600">
-              Absolument. La sécurité de tes données est notre priorité. Nous utilisons un chiffrement de bout en bout,
-              des sauvegardes automatiques et des protocoles de sécurité avancés pour protéger tes informations. Tes
-              données t'appartiennent et ne sont jamais partagées avec des tiers. Productif.io existe pour t'aider à reprendre le contrôle de ta vie, pas pour prendre le contrôle de tes données.
+              Absolutely. Your data security is our priority. We use end-to-end encryption, automatic backups, and advanced security protocols to protect your information. Your data belongs to you and is never shared with third parties. Productif.io exists to help you take control of your life — not your data.
             </AccordionContent>
           </AccordionItem>
 
           <AccordionItem value="item-5">
             <AccordionTrigger className="px-6 py-4 text-gray-900 hover:text-green-500 hover:no-underline">
-              Qu'est-ce que je gagne exactement avec cette waitlist ?
+              What exactly do I get with this waitlist?
             </AccordionTrigger>
             <AccordionContent className="px-6 pb-4 text-gray-600">
-              En rejoignant la waitlist pour 1€, tu obtiens: 1) Un accès anticipé à Productif.io avant son lancement officiel, 2) L'offre Lifetime à un tarif préférentiel qui ne sera jamais reproduit, 3) Un accompagnement personnalisé pour maximiser les bénéfices de l'outil, 4) La priorité absolue sur les nouvelles fonctionnalités à venir, et 5) La certitude de faire partie des premiers à bénéficier d'une technologie qui va transformer ta productivité.
+              By joining the waitlist for €1, you get: 1) Early access to Productif.io before the official launch, 2) The Lifetime offer at a preferential rate that won’t be repeated, 3) Personalized support to maximize the tool’s value, 4) Top priority for upcoming features, and 5) The certainty of being among the first to benefit from a technology that will transform your productivity.
             </AccordionContent>
           </AccordionItem>
         </Accordion>

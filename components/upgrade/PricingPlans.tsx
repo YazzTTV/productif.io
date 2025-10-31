@@ -74,12 +74,12 @@ export function PricingPlans({ userId }: { userId: string }) {
         <Card
           key={plan.id}
           className={`relative bg-white rounded-2xl shadow-lg p-8 ${
-            plan.popular ? 'ring-2 ring-blue-500 scale-105' : ''
+            plan.popular ? 'ring-2 ring-green-500 scale-105' : ''
           }`}
         >
           {plan.popular && (
             <div className="absolute -top-4 left-1/2 -translate-x-1/2">
-              <span className="bg-gradient-to-r from-blue-500 to-purple-500 text-white px-4 py-1 rounded-full text-sm font-medium">
+              <span className="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-4 py-1 rounded-full text-sm font-medium">
                 ⭐ Le plus populaire
               </span>
             </div>
@@ -113,7 +113,7 @@ export function PricingPlans({ userId }: { userId: string }) {
             disabled={!!loading}
             className={`w-full py-3 px-6 rounded-lg font-medium transition-colors ${
               plan.popular
-                ? 'bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white'
+                ? 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white'
                 : 'bg-gray-100 hover:bg-gray-200 text-gray-900'
             } disabled:opacity-50 disabled:cursor-not-allowed`}
           >

@@ -4,138 +4,138 @@ import Link from 'next/link';
 export default function CGV() {
   return (
     <div className="container mx-auto px-4 py-12 max-w-4xl">
-      <h1 className="text-3xl font-bold mb-8">Conditions Générales de Vente</h1>
-      <p className="text-sm text-gray-500 mb-8">Dernière mise à jour: {new Date().toLocaleDateString()}</p>
+      <h1 className="text-3xl font-bold mb-8">Terms & Conditions</h1>
+      <p className="text-sm text-gray-500 mb-8">Last updated: {new Date().toLocaleDateString()}</p>
 
       <section className="mb-10">
-        <h2 className="text-2xl font-semibold mb-4">1. Objet</h2>
+        <h2 className="text-2xl font-semibold mb-4">1. Purpose</h2>
         <p className="mb-4">
-          Les présentes Conditions Générales de Vente (ci-après "CGV") régissent les relations contractuelles entre Noah Lugagne, entrepreneur individuel sous le régime de la micro-entreprise (ci-après "le Prestataire") et toute personne physique ou morale (ci-après "le Client") souscrivant à un abonnement ou achetant des services sur le site productif.io (ci-après "le Service").
+          These Terms & Conditions govern the contractual relationship between Noah Lugagne, sole proprietor under the micro‑enterprise regime (the “Provider”), and any natural or legal person (the “Customer”) subscribing to a subscription or purchasing services on the productif.io website (the “Service”).
         </p>
         <p className="mb-4">
-          Toute souscription ou achat implique l'acceptation sans réserve des présentes CGV par le Client. Ces CGV prévalent sur tout autre document du Client.
+          Any subscription or purchase implies the Customer’s unreserved acceptance of these Terms & Conditions. These T&C prevail over any other Customer document.
         </p>
       </section>
 
       <section className="mb-10">
-        <h2 className="text-2xl font-semibold mb-4">2. Description du service</h2>
+        <h2 className="text-2xl font-semibold mb-4">2. Service description</h2>
         <p className="mb-4">
-          Productif.io est une application de gestion de productivité qui permet aux utilisateurs de gérer leurs tâches, projets, temps et habitudes. Le service offre des fonctionnalités complètes de centralisation et d'organisation pour optimiser votre productivité personnelle et professionnelle.
+          Productif.io is a productivity management application that helps users manage tasks, projects, time, and habits. The service provides comprehensive centralization and organization features to optimize personal and professional productivity.
         </p>
         <p className="mb-4">
-          Le Service est proposé sous forme d'abonnement mensuel selon les modalités présentées sur le site.
+          The Service is offered as a subscription under the terms presented on the website.
         </p>
         <p className="mb-4">
-          Le Prestataire se réserve le droit de faire évoluer les fonctionnalités et services proposés, sans que cela ne constitue une modification substantielle des CGV.
-        </p>
-      </section>
-
-      <section className="mb-10">
-        <h2 className="text-2xl font-semibold mb-4">3. Tarifs et modalités de paiement</h2>
-        <p className="mb-4">
-          Les prix des services sont indiqués en euros et s'élèvent à 150€ par mois pour l'abonnement mensuel. Le Prestataire se réserve le droit de modifier ses tarifs à tout moment. Les nouveaux tarifs entreront en vigueur pour tout nouveau contrat ou renouvellement postérieur à la date de modification.
-        </p>
-        <p className="mb-4">
-          Le paiement s'effectue par carte bancaire, prélèvement automatique ou tout autre moyen de paiement proposé sur le site. Pour les abonnements, le paiement est récurrent et automatique aux échéances indiquées lors de la souscription.
-        </p>
-        <p className="mb-4">
-          En cas de retard ou de défaut de paiement, le Prestataire se réserve le droit de suspendre l'accès au Service jusqu'à régularisation.
+          The Provider reserves the right to evolve features and services offered without this constituting a substantial modification of the T&C.
         </p>
       </section>
 
       <section className="mb-10">
-        <h2 className="text-2xl font-semibold mb-4">4. Durée et renouvellement</h2>
+        <h2 className="text-2xl font-semibold mb-4">3. Pricing and payment terms</h2>
         <p className="mb-4">
-          L'abonnement est souscrit pour la durée choisie par le Client lors de la commande (mensuelle ou annuelle). À l'issue de cette période, l'abonnement est automatiquement renouvelé pour une durée identique, sauf résiliation par le Client dans les conditions prévues à l'article 5.
+          Service prices are indicated in euros. The Provider reserves the right to modify prices at any time. New prices will apply to any new contract or renewal after the modification date.
+        </p>
+        <p className="mb-4">
+          Payment is made by credit card, direct debit, or any other payment method offered on the site. For subscriptions, payment is recurring and automatic at the intervals indicated at the time of subscription.
+        </p>
+        <p className="mb-4">
+          In case of late or non‑payment, the Provider reserves the right to suspend access to the Service until regularization.
         </p>
       </section>
 
       <section className="mb-10">
-        <h2 className="text-2xl font-semibold mb-4">5. Résiliation</h2>
+        <h2 className="text-2xl font-semibold mb-4">4. Term and renewal</h2>
         <p className="mb-4">
-          Le Client peut résilier son abonnement à tout moment depuis son espace client. La résiliation prendra effet à la fin de la période d'abonnement en cours, aucun remboursement ne sera effectué pour la période restante sauf cas spécifiques mentionnés dans notre <Link href="/refund-policy" className="text-blue-600 hover:underline">Politique de Remboursement</Link>.
-        </p>
-        <p className="mb-4">
-          Le Prestataire peut résilier ou suspendre le compte du Client et son droit d'utilisation du Service immédiatement et sans préavis en cas de non-respect des présentes CGV.
+          The subscription is entered into for the duration chosen by the Customer (monthly or annual). At the end of this period, the subscription is automatically renewed for an identical duration, unless terminated by the Customer under section 5.
         </p>
       </section>
 
       <section className="mb-10">
-        <h2 className="text-2xl font-semibold mb-4">6. Droit de rétractation</h2>
+        <h2 className="text-2xl font-semibold mb-4">5. Termination</h2>
         <p className="mb-4">
-          Conformément aux dispositions légales en vigueur, le Client disposant du statut de consommateur bénéficie d'un délai de 14 jours à compter de la souscription pour exercer son droit de rétractation, sans avoir à justifier de motifs ni à payer de pénalités.
+          The Customer may terminate their subscription at any time from their account. Termination will take effect at the end of the current subscription period; no refund will be made for the remaining period except as specified in our <Link href="/refund-policy" className="text-blue-600 hover:underline">Refund Policy</Link>.
         </p>
         <p className="mb-4">
-          En cas d'exercice du droit de rétractation, le Prestataire remboursera le Client de la totalité des sommes versées, au plus tard dans les 14 jours suivant la date à laquelle ce droit a été exercé.
-        </p>
-        <p className="mb-4">
-          Le droit de rétractation ne peut être exercé pour les services pleinement exécutés avant la fin du délai de rétractation et dont l'exécution a commencé après accord préalable exprès du Client et renoncement exprès à son droit de rétractation.
-        </p>
-        <p className="mb-4">
-          Productif.io offre également une période d'essai gratuite de 14 jours pour tous les nouveaux utilisateurs, permettant de tester l'ensemble des fonctionnalités sans engagement.
+          The Provider may terminate or suspend the Customer’s account and right to use the Service immediately and without notice in case of breach of these T&C.
         </p>
       </section>
 
       <section className="mb-10">
-        <h2 className="text-2xl font-semibold mb-4">7. Disponibilité et maintenance</h2>
+        <h2 className="text-2xl font-semibold mb-4">6. Right of withdrawal</h2>
         <p className="mb-4">
-          Le Prestataire s'engage à fournir le meilleur niveau de disponibilité possible du Service. Toutefois, il ne peut garantir une disponibilité continue et se réserve la possibilité d'interrompre temporairement l'accès au Service pour des raisons de maintenance, de mise à jour ou d'amélioration.
+          In accordance with applicable legal provisions, consumer Customers have a 14‑day period from subscription to exercise their right of withdrawal without having to provide reasons or pay penalties.
         </p>
         <p className="mb-4">
-          Dans la mesure du possible, le Prestataire informera préalablement le Client de toute interruption programmée du Service.
+          If the right of withdrawal is exercised, the Provider will refund the Customer in full within 14 days from the date the right was exercised.
+        </p>
+        <p className="mb-4">
+          The right of withdrawal cannot be exercised for services fully performed before the end of the withdrawal period and whose performance began after the Customer’s prior express consent and express waiver of the right of withdrawal.
+        </p>
+        <p className="mb-4">
+          Productif.io also offers a 14‑day free trial for all new users, allowing you to test all features with no commitment.
         </p>
       </section>
 
       <section className="mb-10">
-        <h2 className="text-2xl font-semibold mb-4">8. Responsabilité</h2>
+        <h2 className="text-2xl font-semibold mb-4">7. Availability and maintenance</h2>
         <p className="mb-4">
-          Le Prestataire s'engage à mettre en œuvre tous les moyens nécessaires pour assurer un service de qualité. Toutefois, sa responsabilité ne pourra être engagée en cas de :
+          The Provider strives to ensure the highest possible availability of the Service. However, continuous availability cannot be guaranteed and access may be temporarily interrupted for maintenance, updates, or improvements.
+        </p>
+        <p className="mb-4">
+          Where possible, the Provider will notify the Customer in advance of any scheduled interruptions.
+        </p>
+      </section>
+
+      <section className="mb-10">
+        <h2 className="text-2xl font-semibold mb-4">8. Liability</h2>
+        <p className="mb-4">
+          The Provider undertakes to use all necessary means to ensure a quality service. However, the Provider cannot be held liable in the event of:
         </p>
         <ul className="list-disc pl-8 mb-4 space-y-2">
-          <li>Interruption temporaire du Service pour maintenance</li>
-          <li>Défaillance ou dysfonctionnement du réseau Internet</li>
-          <li>Perte de données ou dommages indirects</li>
-          <li>Utilisation du Service non conforme aux présentes CGV</li>
+          <li>Temporary service interruption for maintenance</li>
+          <li>Internet network failure or malfunction</li>
+          <li>Data loss or indirect damages</li>
+          <li>Use of the Service not in accordance with these T&C</li>
         </ul>
         <p className="mb-4">
-          La responsabilité du Prestataire, si elle est établie, sera limitée au montant des sommes effectivement payées par le Client pour l'abonnement en cours.
+          The Provider’s liability, if established, will be limited to the amount actually paid by the Customer for the current subscription.
         </p>
       </section>
 
       <section className="mb-10">
-        <h2 className="text-2xl font-semibold mb-4">9. Propriété intellectuelle</h2>
+        <h2 className="text-2xl font-semibold mb-4">9. Intellectual property</h2>
         <p className="mb-4">
-          Tous les éléments du Service, incluant sans limitation les textes, graphismes, logos, icônes, images, clips audio et logiciels, sont la propriété exclusive du Prestataire ou de ses partenaires, et sont protégés par les lois françaises et internationales relatives à la propriété intellectuelle.
+          All elements of the Service, including without limitation texts, graphics, logos, icons, images, audio clips, and software, are the exclusive property of the Provider or its partners and are protected by French and international intellectual property laws.
         </p>
         <p className="mb-4">
-          Toute reproduction, distribution, modification, adaptation, retransmission ou publication de ces éléments est strictement interdite sans l'accord écrit préalable du Prestataire.
-        </p>
-      </section>
-
-      <section className="mb-10">
-        <h2 className="text-2xl font-semibold mb-4">10. Protection des données personnelles</h2>
-        <p className="mb-4">
-          Le Prestataire s'engage à respecter la vie privée des Clients et à traiter leurs données personnelles conformément à la législation en vigueur, notamment le Règlement Général sur la Protection des Données (RGPD).
-        </p>
-        <p className="mb-4">
-          Pour plus d'informations sur la façon dont nous traitons vos données, veuillez consulter notre <Link href="/privacy-policy" className="text-blue-600 hover:underline">Politique de Confidentialité</Link>.
+          Any reproduction, distribution, modification, adaptation, retransmission, or publication of these elements is strictly prohibited without the Provider’s prior written consent.
         </p>
       </section>
 
       <section className="mb-10">
-        <h2 className="text-2xl font-semibold mb-4">11. Loi applicable et juridiction</h2>
+        <h2 className="text-2xl font-semibold mb-4">10. Personal data protection</h2>
         <p className="mb-4">
-          Les présentes CGV sont soumises au droit français. En cas de litige, une solution amiable sera recherchée avant tout recours judiciaire. À défaut, les tribunaux français seront seuls compétents.
+          The Provider is committed to respecting Customers’ privacy and processing their personal data in accordance with applicable legislation, including the General Data Protection Regulation (GDPR).
         </p>
         <p className="mb-4">
-          Conformément aux dispositions du Code de la consommation concernant le règlement amiable des litiges, le Client peut recourir au service de médiation proposé par le Prestataire. Le médiateur tentera, en toute indépendance et impartialité, de rapprocher les parties en vue d'aboutir à une solution amiable.
+          For more information on how we process your data, please see our <Link href="/privacy-policy" className="text-blue-600 hover:underline">Privacy Policy</Link>.
+        </p>
+      </section>
+
+      <section className="mb-10">
+        <h2 className="text-2xl font-semibold mb-4">11. Governing law and jurisdiction</h2>
+        <p className="mb-4">
+          These T&C are governed by French law. In the event of a dispute, an amicable solution will be sought before any legal action. Failing that, the French courts shall have exclusive jurisdiction.
+        </p>
+        <p className="mb-4">
+          In accordance with the Consumer Code provisions on amicable dispute resolution, the Customer may use the mediation service offered by the Provider. The mediator will attempt, independently and impartially, to bring the parties together to reach an amicable solution.
         </p>
       </section>
 
       <section className="mb-10">
         <h2 className="text-2xl font-semibold mb-4">12. Contact</h2>
         <p className="mb-4">
-          Pour toute question relative à ces CGV, veuillez nous contacter à l'adresse suivante :
+          For any questions regarding these T&C, please contact us at:
         </p>
         <p className="mb-4">
           Email: productifio@gmail.com<br />
@@ -145,7 +145,7 @@ export default function CGV() {
 
       <div className="mt-12 border-t pt-8">
         <Link href="/" className="text-blue-600 hover:text-blue-800">
-          Retour à l'accueil
+          Back to home
         </Link>
       </div>
     </div>

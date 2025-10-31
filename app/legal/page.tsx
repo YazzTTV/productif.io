@@ -4,89 +4,89 @@ import Link from 'next/link';
 export default function LegalNotice() {
   return (
     <div className="container mx-auto px-4 py-12 max-w-4xl">
-      <h1 className="text-3xl font-bold mb-8">Mentions Légales</h1>
-      <p className="text-sm text-gray-500 mb-8">Dernière mise à jour: {new Date().toLocaleDateString()}</p>
+      <h1 className="text-3xl font-bold mb-8">Legal Notice</h1>
+      <p className="text-sm text-gray-500 mb-8">Last updated: {new Date().toLocaleDateString()}</p>
 
       <section className="mb-10">
-        <h2 className="text-2xl font-semibold mb-4">1. Éditeur du site</h2>
+        <h2 className="text-2xl font-semibold mb-4">1. Website publisher</h2>
         <p className="mb-4">
-          Le site productif.io est édité par Noah Lugagne, entrepreneur individuel sous le régime de la micro-entreprise, dont le siège social est situé au 397 bis route de montpellier, 34730 Prade-le-Lez, France.
+          The website productif.io is published by Noah Lugagne, a sole proprietor under the micro‑enterprise regime, with registered office at 397 bis route de montpellier, 34730 Prade‑le‑Lez, France.
         </p>
         <p className="mb-4">
-          Directeur de la publication : Noah Lugagne
+          Publication director: Noah Lugagne
         </p>
         <p className="mb-4">
-          Email de contact : productifio@gmail.com
+          Contact email: productifio@gmail.com
         </p>
       </section>
 
       <section className="mb-10">
-        <h2 className="text-2xl font-semibold mb-4">2. Hébergement</h2>
+        <h2 className="text-2xl font-semibold mb-4">2. Hosting</h2>
         <p className="mb-4">
-          Le site productif.io est hébergé par Vercel Inc., dont le siège social est situé au 340 S Lemon Ave #4133, Walnut, CA 91789, États-Unis.
+          The website productif.io is hosted by Vercel Inc., headquartered at 340 S Lemon Ave #4133, Walnut, CA 91789, United States.
         </p>
         <p className="mb-4">
-          Site web de l'hébergeur : vercel.com
-        </p>
-      </section>
-
-      <section className="mb-10">
-        <h2 className="text-2xl font-semibold mb-4">3. Propriété intellectuelle</h2>
-        <p className="mb-4">
-          L'ensemble du contenu du site productif.io (architecture, textes, logos, images, photographies, illustrations, etc.) est la propriété exclusive de [Nom de votre entreprise] ou de ses partenaires, et est protégé par les lois françaises et internationales relatives à la propriété intellectuelle.
-        </p>
-        <p className="mb-4">
-          Toute reproduction, représentation, diffusion ou rediffusion, totale ou partielle, du contenu de ce site par quelque procédé que ce soit, sans l'autorisation expresse et préalable de [Nom de votre entreprise], est interdite et constituerait une contrefaçon sanctionnée par les articles L.335-2 et suivants du Code de la Propriété Intellectuelle.
+          Host website: vercel.com
         </p>
       </section>
 
       <section className="mb-10">
-        <h2 className="text-2xl font-semibold mb-4">4. Données personnelles</h2>
+        <h2 className="text-2xl font-semibold mb-4">3. Intellectual property</h2>
         <p className="mb-4">
-          Les informations personnelles collectées sur le site productif.io sont nécessaires au bon fonctionnement des services. Ces informations sont destinées exclusivement à Noah Lugagne et ne seront en aucun cas cédées à des tiers sans votre accord express.
+          All content of productif.io (architecture, texts, logos, images, photographs, illustrations, etc.) is the exclusive property of [Your company name] or its partners and is protected by French and international intellectual property laws.
         </p>
         <p className="mb-4">
-          Conformément à la loi Informatique et Libertés du 6 janvier 1978 modifiée, au Règlement Général sur la Protection des Données (RGPD) et à la loi pour une République Numérique du 7 octobre 2016, vous disposez d'un droit d'accès, de rectification, de suppression, de limitation, de portabilité et d'opposition aux données personnelles vous concernant.
+          Any reproduction, representation, distribution, or redistribution, in whole or in part, of the content of this site by any process whatsoever, without the prior express authorization of [Your company name], is prohibited and would constitute infringement under Articles L.335‑2 et seq. of the French Intellectual Property Code.
+        </p>
+      </section>
+
+      <section className="mb-10">
+        <h2 className="text-2xl font-semibold mb-4">4. Personal data</h2>
+        <p className="mb-4">
+          Personal information collected on the productif.io website is necessary for the proper functioning of the services. This information is intended exclusively for Noah Lugagne and will not be transferred to third parties without your express consent.
         </p>
         <p className="mb-4">
-          Pour exercer ces droits, vous pouvez nous contacter à l'adresse suivante : [adresse email de contact] ou par courrier à [adresse postale de l'entreprise].
+          In accordance with the French Data Protection Act of January 6, 1978 as amended, the General Data Protection Regulation (GDPR), and the Digital Republic Act of October 7, 2016, you have the right to access, rectify, delete, limit, port, and object to the processing of your personal data.
         </p>
         <p className="mb-4">
-          Pour plus d'informations sur la façon dont nous traitons vos données, veuillez consulter notre <Link href="/privacy-policy" className="text-blue-600 hover:underline">Politique de Confidentialité</Link>.
+          To exercise these rights, you can contact us at: [contact email address] or by mail at [company postal address].
+        </p>
+        <p className="mb-4">
+          For more information on how we process your data, please see our <Link href="/privacy-policy" className="text-blue-600 hover:underline">Privacy Policy</Link>.
         </p>
       </section>
 
       <section className="mb-10">
         <h2 className="text-2xl font-semibold mb-4">5. Cookies</h2>
         <p className="mb-4">
-          Le site productif.io utilise des cookies pour améliorer l'expérience utilisateur et recueillir des statistiques de fréquentation. Vous pouvez désactiver l'utilisation des cookies en modifiant les paramètres de votre navigateur.
+          The productif.io website uses cookies to improve the user experience and collect traffic statistics. You can disable cookies by changing your browser settings.
         </p>
         <p className="mb-4">
-          Pour en savoir plus sur notre utilisation des cookies, veuillez consulter notre <Link href="/privacy-policy" className="text-blue-600 hover:underline">Politique de Confidentialité</Link>.
+          To learn more about our use of cookies, please see our <Link href="/privacy-policy" className="text-blue-600 hover:underline">Privacy Policy</Link>.
         </p>
       </section>
 
       <section className="mb-10">
-        <h2 className="text-2xl font-semibold mb-4">6. Loi applicable et juridiction</h2>
+        <h2 className="text-2xl font-semibold mb-4">6. Governing law and jurisdiction</h2>
         <p className="mb-4">
-          Les présentes mentions légales sont soumises au droit français. En cas de litige, les tribunaux français seront seuls compétents.
+          This legal notice is governed by French law. In case of dispute, the French courts shall have exclusive jurisdiction.
         </p>
       </section>
 
       <section className="mb-10">
         <h2 className="text-2xl font-semibold mb-4">7. Contact</h2>
         <p className="mb-4">
-          Pour toute question relative à ces mentions légales, vous pouvez nous contacter à l'adresse suivante :
+          For any questions regarding this legal notice, you can contact us at:
         </p>
         <p className="mb-4">
           Email: productifio@gmail.com<br />
-          Adresse: 397 bis route de montpellier, 34730 Prade-le-Lez, France
+          Address: 397 bis route de montpellier, 34730 Prade‑le‑Lez, France
         </p>
       </section>
 
       <div className="mt-12 border-t pt-8">
         <Link href="/" className="text-blue-600 hover:text-blue-800">
-          Retour à l'accueil
+          Back to home
         </Link>
       </div>
     </div>

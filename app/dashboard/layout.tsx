@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils"
 import { Capacitor } from '@capacitor/core'
 import { MobileNav } from "@/components/navigation/mobile-nav"
 import { TrialBanner } from "@/components/trial/TrialBanner"
+import { TrialExpiredOverlay } from "@/components/trial/TrialExpiredOverlay"
 
 export default function DashboardLayout({
   children,
@@ -120,6 +121,8 @@ export default function DashboardLayout({
         
         {/* Navigation mobile globale - fixe en bas de l'écran */}
         <MobileNav />
+        {/* Trial overlay + lock mask when trial expiré */}
+        <TrialExpiredOverlay />
       </div>
     </ClientAuthProvider>
   )

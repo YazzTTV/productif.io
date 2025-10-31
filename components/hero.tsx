@@ -51,11 +51,11 @@ export function Hero() {
   return (
     <section className="container mx-auto px-4 py-20 text-center relative">
       <h1 className="text-4xl md:text-6xl font-bold text-gray-900 max-w-4xl mx-auto leading-tight">
-        Arrête de t'organiser. <span className="text-green-500">Laisse l'IA le faire pour toi.</span>
+        Stop trying to organize everything. <span className="text-green-500">Let AI do it for you.</span>
       </h1>
       <div className="w-full max-w-2xl mx-auto h-1 bg-gradient-to-r from-transparent via-green-500 to-transparent my-6"></div>
       <p className="text-gray-600 text-xl max-w-2xl mx-auto mb-8">
-        Ton cerveau mérite mieux que des to-do lists. Productif.io s'occupe de tout.
+        Your brain deserves better than endless to-do lists. Productif.io handles it for you.
       </p>
 
       <div className="mt-8 relative">
@@ -67,7 +67,7 @@ export function Hero() {
               <>
                 <Image
                   src="/placeholder.svg?key=u4w4a"
-                  alt="Interface de Productif.io"
+                  alt="Productif.io interface"
                   width={1280}
                   height={720}
                   className="object-cover"
@@ -86,10 +86,10 @@ export function Hero() {
         </div>
       </div>
       
-      {/* Section de waitlist en dessous de la vidéo */}
+      {/* Waitlist section below the video */}
       <div className="mt-8 p-6 bg-gray-50 rounded-lg border border-gray-200">
         <p className="text-gray-700 text-center mb-4">
-          Rejoins la waitlist exclusive (1€) et sécurise ton accès à vie pour un tarif préférentiel.
+          Join the exclusive waitlist (€1) and lock in lifetime access at a preferential rate.
         </p>
         <div className="flex justify-center">
           <Button 
@@ -105,7 +105,7 @@ export function Hero() {
               window.location.href = `/onboarding?${params.toString()}`
             }}
           >
-            Rejoindre la waitlist pour 1€
+            Start Now for Free
           </Button>
         </div>
       </div>

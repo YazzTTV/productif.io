@@ -6,8 +6,8 @@ import { FonctionnalitesAssistant } from "@/components/fonctionnalites/assistant
 import { FonctionnalitesCTA } from "@/components/fonctionnalites/cta"
 
 export const metadata: Metadata = {
-  title: "Fonctionnalités | productif.io",
-  description: "Découvrez toutes les fonctionnalités offertes par productif.io pour optimiser votre productivité et votre organisation.",
+  title: "Features | productif.io",
+  description: "Discover all the features offered by productif.io to optimize your productivity and organization.",
 }
 
 export default function FonctionnalitesPage() {

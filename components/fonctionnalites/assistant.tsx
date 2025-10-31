@@ -8,29 +8,29 @@ export function FonctionnalitesAssistant() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-16 items-center max-w-6xl mx-auto">
         <div>
           <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-6">
-            Ton assistant <span className="text-green-500">WhatsApp</span> personnel
+            Your personal <span className="text-green-500">WhatsApp</span> assistant
           </h2>
           <p className="text-gray-600 text-lg mb-6">
-            Productif.io va au-delà des applications traditionnelles en intégrant un assistant IA directement 
-            dans ton WhatsApp. Il devient ton copilote mental au quotidien.
+            Productif.io goes beyond traditional apps by integrating an AI assistant directly into your WhatsApp.
+            It becomes your daily mental co‑pilot.
           </p>
           
           <div className="space-y-6">
             <Feature 
-              title="Rappels intelligents" 
-              description="Reçois des notifications au moment idéal pour accomplir tes tâches importantes ou maintenir tes habitudes."
+              title="Smart reminders" 
+              description="Receive notifications at the ideal moment to complete important tasks or maintain your habits."
             />
             <Feature 
-              title="Planning adaptatif" 
-              description="Ton planning se réorganise automatiquement en fonction des imprévus et de ton contexte en temps réel."
+              title="Adaptive planning" 
+              description="Your schedule reorganizes automatically based on unexpected events and your real-time context."
             />
             <Feature 
-              title="Conversations naturelles" 
-              description="Interagis naturellement avec ton assistant - pose des questions, reçois des conseils ou ajoute des tâches."
+              title="Natural conversations" 
+              description="Interact naturally with your assistant — ask questions, get advice, or add tasks."
             />
             <Feature 
-              title="Suivi bienveillant" 
-              description="Des encouragements personnalisés et un suivi de ta progression sans jugement."
+              title="Supportive follow‑up" 
+              description="Personalized encouragement and progress tracking without judgment."
             />
           </div>
         </div>
@@ -49,12 +49,12 @@ export function FonctionnalitesAssistant() {
             </div>
             
             <div className="space-y-4 mb-4">
-              <ChatMessage sender="assistant" content="Bonjour ! Voici ta journée organisée. Tu as une réunion importante à 14h et il serait idéal de finaliser le rapport avant." />
-              <ChatMessage sender="user" content="Merci ! Je vais m'y mettre. Quelle est ma priorité après le rapport ?" />
-              <ChatMessage sender="assistant" content="Après le rapport, tu devrais te concentrer sur le projet Alpha, car c'est aligné avec ton objectif trimestriel qui approche de sa date limite." />
-              <ChatMessage sender="assistant" content="Je te rappelle aussi que tu as prévu de méditer aujourd'hui. Le meilleur moment serait après ta réunion pour décompresser." />
-              <ChatMessage sender="user" content="Parfait, ajoute ça à mon planning !" />
-              <ChatMessage sender="assistant" content="C'est fait ! Je t'enverrai un rappel 10 minutes avant." />
+              <ChatMessage sender="assistant" content="Good morning! Here’s your organized day. You have an important meeting at 2 PM — it would be ideal to finalize the report beforehand." />
+              <ChatMessage sender="user" content="Thanks! I’ll get on it. What’s my priority after the report?" />
+              <ChatMessage sender="assistant" content="After the report, you should focus on Project Alpha — it aligns with your quarterly objective approaching its deadline." />
+              <ChatMessage sender="assistant" content="Reminder: you planned to meditate today. The best moment would be after your meeting to decompress." />
+              <ChatMessage sender="user" content="Perfect, add that to my schedule!" />
+              <ChatMessage sender="assistant" content="Done! I’ll send you a reminder 10 minutes before." />
             </div>
           </div>
         </div>

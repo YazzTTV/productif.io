@@ -4,115 +4,114 @@ import Link from 'next/link';
 export default function PrivacyPolicy() {
   return (
     <div className="container mx-auto px-4 py-12 max-w-4xl">
-      <h1 className="text-3xl font-bold mb-8">Politique de Confidentialité</h1>
-      <p className="text-sm text-gray-500 mb-8">Dernière mise à jour: {new Date().toLocaleDateString()}</p>
+      <h1 className="text-3xl font-bold mb-8">Privacy Policy</h1>
+      <p className="text-sm text-gray-500 mb-8">Last updated: {new Date().toLocaleDateString()}</p>
 
       <section className="mb-10">
         <h2 className="text-2xl font-semibold mb-4">Introduction</h2>
         <p className="mb-4">
-          Chez productif.io, nous respectons votre vie privée et nous nous engageons à protéger vos données personnelles. 
-          Cette politique de confidentialité vous informe sur la façon dont nous traitons vos données personnelles lorsque 
-          vous visitez notre site web ou utilisez nos services, indépendamment du canal ou du moyen utilisé.
+          At productif.io, we respect your privacy and are committed to protecting your personal data. 
+          This privacy policy explains how we process your personal data when you visit our website or use our services, regardless of the channel or medium used.
         </p>
         <p className="mb-4">
-          Le responsable du traitement des données est Noah Lugagne, entrepreneur individuel sous le régime de la micro-entreprise, 
-          domicilié au 397 bis route de montpellier, 34730 Prade-le-Lez, France.
+          The data controller is Noah Lugagne, sole proprietor under the micro‑enterprise regime, 
+          residing at 397 bis route de montpellier, 34730 Prade‑le‑Lez, France.
         </p>
       </section>
 
       <section className="mb-10">
-        <h2 className="text-2xl font-semibold mb-4">Les données que nous collectons</h2>
+        <h2 className="text-2xl font-semibold mb-4">Data we collect</h2>
         <p className="mb-4">
-          Nous pouvons collecter, utiliser, stocker et transférer différents types de données personnelles vous concernant :
+          We may collect, use, store, and transfer different kinds of personal data about you:
         </p>
         <ul className="list-disc pl-8 mb-4 space-y-2">
-          <li><strong>Données d'identité :</strong> prénom, nom, nom d'utilisateur ou identifiant similaire.</li>
-          <li><strong>Données de contact :</strong> adresse e-mail, numéro de téléphone, adresse postale.</li>
-          <li><strong>Données techniques :</strong> adresse IP, données de connexion, type et version du navigateur, fuseau horaire, types et versions de plug-ins, système d'exploitation et plateforme.</li>
-          <li><strong>Données d'utilisation :</strong> informations sur la façon dont vous utilisez notre site web et nos services.</li>
-          <li><strong>Données de marketing et communication :</strong> vos préférences pour la réception de communications marketing et vos préférences de communication.</li>
+          <li><strong>Identity data:</strong> first name, last name, username or similar identifier.</li>
+          <li><strong>Contact data:</strong> email address, phone number, postal address.</li>
+          <li><strong>Technical data:</strong> IP address, login data, browser type and version, time zone, plug‑in types and versions, operating system and platform.</li>
+          <li><strong>Usage data:</strong> information about how you use our website and services.</li>
+          <li><strong>Marketing and communications data:</strong> your preferences in receiving marketing from us and your communication preferences.</li>
         </ul>
       </section>
 
       <section className="mb-10">
-        <h2 className="text-2xl font-semibold mb-4">Comment nous utilisons vos données</h2>
+        <h2 className="text-2xl font-semibold mb-4">How we use your data</h2>
         <p className="mb-4">
-          Nous utilisons vos données personnelles uniquement lorsque la loi nous y autorise. Le plus souvent, nous utiliserons vos données personnelles dans les circonstances suivantes :
+          We use your personal data only when the law allows us to. Most commonly, we use your personal data in the following circumstances:
         </p>
         <ul className="list-disc pl-8 mb-4 space-y-2">
-          <li>Lorsque nous devons exécuter le contrat que nous sommes sur le point de conclure ou que nous avons conclu avec vous.</li>
-          <li>Lorsque cela est nécessaire pour nos intérêts légitimes (ou ceux d'un tiers) et que vos intérêts et droits fondamentaux ne prévalent pas sur ces intérêts.</li>
-          <li>Lorsque nous devons nous conformer à une obligation légale ou réglementaire.</li>
+          <li>Where we need to perform the contract we are about to enter into or have entered into with you.</li>
+          <li>Where it is necessary for our legitimate interests (or those of a third party) and your fundamental rights do not override those interests.</li>
+          <li>Where we need to comply with a legal or regulatory obligation.</li>
         </ul>
       </section>
 
       <section className="mb-10">
-        <h2 className="text-2xl font-semibold mb-4">Partage de vos données personnelles</h2>
+        <h2 className="text-2xl font-semibold mb-4">Sharing your personal data</h2>
         <p className="mb-4">
-          Nous pouvons être amenés à partager vos données personnelles avec les parties suivantes :
+          We may share your personal data with the following parties:
         </p>
         <ul className="list-disc pl-8 mb-4 space-y-2">
-          <li>Des prestataires de services qui fournissent des services d'administration informatique et système.</li>
-          <li>Nos conseillers professionnels, notamment des avocats, des banquiers, des auditeurs et des assureurs.</li>
-          <li>Les autorités fiscales et réglementaires, qui nécessitent des rapports sur les activités de traitement dans certaines circonstances.</li>
+          <li>Service providers who provide IT and system administration services.</li>
+          <li>Our professional advisers including lawyers, bankers, auditors, and insurers.</li>
+          <li>Tax and regulatory authorities who require reporting in certain circumstances.</li>
         </ul>
         <p className="mb-4">
-          Nous exigeons de tous les tiers qu'ils respectent la sécurité de vos données personnelles et qu'ils les traitent conformément à la loi. Nous n'autorisons pas nos prestataires de services tiers à utiliser vos données personnelles à leurs propres fins.
+          We require all third parties to respect the security of your personal data and to treat it in accordance with the law. We do not allow our third‑party service providers to use your personal data for their own purposes.
         </p>
       </section>
 
       <section className="mb-10">
-        <h2 className="text-2xl font-semibold mb-4">Sécurité des données</h2>
+        <h2 className="text-2xl font-semibold mb-4">Data security</h2>
         <p className="mb-4">
-          Nous avons mis en place des mesures de sécurité appropriées pour empêcher que vos données personnelles ne soient accidentellement perdues, utilisées ou consultées de manière non autorisée, modifiées ou divulguées. De plus, nous limitons l'accès à vos données personnelles aux employés, agents, contractants et autres tiers qui ont un besoin professionnel de les connaître.
+          We have put in place appropriate security measures to prevent your personal data from being accidentally lost, used or accessed in an unauthorized way, altered, or disclosed. We also limit access to your personal data to employees, agents, contractors, and other third parties who have a business need to know.
         </p>
       </section>
 
       <section className="mb-10">
-        <h2 className="text-2xl font-semibold mb-4">Conservation des données</h2>
+        <h2 className="text-2xl font-semibold mb-4">Data retention</h2>
         <p className="mb-4">
-          Nous conserverons vos données personnelles uniquement aussi longtemps que nécessaire pour atteindre les objectifs pour lesquels nous les avons collectées, y compris pour satisfaire aux exigences légales, comptables ou de déclaration.
+          We will only retain your personal data for as long as necessary to fulfill the purposes we collected it for, including for legal, accounting, or reporting requirements.
         </p>
       </section>
 
       <section className="mb-10">
-        <h2 className="text-2xl font-semibold mb-4">Vos droits légaux</h2>
+        <h2 className="text-2xl font-semibold mb-4">Your legal rights</h2>
         <p className="mb-4">
-          Dans certaines circonstances, vous avez des droits en vertu des lois sur la protection des données concernant vos données personnelles :
+          In certain circumstances, you have rights under data protection laws in relation to your personal data:
         </p>
         <ul className="list-disc pl-8 mb-4 space-y-2">
-          <li><strong>Droit d'accès :</strong> vous pouvez demander une copie des informations personnelles que nous détenons à votre sujet.</li>
-          <li><strong>Droit de rectification :</strong> vous pouvez demander la correction des informations personnelles inexactes que nous détenons à votre sujet.</li>
-          <li><strong>Droit à l'effacement :</strong> vous pouvez nous demander de supprimer ou de retirer des informations personnelles lorsqu'il n'y a aucune bonne raison pour nous de continuer à les traiter.</li>
-          <li><strong>Droit de s'opposer au traitement :</strong> vous pouvez vous opposer au traitement de vos informations personnelles.</li>
-          <li><strong>Droit à la portabilité des données :</strong> vous pouvez demander le transfert de vos informations personnelles à vous-même ou à un tiers.</li>
+          <li><strong>Right of access:</strong> request a copy of the personal information we hold about you.</li>
+          <li><strong>Right to rectification:</strong> request correction of inaccurate personal information we hold about you.</li>
+          <li><strong>Right to erasure:</strong> request deletion of your personal information where there is no good reason for us to continue processing it.</li>
+          <li><strong>Right to object:</strong> object to processing of your personal information.</li>
+          <li><strong>Right to data portability:</strong> request transfer of your personal information to you or to a third party.</li>
         </ul>
         <p className="mb-4">
-          Si vous souhaitez exercer l'un de ces droits, veuillez nous contacter à contact@productif.io.
+          If you wish to exercise any of these rights, please contact us at contact@productif.io.
         </p>
       </section>
 
       <section className="mb-10">
-        <h2 className="text-2xl font-semibold mb-4">Modifications de cette politique de confidentialité</h2>
+        <h2 className="text-2xl font-semibold mb-4">Changes to this privacy policy</h2>
         <p className="mb-4">
-          Nous nous réservons le droit de mettre à jour cette politique de confidentialité à tout moment. Nous publierons toute mise à jour sur cette page et, si les modifications sont importantes, nous vous en informerons par e-mail.
+          We reserve the right to update this privacy policy at any time. We will post any updates on this page and, if the changes are significant, we will notify you by email.
         </p>
       </section>
 
       <section className="mb-10">
-        <h2 className="text-2xl font-semibold mb-4">Nous contacter</h2>
+        <h2 className="text-2xl font-semibold mb-4">Contact us</h2>
         <p className="mb-4">
-          Si vous avez des questions sur cette politique de confidentialité ou sur nos pratiques en matière de confidentialité, veuillez nous contacter à :
+          If you have questions about this privacy policy or our privacy practices, please contact us at:
         </p>
         <p className="mb-4">
           Email: productifio@gmail.com<br />
-          Adresse: 397 bis route de montpellier, 34730 Prade-le-Lez, France
+          Address: 397 bis route de montpellier, 34730 Prade‑le‑Lez, France
         </p>
       </section>
 
       <div className="mt-12 border-t pt-8">
         <Link href="/" className="text-blue-600 hover:text-blue-800">
-          Retour à l'accueil
+          Back to home
         </Link>
       </div>
     </div>

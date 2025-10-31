@@ -12,42 +12,42 @@ export default function Footer() {
           <div>
             <h3 className="text-lg font-semibold mb-4">Productif.io</h3>
             <p className="text-gray-600 text-sm">
-              La solution complète de gestion de productivité pour les professionnels et les équipes.
+              The complete productivity management solution for professionals and teams.
             </p>
           </div>
           
           <div>
-            <h3 className="text-lg font-semibold mb-4">Produit</h3>
+            <h3 className="text-lg font-semibold mb-4">Product</h3>
             <ul className="space-y-2 text-sm">
               <li>
                 <Link href="/fonctionnalites" className="text-gray-600 hover:text-blue-600">
-                  Fonctionnalités
+                  Features
                 </Link>
               </li>
               <li>
                 <Link href="/tarifs" className="text-gray-600 hover:text-blue-600">
-                  Tarifs
+                  Pricing
                 </Link>
               </li>
             </ul>
           </div>
           
           <div>
-            <h3 className="text-lg font-semibold mb-4">Légal</h3>
+            <h3 className="text-lg font-semibold mb-4">Legal</h3>
             <ul className="space-y-2 text-sm">
               <li>
                 <Link href="/terms" className="text-gray-600 hover:text-blue-600">
-                  Conditions d'utilisation
+                  Terms of Use
                 </Link>
               </li>
               <li>
                 <Link href="/privacy-policy" className="text-gray-600 hover:text-blue-600">
-                  Politique de confidentialité
+                  Privacy Policy
                 </Link>
               </li>
               <li>
                 <Link href="/cgv" className="text-gray-600 hover:text-blue-600">
-                  CGV
+                  T&C
                 </Link>
               </li>
               <li>
@@ -57,12 +57,12 @@ export default function Footer() {
               </li>
               <li>
                 <Link href="/refund-policy" className="text-gray-600 hover:text-blue-600">
-                  Politique de remboursement
+                  Refund Policy
                 </Link>
               </li>
               <li>
                 <Link href="/legal" className="text-gray-600 hover:text-blue-600">
-                  Mentions légales
+                  Legal Notice
                 </Link>
               </li>
             </ul>
@@ -71,7 +71,7 @@ export default function Footer() {
         
         <div className="border-t border-gray-200 mt-8 pt-8 flex flex-col md:flex-row justify-between items-center">
           <p className="text-gray-600 text-sm mb-4 md:mb-0">
-            &copy; {currentYear} Productif.io. Tous droits réservés.
+            &copy; {currentYear} Productif.io. All rights reserved.
           </p>
           <div className="flex space-x-4">
             <a href="https://x.com/productifio" target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-blue-600">
