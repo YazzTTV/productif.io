@@ -4,125 +4,125 @@ import Link from 'next/link';
 export default function Terms() {
   return (
     <div className="container mx-auto px-4 py-12 max-w-4xl">
-      <h1 className="text-3xl font-bold mb-8">Conditions Générales d'Utilisation</h1>
-      <p className="text-sm text-gray-500 mb-8">Dernière mise à jour: {new Date().toLocaleDateString()}</p>
+      <h1 className="text-3xl font-bold mb-8">Terms of Use</h1>
+      <p className="text-sm text-gray-500 mb-8">Last updated: {new Date().toLocaleDateString()}</p>
 
       <section className="mb-10">
         <h2 className="text-2xl font-semibold mb-4">1. Introduction</h2>
         <p className="mb-4">
-          Bienvenue sur productif.io. En accédant à notre site web ou en utilisant nos services, vous acceptez d'être lié par ces Conditions Générales d'Utilisation ("CGU"). Si vous n'acceptez pas ces conditions, veuillez ne pas utiliser nos services.
+          Welcome to productif.io. By accessing our website or using our services, you agree to be bound by these Terms of Use. If you do not agree to these terms, please do not use our services.
         </p>
         <p className="mb-4">
-          productif.io est une application de gestion de productivité qui aide les professionnels et les équipes à organiser leurs tâches, projets et temps de travail, en offrant un service complet de centralisation pour optimiser votre productivité.
+          productif.io is a productivity management application that helps professionals and teams organize their tasks, projects, and time, offering a comprehensive centralized service to optimize productivity.
         </p>
       </section>
 
       <section className="mb-10">
-        <h2 className="text-2xl font-semibold mb-4">2. Définitions</h2>
+        <h2 className="text-2xl font-semibold mb-4">2. Definitions</h2>
         <ul className="list-disc pl-8 mb-4 space-y-2">
-          <li><strong>"Nous", "notre", "nos"</strong> font référence à Noah Lugagne, entrepreneur individuel sous le régime de la micro-entreprise.</li>
-          <li><strong>"Vous", "votre", "vos"</strong> font référence à l'utilisateur de nos services.</li>
-          <li><strong>"Services"</strong> désigne l'ensemble des fonctionnalités, outils et prestations proposés par productif.io.</li>
-          <li><strong>"Contenu"</strong> désigne toutes les informations, données, textes, images ou autres matériels que vous soumettez à nos services.</li>
+          <li><strong>"We", "our", "us"</strong> refers to Noah Lugagne, sole proprietor under the micro‑enterprise regime.</li>
+          <li><strong>"You", "your"</strong> refers to the user of our services.</li>
+          <li><strong>"Services"</strong> means all features, tools, and offerings provided by productif.io.</li>
+          <li><strong>"Content"</strong> means any information, data, text, images, or other materials you submit to our services.</li>
         </ul>
       </section>
 
       <section className="mb-10">
-        <h2 className="text-2xl font-semibold mb-4">3. Inscription et compte</h2>
+        <h2 className="text-2xl font-semibold mb-4">3. Registration and account</h2>
         <p className="mb-4">
-          Pour utiliser certaines fonctionnalités de nos services, vous devez créer un compte. Vous êtes responsable de maintenir la confidentialité de vos informations de connexion et de toutes les activités qui se produisent sous votre compte.
+          To use certain features of our services, you must create an account. You are responsible for maintaining the confidentiality of your login information and for all activities that occur under your account.
         </p>
         <p className="mb-4">
-          Vous vous engagez à :
+          You agree to:
         </p>
         <ul className="list-disc pl-8 mb-4 space-y-2">
-          <li>Fournir des informations exactes, actuelles et complètes lors de la création de votre compte.</li>
-          <li>Mettre à jour rapidement vos informations pour qu'elles restent exactes, actuelles et complètes.</li>
-          <li>Protéger la sécurité de votre compte et de votre mot de passe.</li>
-          <li>Nous informer immédiatement de toute utilisation non autorisée de votre compte ou de toute autre violation de sécurité.</li>
+          <li>Provide accurate, current, and complete information when creating your account.</li>
+          <li>Promptly update your information to keep it accurate, current, and complete.</li>
+          <li>Protect the security of your account and password.</li>
+          <li>Notify us immediately of any unauthorized use of your account or other security breach.</li>
         </ul>
       </section>
 
       <section className="mb-10">
-        <h2 className="text-2xl font-semibold mb-4">4. Utilisation des services</h2>
+        <h2 className="text-2xl font-semibold mb-4">4. Use of services</h2>
         <p className="mb-4">
-          Vous acceptez d'utiliser nos services uniquement à des fins légales et conformément à ces CGU. Vous vous engagez à ne pas :
+          You agree to use our services only for lawful purposes and in accordance with these Terms. You agree not to:
         </p>
         <ul className="list-disc pl-8 mb-4 space-y-2">
-          <li>Utiliser nos services d'une manière qui pourrait endommager, désactiver, surcharger ou altérer nos services.</li>
-          <li>Utiliser des robots, des araignées ou d'autres dispositifs automatiques pour accéder à nos services.</li>
-          <li>Tenter d'accéder à des zones ou fonctionnalités de nos services auxquelles vous n'êtes pas autorisé à accéder.</li>
-          <li>Introduire des virus, des chevaux de Troie, des vers ou tout autre code malveillant.</li>
-          <li>Violer les droits de propriété intellectuelle ou autres droits de tiers.</li>
+          <li>Use our services in any way that could damage, disable, overburden, or impair them.</li>
+          <li>Use robots, spiders, or other automated devices to access our services.</li>
+          <li>Attempt to access areas or features of our services you are not authorized to access.</li>
+          <li>Introduce viruses, trojans, worms, or any other malicious code.</li>
+          <li>Violate intellectual property rights or other rights of third parties.</li>
         </ul>
       </section>
 
       <section className="mb-10">
-        <h2 className="text-2xl font-semibold mb-4">5. Contenu de l'utilisateur</h2>
+        <h2 className="text-2xl font-semibold mb-4">5. User content</h2>
         <p className="mb-4">
-          Vous conservez tous les droits sur le contenu que vous soumettez à nos services. En soumettant du contenu, vous nous accordez une licence mondiale, non exclusive, libre de redevance pour utiliser, reproduire, modifier, adapter, publier et afficher ce contenu uniquement dans le but de vous fournir nos services.
+          You retain all rights to content you submit to our services. By submitting content, you grant us a worldwide, non‑exclusive, royalty‑free license to use, reproduce, modify, adapt, publish, and display that content solely to provide our services to you.
         </p>
         <p className="mb-4">
-          Vous êtes entièrement responsable de tout contenu que vous soumettez. Vous déclarez et garantissez que :
+          You are solely responsible for any content you submit. You represent and warrant that:
         </p>
         <ul className="list-disc pl-8 mb-4 space-y-2">
-          <li>Vous possédez ou avez obtenu tous les droits nécessaires pour le contenu que vous soumettez.</li>
-          <li>Le contenu ne viole pas et ne violera pas les droits de tiers, y compris les droits de propriété intellectuelle et les droits à la vie privée.</li>
-          <li>Le contenu n'est pas diffamatoire, obscène, offensant ou illégal de quelque manière que ce soit.</li>
+          <li>You own or have obtained all necessary rights for the content you submit.</li>
+          <li>The content does not and will not infringe third‑party rights, including intellectual property and privacy rights.</li>
+          <li>The content is not defamatory, obscene, offensive, or otherwise unlawful.</li>
         </ul>
       </section>
 
       <section className="mb-10">
-        <h2 className="text-2xl font-semibold mb-4">6. Propriété intellectuelle</h2>
+        <h2 className="text-2xl font-semibold mb-4">6. Intellectual property</h2>
         <p className="mb-4">
-          Nos services et leur contenu, fonctionnalités et fonctionnalités sont et resteront la propriété exclusive de productif.io et de ses concédants de licence. Nos services sont protégés par le droit d'auteur, les marques de commerce et d'autres lois en France et à l'étranger.
+          Our services and their content, features, and functionality are and will remain the exclusive property of productif.io and its licensors. Our services are protected by copyright, trademarks, and other laws in France and abroad.
         </p>
         <p className="mb-4">
-          Aucune disposition des présentes CGU ne vous confère le droit d'utiliser le nom productif.io, ses marques de commerce, logos, noms de domaine ou autres caractéristiques distinctives de la marque.
-        </p>
-      </section>
-
-      <section className="mb-10">
-        <h2 className="text-2xl font-semibold mb-4">7. Résiliation</h2>
-        <p className="mb-4">
-          Nous nous réservons le droit de suspendre ou de résilier votre accès à nos services, avec ou sans préavis, pour quelque raison que ce soit, y compris, sans limitation, si nous croyons raisonnablement que vous avez violé ces CGU.
-        </p>
-        <p className="mb-4">
-          Vous pouvez résilier votre compte à tout moment en suivant les instructions sur notre site web. En cas de résiliation, votre droit d'utiliser nos services cessera immédiatement.
+          Nothing in these Terms grants you the right to use the productif.io name, trademarks, logos, domain names, or other brand features.
         </p>
       </section>
 
       <section className="mb-10">
-        <h2 className="text-2xl font-semibold mb-4">8. Limitation de responsabilité</h2>
+        <h2 className="text-2xl font-semibold mb-4">7. Termination</h2>
         <p className="mb-4">
-          Dans toute la mesure permise par la loi applicable, productif.io ne sera pas responsable des dommages indirects, accessoires, spéciaux, consécutifs ou punitifs, ou de toute perte de profits ou de revenus, que ce soit encouru directement ou indirectement, ou de toute perte de données, d'utilisation, de clientèle ou d'autres pertes intangibles.
+          We reserve the right to suspend or terminate your access to our services, with or without notice, for any reason, including if we reasonably believe you have violated these Terms.
         </p>
         <p className="mb-4">
-          En aucun cas, la responsabilité totale de productif.io pour toutes réclamations liées aux services ne dépassera le montant payé par vous à productif.io au cours des douze derniers mois.
-        </p>
-      </section>
-
-      <section className="mb-10">
-        <h2 className="text-2xl font-semibold mb-4">9. Modifications</h2>
-        <p className="mb-4">
-          Nous nous réservons le droit de modifier ces CGU à tout moment. Si nous apportons des modifications importantes, nous vous en informerons par e-mail ou par un avis sur notre site web avant que les modifications ne prennent effet.
-        </p>
-        <p className="mb-4">
-          Votre utilisation continue de nos services après l'entrée en vigueur des CGU révisées constitue votre acceptation de ces CGU révisées.
+          You may terminate your account at any time by following the instructions on our website. Upon termination, your right to use our services will cease immediately.
         </p>
       </section>
 
       <section className="mb-10">
-        <h2 className="text-2xl font-semibold mb-4">10. Droit applicable et juridiction</h2>
+        <h2 className="text-2xl font-semibold mb-4">8. Limitation of liability</h2>
         <p className="mb-4">
-          Ces CGU sont régies et interprétées conformément aux lois françaises. Tout litige découlant de ou lié à ces CGU sera soumis à la compétence exclusive des tribunaux de Paris, France.
+          To the maximum extent permitted by applicable law, productif.io will not be liable for any indirect, incidental, special, consequential, or punitive damages, or any loss of profits or revenues, whether incurred directly or indirectly, or any loss of data, use, goodwill, or other intangible losses.
+        </p>
+        <p className="mb-4">
+          In no event will productif.io’s total liability for all claims related to the services exceed the amount you paid to productif.io in the last twelve months.
+        </p>
+      </section>
+
+      <section className="mb-10">
+        <h2 className="text-2xl font-semibold mb-4">9. Changes</h2>
+        <p className="mb-4">
+          We reserve the right to modify these Terms at any time. If we make material changes, we will notify you by email or by posting a notice on our website before the changes take effect.
+        </p>
+        <p className="mb-4">
+          Your continued use of our services after the revised Terms take effect constitutes your acceptance of the revised Terms.
+        </p>
+      </section>
+
+      <section className="mb-10">
+        <h2 className="text-2xl font-semibold mb-4">10. Governing law and jurisdiction</h2>
+        <p className="mb-4">
+          These Terms are governed by and construed in accordance with French law. Any dispute arising out of or related to these Terms will be subject to the exclusive jurisdiction of the courts of Paris, France.
         </p>
       </section>
 
       <section className="mb-10">
         <h2 className="text-2xl font-semibold mb-4">11. Contact</h2>
         <p className="mb-4">
-          Si vous avez des questions concernant ces CGU, veuillez nous contacter à :
+          If you have questions regarding these Terms, please contact us at:
         </p>
         <p className="mb-4">
           Email: productifio@gmail.com<br />
@@ -132,7 +132,7 @@ export default function Terms() {
 
       <div className="mt-12 border-t pt-8">
         <Link href="/" className="text-blue-600 hover:text-blue-800">
-          Retour à l'accueil
+          Back to home
         </Link>
       </div>
     </div>

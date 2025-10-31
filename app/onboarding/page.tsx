@@ -24,34 +24,34 @@ type Feature = {
 
 const FEATURES: Feature[] = [
   {
-    title: "Agent IA personnel",
+    title: "Personal AI agent",
     description:
-      "Ton coach virtuel te suit chaque jour, adapte ton plan et te rappelle tes priorités.",
-    insight: "Tu n’as plus besoin de réfléchir à quoi faire, l’IA le fait pour toi.",
+      "Your virtual coach follows you every day, adapts your plan, and reminds you of your priorities.",
+    insight: "You no longer need to think about what to do — the AI does it for you.",
     image: "/dashboard-productif.jpg",
     icon: Bot,
   },
   {
-    title: "Tableau de bord de performance",
+    title: "Performance dashboard",
     description:
-      "Un seul écran pour suivre ton niveau de productivité, ton focus, et tes progrès sur tes OKRs.",
+      "A single screen to track your productivity level, focus, and progress on your OKRs.",
     insight:
-      "Enfin un dashboard qui te montre si tu avances vraiment, pas juste si tu coches des cases.",
+      "Finally, a dashboard that shows if you're really moving forward, not just if you check boxes.",
     image: "/placeholder.jpg",
     icon: LayoutDashboard,
   },
   {
-    title: "Suivi en temps réel avec WhatsApp",
+    title: "Real-time tracking with WhatsApp",
     description:
-      "Ton IA t’écrit directement sur WhatsApp pour t’aider à rester aligné, te remotiver ou célébrer tes wins.",
-    insight: "Ton coach est littéralement dans ta poche.",
+      "Your AI writes to you directly on WhatsApp to help you stay aligned, re-motivate you, or celebrate your wins.",
+    insight: "Your coach is literally in your pocket.",
     image: "/placeholder-user.jpg",
     icon: MessageCircle,
   },
   {
-    title: "Priorités limpides, exécution rapide",
+    title: "Clear priorities, fast execution",
     description:
-      "capture rapide, priorisation et échéances; regroupez par projets, assignez, suivez; un bouton ‘faire la tâche’ → focus immédiat",
+      "Quick capture, prioritization, and deadlines; group by projects, assign, track; a 'do task' button → instant focus",
     insight: "",
     image: "/placeholder-logo.png",
     icon: ListChecks,
@@ -173,43 +173,43 @@ function OnboardingContent() {
   const q4Questions = [
     {
       key: "diagBehavior" as const,
-      title: "Quand tu travailles sur un projet important, tu as tendance à…",
+      title: "When you work on an important project, you tend to…",
       options: [
-        { key: "details", label: "Te perdre dans les détails" },
-        { key: "procrastination", label: "Remettre au lendemain" },
-        { key: "distraction", label: "Te disperser sur d’autres tâches" },
-        { key: "abandon", label: "Commencer fort… puis abandonner" },
+        { key: "details", label: "Get lost in the details" },
+        { key: "procrastination", label: "Put it off until tomorrow" },
+        { key: "distraction", label: "Get distracted by other tasks" },
+        { key: "abandon", label: "Start strong… then abandon it" },
       ],
     },
     {
       key: "timeFeeling" as const,
-      title: "À la fin de ta journée, tu te sens plutôt…",
+      title: "At the end of your day, you feel rather…",
       options: [
-        { key: "frustrated", label: "Frustré de ne pas avoir fait assez" },
-        { key: "tired", label: "Fatigué sans savoir pourquoi" },
-        { key: "proud", label: "Fier mais sans vraie vision claire" },
-        { key: "lost", label: "Complètement perdu dans tes priorités" },
+        { key: "frustrated", label: "Frustrated that you didn't do enough" },
+        { key: "tired", label: "Tired without knowing why" },
+        { key: "proud", label: "Proud but without a clear vision" },
+        { key: "lost", label: "Completely lost in your priorities" },
       ],
     },
     {
       key: "phoneHabit" as const,
-      title: "Ton téléphone pendant que tu bosses, c’est…",
+      title: "Your phone while you work is…",
       options: [
-        { key: "enemy", label: "Mon pire ennemi" },
-        { key: "twoMinutes", label: "Je l’ouvre ‘juste 2 minutes’… puis 2h passent" },
-        { key: "farButBack", label: "Je le mets loin mais je finis par le reprendre" },
-        { key: "managed", label: "J’ai appris à gérer" },
+        { key: "enemy", label: "My worst enemy" },
+        { key: "twoMinutes", label: "I open it 'just for 2 minutes'… then 2 hours pass" },
+        { key: "farButBack", label: "I put it away but end up picking it back up" },
+        { key: "managed", label: "I've learned to manage it" },
       ],
-      analysis: "Tu n’es pas seul : 92% des utilisateurs de Productif.io ont ce problème avant de commencer.",
+      analysis: "You're not alone: 92% of Productif.io users have this problem before starting.",
     },
     {
       key: "mainGoal" as const,
-      title: "Quel est ton objectif principal aujourd’hui ?",
+      title: "What is your main goal today?",
       options: [
-        { key: "Launch", label: "Lancer / faire grandir mon projet" },
-        { key: "Study", label: "Mieux gérer mes études" },
-        { key: "Discipline", label: "Être plus discipliné" },
-        { key: "Balance", label: "Trouver un équilibre entre travail et vie perso" },
+        { key: "Launch", label: "Launch / grow my project" },
+        { key: "Study", label: "Better manage my studies" },
+        { key: "Discipline", label: "Be more disciplined" },
+        { key: "Balance", label: "Find a balance between work and personal life" },
       ],
     },
   ]
@@ -229,12 +229,12 @@ function OnboardingContent() {
     })
   }
 
-  // Déterminer un profil dynamique à partir des réponses
-  const computeProfileName = (q: Questionnaire): string => {
-    if (q.diagBehavior === "distraction") return "Le dispersé déterminé 💭"
-    if (q.diagBehavior === "details") return "Le stratège débordé 🔥"
-    if (q.timeFeeling === "lost" || q.diagBehavior === "abandon") return "Le rêveur désorganisé 🌀"
-    return "Le motivé à structurer 🚀"
+  // Determine a dynamic profile from answers (English labels + emoji)
+  const getProfileMeta = (q: Questionnaire): { label: string; emoji: string } => {
+    if (q.diagBehavior === "distraction") return { label: "The determined distractor", emoji: "💭" }
+    if (q.diagBehavior === "details") return { label: "The overwhelmed strategist", emoji: "🔥" }
+    if (q.timeFeeling === "lost" || q.diagBehavior === "abandon") return { label: "The disorganized dreamer", emoji: "🌀" }
+    return { label: "The motivated organizer", emoji: "🚀" }
   }
 
   // Écran de configuration (chargement 4s)
@@ -417,14 +417,14 @@ function OnboardingContent() {
             <img src="/mon-logo.png" alt="Productif.io" className="h-16 w-auto object-contain" />
           </div>
           <CardTitle>
-            {step === 1 && "Connexion / Inscription"}
-            {step === 2 && "Découvre les fonctionnalités clés"}
-            {step === 3 && "Ils en parlent"}
-            {step === 4 && "Parlons de toi"}
-            {step === 5 && (offer === "early-access" ? "Rejoindre pour 1€" : "Rejoindre la waitlist")}
-            {step === 6 && "Ton profil"}
-            {step === 7 && "Configuration en cours"}
-            {step === 8 && "C’est fait 🎉"}
+            {step === 1 && ""}
+            {step === 2 && "Discover the key features"}
+            {step === 3 && "What people say"}
+            {step === 4 && ""}
+            {step === 5 && (offer === "early-access" ? "Early access" : "Join the waitlist")}
+            {step === 6 && ""}
+            {step === 7 && ""}
+            {step === 8 && ""}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -438,23 +438,19 @@ function OnboardingContent() {
                 <></>
               ) : (
                 <div className="space-y-5">
-                  <div className="flex flex-col items-center gap-2">
-                    <div className="h-9 w-9 rounded-md bg-emerald-500 text-white grid place-items-center font-bold">P</div>
-                    <div className="text-lg font-semibold">Productif</div>
-                    <p className="text-xs text-muted-foreground text-center">Track, Analyze & Dominate Your Market.</p>
-                  </div>
+                  
 
                   <Button
                     variant="outline"
                     className="w-full"
                     onClick={() => signIn("google", { callbackUrl: "/onboarding" })}
                   >
-                    Continuer avec Google
+                    Continue with Google
                   </Button>
 
                   <div className="flex items-center gap-2">
                     <Separator className="flex-1" />
-                    <span className="text-[11px] text-muted-foreground">OU</span>
+                    <span className="text-[11px] text-muted-foreground">OR</span>
                     <Separator className="flex-1" />
                   </div>
 
@@ -464,13 +460,13 @@ function OnboardingContent() {
                       <Input
                         id="email"
                         type="email"
-                        placeholder="toi@exemple.com"
+                        placeholder="you@example.com"
                         value={emailFallback}
                         onChange={(e) => setEmailFallback(e.target.value)}
                       />
                     </div>
                     <div className="grid gap-2">
-                      <Label htmlFor="password">Mot de passe</Label>
+                      <Label htmlFor="password">Password</Label>
                       <Input
                         id="password"
                         type="password"
@@ -484,20 +480,20 @@ function OnboardingContent() {
                     onClick={handleSignupWithEmail}
                     disabled={loading}
                   >
-                    {loading ? "Création du compte…" : "S'inscrire avec l'email"}
+                    {loading ? "Creating account…" : "Sign up with email"}
                   </Button>
                   </div>
 
                   <p className="text-center text-sm text-muted-foreground">
-                    Déjà un compte ? {""}
-                    <Link href="/login?redirect=/onboarding" className="underline underline-offset-4">Se connecter</Link>
+                    Already have an account? {""}
+                    <Link href="/login?redirect=/onboarding" className="underline underline-offset-4">Sign in</Link>
                   </p>
 
                   <p className="text-[11px] text-muted-foreground text-center">
-                    En continuant, vous acceptez nos {""}
-                    <Link href="/terms" className="underline underline-offset-4">Conditions d'utilisation</Link> {""}
-                    et notre {""}
-                    <Link href="/privacy-policy" className="underline underline-offset-4">Politique de confidentialité</Link>.
+                    By continuing, you agree to our {""}
+                    <Link href="/terms" className="underline underline-offset-4">Terms of Use</Link> {""}
+                    and our {""}
+                    <Link href="/privacy-policy" className="underline underline-offset-4">Privacy Policy</Link>.
                   </p>
                 </div>
               )}
@@ -532,7 +528,7 @@ function OnboardingContent() {
                   onClick={() => setFeatureIndex((i) => Math.max(0, i - 1))}
                   disabled={featureIndex === 0}
                 >
-                  Précédent
+                  Previous
                 </Button>
                 <div className="text-sm text-muted-foreground">{featureIndex + 1} / {FEATURES.length}</div>
                 <Button
@@ -544,12 +540,12 @@ function OnboardingContent() {
                     }
                   }}
                 >
-                  {featureIndex < FEATURES.length - 1 ? "Continuer" : "Suivant"}
+                  {featureIndex < FEATURES.length - 1 ? "Continue" : "Next"}
                 </Button>
               </div>
               <div className="flex justify-between">
-                <Button variant="ghost" onClick={prev}>Retour</Button>
-                <Button onClick={next}>Passer</Button>
+                <Button variant="ghost" onClick={prev}>Back</Button>
+                <Button onClick={next}>Skip</Button>
               </div>
             </div>
           )}
@@ -557,7 +553,7 @@ function OnboardingContent() {
           {step === 3 && (
             <div className="space-y-6">
               <div className="grid gap-4 sm:grid-cols-2">
-                {/* Témoignage 1 */}
+                {/* Testimonial 1 */}
                 <div className="rounded-2xl border bg-white p-4 shadow-sm">
                   <div className="flex items-center gap-3">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -567,10 +563,10 @@ function OnboardingContent() {
                       <div className="text-xs text-muted-foreground">Maker</div>
                     </div>
                   </div>
-                  <p className="mt-3 text-sm leading-6">“J’ai enfin un vrai copilote qui me garde aligné.”</p>
+                  <p className="mt-3 text-sm leading-6">“I finally have a real co‑pilot that keeps me aligned.”</p>
                 </div>
 
-                {/* Témoignage 2 */}
+                {/* Testimonial 2 */}
                 <div className="rounded-2xl border bg-white p-4 shadow-sm">
                   <div className="flex items-center gap-3">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -580,26 +576,26 @@ function OnboardingContent() {
                       <div className="text-xs text-muted-foreground">Manager</div>
                     </div>
                   </div>
-                  <p className="mt-3 text-sm leading-6">“Le dashboard m’a montré où j’étais vraiment bloqué.”</p>
+                  <p className="mt-3 text-sm leading-6">“The dashboard showed me where I was truly blocked.”</p>
                 </div>
 
-                {/* Témoignage 3 */}
+                {/* Testimonial 3 */}
                 <div className="rounded-2xl border bg-white p-4 shadow-sm sm:col-span-2">
                   <div className="flex items-center gap-3">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src="/testimonials/sabrina.jpg" alt="Sabrina" className="h-9 w-9 rounded-full object-cover" />
                     <div>
                       <div className="text-sm font-medium">Sabrina</div>
-                      <div className="text-xs text-muted-foreground">Entrepreneure</div>
+                      <div className="text-xs text-muted-foreground">Entrepreneur</div>
                     </div>
                   </div>
-                  <p className="mt-3 text-sm leading-6">“L’IA me relance au bon moment et j’exécute plus vite.”</p>
+                  <p className="mt-3 text-sm leading-6">“The AI nudges me at the right time and I execute faster.”</p>
                 </div>
               </div>
 
               <div className="flex justify-between">
-                <Button variant="ghost" onClick={prev}>Retour</Button>
-                <Button onClick={next}>Continuer</Button>
+                <Button variant="ghost" onClick={prev}>Back</Button>
+                <Button onClick={next}>Continue</Button>
               </div>
             </div>
           )}
@@ -608,21 +604,21 @@ function OnboardingContent() {
             <div className="space-y-6">
               {q4Stage === 0 && (
                 <div className="text-center space-y-5">
-                  <h3 className="text-xl font-semibold">Découvre ton profil de productivité.</h3>
-                  <p className="text-sm text-muted-foreground">Réponds à 6 questions pour savoir pourquoi tu n’avances pas… et comment Productif.io peut t’aider à exploser tes résultats.</p>
+                  <h3 className="text-xl font-semibold">Discover your productivity profile.</h3>
+                  <p className="text-sm text-muted-foreground">Answer 4 questions to find out why you're not moving forward… and how Productif.io can help you skyrocket your results.</p>
                   <div className="mx-auto max-w-sm rounded-2xl border border-emerald-200 bg-emerald-50/40 p-6">
                     <div className="mx-auto mb-4 h-20 w-20 rounded-full bg-white shadow-sm grid place-items-center">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src="/mon-logo.png" alt="Productif.io" className="h-10 w-auto object-contain" />
                     </div>
-                    <div className="text-base font-semibold text-emerald-700">Quelques questions rapides pour comprendre tes habitudes</div>
+                    <div className="text-base font-semibold text-emerald-700">A few quick questions to understand your habits</div>
                     <div className="mt-2 flex items-center justify-center gap-2 text-sm text-emerald-800">
                       <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                      <span>Temps estimé : 1 minute</span>
+                      <span>Estimated time: 1 minute</span>
                     </div>
                   </div>
                   <div className="flex justify-center">
-                    <Button onClick={() => setQ4Stage(1)} className="bg-emerald-500 hover:bg-emerald-600">C’est parti</Button>
+                    <Button onClick={() => setQ4Stage(1)} className="bg-emerald-500 hover:bg-emerald-600">Let's go</Button>
                   </div>
                 </div>
               )}
@@ -643,12 +639,12 @@ function OnboardingContent() {
                     ))}
                   </div>
                   {q4Stage === 3 && (
-                    <div className="text-xs text-muted-foreground bg-gray-50 border rounded-md p-2">Tu n’es pas seul : 92% des utilisateurs de Productif.io ont ce problème avant de commencer.</div>
+                    <div className="text-xs text-muted-foreground bg-gray-50 border rounded-md p-2">You're not alone: 92% of Productif.io users have this problem before starting.</div>
                   )}
                   <div className="flex justify-between">
-                    <Button variant="ghost" onClick={() => setQ4Stage((s) => Math.max(1, s - 1))}>Retour</Button>
+                    <Button variant="ghost" onClick={() => setQ4Stage((s) => Math.max(1, s - 1))}>Back</Button>
                     <Button onClick={() => (q4Stage < 4 ? setQ4Stage((s) => Math.min(4, s + 1)) : setStep(6))}>
-                      {q4Stage < 4 ? "Continuer" : "Suivant"}
+                      {q4Stage < 4 ? "Continue" : "Next"}
                     </Button>
                   </div>
                 </div>
@@ -681,12 +677,19 @@ function OnboardingContent() {
           {step === 6 && (
             <div className="space-y-6 text-center">
               <div className="mx-auto max-w-sm rounded-2xl border bg-white p-6 shadow-sm">
-                <div className="text-sm text-muted-foreground">Ton profil</div>
-                <div className="mt-2 text-2xl font-semibold">{computeProfileName(answers)}</div>
-                <p className="mt-3 text-sm text-muted-foreground">Basé sur tes réponses, on va adapter ton interface et tes priorités.</p>
+                {(() => { const meta = getProfileMeta(answers); return (
+                  <>
+                    <div className="mx-auto mb-3 h-16 w-16 rounded-full bg-emerald-50 border border-emerald-100 grid place-items-center text-2xl">
+                      <span>{meta.emoji}</span>
+                    </div>
+                    <div className="text-sm text-muted-foreground">Your profile</div>
+                    <div className="mt-1 text-2xl font-semibold">{meta.label} {meta.emoji}</div>
+                  </>
+                )})()}
+                <p className="mt-3 text-sm text-muted-foreground">Based on your answers, we’ll tailor your interface and priorities for faster execution.</p>
               </div>
               <div className="flex justify-end">
-                <Button onClick={next}>Suivant</Button>
+                <Button onClick={next}>Next</Button>
               </div>
             </div>
           )}
@@ -703,17 +706,17 @@ function OnboardingContent() {
                 <div className="mt-3 text-base font-medium">
                   {setupDone ? (
                     <span className="inline-flex items-center gap-2 text-emerald-700">
-                      <CheckCircle2 className="h-5 w-5" /> Configuration terminée
+                      <CheckCircle2 className="h-5 w-5" /> Setup complete
                     </span>
                   ) : (
-                    <>Un instant, nous configurons votre interface…</>
+                    <>One moment, we’re setting up your workspace…</>
                   )}
                 </div>
-                <p className="mt-1 text-xs text-muted-foreground">Personnalisation des habitudes, priorités et notifications.</p>
+                <p className="mt-1 text-xs text-muted-foreground">Personalizing habits, priorities, and notifications.</p>
               </div>
               {setupDone && (
                 <div className="flex justify-end">
-                  <Button onClick={next}>Suivant</Button>
+                  <Button onClick={next}>Next</Button>
                 </div>
               )}
             </div>
@@ -723,9 +726,9 @@ function OnboardingContent() {
           {step === 8 && (
             <div className="space-y-8">
               <div className="text-center space-y-2">
-                <h3 className="text-xl font-semibold">Active ton assistant maintenant — 7 jours gratuits</h3>
+                <h3 className="text-xl font-semibold">Activate your assistant now — 7‑day free trial</h3>
                 <p className="text-sm text-muted-foreground max-w-xl mx-auto">
-                  Tu as l’énergie et les ambitions. Mais ton plus gros blocage, c’est la clarté et la structure. Productif.io t’aide à transformer ton chaos en focus grâce à ton assistant IA personnel.
+                  You’ve got the energy and ambition. Your biggest blocker is clarity and structure. Productif.io helps you turn chaos into focus with your personal AI assistant.
                 </p>
               </div>
 
@@ -733,36 +736,55 @@ function OnboardingContent() {
                 <div className="flex items-center justify-center mb-4 gap-2">
                   <button
                     onClick={() => setBillingCycle('monthly')}
-                    className={`px-3 py-1.5 text-sm rounded-full border ${billingCycle === 'monthly' ? 'bg-emerald-600 text-white border-emerald-600' : 'border-gray-300 text-gray-700'}`}
+                    className={`px-3 py-1.5 text-sm rounded-full border ${billingCycle === 'monthly' ? 'bg-green-500 text-white border-green-500' : 'border-gray-300 text-gray-700'}`}
                   >
-                    Mensuel
+                    Monthly
                   </button>
                   <button
                     onClick={() => setBillingCycle('yearly')}
-                    className={`px-3 py-1.5 text-sm rounded-full border ${billingCycle === 'yearly' ? 'bg-emerald-600 text-white border-emerald-600' : 'border-gray-300 text-gray-700'}`}
+                    className={`px-3 py-1.5 text-sm rounded-full border ${billingCycle === 'yearly' ? 'bg-green-500 text-white border-green-500' : 'border-gray-300 text-gray-700'}`}
                   >
-                    Annuel (-60€)
+                    Yearly (-€60)
                   </button>
                 </div>
 
                 <div className="text-center space-y-1">
                   {billingCycle === 'monthly' ? (
-                    <div className="text-3xl font-bold">14,99€<span className="text-base font-medium">/mois</span></div>
+                    <div className="text-3xl font-bold">€14.99<span className="text-base font-medium">/mo</span></div>
                   ) : (
-                    <div className="text-3xl font-bold">9,99€<span className="text-base font-medium">/mois</span>
-                      <span className="ml-2 text-xs inline-block rounded bg-emerald-100 text-emerald-700 px-2 py-0.5">économise 60€</span>
+                    <div className="text-3xl font-bold">€9.99<span className="text-base font-medium">/mo</span>
+                      <span className="ml-2 text-xs inline-block rounded bg-green-100 text-green-700 px-2 py-0.5">save €60</span>
                     </div>
                   )}
-                  <div className="text-xs text-muted-foreground">Facturation {billingCycle === 'monthly' ? 'mensuelle' : 'annuelle'}</div>
+                  <div className="text-xs text-muted-foreground">Billed {billingCycle === 'monthly' ? 'monthly' : 'yearly'}</div>
                 </div>
 
-                <div className="mt-5 grid gap-3 max-w-sm mx-auto">
-                  <Button onClick={handleStartPayment} className="bg-emerald-600 hover:bg-emerald-700">
-                    Active ton assistant maintenant — 7 jours gratuits
+                <ul className="mt-6 space-y-3 text-sm text-gray-700 max-w-md mx-auto text-left">
+                  <li className="flex items-start gap-3">
+                    <CheckCircle2 className="h-5 w-5 text-green-500 mt-0.5" />
+                    <span><strong className="text-gray-900">AI-powered task management</strong> — Your AI organizes, prioritizes, and suggests what to tackle next.</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <CheckCircle2 className="h-5 w-5 text-green-500 mt-0.5" />
+                    <span><strong className="text-gray-900">WhatsApp AI assistant</strong> — Smart reminders and guidance without opening another app.</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <CheckCircle2 className="h-5 w-5 text-green-500 mt-0.5" />
+                    <span><strong className="text-gray-900">Habits & goals that stick</strong> — Build adaptive routines with contextual reminders; track OKRs.</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <CheckCircle2 className="h-5 w-5 text-green-500 mt-0.5" />
+                    <span><strong className="text-gray-900">Complete privacy & lifetime updates</strong> — Your data stays yours. Encryption, backups, future updates included.</span>
+                  </li>
+                </ul>
+
+                <div className="mt-6 grid gap-3 max-w-sm mx-auto">
+                  <Button onClick={handleStartPayment} className="bg-green-500 hover:bg-green-600">
+                    Start Now for Free
                   </Button>
-                  <Button variant="outline" onClick={handleStartPayment}>Commencer</Button>
+                  <Button variant="outline" onClick={handleStartPayment}>Start</Button>
                   <button onClick={() => router.push('/mon-espace')} className="text-[11px] text-muted-foreground underline underline-offset-4">
-                    Ignorer – continuer l’essai gratuit
+                    Skip – continue free trial
                   </button>
                 </div>
               </div>
@@ -770,7 +792,7 @@ function OnboardingContent() {
           )}
         </CardContent>
         <CardFooter className="justify-center">
-          <div className="text-xs text-muted-foreground">Étape {step} / 8</div>
+          <div className="text-xs text-muted-foreground">Step {step} / 8</div>
         </CardFooter>
       </Card>
     </div>

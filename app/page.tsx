@@ -5,7 +5,6 @@ import { Hero } from "@/components/hero" // Version avec vidéo YouTube
 import { Features } from "@/components/features"
 import { Comparison } from "@/components/comparison"
 import { Testimonials } from "@/components/testimonials"
-import { Pricing } from "@/components/pricing"
 import { Faq } from "@/components/faq"
 import Footer from "@/components/footer"
 
@@ -17,7 +16,6 @@ export default function Home() {
       <Features />
       <Comparison />
       <Testimonials />
-      <Pricing />
       <Faq />
       <Footer />
     </main>
