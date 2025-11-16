@@ -32,16 +32,31 @@ export default function PaywallScreen() {
   }, [selected]);
 
   const handleStart = async () => {
+    console.log('🚀 Paywall handleStart called');
+    
+    // Temporairement désactivé Superwall - continuer directement vers le dashboard
+    console.log('⚠️ Superwall temporairement désactivé, continuant vers le dashboard');
+    await AsyncStorage.setItem('onboarding_completed', 'true');
+    await AsyncStorage.setItem('selected_plan', selected);
+    router.replace('/(tabs)');
+    
+    /* Code Superwall désactivé temporairement
     const tryRegister = async (attempt: number): Promise<boolean> => {
-      if (!placementApi?.registerPlacement) return false;
+      if (!placementApi?.registerPlacement) {
+        console.error('❌ placementApi.registerPlacement not available');
+        return false;
+      }
       try {
+        console.log(`🔄 Attempting registerPlacement (attempt ${attempt})`);
         await placementApi.registerPlacement({ placement: 'campaign_trigger' });
+        console.log('✅ registerPlacement succeeded');
         return true;
       } catch (e: any) {
         const msg = String(e?.message || e);
-        console.warn(`registerPlacement attempt ${attempt} failed:`, msg);
+        console.error(`❌ registerPlacement attempt ${attempt} failed:`, msg);
         // Retry on transient Billing timeouts/service unavailable
         if (attempt < 3 && (msg.includes('Timeout') || msg.includes('ErrorCode: 2') || msg.includes('SERVICE_UNAVAILABLE'))) {
+          console.log(`⏳ Retrying in ${2000 * attempt}ms...`);
           await new Promise(r => setTimeout(r, 2000 * attempt));
           return tryRegister(attempt + 1);
         }
@@ -50,11 +65,16 @@ export default function PaywallScreen() {
     };
 
     const ok = await tryRegister(1);
-    if (ok) return;
+    if (ok) {
+      console.log('✅ Paywall registration successful, staying on paywall screen');
+      return;
+    }
 
+    console.log('⚠️ Paywall registration failed, continuing to dashboard');
     await AsyncStorage.setItem('onboarding_completed', 'true');
     await AsyncStorage.setItem('selected_plan', selected);
     router.replace('/(tabs)');
+    */
   };
 
   const ignore = async () => {
