@@ -37,7 +37,7 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       {superwallEnabled ? (
-        <SuperwallProvider apiKeys={{ ios: 'pk_6UQ2JnHcL0P6rvMJNDxZd', android: 'pk_6UQ2JnHcL0P6rvMJNDxZd' }} options={{ logging: true }}>
+        <SuperwallProvider apiKeys={{ ios: 'pk_6UQ2JnHcL0P6rvMJNDxZd', android: 'pk_6UQ2JnHcL0P6rvMJNDxZd' }} options={{ logging: { level: 'debug' } }}>
           {useSuperwall ? <IdentifyOnMount /> : null}
           <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
             <Stack>
@@ -95,22 +95,33 @@ export default function RootLayout() {
 function IdentifyOnMount() {
   const superwall = useSuperwall?.();
   useEffect(() => {
+    // Superwall temporairement désactivé
+    console.log('⚠️ Superwall temporairement désactivé - pas d\'initialisation');
+    return;
+    
+    /* Code Superwall désactivé temporairement
     (async () => {
       try {
+        console.log('🔧 Superwall initialization started');
         const storedId = await AsyncStorage.getItem('sw_user_id');
         const userId = storedId || `${Application.androidId || 'android'}-${Date.now()}`;
         if (!storedId) await AsyncStorage.setItem('sw_user_id', userId);
+        console.log('👤 Superwall identifying user:', userId);
         await superwall?.identify(userId, {
           platform: 'android',
           appVersion: Application.nativeApplicationVersion || 'unknown',
           buildNumber: Application.nativeBuildVersion || 'unknown',
         });
-        // Optionnel: forcer un refresh de l’état d’éligibilité
-        await superwall?.preloadPaywalls?.();
+        console.log('✅ Superwall user identified successfully');
+        // Optionnel: forcer un refresh de l'état d'éligibilité
+        console.log('🔄 Preloading paywalls...');
+        await superwall?.preloadPaywalls?.([]);
+        console.log('✅ Superwall initialization completed');
       } catch (e) {
-        console.warn('Superwall identify failed', e);
+        console.error('❌ Superwall identify failed', e);
       }
     })();
+    */
   }, []);
   return null;
 }

@@ -78,4 +78,4 @@ export function FonctionnalitesCTA() {
       </div>
     </section>
   )
-} 
+}

@@ -3,10 +3,12 @@
 import { Button } from "@/components/ui/button"
 import Image from "next/image"
 import { useState, useRef } from "react"
+import { useRouter } from "next/navigation"
 
 export function HeroWithLocalVideo() {
   const [videoPlaying, setVideoPlaying] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
+  const router = useRouter()
   
   const handlePlayClick = () => {
     setVideoPlaying(true)
@@ -35,7 +37,7 @@ export function HeroWithLocalVideo() {
             if (v) params.set(k, v)
           })
           params.set('offer','early-access')
-          window.location.href = `/onboarding?${params.toString()}`
+          router.push(`/onboarding?${params.toString()}`)
         }}
       >
         Start Now for Free

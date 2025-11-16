@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button"
 import Image from "next/image"
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 
 // Composant dédié pour le player vidéo (mobile-friendly)
 const VideoPlayer = () => {
@@ -37,6 +38,7 @@ const VideoPlayer = () => {
 
 export function Hero() {
   const [videoPlaying, setVideoPlaying] = useState(false)
+  const router = useRouter()
   
   // Auto-play video when component mounts
   useEffect(() => {
@@ -102,7 +104,7 @@ export function Hero() {
                 if (v) params.set(k, v)
               })
               params.set('offer','early-access')
-              window.location.href = `/onboarding?${params.toString()}`
+              router.push(`/onboarding?${params.toString()}`)
             }}
           >
             Start Now for Free
