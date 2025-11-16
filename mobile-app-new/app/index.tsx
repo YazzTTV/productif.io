@@ -13,10 +13,10 @@ export default function Entry() {
         if (flag === 'true') {
           router.replace('/(tabs)');
         } else {
-          router.replace('/onboarding/welcome');
+          router.replace('/(onboarding-new)/intro');
         }
       } catch {
-        router.replace('/onboarding/welcome');
+        router.replace('/(onboarding-new)/intro');
       } finally {
         setBooting(false);
       }
