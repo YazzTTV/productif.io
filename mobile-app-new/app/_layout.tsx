@@ -32,7 +32,7 @@ export default function RootLayout() {
     return null;
   }
 
-  const superwallEnabled = true;
+  const superwallEnabled = false; // Temporairement désactivé
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
