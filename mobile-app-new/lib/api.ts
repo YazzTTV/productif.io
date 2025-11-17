@@ -224,6 +224,23 @@ export const dashboardService = {
   async getTasks(): Promise<any> {
     return await apiCall('/tasks');
   },
+
+  // Récupérer les deep work sessions complétées
+  async getDeepWorkSessions(status: 'active' | 'completed' | 'all' = 'completed'): Promise<any> {
+    // Note: This endpoint requires API token, so we'll use a workaround
+    // We'll get time entries and match them with deep work sessions via the timeEntryId
+    return null; // Will be handled differently
+  },
+
+  // Récupérer les données de productivité hebdomadaires
+  async getWeeklyProductivity(): Promise<any> {
+    return await apiCall('/dashboard/weekly-productivity');
+  },
+
+  // Récupérer les statistiques analytics pour une période
+  async getAnalyticsStats(period: 'week' | 'month' | 'trimester' | 'year' = 'week'): Promise<any> {
+    return await apiCall(`/dashboard/analytics-stats?period=${period}`);
+  },
 };
 
 // Service pour les habitudes
