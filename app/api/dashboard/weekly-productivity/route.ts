@@ -1,9 +1,9 @@
-import { NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getAuthUserFromRequest } from "@/lib/auth"
 import { startOfDay, subDays, format } from "date-fns"
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
     const user = await getAuthUserFromRequest(request)
     if (!user) {
