@@ -30,8 +30,14 @@ export async function verify(token: string): Promise<any> {
     const secretBytes = new TextEncoder().encode(JWT_SECRET)
     const { payload } = await jose.jwtVerify(token, secretBytes)
     return payload
-  } catch (error) {
-    console.error('JWT verification error:', error)
+  } catch (error: any) {
+    // Ne logger l'erreur que si c'est vraiment un problème de signature
+    // Les erreurs d'expiration sont normales et ne doivent pas être loggées
+    if (error.code === 'ERR_JWS_SIGNATURE_VERIFICATION_FAILED') {
+      console.error('JWT verification error: Signature verification failed - token may have been signed with a different secret')
+    } else if (error.code !== 'ERR_JWT_EXPIRED') {
+      console.error('JWT verification error:', error.code || error.message)
+    }
     return null
   }
 } 
