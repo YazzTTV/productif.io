@@ -355,7 +355,7 @@ export default function DashboardScreen() {
       const weekStartStr = weekStart.toISOString();
 
       // Fetch data from API in parallel
-      const [metrics, gamification, tasks, habits, leaderboard, todayTimeEntries, deepWorkStats] = await Promise.allSettled([
+      const [metrics, gamification, tasks, habits, leaderboard, todayTimeEntries, deepWorkStats, weeklyProductivity] = await Promise.allSettled([
         dashboardService.getMetrics(),
         dashboardService.getGamificationStats(),
         tasksService.getTasks(),
@@ -371,6 +371,11 @@ export default function DashboardScreen() {
           console.log('⚠️ Could not fetch deep work stats:', err);
           return null;
         }),
+        // Get weekly productivity data
+        dashboardService.getWeeklyProductivity().catch((err) => {
+          console.log('⚠️ Could not fetch weekly productivity:', err);
+          return null;
+        }),
       ]);
 
       // Process metrics
@@ -381,6 +386,7 @@ export default function DashboardScreen() {
       const leaderboardData = leaderboard.status === 'fulfilled' ? leaderboard.value : null;
       const todayTimeEntriesData = todayTimeEntries.status === 'fulfilled' ? todayTimeEntries.value : null;
       const deepWorkStatsData = deepWorkStats.status === 'fulfilled' ? deepWorkStats.value : null;
+      const weeklyProductivityData = weeklyProductivity.status === 'fulfilled' ? weeklyProductivity.value : null;
 
       // Calculate today's tasks
       let todayTasks: any[] = [];
@@ -579,7 +585,7 @@ export default function DashboardScreen() {
         energyLevel: energyLevel || 0,
         focusLevel: focusLevel || 0,
         habits: formattedHabits.length > 0 ? formattedHabits : mockData.habits,
-        weeklyData: mockData.weeklyData, // TODO: Get real weekly data from API
+        weeklyData: weeklyProductivityData?.weeklyData || mockData.weeklyData,
         userName: userName,
         totalDeepWorkHours: totalDeepWorkHours,
         weeklyWorkHours: weeklyWorkHours,

@@ -59,21 +59,39 @@ export async function GET() {
     // Calculer les streaks pour chaque habitude
     const habitsWithStreaks = habits.map(habit => {
       let streak = 0
-      let checkDate = new Date()
-      checkDate.setHours(12, 0, 0, 0) // Normaliser à midi comme le frontend
       
-      // Obtenir le jour de la semaine actuel
-      const currentDayName = checkDate.toLocaleDateString("en-US", { weekday: "long" }).toLowerCase()
+      // Trier les entrées complétées par date décroissante (les plus récentes en premier)
+      const sortedEntries = [...habit.entries]
+        .filter(entry => entry.completed) // Seulement les entrées complétées
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
       
-      // Vérifier si l'habitude est prévue aujourd'hui
-      const isScheduledToday = habit.daysOfWeek.includes(currentDayName)
-      
-      // Si l'habitude n'est pas prévue aujourd'hui, commencer à partir d'hier
-      if (!isScheduledToday) {
-        checkDate.setDate(checkDate.getDate() - 1)
+      if (sortedEntries.length === 0) {
+        // Aucune entrée complétée, streak = 0
+        return {
+          ...habit,
+          currentStreak: 0,
+        }
       }
       
-      // Calculer le streak en remontant dans le temps
+      // Prendre la date de la dernière entrée complétée
+      const lastEntry = sortedEntries[0]
+      const lastCompletedDate = new Date(lastEntry.date)
+      lastCompletedDate.setHours(12, 0, 0, 0)
+      
+      // Calculer le streak en remontant depuis le dernier jour complété
+      let checkDate = new Date(lastCompletedDate)
+      checkDate.setHours(12, 0, 0, 0)
+      
+      // Créer un Set des dates complétées pour une recherche rapide
+      const completedDatesSet = new Set(
+        sortedEntries.map(entry => {
+          const d = new Date(entry.date)
+          d.setHours(12, 0, 0, 0)
+          return d.getTime()
+        })
+      )
+      
+      // Calculer le streak en remontant jour par jour
       while (true) {
         const dayName = checkDate.toLocaleDateString("en-US", { weekday: "long" }).toLowerCase()
         
@@ -87,15 +105,10 @@ export async function GET() {
         // Normaliser la date pour la comparaison (midi)
         const normalizedCheckDate = new Date(checkDate)
         normalizedCheckDate.setHours(12, 0, 0, 0)
+        const checkDateTimestamp = normalizedCheckDate.getTime()
         
-        // Chercher une entrée complétée pour ce jour
-        const entryForDay = habit.entries.find(entry => {
-          const entryDate = new Date(entry.date)
-          entryDate.setHours(12, 0, 0, 0)
-          return entryDate.getTime() === normalizedCheckDate.getTime() && entry.completed
-        })
-        
-        if (entryForDay) {
+        // Vérifier si ce jour est complété
+        if (completedDatesSet.has(checkDateTimestamp)) {
           streak++
           checkDate.setDate(checkDate.getDate() - 1)
         } else {
@@ -109,6 +122,7 @@ export async function GET() {
         }
       }
       
+      // Toujours retourner la streak, même si elle est 0
       return {
         ...habit,
         currentStreak: streak,
