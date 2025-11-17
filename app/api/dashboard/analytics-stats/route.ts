@@ -16,6 +16,54 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const period = searchParams.get('period') || 'week' // week, month, trimester, year
 
+    // OPTIMISATION: Vérification rapide si l'utilisateur est nouveau
+    const [taskCount, habitCount, deepWorkCount] = await Promise.all([
+      prisma.task.count({ where: { userId: user.id } }),
+      prisma.habit.count({ where: { userId: user.id } }),
+      prisma.deepWorkSession.count({ where: { userId: user.id } })
+    ])
+
+    // Si pas de données, retourner une réponse vide rapidement
+    if (taskCount === 0 && habitCount === 0 && deepWorkCount === 0) {
+      const now = new Date()
+      let startDate: Date
+      let endDate: Date = now
+
+      switch (period) {
+        case 'week':
+          startDate = startOfDay(subDays(now, 7))
+          break
+        case 'month':
+          startDate = startOfMonth(subMonths(now, 1))
+          endDate = endOfMonth(subMonths(now, 1))
+          break
+        case 'trimester':
+          startDate = startOfMonth(subMonths(now, 3))
+          endDate = endOfMonth(subMonths(now, 1))
+          break
+        case 'year':
+          startDate = startOfYear(subMonths(now, 12))
+          endDate = endOfYear(subMonths(now, 1))
+          break
+        default:
+          startDate = startOfDay(subDays(now, 7))
+      }
+
+      return NextResponse.json({
+        period,
+        stats: {
+          avgProductivity: 0,
+          totalTasks: 0,
+          habitsCompletion: 0,
+          focusHours: 0,
+        },
+        dateRange: {
+          start: format(startDate, "yyyy-MM-dd"),
+          end: format(endDate, "yyyy-MM-dd"),
+        }
+      })
+    }
+
     const now = new Date()
     let startDate: Date
     let endDate: Date = now
@@ -45,7 +93,7 @@ export async function GET(request: NextRequest) {
     startDate.setHours(0, 0, 0, 0)
     endDate.setHours(23, 59, 59, 999)
 
-    // 1. Calculer le temps de deep work pour la période
+    // 1. Calculer le temps de deep work pour la période (seulement si nécessaire)
     const deepWorkResult = await prisma.$queryRaw<Array<{ total_hours: number }>>`
       SELECT 
         COALESCE(SUM(EXTRACT(EPOCH FROM (te."endTime" - te."startTime"))/3600), 0) as total_hours

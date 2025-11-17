@@ -4,6 +4,9 @@ import { verifyApiToken } from "@/lib/api-token"
 import { prisma } from "@/lib/prisma"
 import { startOfDay, endOfDay, subDays } from "date-fns"
 
+// Augmenter le timeout pour les requêtes complexes (60 secondes)
+export const maxDuration = 60
+
 export async function GET(req: NextRequest) {
   try {
     // Essayer d'abord avec getAuthUserFromRequest (tokens utilisateur)
@@ -32,6 +35,22 @@ export async function GET(req: NextRequest) {
 
     if (!user) {
       return NextResponse.json({ error: "Non authentifié" }, { status: 401 })
+    }
+
+    // OPTIMISATION: Vérification rapide si l'utilisateur a des sessions deep work
+    const hasDeepWorkSessions = await prisma.deepWorkSession.count({
+      where: { userId: user.id }
+    }) > 0
+
+    // Si pas de sessions, retourner une réponse vide rapidement
+    if (!hasDeepWorkSessions) {
+      return NextResponse.json({
+        today: { hours: 0, seconds: 0 },
+        week: { hours: 0, seconds: 0 },
+        allTime: { hours: 0, seconds: 0 },
+        bestSession: "N/A",
+        bestSessionSeconds: 0
+      })
     }
 
     const now = new Date()
