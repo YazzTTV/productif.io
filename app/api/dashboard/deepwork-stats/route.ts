@@ -1,11 +1,34 @@
-import { NextResponse } from "next/server"
-import { getAuthUser } from "@/lib/auth"
+import { NextRequest, NextResponse } from "next/server"
+import { getAuthUserFromRequest } from "@/lib/auth"
+import { verifyApiToken } from "@/lib/api-token"
 import { prisma } from "@/lib/prisma"
 import { startOfDay, endOfDay, subDays } from "date-fns"
 
-export async function GET(req: Request) {
+export async function GET(req: NextRequest) {
   try {
-    const user = await getAuthUser()
+    // Essayer d'abord avec getAuthUserFromRequest (tokens utilisateur)
+    let user = await getAuthUserFromRequest(req)
+    
+    // Si pas d'utilisateur, essayer avec un token API
+    if (!user) {
+      const authHeader = req.headers.get("authorization")
+      if (authHeader && authHeader.startsWith("Bearer ")) {
+        const token = authHeader.substring(7)
+        try {
+          const apiTokenPayload = await verifyApiToken(token)
+          if (apiTokenPayload && apiTokenPayload.userId) {
+            // Récupérer l'utilisateur depuis le token API
+            user = await prisma.user.findUnique({
+              where: { id: apiTokenPayload.userId }
+            })
+          }
+        } catch (error) {
+          // Si la vérification du token API échoue, on continue avec null
+          // Cela permet de retourner une erreur 401 claire
+          console.error("Erreur lors de la vérification du token API:", error)
+        }
+      }
+    }
 
     if (!user) {
       return NextResponse.json({ error: "Non authentifié" }, { status: 401 })
