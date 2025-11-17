@@ -101,9 +101,6 @@ export async function GET(request: NextRequest) {
           userId: user.id,
           daysOfWeek: {
             has: dayName
-          },
-          isActive: {
-            not: false
           }
         },
         include: {
@@ -148,9 +145,6 @@ export async function GET(request: NextRequest) {
           userId: user.id,
           daysOfWeek: {
             has: dayName
-          },
-          isActive: {
-            not: false
           }
         },
         include: {
