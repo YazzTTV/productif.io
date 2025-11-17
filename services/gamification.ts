@@ -8,6 +8,9 @@ export interface GamificationStats {
   longestStreak: number
   pointsToNextLevel: number
   recentAchievements: Achievement[]
+  energyLevel?: number
+  focusLevel?: number
+  stressLevel?: number
 }
 
 export interface Achievement {
@@ -359,13 +362,70 @@ export class GamificationService {
     const currentStreak = await this.calculateCurrentStreak(userId)
     const pointsToNextLevel = this.calculatePointsToNextLevel(userGamification.points)
 
+    // Récupérer les derniers check-ins de comportement pour Energy, Focus, Stress
+    // Ces données proviennent des réponses de l'utilisateur à l'agent IA tout au long de la journée
+    const sevenDaysAgo = subDays(new Date(), 7)
+    const recentCheckIns = await prisma.behaviorCheckIn.findMany({
+      where: {
+        userId,
+        type: {
+          in: ['energy', 'focus', 'stress']
+        },
+        timestamp: {
+          gte: sevenDaysAgo // Derniers 7 jours
+        }
+      },
+      orderBy: {
+        timestamp: 'desc'
+      },
+      take: 100 // Augmenter à 100 pour avoir plus de données récentes
+    })
+
+    console.log(`[Gamification] Récupération des BehaviorCheckIn pour userId: ${userId}`)
+    console.log(`[Gamification] Check-ins trouvés: ${recentCheckIns.length}`)
+    console.log(`[Gamification] Période: ${sevenDaysAgo.toISOString()} à maintenant`)
+
+    // Calculer les moyennes des derniers check-ins par type
+    // Les valeurs sont sur une échelle de 1-10, on les convertit en 0-100 pour l'affichage
+    const energyCheckIns = recentCheckIns.filter(c => c.type === 'energy')
+    const focusCheckIns = recentCheckIns.filter(c => c.type === 'focus')
+    const stressCheckIns = recentCheckIns.filter(c => c.type === 'stress')
+
+    console.log(`[Gamification] Energy check-ins: ${energyCheckIns.length}`)
+    console.log(`[Gamification] Focus check-ins: ${focusCheckIns.length}`)
+    console.log(`[Gamification] Stress check-ins: ${stressCheckIns.length}`)
+
+    // Calculer la moyenne et convertir de 1-10 à 0-100
+    // Exemple: moyenne de 7.5 → 7.5 * 10 = 75%
+    const energyLevel = energyCheckIns.length > 0
+      ? Math.round((energyCheckIns.reduce((sum, c) => sum + c.value, 0) / energyCheckIns.length) * 10)
+      : undefined
+
+    const focusLevel = focusCheckIns.length > 0
+      ? Math.round((focusCheckIns.reduce((sum, c) => sum + c.value, 0) / focusCheckIns.length) * 10)
+      : undefined
+
+    const stressLevel = stressCheckIns.length > 0
+      ? Math.round((stressCheckIns.reduce((sum, c) => sum + c.value, 0) / stressCheckIns.length) * 10)
+      : undefined
+
+    console.log(`[Gamification] Calculs finaux:`, {
+      energyLevel,
+      focusLevel,
+      stressLevel
+    })
+
+    // Toujours retourner les champs même s'ils sont undefined pour que le frontend puisse les détecter
     return {
       points: userGamification.points,
       level: userGamification.level,
       currentStreak,
       longestStreak: userGamification.longestStreak,
       pointsToNextLevel,
-      recentAchievements: []
+      recentAchievements: [],
+      energyLevel: energyLevel ?? null, // Retourner null au lieu de undefined pour que JSON le sérialise
+      focusLevel: focusLevel ?? null,
+      stressLevel: stressLevel ?? null
     }
   }
 
