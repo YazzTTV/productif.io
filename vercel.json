@@ -1,4 +1,15 @@
 {
+  "functions": {
+    "app/api/**/*.ts": {
+      "maxDuration": 30
+    },
+    "app/api/dashboard/**/*.ts": {
+      "maxDuration": 60
+    },
+    "app/api/analytics/**/*.ts": {
+      "maxDuration": 60
+    }
+  },
   "routes": [
     { 
       "src": "/.well-known/assetlinks.json",

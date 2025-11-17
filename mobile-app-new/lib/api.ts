@@ -109,10 +109,11 @@ class TokenStorage {
   }
 }
 
-// Fonction utilitaire pour les appels API
+// Fonction utilitaire pour les appels API avec timeout
 export async function apiCall<T>(
   endpoint: string,
-  options: RequestInit = {}
+  options: RequestInit = {},
+  timeout: number = 30000 // 30 secondes par défaut (augmenté pour les requêtes complexes)
 ): Promise<T> {
   const tokenStorage = TokenStorage.getInstance();
   const token = await tokenStorage.getToken();
@@ -129,17 +130,49 @@ export async function apiCall<T>(
   try {
     console.log('🌐 apiCall - URL:', `${API_BASE_URL}${endpoint}`);
     console.log('🔑 apiCall - Token présent:', !!token);
-    console.log('📋 apiCall - Config:', JSON.stringify(config, null, 2));
     
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, config);
+    // Créer une promesse avec timeout
+    const fetchPromise = fetch(`${API_BASE_URL}${endpoint}`, config);
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error(`Request timeout after ${timeout}ms`)), timeout);
+    });
+    
+    const response = await Promise.race([fetchPromise, timeoutPromise]);
     
     console.log('📊 apiCall - Status:', response.status);
     console.log('📊 apiCall - Status Text:', response.statusText);
     
     if (!response.ok) {
-      const errorData = await response.json();
+      let errorData;
+      const contentType = response.headers.get('content-type');
+      
+      try {
+        if (contentType && contentType.includes('application/json')) {
+          errorData = await response.json();
+        } else {
+          // Si ce n'est pas du JSON, lire comme texte
+          const text = await response.text();
+          console.error('❌ apiCall - Réponse non-JSON:', text.substring(0, 200));
+          throw new Error(`Erreur serveur (${response.status}): ${text.substring(0, 100)}`);
+        }
+      } catch (parseError) {
+        // Si le parsing JSON échoue, lire comme texte
+        const text = await response.text();
+        console.error('❌ apiCall - Erreur de parsing:', parseError);
+        console.error('❌ apiCall - Réponse brute:', text.substring(0, 200));
+        throw new Error(`Erreur serveur (${response.status}): Réponse invalide`);
+      }
+      
       console.error('❌ apiCall - Erreur serveur:', errorData);
-      throw new Error(errorData.error || 'Erreur de réseau');
+      throw new Error(errorData.error || errorData.message || 'Erreur de réseau');
+    }
+
+    // Vérifier que la réponse est bien du JSON
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      const text = await response.text();
+      console.error('❌ apiCall - Réponse non-JSON reçue:', text.substring(0, 200));
+      throw new Error('Réponse serveur invalide (non-JSON)');
     }
 
     const result = await response.json();
@@ -376,6 +409,87 @@ export const projectsService = {
       method: 'DELETE',
     });
   },
+};
+
+// Service de paiement Stripe
+export const paymentService = {
+  // Créer un PaymentIntent pour Apple Pay / Google Pay
+  async createPaymentIntent(billingType: 'monthly' | 'annual'): Promise<{
+    clientSecret: string;
+    customerId: string;
+    amount: number;
+    currency: string;
+  }> {
+    const user = await authService.checkAuth();
+    if (!user?.id) {
+      throw new Error('User not authenticated');
+    }
+    
+    return await apiCall('/stripe/create-payment-intent', {
+      method: 'POST',
+      body: JSON.stringify({
+        userId: user.id,
+        billingType,
+      }),
+    });
+  },
+
+  // Créer une session de checkout Stripe
+  async createCheckoutSession(billingType: 'monthly' | 'annual'): Promise<{
+    url: string;
+  }> {
+    // Vérifier que l'utilisateur est authentifié
+    const user = await authService.checkAuth();
+    if (!user?.id) {
+      throw new Error('User not authenticated');
+    }
+    
+    // Envoyer le userId dans le body comme fallback (le serveur utilisera le token en priorité)
+    return await apiCall('/stripe/create-checkout-session', {
+      method: 'POST',
+      body: JSON.stringify({
+        userId: user.id, // Fallback si le token ne fonctionne pas
+        billingType,
+      }),
+    });
+  },
+
+  // Confirmer l'abonnement après paiement
+  async confirmSubscription(
+    paymentMethodId: string,
+    billingType: 'monthly' | 'annual'
+  ): Promise<{
+    success: boolean;
+    subscriptionId: string;
+    status: string;
+  }> {
+    const user = await authService.checkAuth();
+    if (!user?.id) {
+      throw new Error('User not authenticated');
+    }
+    
+    return await apiCall('/stripe/confirm-subscription', {
+      method: 'POST',
+      body: JSON.stringify({
+        userId: user.id,
+        paymentMethodId,
+        billingType,
+      }),
+    });
+  },
+};
+
+// Service de trial
+export const trialService = {
+  // Démarrer un free trial de 7 jours
+  async startTrial(): Promise<{
+    success: boolean;
+    message: string;
+  }> {
+    return await apiCall('/user/start-trial', {
+      method: 'POST',
+    });
+  },
 }; 
 
 // Service de gamification (classement, points, etc.)
@@ -398,5 +512,22 @@ export const gamificationService = {
   } | Array<any>> {
     const params = `?limit=${limit}&includeUserRank=${includeUserRank ? 'true' : 'false'}`;
     return await apiCall(`/gamification/leaderboard${params}`);
+  },
+  
+  async getAchievements(): Promise<{
+    achievements: Array<{
+      id: string;
+      name: string;
+      description: string;
+      type: string;
+      points: number;
+      threshold: number;
+      unlocked: boolean;
+      unlockedAt: string | null;
+    }>;
+    totalUnlocked: number;
+    totalAvailable: number;
+  }> {
+    return await apiCall('/gamification/achievements');
   },
 };
