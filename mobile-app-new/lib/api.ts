@@ -233,8 +233,8 @@ export const dashboardService = {
   },
 
   // Récupérer les données de productivité hebdomadaires
-  async getWeeklyProductivity(): Promise<any> {
-    return await apiCall('/dashboard/weekly-productivity');
+  async getWeeklyProductivity(period: 'week' | 'month' | 'trimester' | 'year' = 'week'): Promise<any> {
+    return await apiCall(`/dashboard/weekly-productivity?period=${period}`);
   },
 
   // Récupérer les statistiques analytics pour une période
