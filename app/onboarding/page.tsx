@@ -414,7 +414,7 @@ function OnboardingContent() {
           {/* Header avec logo (agrandi, sans texte) */}
           <div className="flex items-center justify-center mb-2">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/mon-logo.png" alt="Productif.io" className="h-16 w-auto object-contain" />
+            <img src="/P_tech_letter_logo_TEMPLATE-removebg-preview.png" alt="Productif.io" className="h-16 w-auto object-contain" />
           </div>
           <CardTitle>
             {step === 1 && ""}
@@ -609,7 +609,7 @@ function OnboardingContent() {
                   <div className="mx-auto max-w-sm rounded-2xl border border-emerald-200 bg-emerald-50/40 p-6">
                     <div className="mx-auto mb-4 h-20 w-20 rounded-full bg-white shadow-sm grid place-items-center">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src="/mon-logo.png" alt="Productif.io" className="h-10 w-auto object-contain" />
+                      <img src="/P_tech_letter_logo_TEMPLATE-removebg-preview.png" alt="Productif.io" className="h-10 w-auto object-contain" />
                     </div>
                     <div className="text-base font-semibold text-emerald-700">A few quick questions to understand your habits</div>
                     <div className="mt-2 flex items-center justify-center gap-2 text-sm text-emerald-800">

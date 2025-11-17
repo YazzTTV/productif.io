@@ -44,7 +44,7 @@ export default function PricingPage() {
         <CardHeader>
           <div className="flex items-center justify-center mb-2">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/mon-logo.png" alt="Productif.io" className="h-16 w-auto object-contain" />
+            <img src="/P_tech_letter_logo_TEMPLATE-removebg-preview.png" alt="Productif.io" className="h-16 w-auto object-contain" />
           </div>
           <CardTitle className="text-center text-2xl md:text-3xl">Choose your plan</CardTitle>
         </CardHeader>

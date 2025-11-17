@@ -121,7 +121,7 @@ function WaitlistContent() {
         <div className="flex items-center gap-2">
           <Link href="/" className="flex items-center">
             <Image
-              src="/mon-logo.png"
+              src="/P_tech_letter_logo_TEMPLATE-removebg-preview.png"
               alt="Productif.io Logo"
               width={160}
               height={48}
