@@ -1,170 +1,594 @@
-import React, { useState, useEffect } from 'react';
-import { ScrollView, StyleSheet, View, RefreshControl, Alert, TouchableOpacity, Text, Dimensions } from 'react-native';
-import { ThemedText } from '../../components/ThemedText';
-import { ThemedView } from '../../components/ThemedView';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { 
+  ScrollView, 
+  StyleSheet, 
+  View, 
+  Text, 
+  TouchableOpacity, 
+  RefreshControl, 
+  Dimensions,
+  Animated as RNAnimated
+} from 'react-native';
+import { router } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  withTiming,
+  withRepeat,
+  withSequence,
+  FadeInDown,
+  FadeIn,
+  interpolate,
+} from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
-import { dashboardService, tasksService, habitsService, gamificationService } from '../../lib/api';
-import { dashboardEvents, DASHBOARD_DATA_CHANGED } from '../../lib/events';
-import Svg, { Circle } from 'react-native-svg';
-import { format, addDays } from 'date-fns';
-import { fr } from 'date-fns/locale';
+import { LineChart } from 'react-native-chart-kit';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import Svg, { Circle, Defs, LinearGradient as SvgLinearGradient, Stop } from 'react-native-svg';
+import { dashboardService, tasksService, habitsService, gamificationService, apiCall } from '@/lib/api';
 import { useFocusEffect } from '@react-navigation/native';
-import { useRouter } from 'expo-router';
 
 const { width } = Dimensions.get('window');
 
-// Interface pour les données du dashboard
-interface DashboardData {
-  totalTasks: number;
-  completedTasks: number;
-  pendingTasks: number;
-  totalTimeToday: number;
-  totalTimeWeek: number;
-  activeHabits: number;
-  completedHabitsToday: number;
-  currentStreak: number;
-  level: number;
-  experience: number;
-  nextLevelExp: number;
-  recentAchievements: any[];
-}
+// Mock data - will be replaced with API calls
+const mockData = {
+  user: "Alex",
+  todayProgress: 87,
+  focusHours: 6.5,
+  tasksCompleted: 24,
+  totalTasks: 28,
+  streakDays: 42,
+  weeklyGoalProgress: 89,
+  productivityScore: 94,
+  distractionsAvoided: 23,
+  peakHours: "9-11 AM",
+  energyLevel: 92,
+  trialDaysLeft: 5,
+  habits: [
+    { name: "Morning Exercise", completed: false, streak: 38, time: "07:00" },
+    { name: "Deep Work Session", completed: false, streak: 42, time: "09:00" },
+    { name: "Read 30 min", completed: true, streak: 29, time: "20:00" },
+    { name: "Meditation", completed: true, streak: 42, time: "06:30" },
+  ],
+  weeklyData: [
+    { day: 'Mon', score: 88 },
+    { day: 'Tue', score: 92 },
+    { day: 'Wed', score: 85 },
+    { day: 'Thu', score: 95 },
+    { day: 'Fri', score: 91 },
+    { day: 'Sat', score: 78 },
+    { day: 'Sun', score: 87 },
+  ],
+  leaderboard: [
+    { rank: 1, name: "You", score: 3847, avatar: "A", isUser: true, trend: "up" },
+    { rank: 2, name: "Sophie M.", score: 3654, avatar: "S", trend: "same" },
+    { rank: 3, name: "Lucas B.", score: 3521, avatar: "L", trend: "up" },
+  ],
+};
+
+// Particle component for shimmer effects
+const ShimmerParticle = ({ delay = 0 }: { delay?: number }) => {
+  const translateX = useSharedValue(-width);
+  const opacity = useSharedValue(0);
+
+  useEffect(() => {
+    translateX.value = withRepeat(
+      withSequence(
+        withTiming(width * 2, { duration: 2000 }),
+        withTiming(-width, { duration: 0 })
+      ),
+      -1,
+      false
+    );
+    opacity.value = withRepeat(
+      withSequence(
+        withTiming(0.3, { duration: 1000, delay }),
+        withTiming(0, { duration: 1000 })
+      ),
+      -1,
+      false
+    );
+  }, []);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: translateX.value }],
+    opacity: opacity.value,
+  }));
+
+  return (
+    <Animated.View
+      style={[
+        {
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(255, 255, 255, 0.3)',
+        },
+        animatedStyle,
+      ]}
+    />
+  );
+};
+
+// Progress Circle Component
+const ProgressCircle = ({ 
+  percentage, 
+  size = 96, 
+  strokeWidth = 8,
+  showLabel = true 
+}: { 
+  percentage: number; 
+  size?: number; 
+  strokeWidth?: number;
+  showLabel?: boolean;
+}) => {
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const animatedValue = useRef(new RNAnimated.Value(0)).current;
+  const [displayValue, setDisplayValue] = useState(0);
+
+  useEffect(() => {
+    // Animate the value
+    RNAnimated.timing(animatedValue, {
+      toValue: percentage,
+      duration: 1500,
+      useNativeDriver: false,
+    }).start();
+
+    // Update display value
+    const listenerId = animatedValue.addListener(({ value }) => {
+      setDisplayValue(value);
+    });
+
+    return () => {
+      animatedValue.removeListener(listenerId);
+    };
+  }, [percentage, animatedValue]);
+
+  const strokeDashoffset = circumference - (displayValue / 100) * circumference;
+
+  return (
+    <View style={{ width: size, height: size, position: 'relative' }}>
+      <Svg width={size} height={size} style={{ transform: [{ rotate: '-90deg' }] }}>
+        <Circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          stroke="#E5E7EB"
+          strokeWidth={strokeWidth}
+          fill="none"
+        />
+        <Defs>
+          <SvgLinearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <Stop offset="0%" stopColor="#00C27A" />
+            <Stop offset="100%" stopColor="#00D68F" />
+          </SvgLinearGradient>
+        </Defs>
+        <Circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          stroke="url(#progressGradient)"
+          strokeWidth={strokeWidth}
+          fill="none"
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={strokeDashoffset}
+        />
+      </Svg>
+      {showLabel && (
+        <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+            <Text
+              style={{
+                fontSize: size * 0.25,
+                fontWeight: '800',
+                color: '#1F2937',
+              }}
+            >
+              {Math.round(percentage)}
+            </Text>
+            {size > 80 && (
+              <Text style={{ fontSize: size * 0.1, color: '#6B7280' }}>Elite ✨</Text>
+            )}
+          </View>
+        </View>
+      )}
+    </View>
+  );
+};
+
+// Habit Item Component with animation
+const HabitItem = ({ habit, index, isCelebrating, onToggle }: {
+  habit: any;
+  index: number;
+  isCelebrating: boolean;
+  onToggle: () => void;
+}) => {
+  const checkmarkScale = useRef(new RNAnimated.Value(habit.completed ? 1 : 0)).current;
+  
+  // Animer le checkmark quand l'habitude est complétée
+  useEffect(() => {
+    if (habit.completed) {
+      RNAnimated.spring(checkmarkScale, {
+        toValue: 1,
+        useNativeDriver: true,
+        tension: 150,
+        friction: 4,
+      }).start();
+    } else {
+      RNAnimated.timing(checkmarkScale, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [habit.completed]);
+  
+  return (
+    <Animated.View
+      entering={FadeInDown.delay(600 + index * 100).duration(400)}
+      style={styles.habitItem}
+    >
+      {/* Celebration Animation */}
+      {isCelebrating && (
+        <Animated.View
+          entering={FadeIn.duration(200)}
+          exiting={FadeIn.duration(200)}
+          style={StyleSheet.absoluteFillObject}
+          pointerEvents="none"
+        >
+          <View style={styles.celebrationOverlay} />
+          <Text style={styles.celebrationEmoji}>✨</Text>
+        </Animated.View>
+      )}
+
+      <TouchableOpacity
+        onPress={onToggle}
+        activeOpacity={0.8}
+        style={[
+          styles.habitCheckbox,
+          habit.completed && styles.habitCheckboxCompleted,
+        ]}
+      >
+        {habit.completed && (
+          <RNAnimated.View
+            style={{
+              transform: [{ scale: checkmarkScale }],
+            }}
+          >
+            <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+          </RNAnimated.View>
+        )}
+      </TouchableOpacity>
+
+      <View style={styles.habitContent}>
+        <View style={styles.habitHeader}>
+          <Text
+            style={[
+              styles.habitName,
+              habit.completed && styles.habitNameCompleted,
+            ]}
+          >
+            {habit.name}
+          </Text>
+          <Text style={styles.habitTime}>{habit.time}</Text>
+        </View>
+        <View style={styles.habitProgressRow}>
+          <View style={styles.habitProgressBar}>
+            <Animated.View
+              style={[
+                styles.habitProgressFill,
+                { width: habit.completed ? '100%' : '0%' },
+              ]}
+            />
+          </View>
+          <View style={styles.habitStreak}>
+            <Text style={styles.habitStreakText}>{habit.streak}d</Text>
+            <Ionicons name="flame" size={12} color="#00C27A" />
+          </View>
+        </View>
+      </View>
+    </Animated.View>
+  );
+};
 
 export default function DashboardScreen() {
-  const [data, setData] = useState<DashboardData | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const router = useRouter();
-  const [leaderboard, setLeaderboard] = useState<any[] | null>(null);
-  const [userRank, setUserRank] = useState<number | undefined>(undefined);
-
-  const formatTime = (seconds: number): string => {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    if (hours > 0) {
-      return `${hours}h ${minutes}min`;
-    }
-    return `${minutes}min`;
-  };
-
-  const getProgressPercentage = (current: number, total: number): number => {
-    if (total === 0) return 0;
-    return Math.round((current / total) * 100);
-  };
+  const [trialDaysLeft, setTrialDaysLeft] = useState(5);
+  const [dashboardData, setDashboardData] = useState({
+    todayProgress: 0,
+    focusHours: 0, // Deep work time
+    tasksCompleted: 0,
+    totalTasks: 0,
+    streakDays: 0,
+    stressLevel: 0, // Replaces weeklyGoalProgress
+    productivityScore: 0,
+    energyLevel: 0,
+    focusLevel: 0,
+    habits: [] as any[],
+    weeklyData: mockData.weeklyData,
+    userName: 'User',
+    // New fields
+    totalDeepWorkHours: 0,
+    weeklyWorkHours: 0,
+    bestDeepWorkSession: '',
+    globalRank: 0,
+  });
+  const [celebratingHabit, setCelebratingHabit] = useState<string | null>(null);
 
   const loadDashboardData = async () => {
     try {
-      setError(null);
-      console.log('🔄 Chargement des données du dashboard...');
+      setLoading(true);
+      
+      // Load trial days from storage
+      const trialDays = await AsyncStorage.getItem('trialDaysLeft');
+      if (trialDays) setTrialDaysLeft(parseInt(trialDays, 10));
 
-      // Charger les données en parallèle avec gestion d'erreur améliorée
-      const results = await Promise.allSettled([
-        tasksService.getTasks(),
-        habitsService.getAll(),
+      // Load user name
+      const userName = await AsyncStorage.getItem('user_name') || 'User';
+
+      // Calculate today's date range for API calls
+      const today = new Date();
+      const todayStr = today.toISOString().split('T')[0];
+      // Use UTC dates to match server timezone
+      const startOfToday = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate(), 0, 0, 0));
+      const endOfToday = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate(), 23, 59, 59, 999));
+      const startDateStr = startOfToday.toISOString();
+      const endDateStr = endOfToday.toISOString();
+      
+      console.log('📅 Date Range for API:', {
+        todayStr,
+        startDateStr,
+        endDateStr,
+        startOfToday: startOfToday.toISOString(),
+        endOfToday: endOfToday.toISOString(),
+      });
+
+      // Calculate week start (7 days ago)
+      const weekStart = new Date(today);
+      weekStart.setDate(weekStart.getDate() - 7);
+      const weekStartStr = weekStart.toISOString();
+
+      // Fetch data from API in parallel
+      const [metrics, gamification, tasks, habits, leaderboard, todayTimeEntries, deepWorkStats] = await Promise.allSettled([
         dashboardService.getMetrics(),
         dashboardService.getGamificationStats(),
-        gamificationService.getLeaderboard(3, true)
+        tasksService.getTasks(),
+        habitsService.getAll(),
+        gamificationService.getLeaderboard(10, true),
+        // Get today's time entries using startDate and endDate parameters
+        apiCall(`/time-entries?startDate=${encodeURIComponent(startDateStr)}&endDate=${encodeURIComponent(endDateStr)}`).catch((err) => {
+          console.log('⚠️ Could not fetch today time entries:', err);
+          return null;
+        }),
+        // Get deep work stats directly from dedicated endpoint
+        apiCall('/dashboard/deepwork-stats').catch((err) => {
+          console.log('⚠️ Could not fetch deep work stats:', err);
+          return null;
+        }),
       ]);
 
-      // Extraire les données ou valeurs par défaut
-      const tasksResult = results[0].status === 'fulfilled' ? results[0].value : null;
-      const habitsResult = results[1].status === 'fulfilled' ? results[1].value : null;
-      const metricsResult = results[2].status === 'fulfilled' ? results[2].value : null;
-      const gamificationResult = results[3].status === 'fulfilled' ? results[3].value : null;
-      const leaderboardResult = results[4].status === 'fulfilled' ? results[4].value : null;
+      // Process metrics
+      const metricsData = metrics.status === 'fulfilled' ? metrics.value : null;
+      const gamificationData = gamification.status === 'fulfilled' ? gamification.value : null;
+      const tasksData = tasks.status === 'fulfilled' ? tasks.value : null;
+      const habitsData = habits.status === 'fulfilled' ? habits.value : null;
+      const leaderboardData = leaderboard.status === 'fulfilled' ? leaderboard.value : null;
+      const todayTimeEntriesData = todayTimeEntries.status === 'fulfilled' ? todayTimeEntries.value : null;
+      const deepWorkStatsData = deepWorkStats.status === 'fulfilled' ? deepWorkStats.value : null;
 
-      console.log('📊 Résultats API:', {
-        tasks: tasksResult ? 'OK' : 'ERREUR',
-        habits: habitsResult ? 'OK' : 'ERREUR',
-        metrics: metricsResult ? 'OK' : 'ERREUR',
-        gamification: gamificationResult ? 'OK' : 'ERREUR',
-        leaderboard: leaderboardResult ? 'OK' : 'ERREUR'
-      });
-
-      // Traiter le leaderboard et stocker en état
-      let topLeaderboard: any[] = [];
-      let rank: number | undefined = undefined;
-      if (leaderboardResult) {
-        if (Array.isArray(leaderboardResult)) {
-          topLeaderboard = leaderboardResult;
-        } else if (Array.isArray((leaderboardResult as any).leaderboard)) {
-          topLeaderboard = (leaderboardResult as any).leaderboard;
-          rank = (leaderboardResult as any).userRank;
+      // Calculate today's tasks
+      let todayTasks: any[] = [];
+      if (tasksData) {
+        if (Array.isArray(tasksData.tasks)) {
+          todayTasks = tasksData.tasks.filter((task: any) => {
+            const taskDate = task.createdAt ? new Date(task.createdAt).toISOString().split('T')[0] : todayStr;
+            const dueDate = task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : null;
+            return taskDate === todayStr || dueDate === todayStr || task.status === 'PENDING' || task.status === 'IN_PROGRESS';
+          });
+        } else if (Array.isArray(tasksData)) {
+          todayTasks = tasksData.filter((task: any) => {
+            const taskDate = task.createdAt ? new Date(task.createdAt).toISOString().split('T')[0] : todayStr;
+            const dueDate = task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : null;
+            return taskDate === todayStr || dueDate === todayStr || task.status === 'PENDING' || task.status === 'IN_PROGRESS';
+          });
         }
       }
-      setLeaderboard(topLeaderboard);
-      setUserRank(rank);
 
-      // Traiter les tâches
-      let tasks = [];
-      if (tasksResult && Array.isArray(tasksResult.tasks)) {
-        tasks = tasksResult.tasks;
-      } else if (tasksResult && Array.isArray(tasksResult)) {
-        tasks = tasksResult;
-      }
-      
-      // Filtrer les tâches d'aujourd'hui seulement
-      const today = new Date().toISOString().split('T')[0];
-      const todayTasks = tasks.filter((task: any) => {
-        const taskDate = task.createdAt ? new Date(task.createdAt).toISOString().split('T')[0] : today;
-        const dueDate = task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : null;
-        // Inclure les tâches créées aujourd'hui ou dues aujourd'hui
-        return taskDate === today || dueDate === today || task.status === 'PENDING' || task.status === 'IN_PROGRESS';
-      });
-      
       const completedTasks = todayTasks.filter((task: any) => task.status === 'COMPLETED').length;
-      const pendingTasks = todayTasks.filter((task: any) => 
-        task.status === 'PENDING' || task.status === 'IN_PROGRESS'
-      ).length;
+      const totalTasks = todayTasks.length;
 
-      // Traiter les habitudes
-      let habits = [];
-      if (habitsResult && Array.isArray(habitsResult.habits)) {
-        habits = habitsResult.habits;
-      } else if (habitsResult && Array.isArray(habitsResult)) {
-        habits = habitsResult;
+      // Process habits
+      let habitsList: any[] = [];
+      if (habitsData) {
+        if (Array.isArray(habitsData.habits)) {
+          habitsList = habitsData.habits;
+        } else if (Array.isArray(habitsData)) {
+          habitsList = habitsData;
+        }
       }
-      const activeHabits = habits.filter((h: any) => h.isActive !== false).length;
-      
-      // Compter les habitudes complétées aujourd'hui
-      const completedHabitsToday = habits.filter((habit: any) => {
+
+      // Format habits for display - Afficher toutes les habitudes actives
+      const activeHabitsForDisplay = habitsList.filter((h: any) => h.isActive !== false);
+      const formattedHabits = activeHabitsForDisplay.map((habit: any) => {
         const entries = habit.entries || habit.completions || [];
-        return entries.some((entry: any) => {
+        const todayEntry = entries.find((entry: any) => {
           const entryDate = new Date(entry.date).toISOString().split('T')[0];
-          return entryDate === today && entry.completed === true;
+          return entryDate === todayStr && entry.completed === true;
         });
+        
+        return {
+          id: habit.id,
+          name: habit.name,
+          completed: !!todayEntry,
+          streak: habit.currentStreak || 0,
+          time: habit.reminderTime || '09:00',
+        };
+      });
+
+      // Calculate daily progress (habits + tasks)
+      const activeHabits = habitsList.filter((h: any) => h.isActive !== false);
+      const completedHabitsToday = activeHabits.filter((habit: any) => {
+        const entries = habit.entries || habit.completions || [];
+        const todayEntry = entries.find((entry: any) => {
+          const entryDate = new Date(entry.date).toISOString().split('T')[0];
+          return entryDate === todayStr && entry.completed === true;
+        });
+        return !!todayEntry;
       }).length;
-
-      // Données de gamification
-      const streak = gamificationResult?.streak || gamificationResult?.currentStreak || 0;
-      const level = gamificationResult?.level || 1;
-      const experience = gamificationResult?.experience || 0;
-      const nextLevelExp = gamificationResult?.nextLevelExp || 100;
-
-      // Construire les données du dashboard
-      const dashboardData: DashboardData = {
-        totalTasks: todayTasks.length,
-        completedTasks,
-        pendingTasks,
-        totalTimeToday: metricsResult?.totalTimeToday || 0,
-        totalTimeWeek: metricsResult?.totalTimeWeek || 0,
-        activeHabits,
-        completedHabitsToday,
-        currentStreak: streak,
-        level,
-        experience,
-        nextLevelExp,
-        recentAchievements: gamificationResult?.recentAchievements || []
-      };
-
-      console.log('✅ Dashboard final:', dashboardData);
-      setData(dashboardData);
-
-    } catch (err: any) {
-      console.error('❌ Erreur critique lors du chargement du dashboard:', err);
-      setError(`Erreur de connexion: ${err.message}`);
       
-      // Ne pas mettre de données par défaut, garder null pour forcer l'affichage d'erreur
+      const habitsProgress = activeHabits.length > 0 ? (completedHabitsToday / activeHabits.length) * 100 : 0;
+      const tasksProgress = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
+      
+      // Average of habits and tasks progress (weighted if one is 0)
+      let todayProgress = 0;
+      if (activeHabits.length > 0 && totalTasks > 0) {
+        // Both have data, average them
+        todayProgress = Math.round((habitsProgress + tasksProgress) / 2);
+      } else if (activeHabits.length > 0) {
+        // Only habits
+        todayProgress = Math.round(habitsProgress);
+      } else if (totalTasks > 0) {
+        // Only tasks
+        todayProgress = Math.round(tasksProgress);
+      }
+
+      // Deep work time for TODAY (in hours)
+      // Priority 1: Use dedicated deep work stats endpoint
+      let deepWorkTimeSeconds = 0;
+      
+      if (deepWorkStatsData) {
+        deepWorkTimeSeconds = deepWorkStatsData.today?.seconds || 0;
+        console.log('📊 Deep Work Stats from API:', deepWorkStatsData);
+      }
+      
+      // Priority 2: Try metrics data as fallback
+      if (deepWorkTimeSeconds === 0 && metricsData) {
+        if (metricsData.deepWorkTimeToday) {
+          deepWorkTimeSeconds = metricsData.deepWorkTimeToday;
+        } else if (metricsData.todayDeepWorkTime) {
+          deepWorkTimeSeconds = metricsData.todayDeepWorkTime;
+        } else if (metricsData.deepWorkTime) {
+          deepWorkTimeSeconds = typeof metricsData.deepWorkTime === 'number' 
+            ? metricsData.deepWorkTime 
+            : 0;
+        } else if (metricsData.deepWorkMinutes) {
+          deepWorkTimeSeconds = metricsData.deepWorkMinutes * 60;
+        } else if (metricsData.totalTimeToday) {
+          deepWorkTimeSeconds = metricsData.totalTimeToday;
+        }
+      }
+      
+      const focusHours = deepWorkTimeSeconds > 0 ? (deepWorkTimeSeconds / 3600).toFixed(1) : '0.0';
+      
+      // Log for debugging
+      console.log('📊 Deep Work Debug:', {
+        deepWorkStatsData: deepWorkStatsData ? Object.keys(deepWorkStatsData) : 'null',
+        metricsData: metricsData ? Object.keys(metricsData) : 'null',
+        deepWorkTimeSeconds,
+        focusHours,
+      });
+
+      // Calculate Total Hours, This Week, and Best Time from deep work stats endpoint
+      let totalDeepWorkHours = 0;
+      let weeklyWorkHours = 0;
+      let bestDeepWorkSession = 'N/A';
+
+      if (deepWorkStatsData) {
+        totalDeepWorkHours = Math.round(deepWorkStatsData.allTime?.hours || 0);
+        weeklyWorkHours = Math.round(deepWorkStatsData.week?.hours || 0);
+        bestDeepWorkSession = deepWorkStatsData.bestSession || 'N/A';
+        
+        console.log('📊 Deep Work Stats Calculated:', {
+          totalDeepWorkHours,
+          weeklyWorkHours,
+          bestDeepWorkSession,
+          rawData: deepWorkStatsData,
+        });
+      }
+
+      // Fallback to metrics data if available
+      if (totalDeepWorkHours === 0 && metricsData) {
+        const totalDeepWorkSeconds = metricsData?.totalDeepWorkTime || metricsData?.totalDeepWorkHours * 3600 || 0;
+        totalDeepWorkHours = Math.round(totalDeepWorkSeconds / 3600);
+      }
+
+      if (weeklyWorkHours === 0 && metricsData) {
+        const weeklyWorkSeconds = metricsData?.totalTimeWeek || metricsData?.weeklyWorkTime || 0;
+        weeklyWorkHours = Math.round(weeklyWorkSeconds / 3600);
+      }
+
+      if (bestDeepWorkSession === 'N/A' && metricsData) {
+        const bestSession = metricsData?.bestDeepWorkSession || metricsData?.longestDeepWorkSession || '';
+        bestDeepWorkSession = bestSession || metricsData?.bestFocusTime || 'N/A';
+      }
+
+      // Global rank from leaderboard
+      let globalRank = 0;
+      if (leaderboardData) {
+        if (Array.isArray(leaderboardData)) {
+          // Find user in leaderboard
+          const userEntry = leaderboardData.find((entry: any) => entry.isUser || entry.userName === userName);
+          globalRank = userEntry?.rank || 0;
+        } else if (leaderboardData.userRank) {
+          globalRank = leaderboardData.userRank;
+        }
+      }
+
+      // Energy, Focus, Stress from gamification stats (BehaviorCheckIn via agent IA)
+      // Ces valeurs proviennent des réponses de l'utilisateur à l'agent IA tout au long de la journée
+      console.log('📊 Raw gamificationData:', JSON.stringify(gamificationData, null, 2));
+      
+      // Gérer null, undefined, ou valeurs manquantes
+      const energyLevel = (gamificationData?.energyLevel !== null && gamificationData?.energyLevel !== undefined)
+        ? gamificationData.energyLevel 
+        : (gamificationData?.energy !== null && gamificationData?.energy !== undefined ? gamificationData.energy : 0);
+      const focusLevel = (gamificationData?.focusLevel !== null && gamificationData?.focusLevel !== undefined)
+        ? gamificationData.focusLevel 
+        : (gamificationData?.focus !== null && gamificationData?.focus !== undefined ? gamificationData.focus : 0);
+      const stressLevel = (gamificationData?.stressLevel !== null && gamificationData?.stressLevel !== undefined)
+        ? gamificationData.stressLevel 
+        : (gamificationData?.stress !== null && gamificationData?.stress !== undefined ? gamificationData.stress : 0);
+
+      console.log('📊 Productivity Metrics from BehaviorCheckIn:', {
+        energyLevel,
+        focusLevel,
+        stressLevel,
+        source: 'gamificationData (BehaviorCheckIn)',
+        hasData: energyLevel > 0 || focusLevel > 0 || stressLevel > 0
+      });
+
+      // Productivity score basé sur les tâches et habitudes complétées aujourd'hui
+      // Le score reflète le pourcentage de complétion des tâches et habitudes du jour
+      const productivityScore = todayProgress;
+
+      // Update dashboard data
+      setDashboardData({
+        todayProgress: todayProgress,
+        focusHours: parseFloat(focusHours) || 0,
+        tasksCompleted: completedTasks,
+        totalTasks: totalTasks,
+        streakDays: gamificationData?.currentStreak || gamificationData?.streak || 0,
+        stressLevel: stressLevel,
+        productivityScore: productivityScore || 0,
+        energyLevel: energyLevel || 0,
+        focusLevel: focusLevel || 0,
+        habits: formattedHabits.length > 0 ? formattedHabits : mockData.habits,
+        weeklyData: mockData.weeklyData, // TODO: Get real weekly data from API
+        userName: userName,
+        totalDeepWorkHours: totalDeepWorkHours,
+        weeklyWorkHours: weeklyWorkHours,
+        bestDeepWorkSession: bestDeepWorkSession,
+        globalRank: globalRank,
+      });
+    } catch (error) {
+      console.error('Error loading dashboard data:', error);
+      // Keep mock data on error
     } finally {
       setLoading(false);
     }
@@ -174,24 +598,56 @@ export default function DashboardScreen() {
     loadDashboardData();
   }, []);
 
-  // Écouter les événements de mise à jour du dashboard
+  // Reload data when screen comes into focus
   useFocusEffect(
-    React.useCallback(() => {
-      const handleDataChange = () => {
-        console.log('📡 Événement reçu : mise à jour du dashboard');
-        loadDashboardData();
-      };
-
-      dashboardEvents.on(DASHBOARD_DATA_CHANGED, handleDataChange);
-      
-      // Charger les données à chaque fois qu'on revient sur l'écran
+    useCallback(() => {
       loadDashboardData();
-
-      return () => {
-        dashboardEvents.off(DASHBOARD_DATA_CHANGED, handleDataChange);
-      };
     }, [])
   );
+
+  const toggleHabit = async (habitId: string) => {
+    const habit = dashboardData.habits.find(h => h.id === habitId);
+    if (!habit) return;
+
+    const currentCompleted = habit.completed;
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    try {
+      // Optimistic update
+      setDashboardData(prev => ({
+        ...prev,
+        habits: prev.habits.map(h =>
+          h.id === habitId ? { ...h, completed: !currentCompleted } : h
+        ),
+      }));
+
+      // Call API to toggle habit (complete or uncomplete)
+      await habitsService.complete(habitId, todayStr, currentCompleted);
+      
+      // Recharger les données pour avoir la streak à jour
+      await loadDashboardData();
+
+      if (!currentCompleted) {
+        // Célébrer seulement si on vient de compléter
+        setCelebratingHabit(habitId);
+        setTimeout(() => setCelebratingHabit(null), 1500);
+      }
+    } catch (error) {
+      console.error('Error toggling habit:', error);
+      // Rollback en cas d'erreur
+      setDashboardData(prev => ({
+        ...prev,
+        habits: prev.habits.map(h =>
+          h.id === habitId ? { ...h, completed: currentCompleted } : h
+        ),
+      }));
+    }
+  };
+
+  const sortedHabits = [...dashboardData.habits].sort((a, b) => {
+    if (a.completed === b.completed) return 0;
+    return a.completed ? 1 : -1;
+  });
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -199,295 +655,322 @@ export default function DashboardScreen() {
     setRefreshing(false);
   };
 
-  if (loading) {
-    return (
-      <ThemedView style={styles.loadingContainer}>
-        <Ionicons name="hourglass" size={48} color="#22c55e" />
-        <ThemedText style={styles.loadingText}>
-          Chargement de votre tableau de bord...
-        </ThemedText>
-      </ThemedView>
-    );
-  }
-
-  if (!data) {
-    return (
-      <ThemedView style={styles.errorContainer}>
-        <Ionicons name="warning" size={48} color="#f59e0b" />
-        <ThemedText style={styles.errorText}>
-          {error || 'Impossible de charger le dashboard'}
-        </ThemedText>
-        <TouchableOpacity style={styles.retryButton} onPress={loadDashboardData}>
-          <Ionicons name="refresh" size={24} color="#22c55e" />
-          <Text style={styles.retryText}>
-            Réessayer
-          </Text>
-        </TouchableOpacity>
-      </ThemedView>
-    );
-  }
-
-  const today = new Date();
-  const habitsProgress = data.activeHabits > 0 ? (data.completedHabitsToday / data.activeHabits) * 100 : 0;
-
-  // Composant de cercle de progression
-  const ProgressCircle = ({ percentage, size = 200, strokeWidth = 16, color = "#10B981" }) => {
-    const radius = (size - strokeWidth) / 2;
-    const circumference = 2 * Math.PI * radius;
-    const strokeDashoffset = circumference - (percentage / 100) * circumference;
-
-    return (
-      <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
-        <Svg width={size} height={size} style={{ position: 'absolute' }}>
-          {/* Cercle de fond */}
-          <Circle
-            cx={size / 2}
-            cy={size / 2}
-            r={radius}
-            stroke="#E5E7EB"
-            strokeWidth={strokeWidth}
-            fill="transparent"
-          />
-          {/* Cercle de progression */}
-          <Circle
-            cx={size / 2}
-            cy={size / 2}
-            r={radius}
-            stroke={color}
-            strokeWidth={strokeWidth}
-            fill="transparent"
-            strokeDasharray={circumference}
-            strokeDashoffset={strokeDashoffset}
-            strokeLinecap="round"
-            transform={`rotate(-90 ${size/2} ${size/2})`}
-          />
-        </Svg>
-        <View style={{ alignItems: 'center' }}>
-          <Text style={{ fontSize: 36, fontWeight: 'bold', color: '#111827' }}>
-            {Math.round(percentage)}%
-          </Text>
-          <Text style={{ fontSize: 14, color: '#6B7280', marginTop: 4 }}>
-            {data.completedHabitsToday}/{data.activeHabits}
-          </Text>
-          <Text style={{ fontSize: 16, color: '#111827', fontWeight: '600', marginTop: 2 }}>
-            Habitudes
-          </Text>
-        </View>
-      </View>
-    );
+  const chartData = {
+    labels: dashboardData.weeklyData.map(d => d.day),
+    datasets: [{
+      data: dashboardData.weeklyData.map(d => d.score),
+      color: (opacity = 1) => `rgba(0, 194, 122, ${opacity})`,
+      strokeWidth: 2.5,
+    }],
   };
-
-  // Composant de métrique circulaire
-  const MetricCircle = ({ value, label, color = "#6B7280" }) => (
-    <View style={styles.metricCircle}>
-      <View style={[styles.metricCircleInner, { borderColor: color }]}>
-        <Text style={[styles.metricValue, { color }]}>{value}</Text>
-      </View>
-      <Text style={styles.metricLabel}>{label}</Text>
-    </View>
-  );
 
   return (
     <View style={styles.container}>
-      <ScrollView 
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
+      <ScrollView
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
       >
-        {/* Header avec navigation de date */}
-        <View style={styles.header}>
-          <View style={styles.dateNavigation}>
-            <TouchableOpacity style={styles.navButton}>
-              <Ionicons name="chevron-back" size={24} color="#374151" />
-            </TouchableOpacity>
-            
-            <View style={styles.dateContainer}>
-              <Text style={styles.dateText}>
-                {format(today, 'EEEE d MMMM', { locale: fr })}
-              </Text>
-              <Text style={styles.dateSubtext}>Aujourd'hui</Text>
-            </View>
-            
-            <TouchableOpacity style={styles.navButton}>
-              <Ionicons name="chevron-forward" size={24} color="#374151" />
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Cercle principal de progression des habitudes */}
-        <View style={styles.mainProgressContainer}>
-          <ProgressCircle 
-            percentage={habitsProgress} 
-            size={200} 
-            color="#10B981" 
-          />
-        </View>
-
-        {/* Métriques circulaires */}
-        <View style={styles.metricsRow}>
-          <MetricCircle 
-            value={data.currentStreak} 
-            label="Streak" 
-            color="#10B981"
-          />
-          <MetricCircle 
-            value={data.activeHabits} 
-            label="Habitudes" 
-            color="#6B7280"
-          />
-          <MetricCircle 
-            value={data.pendingTasks} 
-            label="restantes" 
-            color="#F59E0B"
-          />
-          <MetricCircle 
-            value={data.level} 
-            label="Score" 
-            color="#8B5CF6"
-          />
-        </View>
-
-        {/* Section Habitudes */}
-        <View style={styles.sectionCard}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Habitudes d'aujourd'hui</Text>
-            <TouchableOpacity>
-              <Text style={styles.sectionLink}>Voir tout</Text>
-            </TouchableOpacity>
-          </View>
-          <View style={styles.sectionContent}>
-            <Text style={styles.progressLabel}>Progression</Text>
-            <Text style={styles.progressValue}>
-              {data.completedHabitsToday}/{data.activeHabits}
-            </Text>
-            <View style={styles.progressBar}>
-              <View 
-                style={[
-                  styles.progressBarFill, 
-                  { width: `${habitsProgress}%` }
-                ]} 
-              />
-            </View>
-            <TouchableOpacity 
-              style={styles.manageButton}
-              onPress={() => router.push('/(tabs)/habits')}
+        {/* Free Trial Banner */}
+        {trialDaysLeft > 0 && (
+          <Animated.View
+            entering={FadeInDown.duration(400)}
+            style={styles.trialBanner}
+          >
+            <LinearGradient
+              colors={['#00C27A', '#00D68F']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.trialBannerGradient}
             >
-              <Text style={styles.manageButtonText}>Gérer mes habitudes</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Section Tâches */}
-        <View style={styles.sectionCard}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Tâches d'aujourd'hui</Text>
-            <TouchableOpacity>
-              <Text style={styles.sectionLink}>Voir tout</Text>
-            </TouchableOpacity>
-          </View>
-          <View style={styles.sectionContent}>
-            <Text style={styles.progressLabel}>Restantes</Text>
-            <Text style={styles.progressValue}>
-              {data.pendingTasks} tâche{data.pendingTasks !== 1 ? 's' : ''}
-            </Text>
-            <Text style={styles.progressLabel}>Progression</Text>
-            <Text style={styles.progressValue}>
-              {data.completedTasks}/{data.totalTasks}
-            </Text>
-            <View style={styles.progressBar}>
-              <View 
-                style={[
-                  styles.progressBarFill, 
-                  { 
-                    width: `${getProgressPercentage(data.completedTasks, data.totalTasks)}%`,
-                    backgroundColor: '#F59E0B'
-                  }
-                ]} 
-              />
-            </View>
-            <TouchableOpacity 
-              style={styles.manageButton}
-              onPress={() => router.push('/(tabs)/tasks')}
-            >
-              <Text style={styles.manageButtonText}>Gérer mes tâches</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Section Top Classement */}
-        <View style={styles.sectionCard}>
-          <View style={styles.sectionHeader}>
-            <View style={styles.leaderboardHeader}>
-              <Ionicons name="trophy" size={24} color="#F59E0B" />
-              <Text style={styles.sectionTitle}>Top Classement</Text>
-            </View>
-          </View>
-          
-          {/* Top leaderboard réel depuis l'API */}
-          {(() => {
-            const top = leaderboard || [];
-            if (!top || top.length === 0) {
-              return (
-                <View style={{ paddingVertical: 8 }}>
-                  <Text style={{ color: '#6B7280' }}>Aucun classement disponible pour le moment.</Text>
-                </View>
-              );
-            }
-            return (
-              <>
-                {top.slice(0, 3).map((entry: any, idx: number) => (
-                  <View key={entry.userId || idx} style={styles.leaderboardItem}>
-                    <View style={styles.leaderboardRank}>
-                      {idx === 0 ? (
-                        <Ionicons name="trophy" size={20} color="#FFD700" />
-                      ) : idx === 1 ? (
-                        <Ionicons name="trophy" size={20} color="#C0C0C0" />
-                      ) : (
-                        <Text style={styles.rankNumber}>{entry.rank ?? idx + 1}</Text>
-                      )}
-                    </View>
-                    <View style={styles.leaderboardInfo}>
-                      <Text style={styles.leaderboardName}>{entry.userName || 'Utilisateur'}</Text>
-                      <View style={styles.leaderboardStats}>
-                        <Ionicons name="star" size={16} color="#F59E0B" />
-                        <Text style={styles.leaderboardPoints}>{entry.totalPoints}</Text>
-                        <Text style={styles.leaderboardStreak}>• {entry.currentStreak}j streak</Text>
-                      </View>
-                    </View>
-                    <View style={styles.leaderboardBadge}>
-                      <Text style={styles.leaderboardLevel}>Niv.{entry.level}</Text>
-                    </View>
+              <ShimmerParticle />
+              <View style={styles.trialBannerContent}>
+                <View style={styles.trialBannerLeft}>
+                  <View style={styles.trialIconContainer}>
+                    <Ionicons name="flash" size={20} color="#FFFFFF" />
+                    <Text style={styles.trialSparkle}>✨</Text>
                   </View>
-                ))}
-                {typeof userRank === 'number' && userRank > 3 && (
-                  <>
-                    <View style={styles.leaderboardDivider} />
-                    <View style={styles.leaderboardItem}>
-                      <View style={styles.leaderboardRank}>
-                        <Text style={styles.rankNumber}>{userRank}</Text>
-                      </View>
-                      <View style={styles.leaderboardInfo}>
-                        <Text style={styles.leaderboardName}>Vous</Text>
-                        <View style={styles.leaderboardStats}>
-                          <Ionicons name="star" size={16} color="#F59E0B" />
-                          <Text style={styles.leaderboardPoints}>{data.experience}</Text>
-                          <Text style={styles.leaderboardStreak}>• {data.currentStreak}j streak</Text>
-                        </View>
-                      </View>
-                      <View style={styles.leaderboardBadge}>
-                        <Text style={styles.leaderboardLevel}>Niv.{data.level}</Text>
-                      </View>
-                    </View>
-                  </>
-                )}
-              </>
-            );
-          })()}
-        </View>
+                  <View>
+                    <Text style={styles.trialLabel}>Free Trial</Text>
+                    <Text style={styles.trialText}>
+                      ⚡ {trialDaysLeft} days left to unlock full potential ⚡
+                    </Text>
+                  </View>
+                </View>
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  style={styles.upgradeButton}
+                  onPress={() => router.push('/upgrade')}
+                >
+                  <Text style={styles.upgradeButtonText}>Upgrade</Text>
+                  <Text style={styles.upgradeSparkle}>✨</Text>
+                </TouchableOpacity>
+              </View>
+            </LinearGradient>
+          </Animated.View>
+        )}
 
-        {/* Espacement en bas */}
-        <View style={{ height: 40 }} />
+        {/* Header */}
+        <Animated.View
+          entering={FadeInDown.delay(100).duration(400)}
+          style={styles.header}
+        >
+          <Text style={styles.headerTitle}>Hello, {dashboardData.userName} 👋</Text>
+          <Text style={styles.headerSubtitle}>Let's make today productive</Text>
+        </Animated.View>
+
+        {/* Main Stats Grid */}
+        <Animated.View
+          entering={FadeInDown.delay(200).duration(400)}
+          style={styles.statsGrid}
+        >
+          {/* Daily Progress Card */}
+          <TouchableOpacity
+            activeOpacity={0.9}
+            style={styles.statCardPrimary}
+          >
+            <LinearGradient
+              colors={['#00C27A', '#00D68F']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.statCardGradient}
+            >
+              <ShimmerParticle />
+              <View style={styles.statCardContent}>
+                <Ionicons name="flag" size={24} color="#FFFFFF" style={{ opacity: 0.9 }} />
+                <Text style={styles.statCardLabel}>Daily Progress</Text>
+                <View style={styles.statCardValueRow}>
+                  <Text style={styles.statCardValue}>{dashboardData.todayProgress}%</Text>
+                  <Text style={styles.statCardChange}>↑ 12%</Text>
+                </View>
+                <View style={styles.progressBarContainer}>
+                  <Animated.View
+                    style={[
+                      styles.progressBarFill,
+                      { width: `${dashboardData.todayProgress}%` },
+                    ]}
+                  />
+                </View>
+              </View>
+            </LinearGradient>
+          </TouchableOpacity>
+
+          {/* Focus Time Card */}
+          <View style={styles.statCard}>
+            <Ionicons name="time" size={24} color="#00C27A" />
+            <Text style={styles.statCardLabelDark}>Focus Time</Text>
+            <View style={styles.statCardValueRow}>
+              <Text style={styles.statCardValueDark}>{dashboardData.focusHours}</Text>
+              <Text style={styles.statCardUnit}>h</Text>
+            </View>
+            <Text style={styles.statCardSubtext}>+2.5h vs yesterday 🎯</Text>
+          </View>
+
+          {/* Tasks Completed Card */}
+          <View style={styles.statCard}>
+            <View style={styles.statCardHeader}>
+              <Ionicons name="checkmark-circle" size={24} color="#00C27A" />
+              <TouchableOpacity onPress={() => router.push('/(tabs)/tasks')}>
+                <Text style={styles.viewAllText}>View All</Text>
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.statCardLabelDark}>Tasks Completed</Text>
+            <View style={styles.statCardValueRow}>
+              <Text style={styles.statCardValueDark}>{dashboardData.tasksCompleted}</Text>
+              <Text style={styles.statCardUnitDark}>/{dashboardData.totalTasks}</Text>
+            </View>
+            <View style={styles.tasksProgressBar}>
+              {Array.from({ length: Math.max(dashboardData.totalTasks, 1) }).map((_, i) => (
+                <View
+                  key={i}
+                  style={[
+                    styles.taskProgressDot,
+                    i < dashboardData.tasksCompleted && styles.taskProgressDotActive,
+                  ]}
+                />
+              ))}
+            </View>
+          </View>
+
+          {/* Streak Card */}
+          <TouchableOpacity
+            activeOpacity={0.9}
+            style={styles.statCardStreak}
+          >
+            <LinearGradient
+              colors={['#FB923C', '#EC4899']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.statCardGradient}
+            >
+              <Ionicons name="flame" size={24} color="#FFFFFF" style={{ opacity: 0.9 }} />
+              <Text style={styles.statCardLabel}>Current Streak</Text>
+              <View style={styles.statCardValueRow}>
+                <Text style={styles.statCardValue}>{dashboardData.streakDays}</Text>
+                <Text style={styles.statCardUnitWhite}>days</Text>
+              </View>
+              <Text style={styles.statCardSubtextWhite}>Personal best! 🏆</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        </Animated.View>
+
+        {/* Productivity Score Card */}
+        <Animated.View
+          entering={FadeInDown.delay(300).duration(400)}
+          style={styles.productivityCard}
+        >
+          <View style={styles.productivityHeader}>
+            <Text style={styles.productivityTitle}>Productivity Score</Text>
+            <View style={styles.trendBadge}>
+              <Ionicons name="trending-up" size={12} color="#059669" />
+              <Text style={styles.trendText}>+12%</Text>
+            </View>
+          </View>
+
+          <View style={styles.productivityContent}>
+            <ProgressCircle percentage={dashboardData.productivityScore} size={96} />
+            <View style={styles.productivityMetrics}>
+              <View style={styles.metricRow}>
+                <Text style={styles.metricLabel}>Energy ⚡</Text>
+                <Text style={styles.metricValue}>{dashboardData.energyLevel}%</Text>
+              </View>
+              <View style={styles.metricBarContainer}>
+                <Animated.View
+                  style={[
+                    styles.metricBar,
+                    { width: `${dashboardData.energyLevel}%` },
+                  ]}
+                />
+              </View>
+
+              <View style={styles.metricRow}>
+                <Text style={styles.metricLabel}>Stress 😰</Text>
+                <Text style={[styles.metricValue, { color: dashboardData.stressLevel > 70 ? '#DC2626' : dashboardData.stressLevel > 40 ? '#F59E0B' : '#00C27A' }]}>
+                  {dashboardData.stressLevel}%
+                </Text>
+              </View>
+              <View style={styles.metricBarContainer}>
+                <Animated.View
+                  style={[
+                    styles.metricBar,
+                    { 
+                      width: `${dashboardData.stressLevel}%`,
+                      backgroundColor: dashboardData.stressLevel > 70 ? '#DC2626' : dashboardData.stressLevel > 40 ? '#F59E0B' : '#00C27A'
+                    },
+                  ]}
+                />
+              </View>
+
+              <View style={styles.metricRow}>
+                <Text style={styles.metricLabel}>Focus 🧠</Text>
+                <Text style={[styles.metricValue, { color: '#0891B2' }]}>{dashboardData.focusLevel}%</Text>
+              </View>
+              <View style={styles.metricBarContainer}>
+                <Animated.View
+                  style={[
+                    styles.metricBar,
+                    { width: `${dashboardData.focusLevel}%`, backgroundColor: '#06B6D4' },
+                  ]}
+                />
+              </View>
+            </View>
+          </View>
+
+          {/* Compact Stats Grid */}
+          <View style={styles.compactStatsGrid}>
+            <View style={styles.compactStat}>
+              <Text style={styles.compactStatLabel}>Total Hours</Text>
+              <Text style={styles.compactStatValue}>{dashboardData.totalDeepWorkHours}h</Text>
+            </View>
+            <View style={styles.compactStat}>
+              <Text style={styles.compactStatLabel}>This Week</Text>
+              <Text style={styles.compactStatValue}>{dashboardData.weeklyWorkHours}h</Text>
+            </View>
+            <View style={styles.compactStat}>
+              <Text style={styles.compactStatLabel}>Best Time</Text>
+              <Text style={styles.compactStatValue}>{dashboardData.bestDeepWorkSession}</Text>
+            </View>
+            <View style={styles.compactStat}>
+              <Text style={styles.compactStatLabel}>Global Rank</Text>
+              <Text style={styles.compactStatValue}>
+                {dashboardData.globalRank > 0 ? `#${dashboardData.globalRank}` : 'N/A'} {dashboardData.globalRank === 1 ? '🏆' : ''}
+              </Text>
+            </View>
+          </View>
+        </Animated.View>
+
+        {/* Weekly Chart */}
+        <Animated.View
+          entering={FadeInDown.delay(400).duration(400)}
+          style={styles.chartCard}
+        >
+          <View style={styles.chartHeader}>
+            <Text style={styles.chartTitle}>Weekly Trend</Text>
+            <TouchableOpacity
+              activeOpacity={0.8}
+              style={styles.viewDataButton}
+              onPress={() => router.push('/analytics')}
+            >
+              <Ionicons name="trending-up" size={14} color="#FFFFFF" />
+              <Text style={styles.viewDataText}>View Data</Text>
+            </TouchableOpacity>
+          </View>
+          <LineChart
+            data={chartData}
+            width={width - 48}
+            height={120}
+            chartConfig={{
+              backgroundColor: '#FFFFFF',
+              backgroundGradientFrom: '#FFFFFF',
+              backgroundGradientTo: '#FFFFFF',
+              decimalPlaces: 0,
+              color: (opacity = 1) => `rgba(0, 194, 122, ${opacity})`,
+              labelColor: (opacity = 1) => `rgba(107, 114, 128, ${opacity})`,
+              style: {
+                borderRadius: 16,
+              },
+              propsForDots: {
+                r: '4',
+                strokeWidth: '2',
+                stroke: '#00C27A',
+              },
+            }}
+            bezier
+            style={{
+              marginVertical: 8,
+              borderRadius: 16,
+            }}
+            withInnerLines={false}
+            withOuterLines={false}
+            withVerticalLabels={false}
+          />
+        </Animated.View>
+
+        {/* Daily Habits */}
+        <Animated.View
+          entering={FadeInDown.delay(500).duration(400)}
+          style={styles.habitsSection}
+        >
+          <Text style={styles.sectionTitle}>Daily Habits</Text>
+          <View style={styles.habitsCard}>
+            {sortedHabits.map((habit, index) => {
+              const isCelebrating = celebratingHabit === habit.id;
+              
+              return (
+                <HabitItem
+                  key={habit.id || habit.name}
+                  habit={habit}
+                  index={index}
+                  isCelebrating={isCelebrating}
+                  onToggle={() => toggleHabit(habit.id || habit.name)}
+                />
+              );
+            })}
+          </View>
+        </Animated.View>
+
+        {/* Bottom spacing for tab bar */}
+        <View style={{ height: 100 }} />
       </ScrollView>
     </View>
   );
@@ -496,248 +979,468 @@ export default function DashboardScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#FFFFFF',
   },
-  header: {
-    backgroundColor: 'white',
+  scrollContent: {
     paddingTop: 60,
     paddingBottom: 20,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
   },
-  dateNavigation: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  navButton: {
-    padding: 8,
-    borderRadius: 8,
-    backgroundColor: '#F3F4F6',
-  },
-  dateContainer: {
-    alignItems: 'center',
-    flex: 1,
-    marginHorizontal: 16,
-  },
-  dateText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#111827',
-    textAlign: 'center',
-    textTransform: 'capitalize',
-  },
-  dateSubtext: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginTop: 2,
-  },
-  mainProgressContainer: {
-    alignItems: 'center',
-    paddingVertical: 40,
-    backgroundColor: 'white',
-  },
-  metricsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingVertical: 20,
-    backgroundColor: 'white',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-  },
-  metricCircle: {
-    alignItems: 'center',
-  },
-  metricCircleInner: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    borderWidth: 3,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'white',
-    marginBottom: 8,
-  },
-  metricValue: {
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  metricLabel: {
-    fontSize: 12,
-    color: '#6B7280',
-    textAlign: 'center',
-  },
-  sectionCard: {
-    backgroundColor: 'white',
-    marginHorizontal: 16,
-    marginVertical: 8,
+  trialBanner: {
+    marginHorizontal: 24,
+    marginBottom: 16,
     borderRadius: 16,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+    overflow: 'hidden',
+    shadowColor: '#00C27A',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 8,
   },
-  sectionHeader: {
+  trialBannerGradient: {
+    padding: 16,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  trialBannerContent: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    zIndex: 10,
+  },
+  trialBannerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  trialIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+  },
+  trialSparkle: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    fontSize: 12,
+  },
+  trialLabel: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.9)',
+    marginBottom: 4,
+  },
+  trialText: {
+    fontSize: 14,
+    color: '#FFFFFF',
+    fontWeight: '600',
+  },
+  upgradeButton: {
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  upgradeButtonText: {
+    color: '#00C27A',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  upgradeSparkle: {
+    fontSize: 12,
+  },
+  header: {
+    paddingHorizontal: 24,
     marginBottom: 16,
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#111827',
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#1F2937',
+    marginBottom: 4,
   },
-  sectionLink: {
-    fontSize: 14,
-    color: '#10B981',
-    fontWeight: '600',
-  },
-  sectionContent: {
-    gap: 8,
-  },
-  progressLabel: {
-    fontSize: 14,
+  headerSubtitle: {
+    fontSize: 16,
+    fontWeight: '400',
     color: '#6B7280',
   },
-  progressValue: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#111827',
+  statsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: 24,
+    gap: 12,
+    marginBottom: 16,
   },
-  progressBar: {
-    height: 8,
-    backgroundColor: '#E5E7EB',
-    borderRadius: 4,
+  statCardPrimary: {
+    width: (width - 60) / 2,
+    borderRadius: 24,
     overflow: 'hidden',
-    marginVertical: 8,
+    shadowColor: '#00C27A',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  statCardGradient: {
+    padding: 20,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  statCardContent: {
+    zIndex: 10,
+  },
+  statCardLabel: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.8)',
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  statCardValue: {
+    fontSize: 32,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  statCardValueRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 4,
+    marginBottom: 8,
+  },
+  statCardChange: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.7)',
+  },
+  progressBarContainer: {
+    height: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    borderRadius: 3,
+    overflow: 'hidden',
+    marginTop: 8,
   },
   progressBarFill: {
     height: '100%',
-    backgroundColor: '#10B981',
-    borderRadius: 4,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 3,
   },
-  manageButton: {
-    backgroundColor: '#10B981',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 8,
+  statCard: {
+    width: (width - 60) / 2,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
   },
-  manageButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  leaderboardHeader: {
+  statCardHeader: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    gap: 8,
-  },
-  leaderboardItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    backgroundColor: '#FFFBEB',
-    borderRadius: 12,
     marginBottom: 8,
   },
-  leaderboardRank: {
-    width: 40,
-    alignItems: 'center',
-  },
-  rankNumber: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#F59E0B',
-  },
-  leaderboardDivider: {
-    height: 1,
-    backgroundColor: '#E5E7EB',
-    marginVertical: 12,
-  },
-  leaderboardInfo: {
-    flex: 1,
-    marginLeft: 12,
-  },
-  leaderboardName: {
-    fontSize: 16,
+  viewAllText: {
+    fontSize: 12,
+    color: '#00C27A',
     fontWeight: '600',
-    color: '#111827',
   },
-  leaderboardStats: {
+  statCardLabelDark: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  statCardValueDark: {
+    fontSize: 32,
+    fontWeight: '800',
+    color: '#1F2937',
+  },
+  statCardUnit: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#1F2937',
+  },
+  statCardUnitDark: {
+    fontSize: 18,
+    color: '#6B7280',
+  },
+  statCardSubtext: {
+    fontSize: 12,
+    color: '#00C27A',
+    marginTop: 4,
+  },
+  statCardStreak: {
+    width: (width - 60) / 2,
+    borderRadius: 24,
+    overflow: 'hidden',
+    shadowColor: '#FB923C',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  statCardUnitWhite: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  statCardSubtextWhite: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.7)',
+    marginTop: 4,
+  },
+  tasksProgressBar: {
+    flexDirection: 'row',
+    gap: 4,
+    marginTop: 8,
+  },
+  taskProgressDot: {
+    flex: 1,
+    height: 6,
+    backgroundColor: '#E5E7EB',
+    borderRadius: 3,
+  },
+  taskProgressDotActive: {
+    backgroundColor: '#00C27A',
+  },
+  productivityCard: {
+    marginHorizontal: 24,
+    marginBottom: 16,
+    backgroundColor: 'rgba(0, 194, 122, 0.05)',
+    borderRadius: 24,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 194, 122, 0.2)',
+  },
+  productivityHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  productivityTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1F2937',
+  },
+  trendBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 4,
     gap: 4,
-  },
-  leaderboardPoints: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginLeft: 4,
-  },
-  leaderboardStreak: {
-    fontSize: 14,
-    color: '#6B7280',
-  },
-  leaderboardBadge: {
-    backgroundColor: '#10B981',
+    backgroundColor: '#D1FAE5',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
   },
-  leaderboardLevel: {
-    color: 'white',
+  trendText: {
     fontSize: 12,
     fontWeight: '600',
+    color: '#059669',
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 40,
-    backgroundColor: '#F9FAFB',
-  },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    textAlign: 'center',
-    opacity: 0.8,
-    color: '#6B7280',
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 40,
-    backgroundColor: '#F9FAFB',
-  },
-  errorText: {
-    marginTop: 16,
-    fontSize: 16,
-    textAlign: 'center',
-    opacity: 0.8,
-    marginBottom: 20,
-    color: '#6B7280',
-  },
-  retryButton: {
+  productivityContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
-    borderRadius: 8,
-    backgroundColor: '#f0fdf4',
+    gap: 16,
+    marginBottom: 12,
   },
-  retryText: {
-    marginLeft: 8,
-    fontSize: 16,
+  productivityMetrics: {
+    flex: 1,
+    gap: 8,
+  },
+  metricRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  metricLabel: {
+    fontSize: 12,
+    color: '#6B7280',
+  },
+  metricValue: {
+    fontSize: 12,
     fontWeight: '600',
-    color: '#22c55e',
+    color: '#00C27A',
+  },
+  metricBarContainer: {
+    height: 6,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  metricBar: {
+    height: '100%',
+    backgroundColor: '#00C27A',
+    borderRadius: 3,
+  },
+  compactStatsGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
+  },
+  compactStat: {
+    alignItems: 'center',
+  },
+  compactStatLabel: {
+    fontSize: 10,
+    color: '#6B7280',
+    marginBottom: 4,
+  },
+  compactStatValue: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#00C27A',
+  },
+  chartCard: {
+    marginHorizontal: 24,
+    marginBottom: 16,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  chartHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  chartTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1F2937',
+  },
+  viewDataButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#00C27A',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  viewDataText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  habitsSection: {
+    paddingHorizontal: 24,
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#1F2937',
+    marginBottom: 12,
+  },
+  habitsCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+    gap: 12,
+  },
+  habitItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    position: 'relative',
+  },
+  celebrationOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 194, 122, 0.2)',
+    borderRadius: 16,
+  },
+  celebrationEmoji: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    transform: [{ translateX: -12 }, { translateY: -12 }],
+    fontSize: 24,
+  },
+  habitCheckbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#D1D5DB',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  habitCheckboxCompleted: {
+    backgroundColor: '#00C27A',
+    borderColor: '#00C27A',
+  },
+  habitContent: {
+    flex: 1,
+  },
+  habitHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  habitName: {
+    fontSize: 14,
+    fontWeight: '400',
+    color: '#6B7280',
+  },
+  habitNameCompleted: {
+    color: '#374151',
+    fontWeight: '500',
+  },
+  habitTime: {
+    fontSize: 12,
+    color: '#9CA3AF',
+  },
+  habitProgressRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  habitProgressBar: {
+    flex: 1,
+    height: 6,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  habitProgressFill: {
+    height: '100%',
+    backgroundColor: '#00C27A',
+    borderRadius: 3,
+  },
+  habitStreak: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  habitStreakText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#00C27A',
   },
 });
