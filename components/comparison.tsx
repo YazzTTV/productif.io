@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { Button } from "@/components/ui/button"
+import { motion } from "framer-motion"
 import { Check, X } from "lucide-react"
 
 export function Comparison() {
@@ -73,17 +73,23 @@ export function Comparison() {
         </div>
       </div>
       <div className="mt-10 text-center">
-        <Button 
-          className="bg-green-500 hover:bg-green-600 text-white px-6 py-3"
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
           onClick={() => {
             const params = new URLSearchParams()
-            params.set('offer','early-access')
-            params.set('billing','monthly')
+            const keep: string[] = ["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term", "ref"]
+            keep.forEach(k => {
+              const v = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get(k) : null
+              if (v) params.set(k, v)
+            })
+            params.set('offer', 'early-access')
             window.location.href = `/onboarding?${params.toString()}`
           }}
+          className="px-8 py-4 bg-gradient-to-r from-[#00C27A] to-[#00D68F] text-white rounded-full shadow-xl text-lg"
         >
           Start Now for Free
-        </Button>
+        </motion.button>
       </div>
     </section>
   )

@@ -2,121 +2,90 @@
 
 import Image from "next/image"
 import { Star } from "lucide-react"
-import { useState, useEffect, useRef } from "react"
-import { Button } from "@/components/ui/button"
+import { useEffect } from "react"
+import { motion } from "framer-motion"
 
 export function Testimonials() {
-  // Suppression des états et des refs qui ne sont plus nécessaires
-  // Le player Voomly gère son propre état de lecture
-  
   return (
-    <section className="container mx-auto px-4 py-20">
-      <div className="text-center mb-16">
-        <span className="text-green-500">— Testimonials</span>
-        <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mt-2">
-          They chose <span className="text-green-500">Productif.io</span>
-        </h2>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-stretch">
-        <TestimonialCard
-          name="Gaetan Silgado"
-          role="Infopreneur"
-          image="/testimonials/gaetan-silgado.jpg"
-          content="As an infopreneur, Productif.io helped me organize and work without distractions. As a result, I generated much more revenue by staying focused on what matters."
-          verified
-          className="min-h-[420px] flex flex-col"
-        />
-        <BenjaminVideoTestimonial className="min-h-[420px] flex flex-col" />
-        <TestimonialCard
-          name="Sabrina"
-          role="Freelance Media Buyer"
-          image="/testimonials/sabrina.jpg"
-          content="I just tried it and it’s perfect. I LOVE how the app organizes my tasks and helps me track my habits. It’s truly intuitive!"
-          className="min-h-[420px] flex flex-col"
-        />
-      </div>
-      <div className="mt-10 text-center">
-        <Button 
-          className="bg-green-500 hover:bg-green-600 text-white px-6 py-3"
-          onClick={() => {
-            const params = new URLSearchParams()
-            params.set('offer','early-access')
-            params.set('billing','monthly')
-            window.location.href = `/onboarding?${params.toString()}`
-          }}
+    <section id="testimonials" className="py-32 bg-gradient-to-br from-gray-50 to-white">
+      <div className="max-w-7xl mx-auto px-6">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          className="text-center mb-16"
         >
-          Start Now for Free
-        </Button>
-      </div>
-    </section>
-  )
-}
+          <h2 className="text-4xl md:text-5xl text-gray-900 mb-6">
+            Loved by Early Adopters
+            <span className="block bg-gradient-to-r from-[#00C27A] to-[#00D68F] bg-clip-text text-transparent">
+              Worldwide
+            </span>
+          </h2>
+          <p className="text-xl text-gray-600">
+            See what our community has to say about their transformation
+          </p>
+        </motion.div>
 
-function VideoTestimonialCard({
-  name,
-  role,
-  image,
-  videoId,
-  content,
-  playingVideo,
-  setPlayingVideo,
-}: {
-  name: string
-  role: string
-  image: string
-  videoId: string
-  content: string
-  playingVideo: boolean
-  setPlayingVideo: (v: boolean) => void
-}) {
-  const isPlaying = playingVideo
-
-  return (
-    <div className="bg-white border border-gray-200 rounded-xl p-6 hover:shadow-lg transition-shadow">
-      <div className="flex items-center gap-3 mb-4">
-        <Image src={image || "/placeholder.svg"} alt={name} width={48} height={48} className="rounded-full" />
-        <div>
-          <div className="flex items-center gap-2">
-            <h3 className="font-bold text-gray-900">{name}</h3>
-            <Star className="w-4 h-4 fill-green-500 text-green-500" />
-          </div>
-          <p className="text-gray-500 text-sm">{role}</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-stretch">
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay: 0 }}
+          >
+            <TestimonialCard
+              name="Gaetan Silgado"
+              role="Infopreneur"
+              image="/testimonials/gaetan-silgado.jpg"
+              content="As an infopreneur, Productif.io helped me organize and work without distractions. As a result, I generated much more revenue by staying focused on what matters."
+              verified
+              className="min-h-[420px] flex flex-col"
+            />
+          </motion.div>
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay: 0.1 }}
+          >
+            <BenjaminVideoTestimonial className="min-h-[420px] flex flex-col" />
+          </motion.div>
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay: 0.2 }}
+          >
+            <TestimonialCard
+              name="Sabrina"
+              role="Freelance Media Buyer"
+              image="/testimonials/sabrina.jpg"
+              content="I just tried it and it's perfect. I LOVE how the app organizes my tasks and helps me track my habits. It's truly intuitive!"
+              className="min-h-[420px] flex flex-col"
+            />
+          </motion.div>
+        </div>
+        <div className="mt-10 text-center">
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => {
+              const params = new URLSearchParams()
+              const keep: string[] = ["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term", "ref"]
+              keep.forEach(k => {
+                const v = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get(k) : null
+                if (v) params.set(k, v)
+              })
+              params.set('offer', 'early-access')
+              window.location.href = `/onboarding?${params.toString()}`
+            }}
+            className="px-8 py-4 bg-gradient-to-r from-[#00C27A] to-[#00D68F] text-white rounded-full shadow-xl text-lg"
+          >
+            Start Now for Free
+          </motion.button>
         </div>
       </div>
-      
-      <div className="relative aspect-video mb-4 rounded-lg overflow-hidden bg-gray-100">
-        {isPlaying ? (
-          <iframe
-            src={`https://www.youtube.com/embed/${videoId}?autoplay=1`}
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowFullScreen
-            className="absolute inset-0 w-full h-full"
-            title={`Témoignage de ${name}`}
-          />
-        ) : (
-          <>
-            <Image
-              src={`https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`}
-              alt={`Témoignage de ${name}`}
-              width={640}
-              height={360}
-              className="w-full h-full object-cover"
-            />
-            <div 
-              className="absolute inset-0 flex items-center justify-center cursor-pointer bg-black/30 hover:bg-black/40 transition-colors"
-              onClick={() => setPlayingVideo(true)}
-            >
-              <div className="w-16 h-16 bg-white/90 rounded-full flex items-center justify-center">
-                <div className="w-0 h-0 border-t-[8px] border-t-transparent border-l-[16px] border-l-green-500 border-b-[8px] border-b-transparent ml-1"></div>
-              </div>
-            </div>
-          </>
-        )}
-      </div>
-      
-      <p className="text-gray-600">« {content} »</p>
-    </div>
+    </section>
   )
 }
 
@@ -125,9 +94,7 @@ function BenjaminVideoTestimonial({
 }: { 
   className?: string 
 }) {
-  // Ajouter le script Voomly dans le head lors du montage du composant
   useEffect(() => {
-    // Vérifier si le script existe déjà
     if (!document.querySelector('script[src="https://embed.voomly.com/embed/embed-build.js"]')) {
       const script = document.createElement('script');
       script.src = "https://embed.voomly.com/embed/embed-build.js";

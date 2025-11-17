@@ -1,11 +1,12 @@
 import { Header } from "@/components/header"
-// import { Hero } from "@/components/hero" // Ancienne version sans vidéo
-import { Hero } from "@/components/hero" // Version avec vidéo YouTube
-// import { HeroWithLocalVideo as Hero } from "@/components/hero-with-local-video" // Version avec vidéo locale
+import { Hero } from "@/components/hero"
+import { Stats } from "@/components/stats"
 import { Features } from "@/components/features"
 import { Comparison } from "@/components/comparison"
 import { Testimonials } from "@/components/testimonials"
+import { DownloadCTA } from "@/components/download-cta"
 import { Faq } from "@/components/faq"
+import { FinalCTA } from "@/components/final-cta"
 import Footer from "@/components/footer"
 
 export default function Home() {
@@ -13,10 +14,13 @@ export default function Home() {
     <main className="min-h-screen bg-white">
       <Header />
       <Hero />
+      <Stats />
       <Features />
       <Comparison />
       <Testimonials />
+      <DownloadCTA />
       <Faq />
+      <FinalCTA />
       <Footer />
     </main>
   )
