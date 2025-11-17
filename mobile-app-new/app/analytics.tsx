@@ -47,15 +47,9 @@ export default function AnalyticsScreen() {
         });
       }
 
-      // Fetch weekly productivity data for charts (only for week period)
-      let weeklyDataArray: any[] = [];
-      if (timePeriod === 'week') {
-        const weeklyProductivity = await dashboardService.getWeeklyProductivity();
-        weeklyDataArray = weeklyProductivity?.weeklyData || [];
-      } else {
-        // For other periods, we could generate aggregated data or leave empty
-        // For now, we'll leave it empty for non-week periods
-      }
+      // Fetch weekly productivity data for charts (supports all periods now)
+      const weeklyProductivity = await dashboardService.getWeeklyProductivity(timePeriod);
+      const weeklyDataArray = weeklyProductivity?.weeklyData || [];
 
       setWeeklyData(weeklyDataArray);
 
