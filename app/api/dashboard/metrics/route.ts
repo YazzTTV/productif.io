@@ -3,6 +3,9 @@ import { getAuthUser } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { format, startOfDay, endOfDay, isSameDay, isAfter, isBefore, startOfTomorrow, isTomorrow } from "date-fns"
 
+// Augmenter le timeout pour les requêtes complexes (60 secondes)
+export const maxDuration = 60
+
 export async function GET(request: Request) {
   try {
     const user = await getAuthUser()
