@@ -28,6 +28,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Svg, { Circle, Defs, LinearGradient as SvgLinearGradient, Stop } from 'react-native-svg';
 import { dashboardService, tasksService, habitsService, gamificationService, apiCall, authService } from '@/lib/api';
 import { useFocusEffect } from '@react-navigation/native';
+import { useTheme } from '@/contexts/ThemeContext';
+import { useTranslation } from '@/hooks/useTranslation';
 
 const { width } = Dimensions.get('window');
 
@@ -118,12 +120,18 @@ const ProgressCircle = ({
   percentage, 
   size = 96, 
   strokeWidth = 8,
-  showLabel = true 
+  showLabel = true,
+  colors = { text: '#1F2937', textSecondary: '#6B7280', border: '#E5E7EB' }
 }: { 
   percentage: number; 
   size?: number; 
   strokeWidth?: number;
   showLabel?: boolean;
+  colors?: {
+    text: string;
+    textSecondary: string;
+    border: string;
+  };
 }) => {
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
@@ -157,7 +165,7 @@ const ProgressCircle = ({
           cx={size / 2}
           cy={size / 2}
           r={radius}
-          stroke="#E5E7EB"
+          stroke={colors.border}
           strokeWidth={strokeWidth}
           fill="none"
         />
@@ -186,13 +194,13 @@ const ProgressCircle = ({
               style={{
                 fontSize: size * 0.25,
                 fontWeight: '800',
-                color: '#1F2937',
+                color: colors.text,
               }}
             >
               {Math.round(percentage)}
             </Text>
             {size > 80 && (
-              <Text style={{ fontSize: size * 0.1, color: '#6B7280' }}>Elite ✨</Text>
+              <Text style={{ fontSize: size * 0.1, color: colors.textSecondary }}>Elite ✨</Text>
             )}
           </View>
         </View>
@@ -202,11 +210,19 @@ const ProgressCircle = ({
 };
 
 // Habit Item Component with animation
-const HabitItem = ({ habit, index, isCelebrating, onToggle }: {
+const HabitItem = ({ habit, index, isCelebrating, onToggle, colors }: {
   habit: any;
   index: number;
   isCelebrating: boolean;
   onToggle: () => void;
+  colors: {
+    background: string;
+    surface: string;
+    text: string;
+    textSecondary: string;
+    border: string;
+    primary: string;
+  };
 }) => {
   const checkmarkScale = useRef(new RNAnimated.Value(habit.completed ? 1 : 0)).current;
   
@@ -271,11 +287,12 @@ const HabitItem = ({ habit, index, isCelebrating, onToggle }: {
             style={[
               styles.habitName,
               habit.completed && styles.habitNameCompleted,
+              { color: habit.completed ? colors.textSecondary : colors.text },
             ]}
           >
             {habit.name}
           </Text>
-          <Text style={styles.habitTime}>{habit.time}</Text>
+          <Text style={[styles.habitTime, { color: colors.textSecondary }]}>{habit.time}</Text>
         </View>
         <View style={styles.habitProgressRow}>
           <View style={styles.habitProgressBar}>
@@ -297,6 +314,8 @@ const HabitItem = ({ habit, index, isCelebrating, onToggle }: {
 };
 
 export default function DashboardScreen() {
+  const { colors } = useTheme();
+  const t = useTranslation();
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [trialDaysLeft, setTrialDaysLeft] = useState(5);
@@ -320,6 +339,8 @@ export default function DashboardScreen() {
     globalRank: 0,
   });
   const [celebratingHabit, setCelebratingHabit] = useState<string | null>(null);
+  const [achievements, setAchievements] = useState<any[]>([]);
+  const [leaderboard, setLeaderboard] = useState<any[]>([]);
 
   const loadDashboardData = async () => {
     try {
@@ -369,25 +390,42 @@ export default function DashboardScreen() {
       weekStart.setDate(weekStart.getDate() - 7);
       const weekStartStr = weekStart.toISOString();
 
-      // Fetch data from API in parallel
-      const [metrics, gamification, tasks, habits, leaderboard, todayTimeEntries, deepWorkStats, weeklyProductivity] = await Promise.allSettled([
-        dashboardService.getMetrics(),
-        dashboardService.getGamificationStats(),
-        tasksService.getTasks(),
-        habitsService.getAll(),
-        gamificationService.getLeaderboard(10, true),
+      // Fetch data from API in parallel with individual timeouts
+      // Wrapper pour ajouter un timeout à chaque appel (augmenté à 30s pour les requêtes complexes)
+      const withTimeout = <T,>(promise: Promise<T>, timeoutMs: number = 30000): Promise<T> => {
+        return Promise.race([
+          promise,
+          new Promise<T>((_, reject) => 
+            setTimeout(() => reject(new Error(`Timeout after ${timeoutMs}ms`)), timeoutMs)
+          )
+        ]).catch((err) => {
+          console.log('⚠️ Request timeout or error:', err.message);
+          return null as T;
+        });
+      };
+
+      const [metrics, gamification, tasks, habits, leaderboard, achievements, todayTimeEntries, deepWorkStats, weeklyProductivity] = await Promise.allSettled([
+        withTimeout(dashboardService.getMetrics(), 30000),
+        withTimeout(dashboardService.getGamificationStats(), 30000),
+        withTimeout(tasksService.getTasks(), 30000),
+        withTimeout(habitsService.getAll(), 30000),
+        withTimeout(gamificationService.getLeaderboard(3, true), 30000),
+        withTimeout(gamificationService.getAchievements(), 30000).catch((err) => {
+          console.log('⚠️ Could not fetch achievements:', err);
+          return null;
+        }),
         // Get today's time entries using startDate and endDate parameters
-        apiCall(`/time-entries?startDate=${encodeURIComponent(startDateStr)}&endDate=${encodeURIComponent(endDateStr)}`).catch((err) => {
+        withTimeout(apiCall(`/time-entries?startDate=${encodeURIComponent(startDateStr)}&endDate=${encodeURIComponent(endDateStr)}`), 30000).catch((err) => {
           console.log('⚠️ Could not fetch today time entries:', err);
           return null;
         }),
         // Get deep work stats directly from dedicated endpoint
-        apiCall('/dashboard/deepwork-stats').catch((err) => {
+        withTimeout(apiCall('/dashboard/deepwork-stats'), 30000).catch((err) => {
           console.log('⚠️ Could not fetch deep work stats:', err);
           return null;
         }),
         // Get weekly productivity data
-        dashboardService.getWeeklyProductivity().catch((err) => {
+        withTimeout(dashboardService.getWeeklyProductivity(), 30000).catch((err) => {
           console.log('⚠️ Could not fetch weekly productivity:', err);
           return null;
         }),
@@ -399,6 +437,7 @@ export default function DashboardScreen() {
       const tasksData = tasks.status === 'fulfilled' ? tasks.value : null;
       const habitsData = habits.status === 'fulfilled' ? habits.value : null;
       const leaderboardData = leaderboard.status === 'fulfilled' ? leaderboard.value : null;
+      const achievementsData = achievements.status === 'fulfilled' ? achievements.value : null;
       const todayTimeEntriesData = todayTimeEntries.status === 'fulfilled' ? todayTimeEntries.value : null;
       const deepWorkStatsData = deepWorkStats.status === 'fulfilled' ? deepWorkStats.value : null;
       const weeklyProductivityData = weeklyProductivity.status === 'fulfilled' ? weeklyProductivity.value : null;
@@ -588,6 +627,25 @@ export default function DashboardScreen() {
       // Le score reflète le pourcentage de complétion des tâches et habitudes du jour
       const productivityScore = todayProgress;
 
+      // Process achievements - get unlocked achievements, limit to 4
+      if (achievementsData && achievementsData.achievements) {
+        const unlockedAchievements = achievementsData.achievements
+          .filter((a: any) => a.unlocked)
+          .slice(0, 4);
+        setAchievements(unlockedAchievements);
+      }
+
+      // Process leaderboard - get top 3
+      if (leaderboardData) {
+        let leaderboardList: any[] = [];
+        if (Array.isArray(leaderboardData)) {
+          leaderboardList = leaderboardData.slice(0, 3);
+        } else if (leaderboardData.leaderboard && Array.isArray(leaderboardData.leaderboard)) {
+          leaderboardList = leaderboardData.leaderboard.slice(0, 3);
+        }
+        setLeaderboard(leaderboardList);
+      }
+
       // Update dashboard data
       setDashboardData({
         todayProgress: todayProgress,
@@ -686,7 +744,7 @@ export default function DashboardScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         showsVerticalScrollIndicator={false}
@@ -714,7 +772,7 @@ export default function DashboardScreen() {
                   <View>
                     <Text style={styles.trialLabel}>Free Trial</Text>
                     <Text style={styles.trialText}>
-                      ⚡ {trialDaysLeft} {trialDaysLeft === 1 ? 'day' : 'days'} left to unlock full potential ⚡
+                      ⚡ {trialDaysLeft} {trialDaysLeft === 1 ? t('day') : t('days')} {t('left')} to unlock full potential ⚡
                     </Text>
                   </View>
                 </View>
@@ -723,7 +781,7 @@ export default function DashboardScreen() {
                   style={styles.upgradeButton}
                   onPress={() => router.push('/upgrade')}
                 >
-                  <Text style={styles.upgradeButtonText}>Upgrade</Text>
+                  <Text style={styles.upgradeButtonText}>{t('upgrade')}</Text>
                   <Text style={styles.upgradeSparkle}>✨</Text>
                 </TouchableOpacity>
               </View>
@@ -736,8 +794,8 @@ export default function DashboardScreen() {
           entering={FadeInDown.delay(100).duration(400)}
           style={styles.header}
         >
-          <Text style={styles.headerTitle}>Hello, {dashboardData.userName} 👋</Text>
-          <Text style={styles.headerSubtitle}>Let's make today productive</Text>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>{t('hello')}, {dashboardData.userName} 👋</Text>
+          <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>{t('letsMakeTodayProductive')}</Text>
         </Animated.View>
 
         {/* Main Stats Grid */}
@@ -759,7 +817,7 @@ export default function DashboardScreen() {
               <ShimmerParticle />
               <View style={styles.statCardContent}>
                 <Ionicons name="flag" size={24} color="#FFFFFF" style={{ opacity: 0.9 }} />
-                <Text style={styles.statCardLabel}>Daily Progress</Text>
+                <Text style={styles.statCardLabel}>{t('dailyProgress')}</Text>
                 <View style={styles.statCardValueRow}>
                   <Text style={styles.statCardValue}>{dashboardData.todayProgress}%</Text>
                   <Text style={styles.statCardChange}>↑ 12%</Text>
@@ -777,28 +835,28 @@ export default function DashboardScreen() {
           </TouchableOpacity>
 
           {/* Focus Time Card */}
-          <View style={styles.statCard}>
-            <Ionicons name="time" size={24} color="#00C27A" />
-            <Text style={styles.statCardLabelDark}>Focus Time</Text>
+          <View style={[styles.statCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Ionicons name="time" size={24} color={colors.primary} />
+            <Text style={[styles.statCardLabelDark, { color: colors.textSecondary }]}>{t('focusTime')}</Text>
             <View style={styles.statCardValueRow}>
-              <Text style={styles.statCardValueDark}>{dashboardData.focusHours}</Text>
-              <Text style={styles.statCardUnit}>h</Text>
+              <Text style={[styles.statCardValueDark, { color: colors.text }]}>{dashboardData.focusHours}</Text>
+              <Text style={[styles.statCardUnit, { color: colors.text }]}>h</Text>
             </View>
             <Text style={styles.statCardSubtext}>+2.5h vs yesterday 🎯</Text>
           </View>
 
           {/* Tasks Completed Card */}
-          <View style={styles.statCard}>
+          <View style={[styles.statCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <View style={styles.statCardHeader}>
               <Ionicons name="checkmark-circle" size={24} color="#00C27A" />
               <TouchableOpacity onPress={() => router.push('/(tabs)/tasks')}>
                 <Text style={styles.viewAllText}>View All</Text>
               </TouchableOpacity>
             </View>
-            <Text style={styles.statCardLabelDark}>Tasks Completed</Text>
+            <Text style={[styles.statCardLabelDark, { color: colors.textSecondary }]}>{t('tasksCompleted')}</Text>
             <View style={styles.statCardValueRow}>
-              <Text style={styles.statCardValueDark}>{dashboardData.tasksCompleted}</Text>
-              <Text style={styles.statCardUnitDark}>/{dashboardData.totalTasks}</Text>
+              <Text style={[styles.statCardValueDark, { color: colors.text }]}>{dashboardData.tasksCompleted}</Text>
+              <Text style={[styles.statCardUnitDark, { color: colors.textSecondary }]}>/{dashboardData.totalTasks}</Text>
             </View>
             <View style={styles.tasksProgressBar}>
               {Array.from({ length: Math.max(dashboardData.totalTasks, 1) }).map((_, i) => (
@@ -825,7 +883,7 @@ export default function DashboardScreen() {
               style={styles.statCardGradient}
             >
               <Ionicons name="flame" size={24} color="#FFFFFF" style={{ opacity: 0.9 }} />
-              <Text style={styles.statCardLabel}>Current Streak</Text>
+              <Text style={styles.statCardLabel}>{t('currentStreak')}</Text>
               <View style={styles.statCardValueRow}>
                 <Text style={styles.statCardValue}>{dashboardData.streakDays}</Text>
                 <Text style={styles.statCardUnitWhite}>days</Text>
@@ -838,10 +896,10 @@ export default function DashboardScreen() {
         {/* Productivity Score Card */}
         <Animated.View
           entering={FadeInDown.delay(300).duration(400)}
-          style={styles.productivityCard}
+          style={[styles.productivityCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
         >
           <View style={styles.productivityHeader}>
-            <Text style={styles.productivityTitle}>Productivity Score</Text>
+            <Text style={[styles.productivityTitle, { color: colors.text }]}>{t('productivityScore')}</Text>
             <View style={styles.trendBadge}>
               <Ionicons name="trending-up" size={12} color="#059669" />
               <Text style={styles.trendText}>+12%</Text>
@@ -849,11 +907,15 @@ export default function DashboardScreen() {
           </View>
 
           <View style={styles.productivityContent}>
-            <ProgressCircle percentage={dashboardData.productivityScore} size={96} />
+            <ProgressCircle 
+              percentage={dashboardData.productivityScore} 
+              size={96} 
+              colors={{ text: colors.text, textSecondary: colors.textSecondary, border: colors.border }}
+            />
             <View style={styles.productivityMetrics}>
               <View style={styles.metricRow}>
-                <Text style={styles.metricLabel}>Energy ⚡</Text>
-                <Text style={styles.metricValue}>{dashboardData.energyLevel}%</Text>
+                <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>Energy ⚡</Text>
+                <Text style={[styles.metricValue, { color: colors.text }]}>{dashboardData.energyLevel}%</Text>
               </View>
               <View style={styles.metricBarContainer}>
                 <Animated.View
@@ -865,7 +927,7 @@ export default function DashboardScreen() {
               </View>
 
               <View style={styles.metricRow}>
-                <Text style={styles.metricLabel}>Stress 😰</Text>
+                <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>Stress 😰</Text>
                 <Text style={[styles.metricValue, { color: dashboardData.stressLevel > 70 ? '#DC2626' : dashboardData.stressLevel > 40 ? '#F59E0B' : '#00C27A' }]}>
                   {dashboardData.stressLevel}%
                 </Text>
@@ -883,7 +945,7 @@ export default function DashboardScreen() {
               </View>
 
               <View style={styles.metricRow}>
-                <Text style={styles.metricLabel}>Focus 🧠</Text>
+                <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>Focus 🧠</Text>
                 <Text style={[styles.metricValue, { color: '#0891B2' }]}>{dashboardData.focusLevel}%</Text>
               </View>
               <View style={styles.metricBarContainer}>
@@ -900,20 +962,20 @@ export default function DashboardScreen() {
           {/* Compact Stats Grid */}
           <View style={styles.compactStatsGrid}>
             <View style={styles.compactStat}>
-              <Text style={styles.compactStatLabel}>Total Hours</Text>
-              <Text style={styles.compactStatValue}>{dashboardData.totalDeepWorkHours}h</Text>
+              <Text style={[styles.compactStatLabel, { color: colors.textSecondary }]}>{t('totalHours')}</Text>
+              <Text style={[styles.compactStatValue, { color: colors.text }]}>{dashboardData.totalDeepWorkHours}h</Text>
             </View>
             <View style={styles.compactStat}>
-              <Text style={styles.compactStatLabel}>This Week</Text>
-              <Text style={styles.compactStatValue}>{dashboardData.weeklyWorkHours}h</Text>
+              <Text style={[styles.compactStatLabel, { color: colors.textSecondary }]}>{t('thisWeek')}</Text>
+              <Text style={[styles.compactStatValue, { color: colors.text }]}>{dashboardData.weeklyWorkHours}h</Text>
             </View>
             <View style={styles.compactStat}>
-              <Text style={styles.compactStatLabel}>Best Time</Text>
-              <Text style={styles.compactStatValue}>{dashboardData.bestDeepWorkSession}</Text>
+              <Text style={[styles.compactStatLabel, { color: colors.textSecondary }]}>{t('bestTime')}</Text>
+              <Text style={[styles.compactStatValue, { color: colors.text }]}>{dashboardData.bestDeepWorkSession}</Text>
             </View>
             <View style={styles.compactStat}>
-              <Text style={styles.compactStatLabel}>Global Rank</Text>
-              <Text style={styles.compactStatValue}>
+              <Text style={[styles.compactStatLabel, { color: colors.textSecondary }]}>{t('globalRank')}</Text>
+              <Text style={[styles.compactStatValue, { color: colors.text }]}>
                 {dashboardData.globalRank > 0 ? `#${dashboardData.globalRank}` : 'N/A'} {dashboardData.globalRank === 1 ? '🏆' : ''}
               </Text>
             </View>
@@ -923,17 +985,17 @@ export default function DashboardScreen() {
         {/* Weekly Chart */}
         <Animated.View
           entering={FadeInDown.delay(400).duration(400)}
-          style={styles.chartCard}
+          style={[styles.chartCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
         >
           <View style={styles.chartHeader}>
-            <Text style={styles.chartTitle}>Weekly Trend</Text>
+            <Text style={[styles.chartTitle, { color: colors.text }]}>{t('weeklyTrend')}</Text>
             <TouchableOpacity
               activeOpacity={0.8}
               style={styles.viewDataButton}
               onPress={() => router.push('/analytics')}
             >
               <Ionicons name="trending-up" size={14} color="#FFFFFF" />
-              <Text style={styles.viewDataText}>View Data</Text>
+              <Text style={styles.viewDataText}>{t('viewData')}</Text>
             </TouchableOpacity>
           </View>
           <LineChart
@@ -941,12 +1003,15 @@ export default function DashboardScreen() {
             width={width - 48}
             height={120}
             chartConfig={{
-              backgroundColor: '#FFFFFF',
-              backgroundGradientFrom: '#FFFFFF',
-              backgroundGradientTo: '#FFFFFF',
+              backgroundColor: colors.surface,
+              backgroundGradientFrom: colors.surface,
+              backgroundGradientTo: colors.surface,
               decimalPlaces: 0,
               color: (opacity = 1) => `rgba(0, 194, 122, ${opacity})`,
-              labelColor: (opacity = 1) => `rgba(107, 114, 128, ${opacity})`,
+              labelColor: (opacity = 1) => {
+                const rgb = colors.textSecondary === '#6b7280' ? '107, 114, 128' : '156, 163, 175';
+                return `rgba(${rgb}, ${opacity})`;
+              },
               style: {
                 borderRadius: 16,
               },
@@ -972,8 +1037,8 @@ export default function DashboardScreen() {
           entering={FadeInDown.delay(500).duration(400)}
           style={styles.habitsSection}
         >
-          <Text style={styles.sectionTitle}>Daily Habits</Text>
-          <View style={styles.habitsCard}>
+          <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>{t('dailyHabits')}</Text>
+          <View style={[styles.habitsCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             {sortedHabits.map((habit, index) => {
               const isCelebrating = celebratingHabit === habit.id;
               
@@ -984,11 +1049,144 @@ export default function DashboardScreen() {
                   index={index}
                   isCelebrating={isCelebrating}
                   onToggle={() => toggleHabit(habit.id || habit.name)}
+                  colors={colors}
                 />
               );
             })}
           </View>
         </Animated.View>
+
+        {/* Achievements Unlocked */}
+        {achievements.length > 0 && (
+          <Animated.View
+            entering={FadeInDown.delay(600).duration(400)}
+            style={styles.achievementsSection}
+          >
+            <View style={styles.achievementsHeader}>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('achievementsUnlocked')}</Text>
+              <TouchableOpacity
+                onPress={() => router.push('/achievements')}
+                style={styles.viewAllButton}
+              >
+                <Ionicons name="trophy" size={14} color="#FFFFFF" />
+                <Text style={styles.viewAllButtonText}>{t('viewAll')}</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.achievementsGrid}>
+              {achievements.slice(0, 4).map((achievement, index) => {
+                const gradients = [
+                  ['#F59E0B', '#EF4444'], // amber to red
+                  ['#A855F7', '#EC4899'], // purple to pink
+                  ['#06B6D4', '#3B82F6'], // cyan to blue
+                  ['#10B981', '#059669'], // green to emerald
+                ];
+                const gradient = gradients[index % gradients.length];
+                const icons = ['🔥', '🎯', '⚡', '🌟'];
+                const icon = icons[index % icons.length];
+                
+                return (
+                  <Animated.View
+                    key={achievement.id}
+                    entering={FadeInDown.delay(650 + index * 50).duration(400)}
+                    style={styles.achievementCard}
+                  >
+                    <LinearGradient
+                      colors={gradient}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.achievementGradient}
+                    >
+                      <View style={styles.achievementIconContainer}>
+                        <Text style={styles.achievementEmoji}>{icon}</Text>
+                      </View>
+                      <Ionicons name="trophy" size={20} color="#FFFFFF" style={{ opacity: 0.9, marginBottom: 4 }} />
+                      <Text style={styles.achievementName} numberOfLines={1}>{achievement.name}</Text>
+                      <Text style={styles.achievementDescription} numberOfLines={2}>{achievement.description}</Text>
+                      <View style={styles.achievementBadge}>
+                        <Text style={styles.achievementBadgeText}>{t('unlocked')}</Text>
+                        <Text style={styles.achievementBadgeIcon}>✨</Text>
+                      </View>
+                    </LinearGradient>
+                  </Animated.View>
+                );
+              })}
+            </View>
+          </Animated.View>
+        )}
+
+        {/* Leaderboard */}
+        {leaderboard.length > 0 && (
+          <Animated.View
+            entering={FadeInDown.delay(700).duration(400)}
+            style={styles.leaderboardSection}
+          >
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('leaderboard')}</Text>
+            <View style={[styles.leaderboardCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              {leaderboard.map((user, index) => {
+                const isUser = user.isUser || user.userName === dashboardData.userName;
+                const rankColors = {
+                  1: ['#FCD34D', '#F59E0B'], // gold
+                  2: ['#00C27A', '#00D68F'], // green
+                  3: ['#D1D5DB', '#9CA3AF'], // gray
+                };
+                const rankColor = rankColors[user.rank as keyof typeof rankColors] || rankColors[3];
+                
+                return (
+                  <Animated.View
+                    key={user.userId || index}
+                    entering={FadeInDown.delay(750 + index * 100).duration(400)}
+                    style={[
+                      styles.leaderboardItem,
+                      isUser && { backgroundColor: colors.primary + '10' },
+                      index < leaderboard.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border }
+                    ]}
+                  >
+                    <View style={styles.leaderboardLeft}>
+                      <LinearGradient
+                        colors={rankColor}
+                        style={styles.leaderboardAvatar}
+                      >
+                        <Text style={styles.leaderboardAvatarText}>
+                          {user.userName?.charAt(0).toUpperCase() || user.userEmail?.charAt(0).toUpperCase() || 'U'}
+                        </Text>
+                      </LinearGradient>
+                      <View>
+                        <Text style={[styles.leaderboardName, { color: isUser ? colors.primary : colors.text }]}>
+                          {user.userName || user.userEmail?.split('@')[0] || 'User'}
+                        </Text>
+                        <Text style={[styles.leaderboardScore, { color: colors.textSecondary }]}>
+                          {user.totalPoints || user.points || 0} {t('points')}
+                        </Text>
+                      </View>
+                    </View>
+                    <View style={styles.leaderboardRight}>
+                      <Ionicons 
+                        name={user.trend === 'up' ? 'trending-up' : user.trend === 'down' ? 'trending-down' : 'remove'} 
+                        size={16} 
+                        color={user.trend === 'up' ? '#10B981' : user.trend === 'down' ? '#EF4444' : colors.textSecondary} 
+                      />
+                      <Text style={[styles.leaderboardRank, { color: colors.textSecondary }]}>#{user.rank}</Text>
+                    </View>
+                  </Animated.View>
+                );
+              })}
+              <TouchableOpacity
+                onPress={() => router.push('/leaderboard')}
+                style={styles.leaderboardButton}
+              >
+                <LinearGradient
+                  colors={['#00C27A', '#00D68F']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.leaderboardButtonGradient}
+                >
+                  <Ionicons name="trophy" size={18} color="#FFFFFF" />
+                  <Text style={styles.leaderboardButtonText}>{t('viewFullLeaderboard')}</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          </Animated.View>
+        )}
 
         {/* Bottom spacing for tab bar */}
         <View style={{ height: 100 }} />
@@ -1463,5 +1661,157 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     color: '#00C27A',
+  },
+  achievementsSection: {
+    marginHorizontal: 24,
+    marginBottom: 24,
+  },
+  achievementsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  viewAllButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#00C27A',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  viewAllButtonText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  achievementsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  achievementCard: {
+    width: (width - 60) / 2,
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  achievementGradient: {
+    padding: 16,
+    minHeight: 140,
+    justifyContent: 'space-between',
+  },
+  achievementIconContainer: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    opacity: 0.1,
+  },
+  achievementEmoji: {
+    fontSize: 48,
+  },
+  achievementName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    marginBottom: 4,
+  },
+  achievementDescription: {
+    fontSize: 11,
+    color: 'rgba(255, 255, 255, 0.8)',
+    marginBottom: 8,
+  },
+  achievementBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    alignSelf: 'flex-start',
+  },
+  achievementBadgeText: {
+    fontSize: 10,
+    color: '#FFFFFF',
+    fontWeight: '600',
+  },
+  achievementBadgeIcon: {
+    fontSize: 10,
+  },
+  leaderboardSection: {
+    marginHorizontal: 24,
+    marginBottom: 24,
+  },
+  leaderboardCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  leaderboardItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+  },
+  leaderboardLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  leaderboardAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  leaderboardAvatarText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  leaderboardName: {
+    fontSize: 16,
+    fontWeight: '500',
+    marginBottom: 2,
+  },
+  leaderboardScore: {
+    fontSize: 12,
+  },
+  leaderboardRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  leaderboardRank: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  leaderboardButton: {
+    marginTop: 0,
+  },
+  leaderboardButtonGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    padding: 16,
+  },
+  leaderboardButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

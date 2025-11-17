@@ -3,6 +3,9 @@ import { prisma } from "@/lib/prisma"
 import { getAuthUserFromRequest } from "@/lib/auth"
 import { startOfDay, subDays, subMonths, format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, eachWeekOfInterval, eachMonthOfInterval } from "date-fns"
 
+// Augmenter le timeout pour les requêtes complexes (60 secondes)
+export const maxDuration = 60
+
 export async function GET(request: NextRequest) {
   try {
     const user = await getAuthUserFromRequest(request)
@@ -12,6 +15,59 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url)
     const period = searchParams.get('period') || 'week' // week, month, trimester, year
+
+    // OPTIMISATION: Vérification rapide si l'utilisateur est nouveau
+    const [taskCount, habitCount] = await Promise.all([
+      prisma.task.count({ where: { userId: user.id } }),
+      prisma.habit.count({ where: { userId: user.id } })
+    ])
+
+    // Si pas de données, retourner une réponse vide rapidement
+    if (taskCount === 0 && habitCount === 0) {
+      // Générer des données vides pour la période demandée
+      const today = new Date()
+      let startDate: Date
+      let endDate: Date = today
+
+      switch (period) {
+        case 'week':
+          startDate = startOfDay(subDays(today, 7))
+          break
+        case 'month':
+          startDate = startOfMonth(subMonths(today, 1))
+          endDate = endOfMonth(subMonths(today, 1))
+          break
+        case 'trimester':
+          startDate = startOfMonth(subMonths(today, 3))
+          endDate = endOfMonth(subMonths(today, 1))
+          break
+        case 'year':
+          startDate = startOfYear(subMonths(today, 12))
+          endDate = endOfYear(subMonths(today, 1))
+          break
+        default:
+          startDate = startOfDay(subDays(today, 7))
+      }
+
+      const emptyData = []
+      let currentDate = new Date(startDate)
+      while (currentDate <= endDate) {
+        emptyData.push({
+          day: format(currentDate, period === 'week' ? 'EEE' : period === 'month' ? 'EEE' : 'MMM'),
+          date: format(currentDate, 'yyyy-MM-dd'),
+          score: 0,
+          habitsProgress: 0,
+          tasksProgress: 0,
+          completedHabits: 0,
+          activeHabits: 0,
+          completedTasks: 0,
+          totalTasks: 0
+        })
+        currentDate.setDate(currentDate.getDate() + (period === 'week' ? 1 : period === 'month' ? 7 : period === 'trimester' ? 30 : 90))
+      }
+
+      return NextResponse.json({ weeklyData: emptyData })
+    }
 
     const today = new Date()
     const chartData = []
