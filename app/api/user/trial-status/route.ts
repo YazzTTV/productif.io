@@ -1,25 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verify } from 'jsonwebtoken';
+import { getAuthUserFromRequest } from '@/lib/auth';
 import { TrialService } from '@/lib/trial/TrialService';
 
 export async function GET(req: NextRequest) {
   try {
-    // Récupérer le token depuis les cookies
-    const token = req.cookies.get('auth_token')?.value;
-
-    if (!token) {
+    // Utiliser getAuthUserFromRequest pour gérer à la fois les cookies (web) et les headers (mobile)
+    const user = await getAuthUserFromRequest(req);
+    
+    if (!user) {
       return NextResponse.json({ error: 'Non authentifié' }, { status: 401 });
     }
 
-    let userId: string;
-    try {
-      const decoded = verify(token, process.env.JWT_SECRET || 'fallback_secret') as { userId: string };
-      userId = decoded.userId;
-    } catch (error) {
-      return NextResponse.json({ error: 'Token invalide' }, { status: 401 });
-    }
-
-    const accessCheck = await TrialService.hasAccess(userId);
+    const accessCheck = await TrialService.hasAccess(user.id);
 
     return NextResponse.json({
       status: accessCheck.status,
