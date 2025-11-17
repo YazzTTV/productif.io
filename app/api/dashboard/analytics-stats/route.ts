@@ -80,43 +80,61 @@ export async function GET(request: NextRequest) {
     const completedTasks = tasksInPeriod.filter(t => t.completed).length
 
     // 3. Calculer les habitudes et leur pourcentage de complétion
-    // Pour chaque jour de la période, calculer le pourcentage de complétion
-    const daysInPeriod: Date[] = []
-    let currentDate = new Date(startDate)
-    while (currentDate <= endDate) {
-      daysInPeriod.push(new Date(currentDate))
-      currentDate.setDate(currentDate.getDate() + 1)
-    }
+    // Optimisation: Pour les longues périodes, on calcule directement depuis les entrées
+    // Récupérer toutes les habitudes de l'utilisateur
+    const allHabits = await prisma.habit.findMany({
+      where: {
+        userId: user.id
+      },
+      include: {
+        entries: {
+          where: {
+            date: {
+              gte: startDate,
+              lte: endDate
+            },
+            completed: true
+          }
+        }
+      }
+    })
 
+    // Calculer le pourcentage de complétion moyen
     let totalHabitsProgress = 0
     let daysWithHabits = 0
+
+    // Pour les longues périodes, on échantillonne les jours au lieu de tous les calculer
+    const daysInPeriod: Date[] = []
+    let currentDate = new Date(startDate)
+    const totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))
+    
+    // Si plus de 30 jours, on échantillonne (tous les jours pour week, échantillon pour les autres)
+    const sampleInterval = period === 'week' ? 1 : Math.max(1, Math.floor(totalDays / 30))
+    
+    while (currentDate <= endDate) {
+      daysInPeriod.push(new Date(currentDate))
+      currentDate.setDate(currentDate.getDate() + sampleInterval)
+    }
 
     for (const date of daysInPeriod) {
       const dayName = date.toLocaleDateString("en-US", { weekday: "long" }).toLowerCase()
       const normalizedDate = new Date(date)
       normalizedDate.setHours(12, 0, 0, 0)
 
-      const habits = await prisma.habit.findMany({
-        where: {
-          userId: user.id,
-          daysOfWeek: {
-            has: dayName
-          }
-        },
-        include: {
-          entries: {
-            where: {
-              date: normalizedDate,
-              completed: true
-            }
-          }
-        }
-      })
+      // Filtrer les habitudes pour ce jour
+      const dayHabits = allHabits.filter(habit => habit.daysOfWeek.includes(dayName))
+      
+      if (dayHabits.length > 0) {
+        // Compter les habitudes complétées ce jour
+        const completedHabits = dayHabits.filter(h => {
+          return h.entries.some(entry => {
+            const entryDate = new Date(entry.date)
+            entryDate.setHours(12, 0, 0, 0)
+            return entryDate.getTime() === normalizedDate.getTime()
+          })
+        }).length
 
-      if (habits.length > 0) {
-        const activeHabits = habits.length
-        const completedHabits = habits.filter(h => h.entries.length > 0).length
-        const habitsProgress = (completedHabits / activeHabits) * 100
+        const habitsProgress = (completedHabits / dayHabits.length) * 100
         totalHabitsProgress += habitsProgress
         daysWithHabits++
       }
@@ -127,7 +145,7 @@ export async function GET(request: NextRequest) {
       : 0
 
     // 4. Calculer la moyenne du score de productivité
-    // Pour chaque jour, calculer le productivity score
+    // Utiliser les mêmes jours échantillonnés que pour les habitudes
     let totalProductivityScore = 0
     let daysWithData = 0
 
@@ -139,26 +157,16 @@ export async function GET(request: NextRequest) {
       const dateEnd = new Date(dateStart)
       dateEnd.setHours(23, 59, 59, 999)
 
-      // Habitudes
-      const habits = await prisma.habit.findMany({
-        where: {
-          userId: user.id,
-          daysOfWeek: {
-            has: dayName
-          }
-        },
-        include: {
-          entries: {
-            where: {
-              date: normalizedDate,
-              completed: true
-            }
-          }
-        }
-      })
-
-      const activeHabits = habits.length
-      const completedHabits = habits.filter(h => h.entries.length > 0).length
+      // Habitudes (utiliser les habitudes déjà chargées)
+      const dayHabits = allHabits.filter(habit => habit.daysOfWeek.includes(dayName))
+      const activeHabits = dayHabits.length
+      const completedHabits = dayHabits.filter(h => {
+        return h.entries.some(entry => {
+          const entryDate = new Date(entry.date)
+          entryDate.setHours(12, 0, 0, 0)
+          return entryDate.getTime() === normalizedDate.getTime()
+        })
+      }).length
       const habitsProgress = activeHabits > 0 ? (completedHabits / activeHabits) * 100 : 0
 
       // Tâches
