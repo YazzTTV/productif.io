@@ -200,6 +200,11 @@ export const authService = {
       return null;
     }
   },
+
+  // Récupérer le statut du trial
+  async getTrialStatus(): Promise<{ status: string; daysLeft?: number; hasAccess: boolean }> {
+    return await apiCall('/user/trial-status');
+  },
 };
 
 // Service pour les données du dashboard

@@ -26,7 +26,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LineChart } from 'react-native-chart-kit';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Svg, { Circle, Defs, LinearGradient as SvgLinearGradient, Stop } from 'react-native-svg';
-import { dashboardService, tasksService, habitsService, gamificationService, apiCall } from '@/lib/api';
+import { dashboardService, tasksService, habitsService, gamificationService, apiCall, authService } from '@/lib/api';
 import { useFocusEffect } from '@react-navigation/native';
 
 const { width } = Dimensions.get('window');
@@ -325,12 +325,27 @@ export default function DashboardScreen() {
     try {
       setLoading(true);
       
-      // Load trial days from storage
-      const trialDays = await AsyncStorage.getItem('trialDaysLeft');
-      if (trialDays) setTrialDaysLeft(parseInt(trialDays, 10));
-
       // Load user name
       const userName = await AsyncStorage.getItem('user_name') || 'User';
+
+      // Fetch trial status from API
+      try {
+        const trialStatus = await authService.getTrialStatus();
+        if (trialStatus.status === 'trial_active' && trialStatus.daysLeft !== undefined) {
+          setTrialDaysLeft(trialStatus.daysLeft);
+          // Save to AsyncStorage for offline access
+          await AsyncStorage.setItem('trialDaysLeft', trialStatus.daysLeft.toString());
+        } else {
+          // User is not in trial (subscribed or expired)
+          setTrialDaysLeft(0);
+          await AsyncStorage.setItem('trialDaysLeft', '0');
+        }
+      } catch (error) {
+        console.error('Error fetching trial status:', error);
+        // Fallback to stored value if API fails
+        const trialDays = await AsyncStorage.getItem('trialDaysLeft');
+        if (trialDays) setTrialDaysLeft(parseInt(trialDays, 10));
+      }
 
       // Calculate today's date range for API calls
       const today = new Date();
@@ -699,7 +714,7 @@ export default function DashboardScreen() {
                   <View>
                     <Text style={styles.trialLabel}>Free Trial</Text>
                     <Text style={styles.trialText}>
-                      ⚡ {trialDaysLeft} days left to unlock full potential ⚡
+                      ⚡ {trialDaysLeft} {trialDaysLeft === 1 ? 'day' : 'days'} left to unlock full potential ⚡
                     </Text>
                   </View>
                 </View>
