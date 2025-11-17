@@ -56,8 +56,67 @@ export async function GET() {
       }
     })
 
-    // Retourner les habitudes avec leurs entrées
-    return NextResponse.json(habits)
+    // Calculer les streaks pour chaque habitude
+    const habitsWithStreaks = habits.map(habit => {
+      let streak = 0
+      let checkDate = new Date()
+      checkDate.setHours(12, 0, 0, 0) // Normaliser à midi comme le frontend
+      
+      // Obtenir le jour de la semaine actuel
+      const currentDayName = checkDate.toLocaleDateString("en-US", { weekday: "long" }).toLowerCase()
+      
+      // Vérifier si l'habitude est prévue aujourd'hui
+      const isScheduledToday = habit.daysOfWeek.includes(currentDayName)
+      
+      // Si l'habitude n'est pas prévue aujourd'hui, commencer à partir d'hier
+      if (!isScheduledToday) {
+        checkDate.setDate(checkDate.getDate() - 1)
+      }
+      
+      // Calculer le streak en remontant dans le temps
+      while (true) {
+        const dayName = checkDate.toLocaleDateString("en-US", { weekday: "long" }).toLowerCase()
+        
+        // Vérifier si l'habitude est prévue ce jour
+        if (!habit.daysOfWeek.includes(dayName)) {
+          // Si l'habitude n'est pas prévue ce jour, passer au jour précédent
+          checkDate.setDate(checkDate.getDate() - 1)
+          continue
+        }
+        
+        // Normaliser la date pour la comparaison (midi)
+        const normalizedCheckDate = new Date(checkDate)
+        normalizedCheckDate.setHours(12, 0, 0, 0)
+        
+        // Chercher une entrée complétée pour ce jour
+        const entryForDay = habit.entries.find(entry => {
+          const entryDate = new Date(entry.date)
+          entryDate.setHours(12, 0, 0, 0)
+          return entryDate.getTime() === normalizedCheckDate.getTime() && entry.completed
+        })
+        
+        if (entryForDay) {
+          streak++
+          checkDate.setDate(checkDate.getDate() - 1)
+        } else {
+          // Pas d'entrée complétée pour ce jour, le streak s'arrête
+          break
+        }
+        
+        // Limite de sécurité
+        if (streak > 365) {
+          break
+        }
+      }
+      
+      return {
+        ...habit,
+        currentStreak: streak,
+      }
+    })
+
+    // Retourner les habitudes avec leurs entrées et leurs streaks
+    return NextResponse.json(habitsWithStreaks)
   } catch (error) {
     console.error("Erreur lors de la récupération des habitudes:", error)
     return NextResponse.json(
