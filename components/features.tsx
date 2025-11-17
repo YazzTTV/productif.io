@@ -1,83 +1,114 @@
 "use client"
 
 import type React from "react"
-import { Button } from "@/components/ui/button"
-import { CheckCircle2, Clock, BarChart3, Users, Zap, Shield, MessageSquare } from "lucide-react"
+import { motion } from "framer-motion"
+import { useRouter } from "next/navigation"
+import { Brain, Target, BarChart3, Zap, Trophy, Users } from "lucide-react"
+
+const features = [
+  {
+    icon: Brain,
+    title: "AI-Powered Insights",
+    description: "Get personalized productivity recommendations based on your unique habits and patterns.",
+    color: "from-purple-500 to-indigo-600"
+  },
+  {
+    icon: Target,
+    title: "Smart Goal Tracking",
+    description: "Set, track, and crush your goals with intelligent reminders and progress analytics.",
+    color: "from-[#00C27A] to-[#00D68F]"
+  },
+  {
+    icon: BarChart3,
+    title: "Deep Analytics",
+    description: "Understand your productivity patterns with beautiful charts and actionable insights.",
+    color: "from-cyan-400 to-blue-500"
+  },
+  {
+    icon: Zap,
+    title: "Focus Mode",
+    description: "Block distractions and enter deep work with our scientifically-designed focus timer.",
+    color: "from-orange-400 to-pink-500"
+  },
+  {
+    icon: Trophy,
+    title: "Gamification",
+    description: "Stay motivated with streaks, achievements, and friendly competition on leaderboards.",
+    color: "from-amber-400 to-orange-500"
+  },
+  {
+    icon: Users,
+    title: "Community Driven",
+    description: "Join thousands of productive individuals and share your journey to success.",
+    color: "from-pink-400 to-rose-500"
+  }
+];
 
 export function Features() {
-  return (
-    <section className="container mx-auto px-4 py-20">
-      <h2 className="text-3xl md:text-4xl font-bold text-gray-900 text-center mb-6">
-        A complete ecosystem to <span className="text-green-500">free your mind</span>
-      </h2>
-      <p className="text-gray-600 text-xl max-w-2xl mx-auto text-center mb-16">
-        Productif.io isn’t just another productivity tool. It’s an AI agent that becomes an extension of your brain — right in your pocket.
-      </p>
+  const router = useRouter();
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-        <FeatureCard
-          icon={<CheckCircle2 className="w-8 h-8 text-green-500" />}
-          title="Smart task management"
-          description="No more endless lists. AI organizes, contextualizes, and prioritizes for you."
-        />
-        <FeatureCard
-          icon={<Clock className="w-8 h-8 text-green-500" />}
-          title="Insightful time tracking"
-          description="See where your time really goes and take back control of your days."
-        />
-        <FeatureCard
-          icon={<BarChart3 className="w-8 h-8 text-green-500" />}
-          title="Habits that stick"
-          description="Personalized routines that adapt to your real life — not the other way around."
-        />
-        <FeatureCard
-          icon={<Zap className="w-8 h-8 text-green-500" />}
-          title="Achievable goals"
-          description="From dream to done with step-by-step AI-guided tracking."
-        />
-        <FeatureCard
-          icon={<MessageSquare className="w-8 h-8 text-green-500" />}
-          title="Built-in WhatsApp assistant"
-          description="Your mental co-pilot, always with you — guiding you without the mental load."
-        />
-        <FeatureCard
-          icon={<Shield className="w-8 h-8 text-green-500" />}
-          title="100% secure data"
-          description="Your privacy is protected. We exist to help you, not to exploit your data."
-        />
-      </div>
-      
-      <div className="mt-16 text-center">
-        <div className="inline-block bg-green-50 border border-green-100 rounded-lg px-6 py-3">
-          <p className="text-green-800 font-medium">
-            "For the first time, I don’t wake up thinking about everything I need to do. Productif.io simply sends me what to do, when to do it. My mental load dropped by 80%."
+  const handleCTAClick = () => {
+    const params = new URLSearchParams();
+    const keep: string[] = ["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term", "ref"];
+    keep.forEach(k => {
+      const v = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get(k) : null;
+      if (v) params.set(k, v);
+    });
+    params.set('offer', 'early-access');
+    router.push(`/onboarding?${params.toString()}`);
+  };
+
+  return (
+    <section id="features" className="py-32 bg-white">
+      <div className="max-w-7xl mx-auto px-6">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          className="text-center mb-16"
+        >
+          <h2 className="text-4xl md:text-5xl text-gray-900 mb-6">
+            Everything You Need to
+            <span className="block bg-gradient-to-r from-[#00C27A] to-[#00D68F] bg-clip-text text-transparent">
+              Achieve More
+            </span>
+          </h2>
+          <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+            Powerful features designed to transform how you work, backed by science and loved by users.
           </p>
-          <p className="text-green-600 text-sm mt-2">— Sabrina, Freelance Media Buyer</p>
+        </motion.div>
+
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+          {features.map((feature, index) => (
+            <motion.div
+              key={feature.title}
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: index * 0.1 }}
+              whileHover={{ y: -8, boxShadow: "0 20px 40px rgba(0, 0, 0, 0.1)" }}
+              className="bg-white rounded-3xl p-8 border-2 border-gray-100 hover:border-[#00C27A]/30 transition-all cursor-pointer"
+            >
+              <div className={`w-16 h-16 bg-gradient-to-br ${feature.color} rounded-2xl flex items-center justify-center mb-6`}>
+                <feature.icon size={32} className="text-white" />
+              </div>
+              <h3 className="text-2xl text-gray-900 mb-3">{feature.title}</h3>
+              <p className="text-gray-600 leading-relaxed">{feature.description}</p>
+            </motion.div>
+          ))}
         </div>
-        <div className="mt-8">
-          <Button 
-            className="bg-green-500 hover:bg-green-600 text-white px-6 py-3"
-            onClick={() => {
-              const params = new URLSearchParams()
-              params.set('offer','early-access')
-              params.set('billing','monthly')
-              window.location.href = `/onboarding?${params.toString()}`
-            }}
+
+        <div className="mt-16 text-center">
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={handleCTAClick}
+            className="px-8 py-4 bg-gradient-to-r from-[#00C27A] to-[#00D68F] text-white rounded-full shadow-xl text-lg"
           >
             Start Now for Free
-          </Button>
+          </motion.button>
         </div>
       </div>
     </section>
-  )
-}
-
-function FeatureCard({ icon, title, description }: { icon: React.ReactNode; title: string; description: string }) {
-  return (
-    <div className="bg-white border border-gray-200 rounded-xl p-6 hover:shadow-lg transition-shadow">
-      <div className="mb-4">{icon}</div>
-      <h3 className="text-xl font-bold text-gray-900 mb-2">{title}</h3>
-      <p className="text-gray-600">{description}</p>
-    </div>
   )
 } 
