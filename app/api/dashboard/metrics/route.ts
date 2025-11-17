@@ -42,7 +42,47 @@ export async function GET(request: Request) {
     console.log("[METRICS] Date normalisée pour habitudes:", normalizedDate.toISOString())
     console.log("[METRICS] Fuseau horaire serveur:", Intl.DateTimeFormat().resolvedOptions().timeZone)
 
-    // Récupérer TOUTES les tâches récentes
+    // OPTIMISATION: Vérification rapide si l'utilisateur est nouveau (pas de données)
+    const [taskCount, habitCount] = await Promise.all([
+      prisma.task.count({ where: { userId: user.id } }),
+      prisma.habit.count({ where: { userId: user.id } })
+    ])
+
+    // Si pas de tâches ni d'habitudes, retourner une réponse vide rapidement
+    if (taskCount === 0 && habitCount === 0) {
+      console.log("[METRICS] Utilisateur nouveau - retour réponse vide")
+      return NextResponse.json({
+        tasks: {
+          today: 0,
+          completed: 0,
+          completionRate: 0,
+          totalCompletedToday: 0,
+          createdToday: 0
+        },
+        habits: {
+          today: 0,
+          completed: 0,
+          completionRate: 0,
+          streak: 0
+        },
+        objectives: {
+          count: 0,
+          progress: 0
+        },
+        productivity: {
+          score: 0,
+          trend: "neutral",
+          change: 0
+        },
+        debug: {
+          serverTime: now.toISOString(),
+          normalizedDate: normalizedDate.toISOString(),
+          timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+        }
+      })
+    }
+
+    // Récupérer TOUTES les tâches récentes seulement si nécessaire
     const recentTasks = await prisma.task.findMany({
       where: {
         userId: user.id,
