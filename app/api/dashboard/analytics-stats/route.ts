@@ -269,7 +269,7 @@ export async function GET(request: NextRequest) {
     console.log(`${routeName} ✅ SUCCÈS - Route terminée en ${totalTime}ms - Timestamp: ${new Date().toISOString()}`)
     
     return NextResponse.json({
-      chartData,
+      period,
       stats: {
         avgProductivity,
         totalTasks: completedTasks,
