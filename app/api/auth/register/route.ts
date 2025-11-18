@@ -3,6 +3,8 @@ import { hash } from "bcryptjs"
 import { prisma } from "@/lib/prisma"
 import { v4 as uuidv4 } from "uuid"
 import { TrialService } from "@/lib/trial/TrialService"
+import { createToken, createSession } from "@/lib/auth"
+import { createDefaultHabits } from "@/lib/habits-utils"
 
 export async function POST(req: Request) {
   try {
@@ -52,6 +54,18 @@ export async function POST(req: Request) {
       // Initialiser le trial gratuit de 7 jours
       await TrialService.initializeTrial(user.id)
       
+      // Créer les habitudes par défaut pour le nouvel utilisateur
+      await createDefaultHabits(user.id)
+      
+      // Créer un token JWT pour l'authentification
+      const token = await createToken({
+        userId: user.id,
+        email: user.email,
+      })
+
+      // Créer une session
+      await createSession(user.id, token)
+      
       let companyData = null
       
       // Si une entreprise est fournie, créer l'entreprise et établir les relations
@@ -88,7 +102,8 @@ export async function POST(req: Request) {
             ? "Compte utilisateur et entreprise créés avec succès ! Profitez de 7 jours d'essai gratuit." 
             : "Compte créé avec succès ! Profitez de 7 jours d'essai gratuit.",
           user,
-          company: companyData
+          company: companyData,
+          token: token // Ajouter le token pour l'app mobile
         },
         { status: 201 }
       )

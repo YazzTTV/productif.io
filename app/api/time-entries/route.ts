@@ -4,6 +4,9 @@ import { verify } from "jsonwebtoken"
 import { prisma } from "@/lib/prisma"
 import { verifyToken } from "@/lib/auth"
 
+// Augmenter le timeout pour les requêtes complexes (30 secondes)
+export const maxDuration = 30
+
 // Fonction utilitaire pour vérifier l'authentification
 async function getAuthUser() {
   const cookieStore = await cookies()
@@ -23,12 +26,20 @@ async function getAuthUser() {
 
 // GET /api/time-entries - Récupérer toutes les entrées de temps de l'utilisateur
 export async function GET(req: Request) {
+  const startTime = Date.now()
+  const routeName = "[TIME_ENTRIES]"
+  
   try {
+    console.log(`${routeName} ⏱️  DÉBUT - Route: /api/time-entries - Timestamp: ${new Date().toISOString()}`)
+    
     const user = await getAuthUser()
 
     if (!user) {
+      console.log(`${routeName} ❌ ERREUR - Non authentifié après ${Date.now() - startTime}ms`)
       return NextResponse.json({ error: "Non authentifié" }, { status: 401 })
     }
+
+    console.log(`${routeName} ✅ Utilisateur authentifié: ${user.id} - Temps: ${Date.now() - startTime}ms`)
 
     const url = new URL(req.url)
     const projectId = url.searchParams.get("projectId")
@@ -61,6 +72,7 @@ export async function GET(req: Request) {
       }
     }
 
+    const dbStartTime = Date.now()
     const timeEntries = await prisma.timeEntry.findMany({
       where: whereClause,
       orderBy: {
@@ -80,11 +92,24 @@ export async function GET(req: Request) {
             color: true,
           },
         },
+        deepWorkSession: {
+          select: {
+            id: true,
+            status: true,
+            type: true,
+          },
+        },
       },
     })
+    console.log(`${routeName} 📊 Time entries récupérés: ${timeEntries.length} - Temps DB: ${Date.now() - dbStartTime}ms`)
+
+    const totalTime = Date.now() - startTime
+    console.log(`${routeName} ✅ SUCCÈS - Route terminée en ${totalTime}ms - Timestamp: ${new Date().toISOString()}`)
 
     return NextResponse.json({ timeEntries })
   } catch (error) {
+    const totalTime = Date.now() - startTime
+    console.error(`${routeName} ❌ ERREUR - Route échouée après ${totalTime}ms - Timestamp: ${new Date().toISOString()}`)
     console.error("Erreur lors de la récupération des entrées de temps:", error)
     return NextResponse.json({ error: "Erreur lors de la récupération des entrées de temps" }, { status: 500 })
   }

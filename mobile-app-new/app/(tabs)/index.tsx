@@ -657,7 +657,7 @@ export default function DashboardScreen() {
         productivityScore: productivityScore || 0,
         energyLevel: energyLevel || 0,
         focusLevel: focusLevel || 0,
-        habits: formattedHabits.length > 0 ? formattedHabits : mockData.habits,
+        habits: formattedHabits, // Toujours utiliser les habitudes réelles de l'API, même si vide
         weeklyData: weeklyProductivityData?.weeklyData || mockData.weeklyData,
         userName: userName,
         totalDeepWorkHours: totalDeepWorkHours,
