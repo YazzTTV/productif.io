@@ -24,11 +24,19 @@ const DEFAULT_HABITS = [
 ]
 
 export async function GET() {
+  const startTime = Date.now()
+  const routeName = "[HABITS]"
+  
   try {
+    console.log(`${routeName} ⏱️  DÉBUT - Route: /api/habits - Timestamp: ${new Date().toISOString()}`)
+    
     const user = await getAuthUser()
     if (!user) {
+      console.log(`${routeName} ❌ ERREUR - Non authentifié après ${Date.now() - startTime}ms`)
       return NextResponse.json({ error: "Non authentifié" }, { status: 401 })
     }
+
+    console.log(`${routeName} ✅ Utilisateur authentifié: ${user.id} - Temps: ${Date.now() - startTime}ms`)
 
     // Obtenir la date du jour
     const today = new Date()
@@ -130,8 +138,13 @@ export async function GET() {
     })
 
     // Retourner les habitudes avec leurs entrées et leurs streaks
+    const totalTime = Date.now() - startTime
+    console.log(`${routeName} ✅ SUCCÈS - Route terminée en ${totalTime}ms - Habitudes: ${habitsWithStreaks.length} - Timestamp: ${new Date().toISOString()}`)
+    
     return NextResponse.json(habitsWithStreaks)
   } catch (error) {
+    const totalTime = Date.now() - startTime
+    console.error(`${routeName} ❌ ERREUR - Route échouée après ${totalTime}ms - Timestamp: ${new Date().toISOString()}`)
     console.error("Erreur lors de la récupération des habitudes:", error)
     return NextResponse.json(
       { error: "Erreur lors de la récupération des habitudes" },

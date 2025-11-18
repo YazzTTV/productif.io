@@ -99,14 +99,23 @@ export class GamificationService {
 
   // Calculer le streak actuel d'un utilisateur
   async calculateCurrentStreak(userId: string): Promise<number> {
+    // OPTIMISATION: Vérification rapide si l'utilisateur a des habitudes
+    const habitCount = await prisma.habit.count({ where: { userId } })
+    if (habitCount === 0) {
+      console.log(`🧮 Aucune habitude pour userId ${userId}, streak = 0`)
+      return 0
+    }
+
     const today = GamificationService.getTodayAsStored()
     let streak = 0
     let checkDate = today
 
     console.log(`🧮 Calcul du streak - Date de référence: ${checkDate.toISOString()}`)
 
-    // Vérifier jour par jour en remontant dans le temps
-    while (true) {
+    // Vérifier jour par jour en remontant dans le temps (limité à 30 jours pour éviter les timeouts)
+    let daysChecked = 0
+    const maxDaysToCheck = 30
+    while (daysChecked < maxDaysToCheck) {
       const dayName = checkDate.toLocaleDateString("en-US", { weekday: "long" }).toLowerCase()
       
       console.log(`📅 Vérification du ${checkDate.toISOString().split('T')[0]} (${dayName})`)
@@ -150,6 +159,8 @@ export class GamificationService {
         break
       }
 
+      daysChecked++
+      
       // Limite de sécurité pour éviter les boucles infinies
       if (streak > 365) {
         console.log('⚠️  Limite de sécurité atteinte (365 jours)')
@@ -435,6 +446,7 @@ export class GamificationService {
     userRank?: number
     totalUsers: number
   }> {
+    // OPTIMISATION: Limiter le nombre d'utilisateurs récupérés
     const allUserGamification = await prisma.userGamification.findMany({
       include: {
         user: {
@@ -449,7 +461,8 @@ export class GamificationService {
         { points: 'desc' },
         { level: 'desc' },
         { longestStreak: 'desc' }
-      ]
+      ],
+      take: Math.max(limit, 100) // Limiter à max(limit, 100) pour éviter de charger tous les utilisateurs
     })
 
     const leaderboard: LeaderboardEntry[] = allUserGamification.map((userGamif, index) => ({
