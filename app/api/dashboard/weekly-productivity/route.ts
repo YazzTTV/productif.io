@@ -229,24 +229,34 @@ export async function GET(request: NextRequest) {
         normalizedDate.setHours(12, 0, 0, 0)
 
         const dayName = date.toLocaleDateString("en-US", { weekday: "long" }).toLowerCase()
-        const dayHabits = allHabits.filter(habit => habit.daysOfWeek.includes(dayName))
+        const dayHabits = allHabits.filter(habit => {
+          // Vérifier si l'habitude est prévue pour ce jour
+          const isScheduled = habit.daysOfWeek.includes(dayName)
+          return isScheduled
+        })
         const activeHabits = dayHabits.length
         
         // Comparer les dates normalisées correctement
+        // Utiliser startOfDay pour comparer uniquement les dates (sans heures)
         const completedHabits = dayHabits.filter(h => {
-          return h.entries.some(entry => {
+          const hasCompletedEntry = h.entries.some(entry => {
             const entryDate = new Date(entry.date)
-            entryDate.setHours(12, 0, 0, 0)
-            const normalizedEntryDate = entryDate.getTime()
-            const normalizedCheckDate = normalizedDate.getTime()
+            const entryDateNormalized = startOfDay(entryDate)
+            const checkDateNormalized = startOfDay(normalizedDate)
+            
+            // Comparer les timestamps après normalisation à minuit
+            const entryTimestamp = entryDateNormalized.getTime()
+            const checkTimestamp = checkDateNormalized.getTime()
             
             // Log pour déboguer
             if (h.id && i === 0) { // Seulement pour aujourd'hui
-              console.log(`${routeName} 🔍 Habitude ${h.name}: entryDate=${entryDate.toISOString()}, normalizedDate=${normalizedDate.toISOString()}, match=${normalizedEntryDate === normalizedCheckDate}`)
+              console.log(`${routeName} 🔍 Habitude ${h.name}: entryDate=${entryDate.toISOString()}, entryDateNormalized=${entryDateNormalized.toISOString()}, checkDateNormalized=${checkDateNormalized.toISOString()}, match=${entryTimestamp === checkTimestamp}`)
             }
             
-            return normalizedEntryDate === normalizedCheckDate
+            return entryTimestamp === checkTimestamp
           })
+          
+          return hasCompletedEntry
         }).length
         
         const habitsProgress = activeHabits > 0 ? (completedHabits / activeHabits) * 100 : 0
