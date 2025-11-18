@@ -1037,7 +1037,17 @@ export default function DashboardScreen() {
           entering={FadeInDown.delay(500).duration(400)}
           style={styles.habitsSection}
         >
-          <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>{t('dailyHabits')}</Text>
+          <View style={styles.habitsSectionHeader}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('dailyHabits')}</Text>
+            <TouchableOpacity
+              onPress={() => router.push('/habits-manager')}
+              style={[styles.viewAllButtonHabits, { backgroundColor: colors.primary }]}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.viewAllButtonHabitsText}>View all</Text>
+              <Ionicons name="chevron-forward" size={14} color="#FFFFFF" />
+            </TouchableOpacity>
+          </View>
           <View style={[styles.habitsCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             {sortedHabits.map((habit, index) => {
               const isCelebrating = celebratingHabit === habit.id;
@@ -1563,11 +1573,39 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     marginBottom: 16,
   },
+  habitsSectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '800',
-    color: '#1F2937',
-    marginBottom: 12,
+  },
+  viewAllButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  viewAllButtonHabits: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  viewAllText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  viewAllButtonHabitsText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
   habitsCard: {
     backgroundColor: '#FFFFFF',
