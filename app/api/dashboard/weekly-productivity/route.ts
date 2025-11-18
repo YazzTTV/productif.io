@@ -138,7 +138,13 @@ export async function GET(request: NextRequest) {
     console.log(`${routeName} 📋 Habitudes récupérées: ${allHabits.length}`)
     allHabits.forEach(habit => {
       console.log(`${routeName}   - ${habit.name}: ${habit.entries.length} entrées complétées, jours: ${habit.daysOfWeek.join(', ')}`)
+      if (habit.entries.length > 0) {
+        habit.entries.forEach(entry => {
+          console.log(`${routeName}     → Entrée: date=${entry.date.toISOString()}, completed=${entry.completed}`)
+        })
+      }
     })
+    console.log(`${routeName} 📅 Période: ${startDate.toISOString()} à ${endDate.toISOString()}`)
 
     // Fonction pour calculer le score de productivité pour une période donnée
     const calculateProductivityForPeriod = (periodStart: Date, periodEnd: Date) => {
@@ -242,15 +248,15 @@ export async function GET(request: NextRequest) {
           const hasCompletedEntry = h.entries.some(entry => {
             const entryDate = new Date(entry.date)
             const entryDateNormalized = startOfDay(entryDate)
-            const checkDateNormalized = startOfDay(normalizedDate)
+            const checkDateNormalized = startOfDay(date) // Utiliser directement la date du jour, pas normalizedDate
             
             // Comparer les timestamps après normalisation à minuit
             const entryTimestamp = entryDateNormalized.getTime()
             const checkTimestamp = checkDateNormalized.getTime()
             
-            // Log pour déboguer
-            if (h.id && i === 0) { // Seulement pour aujourd'hui
-              console.log(`${routeName} 🔍 Habitude ${h.name}: entryDate=${entryDate.toISOString()}, entryDateNormalized=${entryDateNormalized.toISOString()}, checkDateNormalized=${checkDateNormalized.toISOString()}, match=${entryTimestamp === checkTimestamp}`)
+            // Log pour déboguer pour toutes les habitudes avec entrées
+            if (h.entries.length > 0) {
+              console.log(`${routeName} 🔍 Jour ${format(date, "yyyy-MM-dd")} - Habitude ${h.name}: entryDate=${entryDate.toISOString()}, entryDateNormalized=${entryDateNormalized.toISOString()}, checkDateNormalized=${checkDateNormalized.toISOString()}, match=${entryTimestamp === checkTimestamp}`)
             }
             
             return entryTimestamp === checkTimestamp
