@@ -25,10 +25,18 @@ export async function GET(request: NextRequest) {
     const period = searchParams.get('period') || 'week' // week, month, trimester, year
 
     // OPTIMISATION: Vérification rapide si l'utilisateur est nouveau
-    const [taskCount, habitCount] = await Promise.all([
+    const [taskCount, habitCount, totalEntriesCount] = await Promise.all([
       prisma.task.count({ where: { userId: user.id } }),
-      prisma.habit.count({ where: { userId: user.id } })
+      prisma.habit.count({ where: { userId: user.id } }),
+      prisma.habitEntry.count({ 
+        where: { 
+          habit: { userId: user.id },
+          completed: true
+        }
+      })
     ])
+    
+    console.log(`${routeName} 📊 Compteurs: ${habitCount} habitudes, ${taskCount} tâches, ${totalEntriesCount} entrées complétées au total`)
 
     // Si pas de données, retourner une réponse vide rapidement
     if (taskCount === 0 && habitCount === 0) {
@@ -132,7 +140,38 @@ export async function GET(request: NextRequest) {
             date: 'desc'
           }
         }
+      },
+      orderBy: {
+        order: 'asc'
       }
+    })
+    
+    // Récupérer aussi toutes les entrées complétées pour cette période (pour déboguer)
+    const allEntriesInPeriod = await prisma.habitEntry.findMany({
+      where: {
+        habit: { userId: user.id },
+        date: {
+          gte: startDate,
+          lte: endDate
+        },
+        completed: true
+      },
+      include: {
+        habit: {
+          select: {
+            id: true,
+            name: true
+          }
+        }
+      },
+      orderBy: {
+        date: 'desc'
+      }
+    })
+    
+    console.log(`${routeName} 🔍 Entrées complétées dans la période: ${allEntriesInPeriod.length}`)
+    allEntriesInPeriod.forEach(entry => {
+      console.log(`${routeName}   → ${entry.habit.name}: date=${entry.date.toISOString()}, completed=${entry.completed}`)
     })
     
     console.log(`${routeName} 📋 Habitudes récupérées: ${allHabits.length}`)
