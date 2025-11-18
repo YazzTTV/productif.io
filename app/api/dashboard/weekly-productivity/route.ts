@@ -127,9 +127,17 @@ export async function GET(request: NextRequest) {
               lte: endDate
             },
             completed: true
+          },
+          orderBy: {
+            date: 'desc'
           }
         }
       }
+    })
+    
+    console.log(`${routeName} 📋 Habitudes récupérées: ${allHabits.length}`)
+    allHabits.forEach(habit => {
+      console.log(`${routeName}   - ${habit.name}: ${habit.entries.length} entrées complétées, jours: ${habit.daysOfWeek.join(', ')}`)
     })
 
     // Fonction pour calculer le score de productivité pour une période donnée
@@ -223,14 +231,31 @@ export async function GET(request: NextRequest) {
         const dayName = date.toLocaleDateString("en-US", { weekday: "long" }).toLowerCase()
         const dayHabits = allHabits.filter(habit => habit.daysOfWeek.includes(dayName))
         const activeHabits = dayHabits.length
+        
+        // Comparer les dates normalisées correctement
         const completedHabits = dayHabits.filter(h => {
           return h.entries.some(entry => {
             const entryDate = new Date(entry.date)
             entryDate.setHours(12, 0, 0, 0)
-            return entryDate.getTime() === normalizedDate.getTime()
+            const normalizedEntryDate = entryDate.getTime()
+            const normalizedCheckDate = normalizedDate.getTime()
+            
+            // Log pour déboguer
+            if (h.id && i === 0) { // Seulement pour aujourd'hui
+              console.log(`${routeName} 🔍 Habitude ${h.name}: entryDate=${entryDate.toISOString()}, normalizedDate=${normalizedDate.toISOString()}, match=${normalizedEntryDate === normalizedCheckDate}`)
+            }
+            
+            return normalizedEntryDate === normalizedCheckDate
           })
         }).length
+        
         const habitsProgress = activeHabits > 0 ? (completedHabits / activeHabits) * 100 : 0
+        
+        // Log pour déboguer
+        if (i === 0) { // Seulement pour aujourd'hui
+          console.log(`${routeName} 📊 Jour ${format(date, "yyyy-MM-dd")}: activeHabits=${activeHabits}, completedHabits=${completedHabits}, habitsProgress=${habitsProgress}%`)
+          console.log(`${routeName} 📋 Habitudes actives:`, dayHabits.map(h => ({ name: h.name, entries: h.entries.length })))
+        }
 
         const tasksForDay = allTasks.filter(task => {
           const dueDate = task.dueDate ? new Date(task.dueDate) : null
