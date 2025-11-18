@@ -1,0 +1,2256 @@
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TextInput,
+  TouchableOpacity,
+  Image,
+  Modal,
+  Pressable,
+  KeyboardAvoidingView,
+  Platform,
+  SafeAreaView,
+  StatusBar,
+} from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import Animated, {
+  FadeInDown,
+  FadeIn,
+  FadeOut,
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withTiming,
+  withSpring,
+  interpolate,
+  Extrapolate,
+} from 'react-native-reanimated';
+import { Ionicons } from '@expo/vector-icons';
+import { BlurView } from 'expo-blur';
+
+interface Message {
+  id: string;
+  text: string;
+  isAI: boolean;
+  timestamp: Date;
+}
+
+interface Task {
+  id: number;
+  text: string;
+  completed: boolean;
+}
+
+interface Habit {
+  id: number;
+  name: string;
+  icon: string;
+  completed: boolean;
+  streak: number;
+  bestStreak: number;
+  completionRate: number;
+}
+
+const quickActions = [
+  { icon: 'brain' as const, label: 'Start Deep Work', action: 'deepwork' },
+  { icon: 'book' as const, label: 'Daily Journal', action: 'journal' },
+  { icon: 'bulb' as const, label: 'Learning', action: 'learning' },
+  { icon: 'calendar' as const, label: 'Plan my day', action: 'plan' },
+  { icon: 'flag' as const, label: 'Track habit', action: 'track' },
+  { icon: 'trending-up' as const, label: 'Show stats', action: 'stats' },
+];
+
+const timeOptions = [
+  { label: '15 min', minutes: 15, emoji: '⚡' },
+  { label: '25 min', minutes: 25, emoji: '🎯' },
+  { label: '45 min', minutes: 45, emoji: '🔥' },
+  { label: '60 min', minutes: 60, emoji: '💪' },
+];
+
+export default function AssistantScreen() {
+  const [messages, setMessages] = useState<Message[]>([
+    {
+      id: '1',
+      text: "Hi! I'm your AI productivity coach. I'm here to help you optimize your day and unlock your full potential. How can I assist you?",
+      isAI: true,
+      timestamp: new Date(),
+    },
+  ]);
+  const [inputText, setInputText] = useState('');
+  const [xp, setXp] = useState(340);
+  const maxXp = 500;
+
+  // Deep Work Mode State
+  const [isDeepWorkActive, setIsDeepWorkActive] = useState(false);
+  const [deepWorkTimeLeft, setDeepWorkTimeLeft] = useState(25 * 60);
+  const [selectedDuration, setSelectedDuration] = useState(25);
+  const [showTimeSelector, setShowTimeSelector] = useState(false);
+  const [showTaskCompleteAnimation, setShowTaskCompleteAnimation] = useState(false);
+  const [showSessionCompleteAnimation, setShowSessionCompleteAnimation] = useState(false);
+  const [showSessionSummary, setShowSessionSummary] = useState(false);
+  const [sessionStats, setSessionStats] = useState({ timeSpent: 0, tasksCompleted: 0, xpEarned: 0 });
+  const [customDuration, setCustomDuration] = useState('');
+  const [customDurationError, setCustomDurationError] = useState('');
+
+  // Journal State
+  const [showJournalModal, setShowJournalModal] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
+  const [isProcessingJournal, setIsProcessingJournal] = useState(false);
+
+  // Day Planning Voice State
+  const [showPlanningModal, setShowPlanningModal] = useState(false);
+  const [isPlanningRecording, setIsPlanningRecording] = useState(false);
+  const [planningRecordingTime, setPlanningRecordingTime] = useState(0);
+  const [isProcessingPlanning, setIsProcessingPlanning] = useState(false);
+
+  // Learning Voice State
+  const [showLearningModal, setShowLearningModal] = useState(false);
+  const [isLearningRecording, setIsLearningRecording] = useState(false);
+  const [learningRecordingTime, setLearningRecordingTime] = useState(0);
+  const [isProcessingLearning, setIsProcessingLearning] = useState(false);
+
+  // Habit Tracking State
+  const [showHabitsModal, setShowHabitsModal] = useState(false);
+  const [habits, setHabits] = useState<Habit[]>([
+    { id: 1, name: 'Morning Meditation', icon: '🧘', completed: false, streak: 12, bestStreak: 18, completionRate: 85 },
+    { id: 2, name: 'Daily Exercise', icon: '💪', completed: true, streak: 7, bestStreak: 15, completionRate: 78 },
+    { id: 3, name: 'Read 30 min', icon: '📚', completed: false, streak: 5, bestStreak: 10, completionRate: 72 },
+    { id: 4, name: 'Drink 8 glasses water', icon: '💧', completed: true, streak: 14, bestStreak: 20, completionRate: 92 },
+    { id: 5, name: 'Journal before bed', icon: '📝', completed: false, streak: 3, bestStreak: 8, completionRate: 65 },
+    { id: 6, name: 'No phone 1hr before bed', icon: '📵', completed: false, streak: 2, bestStreak: 5, completionRate: 58 },
+  ]);
+
+  const [tasks, setTasks] = useState<Task[]>([
+    { id: 1, text: 'Complete project proposal', completed: false },
+    { id: 2, text: 'Review quarterly reports', completed: false },
+    { id: 3, text: 'Prepare presentation slides', completed: false },
+    { id: 4, text: 'Update team documentation', completed: false },
+  ]);
+
+  // Timer Effect
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+
+    if (isDeepWorkActive && deepWorkTimeLeft > 0) {
+      interval = setInterval(() => {
+        setDeepWorkTimeLeft((prev) => {
+          if (prev <= 1) {
+            setIsDeepWorkActive(false);
+            const completionMessage: Message = {
+              id: Date.now().toString(),
+              text: '🎉 Deep work session complete! Great job staying focused. You earned 50 XP!',
+              isAI: true,
+              timestamp: new Date(),
+            };
+            setMessages((prev) => [...prev, completionMessage]);
+            setXp((prev) => Math.min(prev + 50, maxXp));
+            setShowSessionCompleteAnimation(true);
+            return 25 * 60;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isDeepWorkActive, deepWorkTimeLeft]);
+
+  // Recording Timer Effects
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isRecording) {
+      interval = setInterval(() => {
+        setRecordingTime((prev) => prev + 1);
+      }, 1000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isRecording]);
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isPlanningRecording) {
+      interval = setInterval(() => {
+        setPlanningRecordingTime((prev) => prev + 1);
+      }, 1000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isPlanningRecording]);
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isLearningRecording) {
+      interval = setInterval(() => {
+        setLearningRecordingTime((prev) => prev + 1);
+      }, 1000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isLearningRecording]);
+
+  const handleSend = () => {
+    if (!inputText.trim()) return;
+
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      text: inputText,
+      isAI: false,
+      timestamp: new Date(),
+    };
+
+    setMessages([...messages, userMessage]);
+    setInputText('');
+
+    setTimeout(() => {
+      const aiMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        text: "Great question! Based on your productivity profile, I recommend focusing on your most challenging task during your peak hours (9-11am). Would you like me to help you plan that?",
+        isAI: true,
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, aiMessage]);
+      setXp((prev) => Math.min(prev + 10, maxXp));
+    }, 1000);
+  };
+
+  const handleQuickAction = (action: string) => {
+    if (action === 'deepwork') {
+      setShowTimeSelector(true);
+      return;
+    }
+    if (action === 'journal') {
+      setShowJournalModal(true);
+      return;
+    }
+    if (action === 'learning') {
+      setShowLearningModal(true);
+      return;
+    }
+    if (action === 'plan') {
+      setShowPlanningModal(true);
+      return;
+    }
+    if (action === 'track') {
+      setShowHabitsModal(true);
+      return;
+    }
+
+    const actionTexts: { [key: string]: string } = {
+      stats: 'Show me my productivity stats',
+    };
+
+    const text = actionTexts[action];
+    if (text) {
+      setInputText(text);
+    }
+  };
+
+  const startDeepWork = (minutes: number) => {
+    setShowTimeSelector(false);
+    setIsDeepWorkActive(true);
+    setDeepWorkTimeLeft(minutes * 60);
+    setSelectedDuration(minutes);
+    setCustomDuration('');
+    setCustomDurationError('');
+
+    const deepWorkMessage: Message = {
+      id: Date.now().toString(),
+      text: `🧠 Deep work session started! I'll be here to keep you focused for the next ${minutes} minutes. Your tasks are ready below. Let's do this!`,
+      isAI: true,
+      timestamp: new Date(),
+    };
+    setMessages((prev) => [...prev, deepWorkMessage]);
+  };
+
+  const startCustomDuration = () => {
+    const minutes = parseInt(customDuration);
+
+    if (!customDuration) {
+      setCustomDurationError('Please enter a duration');
+      return;
+    }
+
+    if (isNaN(minutes)) {
+      setCustomDurationError('Please enter a valid number');
+      return;
+    }
+
+    if (minutes < 1) {
+      setCustomDurationError('Minimum 1 minute');
+      return;
+    }
+
+    if (minutes > 120) {
+      setCustomDurationError('Maximum 120 minutes (2 hours)');
+      return;
+    }
+
+    startDeepWork(minutes);
+  };
+
+  const toggleTask = (taskId: number) => {
+    setTasks((prev) =>
+      prev.map((task) => {
+        if (task.id === taskId) {
+          const newCompleted = !task.completed;
+          if (newCompleted && !task.completed) {
+            setXp((prevXp) => Math.min(prevXp + 15, maxXp));
+            setShowTaskCompleteAnimation(true);
+            setTimeout(() => setShowTaskCompleteAnimation(false), 2000);
+          }
+          return { ...task, completed: newCompleted };
+        }
+        return task;
+      })
+    );
+  };
+
+  const startRecording = () => {
+    setIsRecording(true);
+    setRecordingTime(0);
+  };
+
+  const stopRecording = () => {
+    setIsRecording(false);
+    setIsProcessingJournal(true);
+
+    setTimeout(() => {
+      setIsProcessingJournal(false);
+      setShowJournalModal(false);
+
+      const journalResponse: Message = {
+        id: Date.now().toString(),
+        text: `📝 Thank you for sharing! I analyzed your day:\n\n✅ What went well:\n• You maintained great focus during peak hours\n• Completed important tasks on time\n• Good energy management\n\n💡 Areas to improve:\n• Consider taking more breaks\n• Could delegate some routine tasks\n• Try time-blocking for better structure\n\nKeep up the great work! You earned 25 XP! 🌟`,
+        isAI: true,
+        timestamp: new Date(),
+      };
+
+      setMessages((prev) => [...prev, journalResponse]);
+      setXp((prev) => Math.min(prev + 25, maxXp));
+      setRecordingTime(0);
+    }, 2500);
+  };
+
+  const startPlanningRecording = () => {
+    setIsPlanningRecording(true);
+    setPlanningRecordingTime(0);
+  };
+
+  const stopPlanningRecording = () => {
+    setIsPlanningRecording(false);
+    setIsProcessingPlanning(true);
+
+    setTimeout(() => {
+      setIsProcessingPlanning(false);
+      setShowPlanningModal(false);
+
+      const planningResponse: Message = {
+        id: Date.now().toString(),
+        text: `📅 Perfect! I've created your personalized plan for tomorrow:\n\n🌅 Morning (8am-12pm):\n• Client presentation at 9:30am (prep 30min before)\n• Strategy meeting at 11am\n• Quick break & review progress\n\n☀️ Afternoon (1pm-5pm):\n• Deep work: Project deadline tasks (2hrs)\n• Team check-in at 3:30pm\n• Wrap up & plan next day\n\n💡 Pro Tips:\n• Start with hardest task first\n• Block 15min between meetings\n• Set phone on Do Not Disturb during deep work\n\nYou earned 30 XP! Let's crush tomorrow! 🚀`,
+        isAI: true,
+        timestamp: new Date(),
+      };
+
+      setMessages((prev) => [...prev, planningResponse]);
+      setXp((prev) => Math.min(prev + 30, maxXp));
+      setPlanningRecordingTime(0);
+    }, 3000);
+  };
+
+  const startLearningRecording = () => {
+    setIsLearningRecording(true);
+    setLearningRecordingTime(0);
+  };
+
+  const stopLearningRecording = () => {
+    setIsLearningRecording(false);
+    setIsProcessingLearning(true);
+
+    setTimeout(() => {
+      setIsProcessingLearning(false);
+      setShowLearningModal(false);
+
+      const learningResponse: Message = {
+        id: Date.now().toString(),
+        text: `💡 Amazing! I've captured your learning insights:\n\n📚 What You Learned Today:\n• New project management techniques\n• Effective communication strategies\n• Time-blocking methodology\n\n🎯 Key Takeaways:\n• Apply the 2-minute rule for quick tasks\n• Use structured breaks to maintain focus\n• Document learnings for future reference\n\n✨ Recommendations:\n• Practice these skills tomorrow\n• Share your insights with your team\n• Review your learnings weekly\n\nKnowledge retained! You earned 20 XP! 🌟`,
+        isAI: true,
+        timestamp: new Date(),
+      };
+
+      setMessages((prev) => [...prev, learningResponse]);
+      setXp((prev) => Math.min(prev + 20, maxXp));
+      setLearningRecordingTime(0);
+    }, 2800);
+  };
+
+  const endSession = () => {
+    const timeSpent = Math.floor((selectedDuration * 60 - deepWorkTimeLeft) / 60);
+    const tasksCompleted = tasks.filter((t) => t.completed).length;
+    const xpEarned = tasksCompleted * 15;
+
+    setSessionStats({ timeSpent, tasksCompleted, xpEarned });
+    setIsDeepWorkActive(false);
+    setShowSessionSummary(true);
+
+    if (xpEarned > 0) {
+      setXp((prev) => Math.min(prev + xpEarned, maxXp));
+    }
+  };
+
+  const toggleHabit = (habitId: number) => {
+    setHabits((prev) =>
+      prev.map((habit) => {
+        if (habit.id === habitId) {
+          const newCompleted = !habit.completed;
+          if (newCompleted) {
+            setXp((prevXp) => Math.min(prevXp + 10, maxXp));
+
+            const habitMessage: Message = {
+              id: Date.now().toString(),
+              text: `🎉 Great job! You completed "${habit.name}"! Keep that ${habit.streak} day streak going! +10 XP`,
+              isAI: true,
+              timestamp: new Date(),
+            };
+            setMessages((prevMessages) => [...prevMessages, habitMessage]);
+          }
+          return { ...habit, completed: newCompleted };
+        }
+        return habit;
+      })
+    );
+  };
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const xpPercentage = (xp / maxXp) * 100;
+
+  // Animated values
+  const logoScale = useSharedValue(1);
+  const logoY = useSharedValue(0);
+  const pulseScale = useSharedValue(1);
+
+  useEffect(() => {
+    logoScale.value = withRepeat(
+      withTiming(1.05, { duration: 3000 }),
+      -1,
+      true
+    );
+    logoY.value = withRepeat(
+      withTiming(-5, { duration: 3000 }),
+      -1,
+      true
+    );
+    pulseScale.value = withRepeat(
+      withTiming(1.2, { duration: 2000 }),
+      -1,
+      true
+    );
+  }, []);
+
+  const logoAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [
+      { scale: logoScale.value },
+      { translateY: logoY.value },
+    ],
+  }));
+
+  const pulseAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: pulseScale.value }],
+    opacity: interpolate(pulseScale.value, [1, 1.2], [0.5, 0], Extrapolate.CLAMP),
+  }));
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="dark-content" />
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.keyboardView}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+      >
+        <View style={styles.content}>
+          {/* Header with AI Avatar */}
+          <View style={styles.header}>
+            <View style={styles.headerTop}>
+              <Animated.View style={[styles.logoContainer, logoAnimatedStyle]}>
+                <View style={styles.logoWrapper}>
+                  <Image
+                    source={require('../../assets/images/productif-logo.png')}
+                    style={styles.logo}
+                    resizeMode="contain"
+                  />
+                </View>
+                <Animated.View style={[styles.pulseRing, pulseAnimatedStyle]} />
+              </Animated.View>
+              <View style={styles.headerText}>
+                <Text style={styles.headerTitle}>AI Productivity Coach</Text>
+                <Text style={styles.headerSubtitle}>Always learning, always improving</Text>
+              </View>
+            </View>
+
+            {/* XP Progress Ring */}
+            <View style={styles.xpCard}>
+              <View style={styles.xpHeader}>
+                <View style={styles.xpHeaderLeft}>
+                  <Ionicons name="flash" size={16} color="#00C27A" />
+                  <Text style={styles.xpLabel}>Progress to next level</Text>
+                </View>
+                <Text style={styles.xpValue}>{xp}/{maxXp} XP</Text>
+              </View>
+              <View style={styles.progressBar}>
+                <Animated.View
+                  style={[
+                    styles.progressFill,
+                    {
+                      width: `${xpPercentage}%`,
+                    },
+                  ]}
+                />
+              </View>
+            </View>
+          </View>
+
+          {/* Messages */}
+          <ScrollView
+            style={styles.messagesContainer}
+            contentContainerStyle={styles.messagesContent}
+            showsVerticalScrollIndicator={false}
+          >
+            {messages.map((message, index) => (
+              <Animated.View
+                key={message.id}
+                entering={FadeInDown.delay(index * 100).duration(400)}
+                style={[
+                  styles.messageContainer,
+                  message.isAI ? styles.messageAI : styles.messageUser,
+                ]}
+              >
+                <View
+                  style={[
+                    styles.messageBubble,
+                    message.isAI ? styles.messageBubbleAI : styles.messageBubbleUser,
+                  ]}
+                >
+                  <Text style={message.isAI ? styles.messageTextAI : styles.messageTextUser}>
+                    {message.text}
+                  </Text>
+                </View>
+              </Animated.View>
+            ))}
+
+            {/* Deep Work Timer & Tasks */}
+            {isDeepWorkActive && (
+              <Animated.View
+                entering={FadeIn.duration(400)}
+                exiting={FadeOut.duration(400)}
+                style={styles.deepWorkContainer}
+              >
+                {/* Focus Bubble with Timer */}
+                <LinearGradient
+                  colors={['#00C27A', '#00D68F']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.focusBubble}
+                >
+                  <View style={styles.focusHeader}>
+                    <View style={styles.focusHeaderLeft}>
+                      <Ionicons name="brain" size={24} color="#FFFFFF" />
+                      <Text style={styles.focusTitle}>Deep Focus Mode</Text>
+                    </View>
+                    <TouchableOpacity onPress={endSession}>
+                      <Text style={styles.endSessionText}>End Session</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  <View style={styles.timerContainer}>
+                    <Text style={styles.timerText}>{formatTime(deepWorkTimeLeft)}</Text>
+                    <Text style={styles.timerSubtext}>Stay focused! You're doing great 🎯</Text>
+                  </View>
+
+                  <View style={styles.timerProgressBar}>
+                    <View
+                      style={[
+                        styles.timerProgressFill,
+                        {
+                          width: `${((selectedDuration * 60 - deepWorkTimeLeft) / (selectedDuration * 60)) * 100}%`,
+                        },
+                      ]}
+                    />
+                  </View>
+                </LinearGradient>
+
+                {/* Task List */}
+                <View style={styles.tasksCard}>
+                  <View style={styles.tasksHeader}>
+                    <View style={styles.tasksHeaderLeft}>
+                      <Ionicons name="flag" size={20} color="#00C27A" />
+                      <Text style={styles.tasksTitle}>Your Tasks</Text>
+                    </View>
+                    <Text style={styles.tasksCount}>
+                      {tasks.filter((t) => t.completed).length}/{tasks.length}
+                    </Text>
+                  </View>
+
+                  {tasks.map((task, index) => (
+                    <TouchableOpacity
+                      key={task.id}
+                      onPress={() => toggleTask(task.id)}
+                      style={styles.taskItem}
+                    >
+                      <View
+                        style={[
+                          styles.taskCheckbox,
+                          task.completed && styles.taskCheckboxCompleted,
+                        ]}
+                      >
+                        {task.completed && (
+                          <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+                        )}
+                      </View>
+                      <Text
+                        style={[
+                          styles.taskText,
+                          task.completed && styles.taskTextCompleted,
+                        ]}
+                      >
+                        {task.text}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </Animated.View>
+            )}
+          </ScrollView>
+
+          {/* Quick Action Chips */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.quickActionsContainer}
+            contentContainerStyle={styles.quickActionsContent}
+          >
+            {quickActions.map((action, index) => (
+              <Animated.View
+                key={action.action}
+                entering={FadeInDown.delay(index * 100).duration(400)}
+              >
+                <TouchableOpacity
+                  onPress={() => handleQuickAction(action.action)}
+                  style={styles.quickActionChip}
+                >
+                  <Ionicons name={action.icon} size={16} color="#00C27A" />
+                  <Text style={styles.quickActionText}>{action.label}</Text>
+                </TouchableOpacity>
+              </Animated.View>
+            ))}
+          </ScrollView>
+
+          {/* Input Area */}
+          <View style={styles.inputContainer}>
+            <View style={styles.inputWrapper}>
+              <TextInput
+                style={styles.input}
+                value={inputText}
+                onChangeText={setInputText}
+                placeholder="Ask me anything..."
+                placeholderTextColor="#9CA3AF"
+                multiline
+                maxLength={500}
+              />
+            </View>
+
+            <TouchableOpacity style={styles.micButton}>
+              <Ionicons name="mic" size={20} color="#6B7280" />
+            </TouchableOpacity>
+
+            <TouchableOpacity onPress={handleSend} style={styles.sendButton}>
+              <LinearGradient
+                colors={['#00C27A', '#00D68F']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.sendButtonGradient}
+              >
+                <Ionicons name="send" size={20} color="#FFFFFF" />
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Time Selector Modal */}
+        <Modal
+          visible={showTimeSelector}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowTimeSelector(false)}
+        >
+          <Pressable
+            style={styles.modalBackdrop}
+            onPress={() => setShowTimeSelector(false)}
+          >
+            <Pressable style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <View style={styles.modalIconContainer}>
+                  <Ionicons name="timer" size={32} color="#FFFFFF" />
+                </View>
+                <Text style={styles.modalTitle}>Choose Focus Duration</Text>
+                <Text style={styles.modalSubtitle}>How long do you want to focus?</Text>
+              </View>
+
+              <View style={styles.timeOptionsGrid}>
+                {timeOptions.map((option) => (
+                  <TouchableOpacity
+                    key={option.minutes}
+                    onPress={() => startDeepWork(option.minutes)}
+                    style={styles.timeOption}
+                  >
+                    <Text style={styles.timeOptionEmoji}>{option.emoji}</Text>
+                    <Text style={styles.timeOptionLabel}>{option.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <View style={styles.customDurationContainer}>
+                <Text style={styles.customDurationLabel}>Or enter custom duration</Text>
+                <View style={styles.customDurationInputRow}>
+                  <TextInput
+                    style={[
+                      styles.customDurationInput,
+                      customDurationError && styles.customDurationInputError,
+                    ]}
+                    value={customDuration}
+                    onChangeText={(text) => {
+                      setCustomDuration(text);
+                      setCustomDurationError('');
+                    }}
+                    placeholder="e.g. 30"
+                    keyboardType="numeric"
+                    maxLength={3}
+                  />
+                  <TouchableOpacity
+                    onPress={startCustomDuration}
+                    style={styles.customDurationButton}
+                  >
+                    <LinearGradient
+                      colors={['#00C27A', '#00D68F']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 0 }}
+                      style={styles.customDurationButtonGradient}
+                    >
+                      <Text style={styles.customDurationButtonText}>Start</Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                </View>
+                {customDurationError && (
+                  <Text style={styles.customDurationError}>{customDurationError}</Text>
+                )}
+                <Text style={styles.customDurationHint}>Range: 1-120 minutes</Text>
+              </View>
+
+              <TouchableOpacity
+                onPress={() => setShowTimeSelector(false)}
+                style={styles.modalCancelButton}
+              >
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+            </Pressable>
+          </Pressable>
+        </Modal>
+
+        {/* Voice Journal Modal */}
+        <VoiceModal
+          visible={showJournalModal}
+          onClose={() => {
+            setShowJournalModal(false);
+            setIsRecording(false);
+            setRecordingTime(0);
+          }}
+          title="Daily Journal"
+          subtitle={isProcessingJournal ? 'Processing your thoughts...' : isRecording ? "I'm listening..." : 'Tell me about your day'}
+          emoji="📝"
+          isRecording={isRecording}
+          recordingTime={recordingTime}
+          isProcessing={isProcessingJournal}
+          onStartRecording={startRecording}
+          onStopRecording={stopRecording}
+          prompt="Share what went well and what needs improvement"
+        />
+
+        {/* Voice Planning Modal */}
+        <VoiceModal
+          visible={showPlanningModal}
+          onClose={() => {
+            setShowPlanningModal(false);
+            setIsPlanningRecording(false);
+            setPlanningRecordingTime(0);
+          }}
+          title="Plan Tomorrow"
+          subtitle={isProcessingPlanning ? 'Creating your personalized plan...' : isPlanningRecording ? "I'm listening..." : 'Tell me about your day tomorrow'}
+          emoji="📅"
+          isRecording={isPlanningRecording}
+          recordingTime={planningRecordingTime}
+          isProcessing={isProcessingPlanning}
+          onStartRecording={startPlanningRecording}
+          onStopRecording={stopPlanningRecording}
+          prompt="Share your tasks, meetings, and priorities for tomorrow"
+        />
+
+        {/* Voice Learning Modal */}
+        <VoiceModal
+          visible={showLearningModal}
+          onClose={() => {
+            setShowLearningModal(false);
+            setIsLearningRecording(false);
+            setLearningRecordingTime(0);
+          }}
+          title="What I Learned Today"
+          subtitle={isProcessingLearning ? 'Processing your insights...' : isLearningRecording ? "I'm listening..." : 'Share what you learned today'}
+          emoji="💡"
+          isRecording={isLearningRecording}
+          recordingTime={learningRecordingTime}
+          isProcessing={isProcessingLearning}
+          onStartRecording={startLearningRecording}
+          onStopRecording={stopLearningRecording}
+          prompt="Describe new skills, insights, or knowledge you gained"
+        />
+
+        {/* Habit Tracking Modal */}
+        <HabitsModal
+          visible={showHabitsModal}
+          onClose={() => setShowHabitsModal(false)}
+          habits={habits}
+          onToggleHabit={toggleHabit}
+        />
+
+        {/* Task Complete Animation */}
+        {showTaskCompleteAnimation && (
+          <TaskCompleteAnimation onComplete={() => setShowTaskCompleteAnimation(false)} />
+        )}
+
+        {/* Session Complete Animation */}
+        {showSessionCompleteAnimation && (
+          <SessionCompleteAnimation
+            onComplete={() => setShowSessionCompleteAnimation(false)}
+            selectedDuration={selectedDuration}
+            tasksCompleted={tasks.filter((t) => t.completed).length}
+          />
+        )}
+
+        {/* Session Summary Modal */}
+        <SessionSummaryModal
+          visible={showSessionSummary}
+          onClose={() => {
+            setShowSessionSummary(false);
+            setTasks((prev) => prev.map((task) => ({ ...task, completed: false })));
+          }}
+          sessionStats={sessionStats}
+          totalTasks={tasks.length}
+        />
+      </KeyboardAvoidingView>
+    </SafeAreaView>
+  );
+}
+
+// Voice Modal Component
+function VoiceModal({
+  visible,
+  onClose,
+  title,
+  subtitle,
+  emoji,
+  isRecording,
+  recordingTime,
+  isProcessing,
+  onStartRecording,
+  onStopRecording,
+  prompt,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  title: string;
+  subtitle: string;
+  emoji: string;
+  isRecording: boolean;
+  recordingTime: number;
+  isProcessing: boolean;
+  onStartRecording: () => void;
+  onStopRecording: () => void;
+  prompt: string;
+}) {
+  const micScale = useSharedValue(1);
+  const processingRotation = useSharedValue(0);
+  const pulseRings = [useSharedValue(1), useSharedValue(1), useSharedValue(1)];
+
+  useEffect(() => {
+    if (isRecording) {
+      micScale.value = withRepeat(withTiming(1.1, { duration: 1500 }), -1, true);
+      pulseRings.forEach((ring, i) => {
+        ring.value = withRepeat(
+          withTiming(2.2, { duration: 2000 }),
+          -1,
+          false
+        );
+      });
+    } else {
+      micScale.value = 1;
+      pulseRings.forEach((ring) => {
+        ring.value = 1;
+      });
+    }
+  }, [isRecording]);
+
+  useEffect(() => {
+    if (isProcessing) {
+      processingRotation.value = withRepeat(
+        withTiming(360, { duration: 2000 }),
+        -1,
+        false
+      );
+    } else {
+      processingRotation.value = 0;
+    }
+  }, [isProcessing]);
+
+  const micAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: micScale.value }],
+  }));
+
+  const processingRotationStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${processingRotation.value}deg` }],
+  }));
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <BlurView intensity={20} style={styles.voiceModalBackdrop}>
+        <Pressable style={styles.voiceModalContent} onPress={(e) => e.stopPropagation()}>
+          <LinearGradient
+            colors={['#00C27A', '#00D68F']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.voiceModalHeader}
+          >
+            <Text style={styles.voiceModalEmoji}>{emoji}</Text>
+            <Text style={styles.voiceModalTitle}>{title}</Text>
+            <Text style={styles.voiceModalSubtitle}>{subtitle}</Text>
+          </LinearGradient>
+
+          <View style={styles.voiceModalBody}>
+            {isProcessing ? (
+              <View style={styles.processingContainer}>
+                <Animated.View style={[styles.processingIcon, processingRotationStyle]}>
+                  <Ionicons name="flash" size={32} color="#00C27A" />
+                </Animated.View>
+                <Text style={styles.processingText}>
+                  {title.includes('Journal') ? 'Analyzing your reflections...' : title.includes('Plan') ? 'Building your perfect day...' : 'Capturing your knowledge...'}
+                </Text>
+              </View>
+            ) : (
+              <>
+                <View style={styles.micContainer}>
+                  <Animated.View style={micAnimatedStyle}>
+                    <TouchableOpacity
+                      onPress={isRecording ? onStopRecording : onStartRecording}
+                      style={[
+                        styles.micButtonLarge,
+                        isRecording && styles.micButtonRecording,
+                      ]}
+                    >
+                      <LinearGradient
+                        colors={isRecording ? ['#EF4444', '#DC2626'] : ['#00C27A', '#00D68F']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={styles.micButtonGradient}
+                      >
+                        <Ionicons name="mic" size={48} color="#FFFFFF" />
+                      </LinearGradient>
+                    </TouchableOpacity>
+                  </Animated.View>
+
+                  {isRecording && (
+                    <>
+                      {pulseRings.map((ring, i) => {
+                        const ringStyle = useAnimatedStyle(() => ({
+                          transform: [{ scale: ring.value }],
+                          opacity: interpolate(ring.value, [1, 2.2], [0.5, 0], Extrapolate.CLAMP),
+                        }));
+                        return (
+                          <Animated.View
+                            key={i}
+                            style={[styles.pulseRing, ringStyle]}
+                          />
+                        );
+                      })}
+                      <View style={styles.recordingDot} />
+                    </>
+                  )}
+                </View>
+
+                {isRecording && (
+                  <Text style={styles.recordingTime}>{formatTime(recordingTime)}</Text>
+                )}
+
+                <Text style={styles.voicePrompt}>
+                  {isRecording ? 'Tap again to stop recording' : 'Tap the microphone to start'}
+                </Text>
+                <Text style={styles.voicePromptHint}>{prompt}</Text>
+              </>
+            )}
+          </View>
+
+          {!isProcessing && (
+            <TouchableOpacity onPress={onClose} style={styles.voiceModalCancel}>
+              <Text style={styles.voiceModalCancelText}>Cancel</Text>
+            </TouchableOpacity>
+          )}
+        </Pressable>
+      </BlurView>
+    </Modal>
+  );
+}
+
+// Habits Modal Component
+function HabitsModal({
+  visible,
+  onClose,
+  habits,
+  onToggleHabit,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  habits: Habit[];
+  onToggleHabit: (id: number) => void;
+}) {
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <Pressable style={styles.habitsModalBackdrop} onPress={onClose}>
+        <Pressable style={styles.habitsModalContent} onPress={(e) => e.stopPropagation()}>
+          <LinearGradient
+            colors={['#00C27A', '#00D68F']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.habitsModalHeader}
+          >
+            <View style={styles.habitsModalIconContainer}>
+              <Ionicons name="flag" size={32} color="#FFFFFF" />
+            </View>
+            <Text style={styles.habitsModalTitle}>Today's Habits</Text>
+            <Text style={styles.habitsModalSubtitle}>
+              {habits.filter((h) => h.completed).length}/{habits.length} completed
+            </Text>
+          </LinearGradient>
+
+          <ScrollView style={styles.habitsList} contentContainerStyle={styles.habitsListContent}>
+            {habits.map((habit, index) => (
+              <Animated.View
+                key={habit.id}
+                entering={FadeInDown.delay(index * 50).duration(300)}
+              >
+                <TouchableOpacity
+                  onPress={() => onToggleHabit(habit.id)}
+                  style={[
+                    styles.habitItem,
+                    habit.completed && styles.habitItemCompleted,
+                  ]}
+                >
+                  <View
+                    style={[
+                      styles.habitCheckbox,
+                      habit.completed && styles.habitCheckboxCompleted,
+                    ]}
+                  >
+                    {habit.completed && (
+                      <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+                    )}
+                  </View>
+                  <View style={styles.habitContent}>
+                    <View style={styles.habitHeader}>
+                      <Text style={styles.habitIcon}>{habit.icon}</Text>
+                      <Text
+                        style={[
+                          styles.habitName,
+                          habit.completed && styles.habitNameCompleted,
+                        ]}
+                      >
+                        {habit.name}
+                      </Text>
+                    </View>
+                    <View style={styles.habitStats}>
+                      <View style={styles.habitStat}>
+                        <Text style={styles.habitStatIcon}>🔥</Text>
+                        <Text style={styles.habitStatText}>{habit.streak} day streak</Text>
+                      </View>
+                      <View style={styles.habitStat}>
+                        <Text style={styles.habitStatIcon}>📊</Text>
+                        <Text style={styles.habitStatText}>{habit.completionRate}%</Text>
+                      </View>
+                    </View>
+                    {habit.streak === habit.bestStreak && habit.streak > 3 && (
+                      <View style={styles.bestStreakBadge}>
+                        <Text style={styles.bestStreakText}>⭐ Best streak!</Text>
+                      </View>
+                    )}
+                  </View>
+                </TouchableOpacity>
+              </Animated.View>
+            ))}
+          </ScrollView>
+
+          <View style={styles.habitsFooter}>
+            <View style={styles.habitsStatsGrid}>
+              <View style={styles.habitStatCard}>
+                <Text style={styles.habitStatCardIcon}>✅</Text>
+                <Text style={styles.habitStatCardValue}>
+                  {habits.filter((h) => h.completed).length}
+                </Text>
+                <Text style={styles.habitStatCardLabel}>Done Today</Text>
+              </View>
+              <View style={styles.habitStatCard}>
+                <Text style={styles.habitStatCardIcon}>📈</Text>
+                <Text style={styles.habitStatCardValue}>
+                  {Math.round(habits.reduce((acc, h) => acc + h.completionRate, 0) / habits.length)}%
+                </Text>
+                <Text style={styles.habitStatCardLabel}>Avg Rate</Text>
+              </View>
+              <View style={styles.habitStatCard}>
+                <Text style={styles.habitStatCardIcon}>🔥</Text>
+                <Text style={styles.habitStatCardValue}>
+                  {Math.max(...habits.map((h) => h.streak))}
+                </Text>
+                <Text style={styles.habitStatCardLabel}>Top Streak</Text>
+              </View>
+            </View>
+
+            <TouchableOpacity onPress={onClose} style={styles.habitsDoneButton}>
+              <LinearGradient
+                colors={['#00C27A', '#00D68F']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.habitsDoneButtonGradient}
+              >
+                <Text style={styles.habitsDoneButtonText}>Done</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
+// Task Complete Animation Component
+function TaskCompleteAnimation({ onComplete }: { onComplete: () => void }) {
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      onComplete();
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, [onComplete]);
+
+  return (
+    <View style={styles.animationOverlay} pointerEvents="none">
+      <Animated.View entering={FadeIn.duration(300)} exiting={FadeOut.duration(300)}>
+        <View style={styles.animationContent}>
+          <View style={styles.checkmarkCircle}>
+            <Ionicons name="checkmark-circle" size={96} color="#00C27A" />
+          </View>
+          <Animated.Text
+            entering={FadeIn.delay(200).duration(300)}
+            style={styles.xpText}
+          >
+            +15 XP
+          </Animated.Text>
+        </View>
+      </Animated.View>
+    </View>
+  );
+}
+
+// Session Complete Animation Component
+function SessionCompleteAnimation({
+  onComplete,
+  selectedDuration,
+  tasksCompleted,
+}: {
+  onComplete: () => void;
+  selectedDuration: number;
+  tasksCompleted: number;
+}) {
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      onComplete();
+    }, 4000);
+    return () => clearTimeout(timer);
+  }, [onComplete]);
+
+  return (
+    <Pressable style={styles.sessionCompleteOverlay} onPress={onComplete}>
+      <BlurView intensity={80} style={styles.sessionCompleteBlur}>
+        <Animated.View entering={FadeIn.duration(400)} style={styles.sessionCompleteContent}>
+          <Text style={styles.sessionCompleteEmoji}>🏆</Text>
+          <Text style={styles.sessionCompleteTitle}>Amazing Work!</Text>
+          <Text style={styles.sessionCompleteSubtitle}>Deep Work Session Complete</Text>
+          <View style={styles.sessionCompleteXPBadge}>
+            <Ionicons name="flash" size={24} color="#FCD34D" />
+            <Text style={styles.sessionCompleteXPText}>+50 XP</Text>
+          </View>
+          <View style={styles.sessionCompleteStats}>
+            <View style={styles.sessionCompleteStat}>
+              <Text style={styles.sessionCompleteStatEmoji}>⏱️</Text>
+              <Text style={styles.sessionCompleteStatText}>{selectedDuration} min focused</Text>
+            </View>
+            <View style={styles.sessionCompleteStat}>
+              <Text style={styles.sessionCompleteStatEmoji}>✅</Text>
+              <Text style={styles.sessionCompleteStatText}>{tasksCompleted} tasks done</Text>
+            </View>
+          </View>
+          <Text style={styles.sessionCompleteHint}>Tap anywhere to continue</Text>
+        </Animated.View>
+      </BlurView>
+    </Pressable>
+  );
+}
+
+// Session Summary Modal Component
+function SessionSummaryModal({
+  visible,
+  onClose,
+  sessionStats,
+  totalTasks,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  sessionStats: { timeSpent: number; tasksCompleted: number; xpEarned: number };
+  totalTasks: number;
+}) {
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <Pressable style={styles.summaryModalBackdrop} onPress={onClose}>
+        <Pressable style={styles.summaryModalContent} onPress={(e) => e.stopPropagation()}>
+          <LinearGradient
+            colors={['#00C27A', '#00D68F']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.summaryModalHeader}
+          >
+            <Text style={styles.summaryModalEmoji}>📊</Text>
+            <Text style={styles.summaryModalTitle}>Session Summary</Text>
+            <Text style={styles.summaryModalSubtitle}>Here's how you did!</Text>
+          </LinearGradient>
+
+          <View style={styles.summaryStats}>
+            <View style={styles.summaryStatCard}>
+              <View style={styles.summaryStatIconContainer}>
+                <Ionicons name="timer" size={24} color="#FFFFFF" />
+              </View>
+              <View style={styles.summaryStatContent}>
+                <Text style={styles.summaryStatLabel}>Time Focused</Text>
+                <Text style={styles.summaryStatValue}>{sessionStats.timeSpent} min</Text>
+              </View>
+              <Text style={styles.summaryStatEmoji}>⏱️</Text>
+            </View>
+
+            <View style={styles.summaryStatCard}>
+              <View style={styles.summaryStatIconContainer}>
+                <Ionicons name="checkmark-circle" size={24} color="#FFFFFF" />
+              </View>
+              <View style={styles.summaryStatContent}>
+                <Text style={styles.summaryStatLabel}>Tasks Completed</Text>
+                <Text style={styles.summaryStatValue}>
+                  {sessionStats.tasksCompleted} / {totalTasks}
+                </Text>
+              </View>
+              <Text style={styles.summaryStatEmoji}>✅</Text>
+            </View>
+
+            <View style={[styles.summaryStatCard, styles.summaryStatCardXP]}>
+              <View style={[styles.summaryStatIconContainer, styles.summaryStatIconContainerXP]}>
+                <Ionicons name="flash" size={24} color="#FFFFFF" />
+              </View>
+              <View style={styles.summaryStatContent}>
+                <Text style={styles.summaryStatLabel}>XP Earned</Text>
+                <Text style={styles.summaryStatValue}>+{sessionStats.xpEarned} XP</Text>
+              </View>
+              <Text style={styles.summaryStatEmoji}>⚡</Text>
+            </View>
+
+            <Text style={styles.summaryMotivational}>
+              {sessionStats.tasksCompleted === totalTasks
+                ? '🎉 Perfect! You completed all tasks!'
+                : sessionStats.tasksCompleted > 0
+                  ? '💪 Great progress! Keep it up!'
+                  : '👍 Every minute counts! Try again soon!'}
+            </Text>
+          </View>
+
+          <TouchableOpacity onPress={onClose} style={styles.summaryFinishButton}>
+            <LinearGradient
+              colors={['#00C27A', '#00D68F']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.summaryFinishButtonGradient}
+            >
+              <Text style={styles.summaryFinishButtonText}>Finish</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
+  keyboardView: {
+    flex: 1,
+  },
+  content: {
+    flex: 1,
+  },
+  header: {
+    paddingTop: 12,
+    paddingHorizontal: 24,
+    paddingBottom: 16,
+  },
+  headerTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  logoContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+    shadowColor: '#00C27A',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+    overflow: 'visible',
+  },
+  logoWrapper: {
+    width: 48,
+    height: 48,
+    zIndex: 1,
+  },
+  logo: {
+    width: '100%',
+    height: '100%',
+  },
+  pulseRing: {
+    position: 'absolute',
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#00C27A',
+    opacity: 0.1,
+  },
+  headerText: {
+    flex: 1,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1F2937',
+    marginBottom: 4,
+  },
+  headerSubtitle: {
+    fontSize: 14,
+    color: '#00C27A',
+  },
+  xpCard: {
+    backgroundColor: '#F0FDF4',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#00C27A33',
+  },
+  xpHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  xpHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  xpLabel: {
+    fontSize: 14,
+    color: '#374151',
+  },
+  xpValue: {
+    fontSize: 14,
+    color: '#00C27A',
+    fontWeight: '600',
+  },
+  progressBar: {
+    height: 8,
+    backgroundColor: '#E5E7EB',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: '#00C27A',
+    borderRadius: 4,
+  },
+  messagesContainer: {
+    flex: 1,
+  },
+  messagesContent: {
+    paddingHorizontal: 24,
+    paddingBottom: 16,
+  },
+  messageContainer: {
+    marginBottom: 12,
+  },
+  messageAI: {
+    alignItems: 'flex-start',
+  },
+  messageUser: {
+    alignItems: 'flex-end',
+  },
+  messageBubble: {
+    maxWidth: '80%',
+    borderRadius: 24,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+  },
+  messageBubbleAI: {
+    backgroundColor: '#F0FDF4',
+    borderTopLeftRadius: 4,
+    borderWidth: 1,
+    borderColor: '#00C27A33',
+  },
+  messageBubbleUser: {
+    backgroundColor: '#00C27A',
+    borderTopRightRadius: 4,
+  },
+  messageTextAI: {
+    fontSize: 15,
+    color: '#1F2937',
+    lineHeight: 20,
+  },
+  messageTextUser: {
+    fontSize: 15,
+    color: '#FFFFFF',
+    lineHeight: 20,
+  },
+  deepWorkContainer: {
+    marginTop: 16,
+  },
+  focusBubble: {
+    borderRadius: 24,
+    padding: 24,
+    marginBottom: 16,
+    shadowColor: '#00C27A',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  focusHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  focusHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  focusTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  endSessionText: {
+    fontSize: 14,
+    color: '#FFFFFF',
+    opacity: 0.8,
+  },
+  timerContainer: {
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  timerText: {
+    fontSize: 64,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    marginBottom: 8,
+  },
+  timerSubtext: {
+    fontSize: 14,
+    color: '#FFFFFF',
+    opacity: 0.8,
+  },
+  timerProgressBar: {
+    height: 8,
+    backgroundColor: '#FFFFFF33',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  timerProgressFill: {
+    height: '100%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 4,
+  },
+  tasksCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+  },
+  tasksHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  tasksHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  tasksTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1F2937',
+  },
+  tasksCount: {
+    fontSize: 14,
+    color: '#6B7280',
+  },
+  taskItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 16,
+    backgroundColor: '#F9FAFB',
+    marginBottom: 8,
+    gap: 12,
+  },
+  taskCheckbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#D1D5DB',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  taskCheckboxCompleted: {
+    backgroundColor: '#00C27A',
+    borderColor: '#00C27A',
+  },
+  taskText: {
+    flex: 1,
+    fontSize: 15,
+    color: '#374151',
+  },
+  taskTextCompleted: {
+    color: '#9CA3AF',
+    textDecorationLine: 'line-through',
+  },
+  quickActionsContainer: {
+    maxHeight: 60,
+    marginBottom: 16,
+  },
+  quickActionsContent: {
+    paddingHorizontal: 24,
+    gap: 8,
+  },
+  quickActionChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#00C27A4D',
+    gap: 6,
+  },
+  quickActionText: {
+    fontSize: 14,
+    color: '#374151',
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingBottom: 24,
+    gap: 12,
+  },
+  inputWrapper: {
+    flex: 1,
+  },
+  input: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 24,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    fontSize: 15,
+    color: '#1F2937',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    maxHeight: 100,
+  },
+  micButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#F9FAFB',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  sendButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    overflow: 'hidden',
+    shadowColor: '#00C27A',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  sendButtonGradient: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  // Modal Styles
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  modalContent: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 24,
+    width: '100%',
+    maxWidth: 400,
+  },
+  modalHeader: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  modalIconContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#00C27A',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1F2937',
+    marginBottom: 8,
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    color: '#6B7280',
+  },
+  timeOptionsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginBottom: 24,
+  },
+  timeOption: {
+    flex: 1,
+    minWidth: '45%',
+    backgroundColor: '#F0FDF4',
+    borderRadius: 16,
+    padding: 20,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#00C27A4D',
+  },
+  timeOptionEmoji: {
+    fontSize: 32,
+    marginBottom: 8,
+  },
+  timeOptionLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1F2937',
+  },
+  customDurationContainer: {
+    marginBottom: 24,
+  },
+  customDurationLabel: {
+    fontSize: 14,
+    color: '#6B7280',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  customDurationInputRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 8,
+  },
+  customDurationInput: {
+    flex: 1,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 16,
+    textAlign: 'center',
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
+  },
+  customDurationInputError: {
+    borderColor: '#EF4444',
+  },
+  customDurationButton: {
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  customDurationButtonGradient: {
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  customDurationButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  customDurationError: {
+    fontSize: 12,
+    color: '#EF4444',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  customDurationHint: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    textAlign: 'center',
+  },
+  modalCancelButton: {
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  modalCancelText: {
+    fontSize: 16,
+    color: '#6B7280',
+  },
+  // Voice Modal Styles
+  voiceModalBackdrop: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  voiceModalContent: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    overflow: 'hidden',
+    width: '100%',
+    maxWidth: 400,
+  },
+  voiceModalHeader: {
+    padding: 24,
+    alignItems: 'center',
+  },
+  voiceModalEmoji: {
+    fontSize: 48,
+    marginBottom: 12,
+  },
+  voiceModalTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    marginBottom: 4,
+  },
+  voiceModalSubtitle: {
+    fontSize: 14,
+    color: '#FFFFFF',
+    opacity: 0.9,
+  },
+  voiceModalBody: {
+    padding: 32,
+    alignItems: 'center',
+  },
+  processingContainer: {
+    alignItems: 'center',
+    paddingVertical: 32,
+  },
+  processingIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#F0FDF4',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  processingText: {
+    fontSize: 16,
+    color: '#6B7280',
+  },
+  micContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+    position: 'relative',
+  },
+  micButtonLarge: {
+    width: 128,
+    height: 128,
+    borderRadius: 64,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  micButtonGradient: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  micButtonRecording: {
+    shadowColor: '#EF4444',
+  },
+  pulseRing: {
+    position: 'absolute',
+    width: 128,
+    height: 128,
+    borderRadius: 64,
+    borderWidth: 4,
+    borderColor: '#EF4444',
+  },
+  recordingDot: {
+    position: 'absolute',
+    top: -8,
+    right: -8,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#EF4444',
+    borderWidth: 4,
+    borderColor: '#FFFFFF',
+  },
+  recordingTime: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#EF4444',
+    marginBottom: 16,
+  },
+  voicePrompt: {
+    fontSize: 16,
+    color: '#374151',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  voicePromptHint: {
+    fontSize: 14,
+    color: '#6B7280',
+    textAlign: 'center',
+  },
+  voiceModalCancel: {
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    alignItems: 'center',
+  },
+  voiceModalCancelText: {
+    fontSize: 16,
+    color: '#6B7280',
+  },
+  // Habits Modal Styles
+  habitsModalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  habitsModalContent: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    overflow: 'hidden',
+    width: '100%',
+    maxWidth: 400,
+    maxHeight: '80%',
+  },
+  habitsModalHeader: {
+    padding: 24,
+    alignItems: 'center',
+  },
+  habitsModalIconContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#FFFFFF33',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  habitsModalTitle: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    marginBottom: 4,
+  },
+  habitsModalSubtitle: {
+    fontSize: 16,
+    color: '#FFFFFF',
+    opacity: 0.9,
+  },
+  habitsList: {
+    flex: 1,
+  },
+  habitsListContent: {
+    padding: 24,
+    gap: 12,
+  },
+  habitItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    padding: 16,
+    borderRadius: 16,
+    backgroundColor: '#F9FAFB',
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
+    gap: 12,
+  },
+  habitItemCompleted: {
+    backgroundColor: '#F0FDF4',
+    borderColor: '#00C27A',
+  },
+  habitCheckbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#D1D5DB',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 2,
+  },
+  habitCheckboxCompleted: {
+    backgroundColor: '#00C27A',
+    borderColor: '#00C27A',
+  },
+  habitContent: {
+    flex: 1,
+  },
+  habitHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+    gap: 8,
+  },
+  habitIcon: {
+    fontSize: 24,
+  },
+  habitName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1F2937',
+  },
+  habitNameCompleted: {
+    color: '#374151',
+  },
+  habitStats: {
+    flexDirection: 'row',
+    gap: 16,
+  },
+  habitStat: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  habitStatIcon: {
+    fontSize: 12,
+  },
+  habitStatText: {
+    fontSize: 12,
+    color: '#6B7280',
+  },
+  bestStreakBadge: {
+    marginTop: 8,
+    alignSelf: 'flex-start',
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  bestStreakText: {
+    fontSize: 12,
+    color: '#92400E',
+  },
+  habitsFooter: {
+    padding: 24,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+    backgroundColor: '#F9FAFB',
+  },
+  habitsStatsGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginBottom: 16,
+  },
+  habitStatCard: {
+    alignItems: 'center',
+  },
+  habitStatCardIcon: {
+    fontSize: 24,
+    marginBottom: 4,
+  },
+  habitStatCardValue: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#00C27A',
+    marginBottom: 4,
+  },
+  habitStatCardLabel: {
+    fontSize: 12,
+    color: '#6B7280',
+  },
+  habitsDoneButton: {
+    borderRadius: 24,
+    overflow: 'hidden',
+  },
+  habitsDoneButtonGradient: {
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  habitsDoneButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  // Animation Styles
+  animationOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  animationContent: {
+    alignItems: 'center',
+  },
+  checkmarkCircle: {
+    marginBottom: 16,
+  },
+  xpText: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#00C27A',
+  },
+  sessionCompleteOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 1000,
+  },
+  sessionCompleteBlur: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  sessionCompleteContent: {
+    alignItems: 'center',
+  },
+  sessionCompleteEmoji: {
+    fontSize: 80,
+    marginBottom: 24,
+  },
+  sessionCompleteTitle: {
+    fontSize: 36,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    marginBottom: 16,
+  },
+  sessionCompleteSubtitle: {
+    fontSize: 20,
+    color: '#FFFFFF',
+    opacity: 0.9,
+    marginBottom: 24,
+  },
+  sessionCompleteXPBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF33',
+    borderRadius: 24,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    marginBottom: 24,
+    gap: 12,
+  },
+  sessionCompleteXPText: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  sessionCompleteStats: {
+    flexDirection: 'row',
+    gap: 24,
+    marginBottom: 32,
+  },
+  sessionCompleteStat: {
+    alignItems: 'center',
+  },
+  sessionCompleteStatEmoji: {
+    fontSize: 32,
+    marginBottom: 8,
+  },
+  sessionCompleteStatText: {
+    fontSize: 14,
+    color: '#FFFFFF',
+    opacity: 0.8,
+  },
+  sessionCompleteHint: {
+    fontSize: 14,
+    color: '#FFFFFF',
+    opacity: 0.6,
+  },
+  // Summary Modal Styles
+  summaryModalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  summaryModalContent: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    overflow: 'hidden',
+    width: '100%',
+    maxWidth: 400,
+  },
+  summaryModalHeader: {
+    padding: 24,
+    alignItems: 'center',
+  },
+  summaryModalEmoji: {
+    fontSize: 48,
+    marginBottom: 12,
+  },
+  summaryModalTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    marginBottom: 4,
+  },
+  summaryModalSubtitle: {
+    fontSize: 14,
+    color: '#FFFFFF',
+    opacity: 0.9,
+  },
+  summaryStats: {
+    padding: 24,
+    gap: 16,
+  },
+  summaryStatCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 16,
+    backgroundColor: '#F0FDF4',
+    borderWidth: 1,
+    borderColor: '#00C27A33',
+    gap: 12,
+  },
+  summaryStatCardXP: {
+    backgroundColor: '#FEF3C7',
+    borderColor: '#FCD34D',
+  },
+  summaryStatIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: '#00C27A',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  summaryStatIconContainerXP: {
+    backgroundColor: '#F59E0B',
+  },
+  summaryStatContent: {
+    flex: 1,
+  },
+  summaryStatLabel: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 4,
+  },
+  summaryStatValue: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1F2937',
+  },
+  summaryStatEmoji: {
+    fontSize: 24,
+  },
+  summaryMotivational: {
+    fontSize: 14,
+    color: '#6B7280',
+    textAlign: 'center',
+    paddingVertical: 12,
+  },
+  summaryFinishButton: {
+    marginHorizontal: 24,
+    marginBottom: 24,
+    borderRadius: 24,
+    overflow: 'hidden',
+  },
+  summaryFinishButtonGradient: {
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  summaryFinishButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+});
