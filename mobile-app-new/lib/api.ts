@@ -325,6 +325,14 @@ export const habitsService = {
       }),
     });
   },
+
+  // Supprimer une habitude
+  async delete(habitId: string): Promise<any> {
+    return await apiCall('/habits', {
+      method: 'DELETE',
+      body: JSON.stringify({ habitId }),
+    });
+  },
 };
 
 // Service pour les tâches
@@ -444,14 +452,23 @@ export const paymentService = {
       throw new Error('User not authenticated');
     }
     
+    console.log('💳 [PAYMENT] Création de session checkout:', {
+      billingType,
+      userId: user.id,
+      billingTypeType: typeof billingType
+    });
+    
     // Envoyer le userId dans le body comme fallback (le serveur utilisera le token en priorité)
-    return await apiCall('/stripe/create-checkout-session', {
+    const result = await apiCall('/stripe/create-checkout-session', {
       method: 'POST',
       body: JSON.stringify({
         userId: user.id, // Fallback si le token ne fonctionne pas
         billingType,
       }),
     });
+    
+    console.log('💳 [PAYMENT] Session créée:', result);
+    return result;
   },
 
   // Confirmer l'abonnement après paiement
