@@ -7,11 +7,19 @@ import { startOfDay, subDays, subMonths, subWeeks, format, startOfWeek, endOfWee
 export const maxDuration = 60
 
 export async function GET(request: NextRequest) {
+  const startTime = Date.now()
+  const routeName = "[ANALYTICS_STATS]"
+  
   try {
+    console.log(`${routeName} ⏱️  DÉBUT - Route: /api/dashboard/analytics-stats - Timestamp: ${new Date().toISOString()}`)
+    
     const user = await getAuthUserFromRequest(request)
     if (!user) {
+      console.log(`${routeName} ❌ ERREUR - Non authentifié après ${Date.now() - startTime}ms`)
       return NextResponse.json({ error: "Non authentifié" }, { status: 401 })
     }
+
+    console.log(`${routeName} ✅ Utilisateur authentifié: ${user.id} - Temps: ${Date.now() - startTime}ms`)
 
     const { searchParams } = new URL(request.url)
     const period = searchParams.get('period') || 'week' // week, month, trimester, year
@@ -257,8 +265,11 @@ export async function GET(request: NextRequest) {
       ? Math.round(totalProductivityScore / daysWithData)
       : 0
 
+    const totalTime = Date.now() - startTime
+    console.log(`${routeName} ✅ SUCCÈS - Route terminée en ${totalTime}ms - Timestamp: ${new Date().toISOString()}`)
+    
     return NextResponse.json({
-      period,
+      chartData,
       stats: {
         avgProductivity,
         totalTasks: completedTasks,
@@ -271,6 +282,8 @@ export async function GET(request: NextRequest) {
       }
     })
   } catch (error) {
+    const totalTime = Date.now() - startTime
+    console.error(`${routeName} ❌ ERREUR - Route échouée après ${totalTime}ms - Timestamp: ${new Date().toISOString()}`)
     console.error("Erreur lors de la récupération des statistiques analytics:", error)
     return NextResponse.json(
       { error: "Erreur lors de la récupération des statistiques analytics" },

@@ -7,13 +7,24 @@ import { formatInTimezone, USER_TIMEZONE, localDateToUTC } from "@/lib/date-util
 import { parse, parseISO, isWithinInterval } from "date-fns"
 import { toZonedTime } from "date-fns-tz"
 
+// Augmenter le timeout pour les requêtes complexes (30 secondes)
+export const maxDuration = 30
+
 // GET /api/tasks - Récupérer toutes les tâches de l'utilisateur
 export async function GET(request: Request) {
+  const startTime = Date.now()
+  const routeName = "[TASKS]"
+  
   try {
+    console.log(`${routeName} ⏱️  DÉBUT - Route: /api/tasks - Timestamp: ${new Date().toISOString()}`)
+    
     const user = await getAuthUser()
     if (!user) {
+      console.log(`${routeName} ❌ ERREUR - Non authentifié après ${Date.now() - startTime}ms`)
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 })
     }
+
+    console.log(`${routeName} ✅ Utilisateur authentifié: ${user.id} - Temps: ${Date.now() - startTime}ms`)
 
     const userId = user.id
     
@@ -232,11 +243,16 @@ export async function GET(request: Request) {
       }
     })
     
+    const totalTime = Date.now() - startTime
+    console.log(`${routeName} ✅ SUCCÈS - Route terminée en ${totalTime}ms - Tâches: ${tasks.length} - Timestamp: ${new Date().toISOString()}`)
+    
     return NextResponse.json({ 
       tasks,
       isCompanyFiltered: false
     })
   } catch (error) {
+    const totalTime = Date.now() - startTime
+    console.error(`${routeName} ❌ ERREUR - Route échouée après ${totalTime}ms - Timestamp: ${new Date().toISOString()}`)
     console.error("[TASKS_GET]", error)
     return NextResponse.json({ error: "Erreur lors du chargement des tâches" }, { status: 500 })
   }

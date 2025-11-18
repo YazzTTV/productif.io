@@ -8,7 +8,12 @@ import { startOfDay, endOfDay, subDays } from "date-fns"
 export const maxDuration = 60
 
 export async function GET(req: NextRequest) {
+  const startTime = Date.now()
+  const routeName = "[DEEPWORK_STATS]"
+  
   try {
+    console.log(`${routeName} ⏱️  DÉBUT - Route: /api/dashboard/deepwork-stats - Timestamp: ${new Date().toISOString()}`)
+    
     // Essayer d'abord avec getAuthUserFromRequest (tokens utilisateur)
     let user = await getAuthUserFromRequest(req)
     
@@ -126,6 +131,9 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    const totalTime = Date.now() - startTime
+    console.log(`${routeName} ✅ SUCCÈS - Route terminée en ${totalTime}ms - Timestamp: ${new Date().toISOString()}`)
+
     return NextResponse.json({
       today: {
         hours: todayHours,
@@ -143,6 +151,8 @@ export async function GET(req: NextRequest) {
       bestSessionSeconds: bestSessionSeconds,
     })
   } catch (error) {
+    const totalTime = Date.now() - startTime
+    console.error(`${routeName} ❌ ERREUR - Route échouée après ${totalTime}ms - Timestamp: ${new Date().toISOString()}`)
     console.error("Erreur lors de la récupération des stats de deep work:", error)
     return NextResponse.json(
       { error: "Erreur lors de la récupération des statistiques" },

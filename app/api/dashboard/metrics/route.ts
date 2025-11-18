@@ -7,21 +7,29 @@ import { format, startOfDay, endOfDay, isSameDay, isAfter, isBefore, startOfTomo
 export const maxDuration = 60
 
 export async function GET(request: Request) {
+  const startTime = Date.now()
+  const routeName = "[METRICS]"
+  
   try {
+    console.log(`${routeName} ⏱️  DÉBUT - Route: /api/dashboard/metrics - Timestamp: ${new Date().toISOString()}`)
+    
     const user = await getAuthUser()
     
     if (!user) {
+      console.log(`${routeName} ❌ ERREUR - Non authentifié après ${Date.now() - startTime}ms`)
       return NextResponse.json(
         { error: "Non authentifié" },
         { status: 401 }
       )
     }
 
+    console.log(`${routeName} ✅ Utilisateur authentifié: ${user.id} - Temps: ${Date.now() - startTime}ms`)
+
     // Récupérer le paramètre date de l'URL
     const { searchParams } = new URL(request.url)
     const dateParam = searchParams.get('date')
     
-    console.log("[METRICS] Récupération des métriques pour l'utilisateur:", user.id)
+    console.log(`${routeName} 📊 Récupération des métriques pour l'utilisateur: ${user.id}`)
     console.log("[METRICS] Paramètre date reçu:", dateParam)
 
     // Utiliser la date fournie ou la date actuelle
@@ -270,10 +278,14 @@ export async function GET(request: Request) {
       }
     }
 
+    const totalTime = Date.now() - startTime
+    console.log(`${routeName} ✅ SUCCÈS - Route terminée en ${totalTime}ms - Timestamp: ${new Date().toISOString()}`)
     console.log("[METRICS] Réponse finale:", JSON.stringify(response, null, 2))
 
     return NextResponse.json(response)
   } catch (error) {
+    const totalTime = Date.now() - startTime
+    console.error(`${routeName} ❌ ERREUR - Route échouée après ${totalTime}ms - Timestamp: ${new Date().toISOString()}`)
     console.error("[METRICS_ERROR] Erreur lors de la récupération des métriques:", error)
     return NextResponse.json(
       { error: "Erreur interne du serveur" },
