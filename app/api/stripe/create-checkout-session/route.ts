@@ -1,16 +1,48 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { stripe, TRIAL_PERIOD_DAYS } from '@/lib/stripe';
 import { prisma } from '@/lib/prisma';
+import { getAuthUserFromRequest } from '@/lib/auth';
 import Stripe from 'stripe';
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
     console.log('Starting checkout session creation...');
+    console.log('Request headers:', {
+      authorization: req.headers.get('authorization') ? 'present' : 'missing',
+      'content-type': req.headers.get('content-type'),
+    });
 
-    const { userId, billingType } = await req.json();
-    console.log('Received userId:', userId);
-    console.log('Billing type:', billingType);
+    // Extraire l'utilisateur depuis le token JWT AVANT de parser le body
+    // (car getAuthUserFromRequest lit les headers, pas le body)
+    const authUser = await getAuthUserFromRequest(req);
+    console.log('Auth user from request:', authUser ? { id: authUser.id, email: authUser.email } : 'null');
+    
+    // Parser le body après l'authentification
+    const body = await req.json();
+    const { billingType, userId: bodyUserId } = body;
+    console.log('📦 [CHECKOUT] Body reçu:', JSON.stringify(body, null, 2));
+    console.log('📦 [CHECKOUT] Billing type from body:', billingType);
+    console.log('📦 [CHECKOUT] Type de billingType:', typeof billingType);
+    console.log('📦 [CHECKOUT] User ID from body (fallback):', bodyUserId);
+    
+    // Déterminer le userId : priorité au token, fallback au body
+    let userId: string | undefined;
+    
+    if (authUser?.id) {
+      userId = authUser.id;
+      console.log('Using userId from token:', userId);
+    } else if (bodyUserId) {
+      userId = bodyUserId;
+      console.log('Using userId from body (fallback):', userId);
+    } else {
+      console.error('No userId found in token or body');
+      return NextResponse.json({ error: 'Non authentifié' }, { status: 401 });
+    }
 
+    if (!userId) {
+      return NextResponse.json({ error: 'User ID manquant' }, { status: 401 });
+    }
+    
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -53,17 +85,36 @@ export async function POST(req: Request) {
       });
     }
 
-    // Pick price based on billing type
-    const priceId = billingType === 'yearly'
-      ? process.env.STRIPE_PRICE_YEARLY_ID
-      : process.env.STRIPE_PRICE_MONTHLY_ID;
+    // Pick price based on billing type (accept both 'annual' and 'yearly')
+    const isAnnual = billingType === 'yearly' || billingType === 'annual';
+    const yearlyPriceId = process.env.STRIPE_PRICE_YEARLY_ID;
+    const monthlyPriceId = process.env.STRIPE_PRICE_MONTHLY_ID;
+    const priceId = isAnnual ? yearlyPriceId : monthlyPriceId;
+
+    console.log('💰 [CHECKOUT] Billing type check:', {
+      received: billingType,
+      isAnnual,
+      yearlyPriceId: yearlyPriceId || 'MISSING',
+      monthlyPriceId: monthlyPriceId || 'MISSING',
+      selectedPriceId: priceId || 'MISSING',
+      priceType: isAnnual ? 'YEARLY' : 'MONTHLY'
+    });
 
     if (!priceId) {
       return NextResponse.json({ error: 'Price ID not configured for selected billing type' }, { status: 500 });
     }
 
-    const successURL = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/merci?success=true`;
-    const cancelURL = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/upgrade?canceled=true`;
+    // URLs pour le mobile app (détectées dans le WebView)
+    // Pour le web, utiliser les URLs normales
+    const isMobile = req.headers.get('user-agent')?.includes('Mobile') || false;
+    const baseURL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    
+    const successURL = isMobile 
+      ? `${baseURL}/merci?success=true&mobile=true`
+      : `${baseURL}/merci?success=true`;
+    const cancelURL = isMobile
+      ? `${baseURL}/upgrade?canceled=true&mobile=true`
+      : `${baseURL}/upgrade?canceled=true`;
 
     const sessionParams: Stripe.Checkout.SessionCreateParams = {
       customer: stripeCustomerId,
@@ -78,7 +129,7 @@ export async function POST(req: Request) {
       cancel_url: cancelURL,
       metadata: {
         userId: user.id,
-        billingType: billingType || 'monthly',
+        billingType: (billingType === 'yearly' || billingType === 'annual') ? 'annual' : 'monthly',
       },
     };
 
