@@ -1,25 +1,46 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verifyApiToken, hasRequiredScopes } from '@/lib/api-token'
+import { getAuthUserFromRequest } from '@/lib/auth'
 
 export async function POST(req: NextRequest) {
   try {
     const authHeader = req.headers.get('authorization') || ''
     const token = authHeader.startsWith('Bearer ') ? authHeader.substring(7) : ''
-    if (!token) {
-      return NextResponse.json({ error: 'Un token API est requis' }, { status: 401 })
+    
+    let userId: string | null = null
+    
+    // Essayer d'abord avec un token utilisateur (JWT) - pour l'app mobile
+    if (token) {
+      const user = await getAuthUserFromRequest(req)
+      if (user) {
+        userId = user.id
+      }
     }
-
-    const payload = await verifyApiToken(token)
-    if (!payload) {
-      return NextResponse.json({ error: 'Token API invalide ou expiré' }, { status: 401 })
+    
+    // Si pas d'utilisateur, essayer avec un token API
+    if (!userId && token) {
+      try {
+        const payload = await verifyApiToken(token)
+        if (payload) {
+          // Vérifier les scopes pour les tokens API
+          if (!hasRequiredScopes(payload.scopes, ['deepwork:write', 'tasks:write'])) {
+            return NextResponse.json({ error: 'Permissions insuffisantes', requiredScopes: ['deepwork:write', 'tasks:write'] }, { status: 403 })
+          }
+          userId = payload.userId
+        }
+      } catch (error) {
+        // Si la vérification du token API échoue, on continue avec null
+        // Cela permet de retourner une erreur 401 claire
+        console.error('Erreur lors de la vérification du token API:', error)
+      }
     }
-    if (!hasRequiredScopes(payload.scopes, ['deepwork:write', 'tasks:write'])) {
-      return NextResponse.json({ error: 'Permissions insuffisantes', requiredScopes: ['deepwork:write', 'tasks:write'] }, { status: 403 })
+    
+    if (!userId) {
+      return NextResponse.json({ error: 'Token invalide ou expiré' }, { status: 401 })
     }
 
     const { plannedDuration, type = 'deepwork', description } = await req.json()
-    const userId = payload.userId
 
     if (!plannedDuration || plannedDuration < 1) {
       return NextResponse.json({ error: 'plannedDuration requis (en minutes)' }, { status: 400 })
@@ -70,19 +91,38 @@ export async function GET(req: NextRequest) {
   try {
     const authHeader = req.headers.get('authorization') || ''
     const token = authHeader.startsWith('Bearer ') ? authHeader.substring(7) : ''
-    if (!token) {
-      return NextResponse.json({ error: 'Un token API est requis' }, { status: 401 })
+    
+    let userId: string | null = null
+    
+    // Essayer d'abord avec un token utilisateur (JWT) - pour l'app mobile
+    if (token) {
+      const user = await getAuthUserFromRequest(req)
+      if (user) {
+        userId = user.id
+      }
     }
-
-    const payload = await verifyApiToken(token)
-    if (!payload) {
-      return NextResponse.json({ error: 'Token API invalide ou expiré' }, { status: 401 })
+    
+    // Si pas d'utilisateur, essayer avec un token API
+    if (!userId && token) {
+      try {
+        const payload = await verifyApiToken(token)
+        if (payload) {
+          // Vérifier les scopes pour les tokens API
+          if (!hasRequiredScopes(payload.scopes, ['deepwork:read', 'tasks:read'])) {
+            return NextResponse.json({ error: 'Permissions insuffisantes', requiredScopes: ['deepwork:read', 'tasks:read'] }, { status: 403 })
+          }
+          userId = payload.userId
+        }
+      } catch (error) {
+        // Si la vérification du token API échoue, on continue avec null
+        // Cela permet de retourner une erreur 401 claire
+        console.error('Erreur lors de la vérification du token API:', error)
+      }
     }
-    if (!hasRequiredScopes(payload.scopes, ['deepwork:read', 'tasks:read'])) {
-      return NextResponse.json({ error: 'Permissions insuffisantes', requiredScopes: ['deepwork:read', 'tasks:read'] }, { status: 403 })
+    
+    if (!userId) {
+      return NextResponse.json({ error: 'Token invalide ou expiré' }, { status: 401 })
     }
-
-    const userId = payload.userId
     const { searchParams } = new URL(req.url)
     const statusParam = searchParams.get('status') // active, completed, all
     const limit = parseInt(searchParams.get('limit') || '10')

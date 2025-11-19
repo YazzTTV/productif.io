@@ -13,6 +13,8 @@ import {
   Platform,
   SafeAreaView,
   StatusBar,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
@@ -29,6 +31,8 @@ import Animated, {
 } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
+import { assistantService, tasksService, habitsService } from '@/lib/api';
+import { format } from 'date-fns';
 
 interface Message {
   id: string;
@@ -38,19 +42,28 @@ interface Message {
 }
 
 interface Task {
-  id: number;
-  text: string;
+  id: string;
+  title: string;
   completed: boolean;
+  priority?: number;
+  dueDate?: string;
 }
 
 interface Habit {
-  id: number;
+  id: string;
   name: string;
-  icon: string;
+  icon?: string;
   completed: boolean;
-  streak: number;
-  bestStreak: number;
-  completionRate: number;
+  streak?: number;
+  bestStreak?: number;
+  completionRate?: number;
+  entries?: Array<{
+    id: string;
+    date: string;
+    completed: boolean;
+    note?: string;
+    rating?: number;
+  }>;
 }
 
 const quickActions = [
@@ -114,21 +127,12 @@ export default function AssistantScreen() {
 
   // Habit Tracking State
   const [showHabitsModal, setShowHabitsModal] = useState(false);
-  const [habits, setHabits] = useState<Habit[]>([
-    { id: 1, name: 'Morning Meditation', icon: '🧘', completed: false, streak: 12, bestStreak: 18, completionRate: 85 },
-    { id: 2, name: 'Daily Exercise', icon: '💪', completed: true, streak: 7, bestStreak: 15, completionRate: 78 },
-    { id: 3, name: 'Read 30 min', icon: '📚', completed: false, streak: 5, bestStreak: 10, completionRate: 72 },
-    { id: 4, name: 'Drink 8 glasses water', icon: '💧', completed: true, streak: 14, bestStreak: 20, completionRate: 92 },
-    { id: 5, name: 'Journal before bed', icon: '📝', completed: false, streak: 3, bestStreak: 8, completionRate: 65 },
-    { id: 6, name: 'No phone 1hr before bed', icon: '📵', completed: false, streak: 2, bestStreak: 5, completionRate: 58 },
-  ]);
+  const [habits, setHabits] = useState<Habit[]>([]);
+  const [isLoadingHabits, setIsLoadingHabits] = useState(false);
+  const [deepWorkSessionId, setDeepWorkSessionId] = useState<string | null>(null);
 
-  const [tasks, setTasks] = useState<Task[]>([
-    { id: 1, text: 'Complete project proposal', completed: false },
-    { id: 2, text: 'Review quarterly reports', completed: false },
-    { id: 3, text: 'Prepare presentation slides', completed: false },
-    { id: 4, text: 'Update team documentation', completed: false },
-  ]);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [isLoadingTasks, setIsLoadingTasks] = useState(false);
 
   // Timer Effect
   useEffect(() => {
@@ -254,21 +258,43 @@ export default function AssistantScreen() {
     }
   };
 
-  const startDeepWork = (minutes: number) => {
-    setShowTimeSelector(false);
-    setIsDeepWorkActive(true);
-    setDeepWorkTimeLeft(minutes * 60);
-    setSelectedDuration(minutes);
-    setCustomDuration('');
-    setCustomDurationError('');
+  const startDeepWork = async (minutes: number) => {
+    try {
+      setShowTimeSelector(false);
+      setCustomDuration('');
+      setCustomDurationError('');
 
-    const deepWorkMessage: Message = {
-      id: Date.now().toString(),
-      text: `🧠 Deep work session started! I'll be here to keep you focused for the next ${minutes} minutes. Your tasks are ready below. Let's do this!`,
-      isAI: true,
-      timestamp: new Date(),
-    };
-    setMessages((prev) => [...prev, deepWorkMessage]);
+      // Appeler l'API pour démarrer la session Deep Work
+      const response = await assistantService.startDeepWorkSession(
+        minutes,
+        'deepwork',
+        `Session Deep Work (${minutes}min)`
+      );
+
+      if (response.error) {
+        Alert.alert('Erreur', response.error);
+        return;
+      }
+
+      setIsDeepWorkActive(true);
+      setDeepWorkTimeLeft(minutes * 60);
+      setSelectedDuration(minutes);
+      setDeepWorkSessionId(response.session?.id || null);
+
+      // Charger les tâches d'aujourd'hui
+      await loadTodayTasks();
+
+      const deepWorkMessage: Message = {
+        id: Date.now().toString(),
+        text: `🧠 Deep work session started! I'll be here to keep you focused for the next ${minutes} minutes. Your tasks are ready below. Let's do this!`,
+        isAI: true,
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, deepWorkMessage]);
+    } catch (error: any) {
+      console.error('Erreur lors du démarrage de la session Deep Work:', error);
+      Alert.alert('Erreur', error.message || 'Impossible de démarrer la session Deep Work');
+    }
   };
 
   const startCustomDuration = () => {
@@ -297,21 +323,36 @@ export default function AssistantScreen() {
     startDeepWork(minutes);
   };
 
-  const toggleTask = (taskId: number) => {
-    setTasks((prev) =>
-      prev.map((task) => {
-        if (task.id === taskId) {
-          const newCompleted = !task.completed;
-          if (newCompleted && !task.completed) {
-            setXp((prevXp) => Math.min(prevXp + 15, maxXp));
-            setShowTaskCompleteAnimation(true);
-            setTimeout(() => setShowTaskCompleteAnimation(false), 2000);
-          }
-          return { ...task, completed: newCompleted };
-        }
-        return task;
-      })
-    );
+  const toggleTask = async (taskId: string) => {
+    try {
+      const task = tasks.find((t) => t.id === taskId);
+      if (!task) return;
+
+      const newCompleted = !task.completed;
+
+      // Mettre à jour optimistiquement
+      setTasks((prev) =>
+        prev.map((t) => (t.id === taskId ? { ...t, completed: newCompleted } : t))
+      );
+
+      // Appeler l'API pour mettre à jour la tâche
+      if (newCompleted) {
+        await tasksService.complete(taskId);
+        setXp((prevXp) => Math.min(prevXp + 15, maxXp));
+        setShowTaskCompleteAnimation(true);
+        setTimeout(() => setShowTaskCompleteAnimation(false), 2000);
+      } else {
+        // Si on décoche, on doit utiliser updateTask
+        await tasksService.updateTask(taskId, { completed: false });
+      }
+    } catch (error: any) {
+      console.error('Erreur lors de la mise à jour de la tâche:', error);
+      Alert.alert('Erreur', 'Impossible de mettre à jour la tâche');
+      // Rollback
+      setTasks((prev) =>
+        prev.map((t) => (t.id === taskId ? { ...t, completed: !t.completed } : t))
+      );
+    }
   };
 
   const startRecording = () => {
@@ -319,25 +360,45 @@ export default function AssistantScreen() {
     setRecordingTime(0);
   };
 
-  const stopRecording = () => {
+  const stopRecording = async () => {
     setIsRecording(false);
     setIsProcessingJournal(true);
 
-    setTimeout(() => {
+    try {
+      // Pour l'instant, on simule la transcription
+      // TODO: Intégrer un vrai système d'enregistrement vocal
+      const transcription = `Note de ma journée: ${recordingTime} secondes d'enregistrement. [À remplacer par la vraie transcription vocale]`;
+
+      // Enregistrer le journaling
+      const journalResponse = await assistantService.saveJournal(transcription);
+
+      // Trouver l'habitude "Note de sa journée"
+      const noteHabit = await assistantService.findHabitByName('note de sa journée');
+      if (noteHabit) {
+        const today = format(new Date(), 'yyyy-MM-dd');
+        await assistantService.saveHabitEntry(noteHabit.id, today, transcription);
+        // Recharger les habitudes
+        await loadHabits();
+      }
+
       setIsProcessingJournal(false);
       setShowJournalModal(false);
 
-      const journalResponse: Message = {
+      const aiMessage: Message = {
         id: Date.now().toString(),
-        text: `📝 Thank you for sharing! I analyzed your day:\n\n✅ What went well:\n• You maintained great focus during peak hours\n• Completed important tasks on time\n• Good energy management\n\n💡 Areas to improve:\n• Consider taking more breaks\n• Could delegate some routine tasks\n• Try time-blocking for better structure\n\nKeep up the great work! You earned 25 XP! 🌟`,
+        text: `📝 Merci pour ton partage ! J'ai enregistré ta note de journée.\n\nJe vais analyser tes réflexions et te donner mes insights demain matin 🌅\n\nTu peux aussi consulter ton journal sur la page /mon-espace de l'app web.\n\nTu as gagné 25 XP ! 🌟`,
         isAI: true,
         timestamp: new Date(),
       };
 
-      setMessages((prev) => [...prev, journalResponse]);
+      setMessages((prev) => [...prev, aiMessage]);
       setXp((prev) => Math.min(prev + 25, maxXp));
       setRecordingTime(0);
-    }, 2500);
+    } catch (error: any) {
+      console.error('Erreur lors de l\'enregistrement du journal:', error);
+      setIsProcessingJournal(false);
+      Alert.alert('Erreur', 'Impossible d\'enregistrer le journal');
+    }
   };
 
   const startPlanningRecording = () => {
@@ -345,17 +406,43 @@ export default function AssistantScreen() {
     setPlanningRecordingTime(0);
   };
 
-  const stopPlanningRecording = () => {
+  const stopPlanningRecording = async () => {
     setIsPlanningRecording(false);
     setIsProcessingPlanning(true);
 
-    setTimeout(() => {
+    try {
+      // Pour l'instant, on simule la transcription
+      // TODO: Intégrer un vrai système d'enregistrement vocal
+      const userInput = `Plan pour demain: ${planningRecordingTime} secondes d'enregistrement. [À remplacer par la vraie transcription vocale]`;
+
+      // Appeler l'API plan tomorrow
+      const result = await assistantService.planTomorrow(userInput);
+
       setIsProcessingPlanning(false);
       setShowPlanningModal(false);
 
+      // Construire le message de réponse
+      let responseMessage = `📅 Parfait ! J'ai créé ${result.tasksCreated} tâche${result.tasksCreated > 1 ? 's' : ''} pour demain !\n\n`;
+
+      if (result.analysis?.summary) {
+        responseMessage += `💭 Analyse :\n${result.analysis.summary}\n\n`;
+      }
+
+      if (result.analysis?.planSummary) {
+        responseMessage += result.analysis.planSummary;
+      }
+
+      if (result.analysis?.totalEstimatedTime) {
+        const hours = Math.floor(result.analysis.totalEstimatedTime / 60);
+        const minutes = result.analysis.totalEstimatedTime % 60;
+        responseMessage += `\n\n⏱️ Temps total estimé : ${hours}h${minutes > 0 ? minutes : ''}`;
+      }
+
+      responseMessage += `\n\n💡 Conseil : Commence par les tâches 🔴 haute priorité le matin quand ton énergie est au max !`;
+
       const planningResponse: Message = {
         id: Date.now().toString(),
-        text: `📅 Perfect! I've created your personalized plan for tomorrow:\n\n🌅 Morning (8am-12pm):\n• Client presentation at 9:30am (prep 30min before)\n• Strategy meeting at 11am\n• Quick break & review progress\n\n☀️ Afternoon (1pm-5pm):\n• Deep work: Project deadline tasks (2hrs)\n• Team check-in at 3:30pm\n• Wrap up & plan next day\n\n💡 Pro Tips:\n• Start with hardest task first\n• Block 15min between meetings\n• Set phone on Do Not Disturb during deep work\n\nYou earned 30 XP! Let's crush tomorrow! 🚀`,
+        text: responseMessage,
         isAI: true,
         timestamp: new Date(),
       };
@@ -363,7 +450,11 @@ export default function AssistantScreen() {
       setMessages((prev) => [...prev, planningResponse]);
       setXp((prev) => Math.min(prev + 30, maxXp));
       setPlanningRecordingTime(0);
-    }, 3000);
+    } catch (error: any) {
+      console.error('Erreur lors de la planification:', error);
+      setIsProcessingPlanning(false);
+      Alert.alert('Erreur', error.message || 'Impossible de créer le plan');
+    }
   };
 
   const startLearningRecording = () => {
@@ -371,17 +462,32 @@ export default function AssistantScreen() {
     setLearningRecordingTime(0);
   };
 
-  const stopLearningRecording = () => {
+  const stopLearningRecording = async () => {
     setIsLearningRecording(false);
     setIsProcessingLearning(true);
 
-    setTimeout(() => {
+    try {
+      // Pour l'instant, on simule la transcription
+      // TODO: Intégrer un vrai système d'enregistrement vocal
+      const learningNote = `Apprentissage du jour: ${learningRecordingTime} secondes d'enregistrement. [À remplacer par la vraie transcription vocale]`;
+
+      // Trouver l'habitude "Apprentissage"
+      const learningHabit = await assistantService.findHabitByName('apprentissage');
+      if (learningHabit) {
+        const today = format(new Date(), 'yyyy-MM-dd');
+        await assistantService.saveHabitEntry(learningHabit.id, today, learningNote);
+        // Recharger les habitudes
+        await loadHabits();
+      } else {
+        console.warn('Habitude "Apprentissage" non trouvée');
+      }
+
       setIsProcessingLearning(false);
       setShowLearningModal(false);
 
       const learningResponse: Message = {
         id: Date.now().toString(),
-        text: `💡 Amazing! I've captured your learning insights:\n\n📚 What You Learned Today:\n• New project management techniques\n• Effective communication strategies\n• Time-blocking methodology\n\n🎯 Key Takeaways:\n• Apply the 2-minute rule for quick tasks\n• Use structured breaks to maintain focus\n• Document learnings for future reference\n\n✨ Recommendations:\n• Practice these skills tomorrow\n• Share your insights with your team\n• Review your learnings weekly\n\nKnowledge retained! You earned 20 XP! 🌟`,
+        text: `💡 Excellent ! J'ai enregistré tes apprentissages du jour.\n\n📚 Tes apprentissages sont maintenant sauvegardés dans l'habitude "Apprentissage" et visibles sur /mon-espace apprentissage.\n\n✨ Continue à apprendre et à grandir chaque jour !\n\nTu as gagné 20 XP ! 🌟`,
         isAI: true,
         timestamp: new Date(),
       };
@@ -389,7 +495,11 @@ export default function AssistantScreen() {
       setMessages((prev) => [...prev, learningResponse]);
       setXp((prev) => Math.min(prev + 20, maxXp));
       setLearningRecordingTime(0);
-    }, 2800);
+    } catch (error: any) {
+      console.error('Erreur lors de l\'enregistrement de l\'apprentissage:', error);
+      setIsProcessingLearning(false);
+      Alert.alert('Erreur', 'Impossible d\'enregistrer l\'apprentissage');
+    }
   };
 
   const endSession = () => {
@@ -406,27 +516,51 @@ export default function AssistantScreen() {
     }
   };
 
-  const toggleHabit = (habitId: number) => {
-    setHabits((prev) =>
-      prev.map((habit) => {
-        if (habit.id === habitId) {
-          const newCompleted = !habit.completed;
-          if (newCompleted) {
-            setXp((prevXp) => Math.min(prevXp + 10, maxXp));
+  const toggleHabit = async (habitId: string) => {
+    try {
+      const habit = habits.find((h) => h.id === habitId);
+      if (!habit) return;
 
-            const habitMessage: Message = {
-              id: Date.now().toString(),
-              text: `🎉 Great job! You completed "${habit.name}"! Keep that ${habit.streak} day streak going! +10 XP`,
-              isAI: true,
-              timestamp: new Date(),
-            };
-            setMessages((prevMessages) => [...prevMessages, habitMessage]);
+      const newCompleted = !habit.completed;
+      const today = format(new Date(), 'yyyy-MM-dd');
+
+      // Mettre à jour optimistiquement
+      setHabits((prev) =>
+        prev.map((h) => {
+          if (h.id === habitId) {
+            return { ...h, completed: newCompleted };
           }
-          return { ...habit, completed: newCompleted };
-        }
-        return habit;
-      })
-    );
+          return h;
+        })
+      );
+
+      // Appeler l'API pour mettre à jour l'habitude
+      await habitsService.complete(habitId, today, habit.completed);
+
+      if (newCompleted) {
+        setXp((prevXp) => Math.min(prevXp + 10, maxXp));
+
+        const habitMessage: Message = {
+          id: Date.now().toString(),
+          text: `🎉 Excellent ! Tu as complété "${habit.name}" ! Continue cette série de ${habit.streak || 0} jours ! +10 XP`,
+          isAI: true,
+          timestamp: new Date(),
+        };
+        setMessages((prevMessages) => [...prevMessages, habitMessage]);
+      }
+    } catch (error: any) {
+      console.error('Erreur lors de la mise à jour de l\'habitude:', error);
+      Alert.alert('Erreur', 'Impossible de mettre à jour l\'habitude');
+      // Rollback
+      setHabits((prev) =>
+        prev.map((h) => {
+          if (h.id === habitId) {
+            return { ...h, completed: !h.completed };
+          }
+          return h;
+        })
+      );
+    }
   };
 
   const formatTime = (seconds: number) => {
@@ -436,6 +570,84 @@ export default function AssistantScreen() {
   };
 
   const xpPercentage = (xp / maxXp) * 100;
+
+  // Charger les tâches d'aujourd'hui
+  useEffect(() => {
+    if (isDeepWorkActive) {
+      loadTodayTasks();
+    }
+  }, [isDeepWorkActive]);
+
+  // Charger les habitudes
+  useEffect(() => {
+    loadHabits();
+  }, []);
+
+  const loadTodayTasks = async () => {
+    try {
+      setIsLoadingTasks(true);
+      const todayTasks = await assistantService.getTodayTasks();
+      // Limiter à 4-6 tâches pour la session deep work
+      const limitedTasks = todayTasks.slice(0, 6).map((task: any) => ({
+        id: task.id,
+        title: task.title,
+        completed: task.completed || false,
+        priority: task.priority,
+        dueDate: task.dueDate,
+      }));
+      setTasks(limitedTasks);
+    } catch (error) {
+      console.error('Erreur lors du chargement des tâches:', error);
+      Alert.alert('Erreur', 'Impossible de charger les tâches');
+    } finally {
+      setIsLoadingTasks(false);
+    }
+  };
+
+  const loadHabits = async () => {
+    try {
+      setIsLoadingHabits(true);
+      const allHabits = await assistantService.getHabits();
+      const today = format(new Date(), 'yyyy-MM-dd');
+      
+      const habitsWithStatus = allHabits.map((habit: any) => {
+        const entry = habit.entries?.find((e: any) => {
+          const entryDate = format(new Date(e.date), 'yyyy-MM-dd');
+          return entryDate === today;
+        });
+        
+        return {
+          id: habit.id,
+          name: habit.name,
+          icon: getHabitIcon(habit.name),
+          completed: entry?.completed || false,
+          streak: habit.streak || 0,
+          bestStreak: habit.bestStreak || 0,
+          completionRate: habit.completionRate || 0,
+          entries: habit.entries || [],
+        };
+      });
+      
+      setHabits(habitsWithStatus);
+    } catch (error) {
+      console.error('Erreur lors du chargement des habitudes:', error);
+      Alert.alert('Erreur', 'Impossible de charger les habitudes');
+    } finally {
+      setIsLoadingHabits(false);
+    }
+  };
+
+  const getHabitIcon = (name: string): string => {
+    const lowerName = name.toLowerCase();
+    if (lowerName.includes('méditation') || lowerName.includes('meditation')) return '🧘';
+    if (lowerName.includes('exercice') || lowerName.includes('sport')) return '💪';
+    if (lowerName.includes('lecture') || lowerName.includes('read')) return '📚';
+    if (lowerName.includes('eau') || lowerName.includes('water')) return '💧';
+    if (lowerName.includes('journal') || lowerName.includes('note')) return '📝';
+    if (lowerName.includes('apprentissage') || lowerName.includes('learning')) return '💡';
+    if (lowerName.includes('phone') || lowerName.includes('téléphone')) return '📵';
+    return '✅';
+  };
 
   // Animated values
   const logoScale = useSharedValue(1);
@@ -603,32 +815,41 @@ export default function AssistantScreen() {
                     </Text>
                   </View>
 
-                  {tasks.map((task, index) => (
-                    <TouchableOpacity
-                      key={task.id}
-                      onPress={() => toggleTask(task.id)}
-                      style={styles.taskItem}
-                    >
-                      <View
-                        style={[
-                          styles.taskCheckbox,
-                          task.completed && styles.taskCheckboxCompleted,
-                        ]}
+                  {isLoadingTasks ? (
+                    <View style={styles.loadingContainer}>
+                      <ActivityIndicator size="small" color="#00C27A" />
+                      <Text style={styles.loadingText}>Chargement des tâches...</Text>
+                    </View>
+                  ) : tasks.length === 0 ? (
+                    <Text style={styles.emptyText}>Aucune tâche pour aujourd'hui</Text>
+                  ) : (
+                    tasks.map((task, index) => (
+                      <TouchableOpacity
+                        key={task.id}
+                        onPress={() => toggleTask(task.id)}
+                        style={styles.taskItem}
                       >
-                        {task.completed && (
-                          <Ionicons name="checkmark" size={16} color="#FFFFFF" />
-                        )}
-                      </View>
-                      <Text
-                        style={[
-                          styles.taskText,
-                          task.completed && styles.taskTextCompleted,
-                        ]}
-                      >
-                        {task.text}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
+                        <View
+                          style={[
+                            styles.taskCheckbox,
+                            task.completed && styles.taskCheckboxCompleted,
+                          ]}
+                        >
+                          {task.completed && (
+                            <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+                          )}
+                        </View>
+                        <Text
+                          style={[
+                            styles.taskText,
+                            task.completed && styles.taskTextCompleted,
+                          ]}
+                        >
+                          {task.title}
+                        </Text>
+                      </TouchableOpacity>
+                    ))
+                  )}
                 </View>
               </Animated.View>
             )}
@@ -831,6 +1052,7 @@ export default function AssistantScreen() {
           onClose={() => setShowHabitsModal(false)}
           habits={habits}
           onToggleHabit={toggleHabit}
+          isLoadingHabits={isLoadingHabits}
         />
 
         {/* Task Complete Animation */}
@@ -1031,11 +1253,13 @@ function HabitsModal({
   onClose,
   habits,
   onToggleHabit,
+  isLoadingHabits,
 }: {
   visible: boolean;
   onClose: () => void;
   habits: Habit[];
-  onToggleHabit: (id: number) => void;
+  onToggleHabit: (id: string) => void;
+  isLoadingHabits: boolean;
 }) {
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -1057,59 +1281,68 @@ function HabitsModal({
           </LinearGradient>
 
           <ScrollView style={styles.habitsList} contentContainerStyle={styles.habitsListContent}>
-            {habits.map((habit, index) => (
-              <Animated.View
-                key={habit.id}
-                entering={FadeInDown.delay(index * 50).duration(300)}
-              >
-                <TouchableOpacity
-                  onPress={() => onToggleHabit(habit.id)}
-                  style={[
-                    styles.habitItem,
-                    habit.completed && styles.habitItemCompleted,
-                  ]}
+            {isLoadingHabits ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="small" color="#00C27A" />
+                <Text style={styles.loadingText}>Chargement des habitudes...</Text>
+              </View>
+            ) : habits.length === 0 ? (
+              <Text style={styles.emptyText}>Aucune habitude trouvée</Text>
+            ) : (
+              habits.map((habit, index) => (
+                <Animated.View
+                  key={habit.id}
+                  entering={FadeInDown.delay(index * 50).duration(300)}
                 >
-                  <View
+                  <TouchableOpacity
+                    onPress={() => onToggleHabit(habit.id)}
                     style={[
-                      styles.habitCheckbox,
-                      habit.completed && styles.habitCheckboxCompleted,
+                      styles.habitItem,
+                      habit.completed && styles.habitItemCompleted,
                     ]}
                   >
-                    {habit.completed && (
-                      <Ionicons name="checkmark" size={16} color="#FFFFFF" />
-                    )}
-                  </View>
-                  <View style={styles.habitContent}>
-                    <View style={styles.habitHeader}>
-                      <Text style={styles.habitIcon}>{habit.icon}</Text>
-                      <Text
-                        style={[
-                          styles.habitName,
-                          habit.completed && styles.habitNameCompleted,
-                        ]}
-                      >
-                        {habit.name}
-                      </Text>
+                    <View
+                      style={[
+                        styles.habitCheckbox,
+                        habit.completed && styles.habitCheckboxCompleted,
+                      ]}
+                    >
+                      {habit.completed && (
+                        <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+                      )}
                     </View>
-                    <View style={styles.habitStats}>
-                      <View style={styles.habitStat}>
-                        <Text style={styles.habitStatIcon}>🔥</Text>
-                        <Text style={styles.habitStatText}>{habit.streak} day streak</Text>
+                    <View style={styles.habitContent}>
+                      <View style={styles.habitHeader}>
+                        <Text style={styles.habitIcon}>{habit.icon || '✅'}</Text>
+                        <Text
+                          style={[
+                            styles.habitName,
+                            habit.completed && styles.habitNameCompleted,
+                          ]}
+                        >
+                          {habit.name}
+                        </Text>
                       </View>
-                      <View style={styles.habitStat}>
-                        <Text style={styles.habitStatIcon}>📊</Text>
-                        <Text style={styles.habitStatText}>{habit.completionRate}%</Text>
+                      <View style={styles.habitStats}>
+                        <View style={styles.habitStat}>
+                          <Text style={styles.habitStatIcon}>🔥</Text>
+                          <Text style={styles.habitStatText}>{habit.streak || 0} jour{habit.streak !== 1 ? 's' : ''}</Text>
+                        </View>
+                        <View style={styles.habitStat}>
+                          <Text style={styles.habitStatIcon}>📊</Text>
+                          <Text style={styles.habitStatText}>{habit.completionRate || 0}%</Text>
+                        </View>
                       </View>
+                      {habit.streak === habit.bestStreak && habit.streak && habit.streak > 3 && (
+                        <View style={styles.bestStreakBadge}>
+                          <Text style={styles.bestStreakText}>⭐ Meilleure série !</Text>
+                        </View>
+                      )}
                     </View>
-                    {habit.streak === habit.bestStreak && habit.streak > 3 && (
-                      <View style={styles.bestStreakBadge}>
-                        <Text style={styles.bestStreakText}>⭐ Best streak!</Text>
-                      </View>
-                    )}
-                  </View>
-                </TouchableOpacity>
-              </Animated.View>
-            ))}
+                  </TouchableOpacity>
+                </Animated.View>
+              ))
+            )}
           </ScrollView>
 
           <View style={styles.habitsFooter}>
@@ -1424,7 +1657,7 @@ const styles = StyleSheet.create({
   },
   messagesContent: {
     paddingHorizontal: 24,
-    paddingBottom: 16,
+    paddingBottom: Platform.OS === 'ios' ? 120 : 110,
   },
   messageContainer: {
     marginBottom: 12,
@@ -1586,7 +1819,8 @@ const styles = StyleSheet.create({
   },
   quickActionsContainer: {
     maxHeight: 60,
-    marginBottom: 16,
+    marginBottom: 12,
+    paddingBottom: 8,
   },
   quickActionsContent: {
     paddingHorizontal: 24,
@@ -1611,8 +1845,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 24,
-    paddingBottom: 24,
+    paddingTop: 12,
+    paddingBottom: Platform.OS === 'ios' ? 100 : 90,
     gap: 12,
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
   },
   inputWrapper: {
     flex: 1,
