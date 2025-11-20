@@ -50,7 +50,7 @@ export interface ApiError {
 }
 
 // Service de stockage local pour les tokens
-class TokenStorage {
+export class TokenStorage {
   private static instance: TokenStorage;
   private token: string | null = null;
 
@@ -107,6 +107,12 @@ class TokenStorage {
       console.warn('AsyncStorage not available, token cleared from memory only');
     }
   }
+}
+
+// Fonction utilitaire pour obtenir le token
+export async function getAuthToken(): Promise<string | null> {
+  const tokenStorage = TokenStorage.getInstance();
+  return await tokenStorage.getToken();
 }
 
 // Fonction utilitaire pour les appels API avec timeout
@@ -546,5 +552,87 @@ export const gamificationService = {
     totalAvailable: number;
   }> {
     return await apiCall('/gamification/achievements');
+  },
+};
+
+// Service pour l'assistant IA
+export const assistantService = {
+  // Démarrer une session Deep Work
+  async startDeepWorkSession(plannedDuration: number, type: string = 'deepwork', description?: string): Promise<any> {
+    // Note: Cette API nécessite un token API avec les scopes deepwork:write et tasks:write
+    // Pour l'instant, on utilise l'endpoint normal qui nécessite l'authentification utilisateur
+    // Il faudra peut-être créer un endpoint spécifique pour l'app mobile
+    return await apiCall('/deepwork/agent', {
+      method: 'POST',
+      body: JSON.stringify({
+        plannedDuration,
+        type,
+        description,
+      }),
+    });
+  },
+
+  // Récupérer les tâches d'aujourd'hui
+  async getTodayTasks(): Promise<any> {
+    return await apiCall('/tasks/today');
+  },
+
+  // Créer des tâches intelligentes (plan tomorrow)
+  async planTomorrow(userInput: string, date?: string): Promise<any> {
+    return await apiCall('/tasks/agent/batch-create', {
+      method: 'POST',
+      body: JSON.stringify({
+        userInput,
+        date,
+      }),
+    });
+  },
+
+  // Envoyer un message au chat et recevoir une réponse de l'agent IA
+  async sendChatMessage(message: string): Promise<any> {
+    return await apiCall('/assistant/chat', {
+      method: 'POST',
+      body: JSON.stringify({
+        message,
+      }),
+    });
+  },
+
+  // Enregistrer un journaling
+  async saveJournal(transcription: string, date?: string): Promise<any> {
+    return await apiCall('/journal/agent', {
+      method: 'POST',
+      body: JSON.stringify({
+        transcription,
+        date: date || new Date().toISOString(),
+      }),
+    });
+  },
+
+  // Récupérer les habitudes
+  async getHabits(): Promise<any> {
+    return await apiCall('/habits');
+  },
+
+  // Trouver une habitude par nom
+  async findHabitByName(name: string): Promise<any> {
+    const habits = await apiCall('/habits');
+    return habits.find((h: any) => 
+      h.name.toLowerCase().includes(name.toLowerCase())
+    );
+  },
+
+  // Enregistrer une entrée d'habitude avec note
+  async saveHabitEntry(habitId: string, date: string, note: string, rating?: number): Promise<any> {
+    return await apiCall('/habits/entries', {
+      method: 'POST',
+      body: JSON.stringify({
+        habitId,
+        date,
+        completed: true,
+        note,
+        rating,
+      }),
+    });
   },
 };
