@@ -6,6 +6,9 @@ import { TaskAnalysisService } from '@/lib/ai/TaskAnalysisService'
 import { prisma } from '@/lib/prisma'
 import { calculateTaskOrder } from '@/lib/tasks'
 
+// Augmenter le timeout pour permettre l'analyse IA (jusqu'à 60 secondes)
+export const maxDuration = 60
+
 export async function POST(req: NextRequest) {
   try {
     const authHeader = req.headers.get('authorization') || ''
