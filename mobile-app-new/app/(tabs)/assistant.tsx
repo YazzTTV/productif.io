@@ -33,7 +33,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { Audio } from 'expo-av';
 import * as FileSystem from 'expo-file-system';
-import { assistantService, tasksService, habitsService, getAuthToken } from '@/lib/api';
+import { assistantService, tasksService, habitsService, getAuthToken, dashboardService } from '@/lib/api';
 import { format } from 'date-fns';
 
 interface Message {
@@ -69,7 +69,7 @@ interface Habit {
 }
 
 const quickActions = [
-  { icon: 'brain' as const, label: 'Start Deep Work', action: 'deepwork' },
+  { icon: 'flash' as const, label: 'Start Deep Work', action: 'deepwork' },
   { icon: 'book' as const, label: 'Daily Journal', action: 'journal' },
   { icon: 'bulb' as const, label: 'Learning', action: 'learning' },
   { icon: 'calendar' as const, label: 'Plan my day', action: 'plan' },
@@ -138,6 +138,16 @@ export default function AssistantScreen() {
   const [habits, setHabits] = useState<Habit[]>([]);
   const [isLoadingHabits, setIsLoadingHabits] = useState(false);
   const [deepWorkSessionId, setDeepWorkSessionId] = useState<string | null>(null);
+
+  // Stats Modal State
+  const [showStatsModal, setShowStatsModal] = useState(false);
+  const [statsData, setStatsData] = useState({
+    completedTasks: 0,
+    totalTasks: 0,
+    habitsCompletionRate: 0,
+    deepWorkTime: 0, // en minutes
+  });
+  const [isLoadingStats, setIsLoadingStats] = useState(false);
 
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isLoadingTasks, setIsLoadingTasks] = useState(false);
@@ -240,9 +250,9 @@ export default function AssistantScreen() {
     const loadingMessage: Message = {
       id: loadingMessageId,
       text: '...',
-      isAI: true,
-      timestamp: new Date(),
-    };
+        isAI: true,
+        timestamp: new Date(),
+      };
     setMessages((prev) => [...prev, loadingMessage]);
 
     try {
@@ -296,6 +306,11 @@ export default function AssistantScreen() {
     }
     if (action === 'track') {
       setShowHabitsModal(true);
+      return;
+    }
+    if (action === 'stats') {
+      loadStatsData();
+      setShowStatsModal(true);
       return;
     }
 
@@ -427,8 +442,8 @@ export default function AssistantScreen() {
       );
 
       recordingRef.current = recording;
-      setIsRecording(true);
-      setRecordingTime(0);
+    setIsRecording(true);
+    setRecordingTime(0);
     } catch (error: any) {
       console.error('Erreur lors du démarrage de l\'enregistrement:', error);
       Alert.alert('Erreur', 'Impossible de démarrer l\'enregistrement');
@@ -576,8 +591,8 @@ export default function AssistantScreen() {
       );
 
       planningRecordingRef.current = recording;
-      setIsPlanningRecording(true);
-      setPlanningRecordingTime(0);
+    setIsPlanningRecording(true);
+    setPlanningRecordingTime(0);
     } catch (error: any) {
       console.error('Erreur lors du démarrage de l\'enregistrement:', error);
       Alert.alert('Erreur', 'Impossible de démarrer l\'enregistrement');
@@ -735,8 +750,8 @@ export default function AssistantScreen() {
       );
 
       learningRecordingRef.current = recording;
-      setIsLearningRecording(true);
-      setLearningRecordingTime(0);
+    setIsLearningRecording(true);
+    setLearningRecordingTime(0);
     } catch (error: any) {
       console.error('Erreur lors du démarrage de l\'enregistrement:', error);
       Alert.alert('Erreur', 'Impossible de démarrer l\'enregistrement');
@@ -977,9 +992,9 @@ export default function AssistantScreen() {
         });
         
         return {
-          id: habit.id,
-          name: habit.name,
-          icon: getHabitIcon(habit.name),
+          id: habit.id || '',
+          name: habit.name || 'Habitude sans nom',
+          icon: getHabitIcon(habit.name || ''),
           completed: entry?.completed || false,
           streak: habit.streak || 0,
           bestStreak: habit.bestStreak || 0,
@@ -1007,6 +1022,57 @@ export default function AssistantScreen() {
     if (lowerName.includes('apprentissage') || lowerName.includes('learning')) return '💡';
     if (lowerName.includes('phone') || lowerName.includes('téléphone')) return '📵';
     return '✅';
+  };
+
+  const loadStatsData = async () => {
+    try {
+      setIsLoadingStats(true);
+      const today = format(new Date(), 'yyyy-MM-dd');
+
+      // Charger les tâches d'aujourd'hui
+      const todayTasks = await assistantService.getTodayTasks();
+      const completedTasks = todayTasks.filter((task: any) => task.completed).length;
+      const totalTasks = todayTasks.length;
+
+      // Calculer le pourcentage de complétion des habitudes
+      const allHabits = await assistantService.getHabits();
+      const habitsWithStatus = allHabits.map((habit: any) => {
+        const entry = habit.entries?.find((e: any) => {
+          const entryDate = format(new Date(e.date), 'yyyy-MM-dd');
+          return entryDate === today;
+        });
+        return entry?.completed || false;
+      });
+      const completedHabits = habitsWithStatus.filter((completed: boolean) => completed).length;
+      const habitsCompletionRate = allHabits.length > 0 
+        ? Math.round((completedHabits / allHabits.length) * 100)
+        : 0;
+
+      // Charger le temps de deep work du jour
+      let deepWorkTimeMinutes = 0;
+      try {
+        const metrics = await dashboardService.getMetrics(today);
+        if (metrics) {
+          // Le temps peut être en secondes ou en minutes selon l'API
+          const deepWorkTimeSeconds = metrics.deepWorkTimeToday || metrics.todayDeepWorkTime || metrics.deepWorkTime || 0;
+          deepWorkTimeMinutes = Math.round(deepWorkTimeSeconds / 60);
+        }
+      } catch (error) {
+        console.error('Erreur lors du chargement du temps de deep work:', error);
+      }
+
+      setStatsData({
+        completedTasks,
+        totalTasks,
+        habitsCompletionRate,
+        deepWorkTime: deepWorkTimeMinutes,
+      });
+    } catch (error) {
+      console.error('Erreur lors du chargement des statistiques:', error);
+      Alert.alert('Erreur', 'Impossible de charger les statistiques');
+    } finally {
+      setIsLoadingStats(false);
+    }
   };
 
   // Animated values
@@ -1494,6 +1560,14 @@ export default function AssistantScreen() {
           sessionStats={sessionStats}
           totalTasks={tasks.length}
         />
+
+        {/* Stats Modal */}
+        <StatsModal
+          visible={showStatsModal}
+          onClose={() => setShowStatsModal(false)}
+          statsData={statsData}
+          isLoading={isLoadingStats}
+        />
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -1773,7 +1847,7 @@ function JournalModal({
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  return (
+                        return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <BlurView intensity={20} style={styles.voiceModalBackdrop}>
         <Pressable style={styles.voiceModalContent} onPress={(e) => e.stopPropagation()}>
@@ -1840,7 +1914,7 @@ function JournalModal({
 
                   {isRecording && (
                     <>
-                      <Animated.View
+                          <Animated.View
                         style={[styles.pulseRing, pulseRingStyle1]}
                         pointerEvents="none"
                       />
@@ -1884,16 +1958,18 @@ function JournalModal({
 function HabitsModal({
   visible,
   onClose,
-  habits,
+  habits = [],
   onToggleHabit,
   isLoadingHabits,
 }: {
   visible: boolean;
   onClose: () => void;
-  habits: Habit[];
+  habits?: Habit[];
   onToggleHabit: (id: string) => void;
   isLoadingHabits: boolean;
 }) {
+  const safeHabits = habits || [];
+  
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={styles.habitsModalBackdrop} onPress={onClose}>
@@ -1909,7 +1985,7 @@ function HabitsModal({
             </View>
             <Text style={styles.habitsModalTitle}>Today's Habits</Text>
             <Text style={styles.habitsModalSubtitle}>
-              {habits.filter((h) => h.completed).length}/{habits.length} completed
+              {String(safeHabits.filter((h) => h.completed).length)}/{String(safeHabits.length)} completed
             </Text>
           </LinearGradient>
 
@@ -1925,20 +2001,22 @@ function HabitsModal({
                 <ActivityIndicator size="small" color="#00C27A" />
                 <Text style={styles.loadingText}>Chargement des habitudes...</Text>
               </View>
-            ) : habits.length === 0 ? (
+            ) : safeHabits.length === 0 ? (
               <Text style={styles.emptyText}>Aucune habitude trouvée</Text>
             ) : (
               // Trier les habitudes : non complétées en premier
-              (() => {
-                const sortedHabits = [...habits].sort((a, b) => {
+              [...safeHabits]
+                .sort((a, b) => {
                   if (a.completed === b.completed) return 0;
                   return a.completed ? 1 : -1;
-                });
-                return sortedHabits.map((habit, index) => (
-                <Animated.View
-                  key={habit.id}
-                  entering={FadeInDown.delay(index * 50).duration(300)}
-                >
+                })
+                .map((habit, index) => {
+                  if (!habit || !habit.id) return null;
+                  return (
+                  <Animated.View
+                    key={habit.id}
+                    entering={FadeInDown.delay(index * 50).duration(300)}
+                  >
                   <TouchableOpacity
                     onPress={() => onToggleHabit(habit.id)}
                     style={[
@@ -1965,17 +2043,21 @@ function HabitsModal({
                             habit.completed && styles.habitNameCompleted,
                           ]}
                         >
-                          {habit.name}
+                          {habit.name || 'Habitude sans nom'}
                         </Text>
                       </View>
                       <View style={styles.habitStats}>
                         <View style={styles.habitStat}>
                           <Text style={styles.habitStatIcon}>🔥</Text>
-                          <Text style={styles.habitStatText}>{habit.streak || 0} jour{habit.streak !== 1 ? 's' : ''}</Text>
+                          <Text style={styles.habitStatText}>
+                            {String(habit.streak || 0)} jour{habit.streak !== 1 ? 's' : ''}
+                          </Text>
                         </View>
                         <View style={styles.habitStat}>
                           <Text style={styles.habitStatIcon}>📊</Text>
-                          <Text style={styles.habitStatText}>{habit.completionRate || 0}%</Text>
+                          <Text style={styles.habitStatText}>
+                            {String(habit.completionRate || 0)}%
+                          </Text>
                         </View>
                       </View>
                       {habit.streak === habit.bestStreak && habit.streak && habit.streak > 3 && (
@@ -1986,10 +2068,10 @@ function HabitsModal({
                     </View>
                   </TouchableOpacity>
                 </Animated.View>
-                ));
-              })()
+                  );
+                })
             )}
-            </ScrollView>
+          </ScrollView>
           </View>
 
           <View style={styles.habitsFooter}>
@@ -1997,25 +2079,25 @@ function HabitsModal({
               <View style={styles.habitStatCard}>
                 <Text style={styles.habitStatCardIcon}>✅</Text>
                 <Text style={styles.habitStatCardValue}>
-                  {habits.filter((h) => h.completed).length}
+                  {String(safeHabits.filter((h) => h.completed).length)}
                 </Text>
                 <Text style={styles.habitStatCardLabel}>Done Today</Text>
               </View>
               <View style={styles.habitStatCard}>
                 <Text style={styles.habitStatCardIcon}>📈</Text>
                 <Text style={styles.habitStatCardValue}>
-                  {habits.length > 0
-                    ? Math.round((habits.filter((h) => h.completed).length / habits.length) * 100)
-                    : 0}%
+                  {String(safeHabits.length > 0
+                    ? Math.round((safeHabits.filter((h) => h.completed).length / safeHabits.length) * 100)
+                    : 0)}%
                 </Text>
                 <Text style={styles.habitStatCardLabel}>Avg Rate</Text>
               </View>
               <View style={styles.habitStatCard}>
                 <Text style={styles.habitStatCardIcon}>🔥</Text>
                 <Text style={styles.habitStatCardValue}>
-                  {habits.length > 0
-                    ? Math.max(...habits.map((h) => h.streak || 0))
-                    : 0}
+                  {String(safeHabits.length > 0
+                    ? Math.max(...safeHabits.map((h) => h.streak || 0))
+                    : 0)}
                 </Text>
                 <Text style={styles.habitStatCardLabel}>Top Streak</Text>
               </View>
@@ -2191,6 +2273,148 @@ function SessionSummaryModal({
               style={styles.summaryFinishButtonGradient}
             >
               <Text style={styles.summaryFinishButtonText}>Finish</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
+// Stats Modal Component
+function StatsModal({
+  visible,
+  onClose,
+  statsData,
+  isLoading,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  statsData: {
+    completedTasks: number;
+    totalTasks: number;
+    habitsCompletionRate: number;
+    deepWorkTime: number;
+  };
+  isLoading: boolean;
+}) {
+  const formatTime = (minutes: number): string => {
+    if (minutes < 60) {
+      return `${minutes} min`;
+    }
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return mins > 0 ? `${hours}h ${mins}min` : `${hours}h`;
+  };
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <Pressable style={styles.statsModalBackdrop} onPress={onClose}>
+        <Pressable style={styles.statsModalContent} onPress={(e) => e.stopPropagation()}>
+          <LinearGradient
+            colors={['#00C27A', '#00D68F']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.statsModalHeader}
+          >
+            <View style={styles.statsModalIconContainer}>
+              <Ionicons name="stats-chart" size={32} color="#FFFFFF" />
+            </View>
+            <Text style={styles.statsModalTitle}>Today's Stats</Text>
+            <Text style={styles.statsModalSubtitle}>Your productivity overview</Text>
+          </LinearGradient>
+
+          <View style={styles.statsContent}>
+            {isLoading ? (
+              <View style={styles.statsLoadingContainer}>
+                <ActivityIndicator size="large" color="#00C27A" />
+                <Text style={styles.statsLoadingText}>Loading stats...</Text>
+              </View>
+            ) : (
+              <>
+                {/* Tasks Completed */}
+                <View style={styles.statsCard}>
+                  <View style={styles.statsCardHeader}>
+                    <View style={[styles.statsIconContainer, { backgroundColor: '#3B82F6' }]}>
+                      <Ionicons name="checkmark-circle" size={24} color="#FFFFFF" />
+                    </View>
+                    <View style={styles.statsCardContent}>
+                      <Text style={styles.statsCardLabel}>Tasks Completed</Text>
+                      <Text style={styles.statsCardValue}>
+                        {statsData.completedTasks} / {statsData.totalTasks}
+                      </Text>
+                      {statsData.totalTasks > 0 && (
+                        <View style={styles.statsProgressBar}>
+                          <View
+                            style={[
+                              styles.statsProgressFill,
+                              {
+                                width: `${(statsData.completedTasks / statsData.totalTasks) * 100}%`,
+                                backgroundColor: '#3B82F6',
+                              },
+                            ]}
+                          />
+                        </View>
+                      )}
+                    </View>
+                  </View>
+                </View>
+
+                {/* Habits Completion */}
+                <View style={styles.statsCard}>
+                  <View style={styles.statsCardHeader}>
+                    <View style={[styles.statsIconContainer, { backgroundColor: '#10B981' }]}>
+                      <Ionicons name="flag" size={24} color="#FFFFFF" />
+                    </View>
+                    <View style={styles.statsCardContent}>
+                      <Text style={styles.statsCardLabel}>Habits Completion</Text>
+                      <Text style={styles.statsCardValue}>{statsData.habitsCompletionRate}%</Text>
+                      <View style={styles.statsProgressBar}>
+                        <View
+                          style={[
+                            styles.statsProgressFill,
+                            {
+                              width: `${statsData.habitsCompletionRate}%`,
+                              backgroundColor: '#10B981',
+                            },
+                          ]}
+                        />
+                      </View>
+                    </View>
+                  </View>
+                </View>
+
+                {/* Deep Work Time */}
+                <View style={styles.statsCard}>
+                  <View style={styles.statsCardHeader}>
+                    <View style={[styles.statsIconContainer, { backgroundColor: '#8B5CF6' }]}>
+                      <Ionicons name="brain" size={24} color="#FFFFFF" />
+                    </View>
+                    <View style={styles.statsCardContent}>
+                      <Text style={styles.statsCardLabel}>Deep Work Time</Text>
+                      <Text style={styles.statsCardValue}>
+                        {formatTime(statsData.deepWorkTime)}
+                      </Text>
+                      <Text style={styles.statsCardSubtext}>
+                        {statsData.deepWorkTime > 0
+                          ? 'Great focus session! 🎯'
+                          : 'Start a deep work session to track your focus time'}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              </>
+            )}
+          </View>
+
+          <TouchableOpacity onPress={onClose} style={styles.statsDoneButton}>
+            <LinearGradient
+              colors={['#00C27A', '#00D68F']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.statsDoneButtonGradient}
+            >
+              <Text style={styles.statsDoneButtonText}>Done</Text>
             </LinearGradient>
           </TouchableOpacity>
         </Pressable>
@@ -2984,6 +3208,126 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   habitsDoneButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  // Stats Modal Styles
+  statsModalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  statsModalContent: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: '90%',
+    paddingBottom: Platform.OS === 'ios' ? 40 : 24,
+  },
+  statsModalHeader: {
+    paddingTop: 24,
+    paddingBottom: 20,
+    paddingHorizontal: 24,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    alignItems: 'center',
+  },
+  statsModalIconContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  statsModalTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    marginBottom: 4,
+  },
+  statsModalSubtitle: {
+    fontSize: 14,
+    color: '#FFFFFF',
+    opacity: 0.9,
+  },
+  statsContent: {
+    padding: 24,
+    gap: 16,
+  },
+  statsLoadingContainer: {
+    padding: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statsLoadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: '#6B7280',
+  },
+  statsCard: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  statsCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 16,
+  },
+  statsIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  statsCardContent: {
+    flex: 1,
+  },
+  statsCardLabel: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 8,
+    fontWeight: '500',
+  },
+  statsCardValue: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 8,
+  },
+  statsCardSubtext: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    marginTop: 4,
+  },
+  statsProgressBar: {
+    height: 6,
+    backgroundColor: '#E5E7EB',
+    borderRadius: 3,
+    overflow: 'hidden',
+    marginTop: 8,
+  },
+  statsProgressFill: {
+    height: '100%',
+    borderRadius: 3,
+  },
+  statsDoneButton: {
+    marginHorizontal: 24,
+    marginTop: 8,
+    borderRadius: 24,
+    overflow: 'hidden',
+  },
+  statsDoneButtonGradient: {
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  statsDoneButtonText: {
     fontSize: 16,
     fontWeight: '600',
     color: '#FFFFFF',

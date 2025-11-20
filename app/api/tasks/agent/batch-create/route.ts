@@ -1,22 +1,60 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { apiAuth } from '@/middleware/api-auth'
+import { getAuthUserFromRequest } from '@/lib/auth'
+import { verifyApiToken, hasRequiredScopes } from '@/lib/api-token'
 import { TaskAnalysisService } from '@/lib/ai/TaskAnalysisService'
 import { prisma } from '@/lib/prisma'
 import { calculateTaskOrder } from '@/lib/tasks'
 
 export async function POST(req: NextRequest) {
   try {
-    // Vérifier l'authentification API
-    const authResponse = await apiAuth(req, {
-      requiredScopes: ['tasks:write']
-    })
+    const authHeader = req.headers.get('authorization') || ''
+    const token = authHeader.startsWith('Bearer ') ? authHeader.substring(7) : ''
     
-    if (authResponse) {
-      return authResponse
+    let userId: string | null = null
+    
+    // Essayer d'abord avec un token utilisateur (JWT) - pour l'app mobile
+    if (token) {
+      const user = await getAuthUserFromRequest(req)
+      if (user) {
+        userId = user.id
+      }
+    }
+    
+    // Si pas d'utilisateur, essayer avec un token API
+    if (!userId && token) {
+      try {
+        const payload = await verifyApiToken(token)
+        if (payload) {
+          // Vérifier les scopes pour les tokens API
+          if (!hasRequiredScopes(payload.scopes, ['tasks:write'])) {
+            return NextResponse.json({ error: 'Permissions insuffisantes', requiredScopes: ['tasks:write'] }, { status: 403 })
+          }
+          userId = payload.userId
+        }
+      } catch (error) {
+        console.error('Erreur lors de la vérification du token API:', error)
+      }
+    }
+    
+    // Si toujours pas d'utilisateur, essayer avec apiAuth (pour compatibilité)
+    if (!userId) {
+      const authResponse = await apiAuth(req, {
+        requiredScopes: ['tasks:write']
+      })
+      
+      if (authResponse) {
+        return authResponse
+      }
+      
+      userId = req.headers.get('x-api-user-id')
+    }
+    
+    if (!userId) {
+      return NextResponse.json({ error: 'Token invalide ou expiré' }, { status: 401 })
     }
 
     const { userInput, date, projectId } = await req.json()
-    const userId = req.headers.get('x-api-user-id')
 
     if (!userId) {
       return NextResponse.json({ error: 'Utilisateur non trouvé' }, { status: 404 })
