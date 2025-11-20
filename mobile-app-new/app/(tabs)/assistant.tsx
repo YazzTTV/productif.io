@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -31,6 +31,8 @@ import Animated, {
 } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
+import { Audio } from 'expo-av';
+import * as FileSystem from 'expo-file-system';
 import { assistantService, tasksService, habitsService } from '@/lib/api';
 import { format } from 'date-fns';
 
@@ -112,6 +114,8 @@ export default function AssistantScreen() {
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [isProcessingJournal, setIsProcessingJournal] = useState(false);
+  const [journalText, setJournalText] = useState('');
+  const recordingRef = useRef<Audio.Recording | null>(null);
 
   // Day Planning Voice State
   const [showPlanningModal, setShowPlanningModal] = useState(false);
@@ -355,19 +359,122 @@ export default function AssistantScreen() {
     }
   };
 
-  const startRecording = () => {
-    setIsRecording(true);
-    setRecordingTime(0);
+  const startRecording = async () => {
+    try {
+      // Demander la permission d'utiliser le microphone
+      const { status } = await Audio.requestPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission requise', 'L\'accès au microphone est nécessaire pour enregistrer votre voix.');
+        return;
+      }
+
+      // Configurer le mode audio
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+      });
+
+      // Créer un nouvel enregistrement
+      const { recording } = await Audio.Recording.createAsync(
+        Audio.RecordingOptionsPresets.HIGH_QUALITY
+      );
+
+      recordingRef.current = recording;
+      setIsRecording(true);
+      setRecordingTime(0);
+    } catch (error: any) {
+      console.error('Erreur lors du démarrage de l\'enregistrement:', error);
+      Alert.alert('Erreur', 'Impossible de démarrer l\'enregistrement');
+    }
   };
 
   const stopRecording = async () => {
+    if (!recordingRef.current) {
+      return;
+    }
+
     setIsRecording(false);
     setIsProcessingJournal(true);
 
     try {
-      // Pour l'instant, on simule la transcription
-      // TODO: Intégrer un vrai système d'enregistrement vocal
-      const transcription = `Note de ma journée: ${recordingTime} secondes d'enregistrement. [À remplacer par la vraie transcription vocale]`;
+      // Arrêter l'enregistrement
+      await recordingRef.current.stopAndUnloadAsync();
+      const uri = recordingRef.current.getURI();
+      recordingRef.current = null;
+
+      // Réinitialiser le mode audio
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+      });
+
+      let transcription = journalText.trim();
+
+      // Si un enregistrement audio existe, le transcrire
+      if (uri) {
+        try {
+          // Lire le fichier audio
+          const fileInfo = await FileSystem.getInfoAsync(uri);
+          if (fileInfo.exists) {
+            // Créer un FormData pour envoyer l'audio
+            const formData = new FormData();
+            const filename = uri.split('/').pop() || 'recording.m4a';
+            const fileType = 'audio/m4a';
+
+            formData.append('audio', {
+              uri: uri,
+              name: filename,
+              type: fileType,
+            } as any);
+
+            // Appeler l'API de transcription
+            const tokenStorage = (await import('@/lib/api')).TokenStorage.getInstance();
+            const token = await tokenStorage.getToken();
+            const API_BASE_URL = 'https://www.productif.io/api';
+
+            const transcriptionResponse = await fetch(`${API_BASE_URL}/transcribe`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${token}`,
+              },
+              body: formData,
+            });
+
+            if (transcriptionResponse.ok) {
+              const transcriptionData = await transcriptionResponse.json();
+              if (transcriptionData.success && transcriptionData.transcription) {
+                transcription = transcriptionData.transcription;
+                // Mettre à jour le champ de texte avec la transcription
+                setJournalText(transcription);
+              }
+            } else {
+              console.error('Erreur transcription:', await transcriptionResponse.text());
+            }
+
+            // Nettoyer le fichier audio temporaire
+            try {
+              await FileSystem.deleteAsync(uri, { idempotent: true });
+            } catch (cleanupError) {
+              console.error('Erreur lors du nettoyage du fichier audio:', cleanupError);
+            }
+          }
+        } catch (transcriptionError: any) {
+          console.error('Erreur lors de la transcription:', transcriptionError);
+          // Continuer avec le texte manuel si la transcription échoue
+          // Nettoyer le fichier audio même en cas d'erreur
+          try {
+            if (uri) {
+              await FileSystem.deleteAsync(uri, { idempotent: true });
+            }
+          } catch (cleanupError) {
+            console.error('Erreur lors du nettoyage du fichier audio:', cleanupError);
+          }
+        }
+      }
+
+      // Si pas de transcription et pas de texte manuel, utiliser un placeholder
+      if (!transcription) {
+        transcription = `Note de ma journée: ${recordingTime} secondes d'enregistrement.`;
+      }
 
       // Enregistrer le journaling
       const journalResponse = await assistantService.saveJournal(transcription);
@@ -383,6 +490,8 @@ export default function AssistantScreen() {
 
       setIsProcessingJournal(false);
       setShowJournalModal(false);
+      setJournalText(''); // Réinitialiser le texte
+      setRecordingTime(0);
 
       const aiMessage: Message = {
         id: Date.now().toString(),
@@ -393,7 +502,6 @@ export default function AssistantScreen() {
 
       setMessages((prev) => [...prev, aiMessage]);
       setXp((prev) => Math.min(prev + 25, maxXp));
-      setRecordingTime(0);
     } catch (error: any) {
       console.error('Erreur lors de l\'enregistrement du journal:', error);
       setIsProcessingJournal(false);
@@ -990,12 +1098,27 @@ export default function AssistantScreen() {
         </Modal>
 
         {/* Voice Journal Modal */}
-        <VoiceModal
+        <JournalModal
           visible={showJournalModal}
-          onClose={() => {
-            setShowJournalModal(false);
+          onClose={async () => {
+            // Arrêter l'enregistrement si en cours
+            if (recordingRef.current) {
+              try {
+                await recordingRef.current.stopAndUnloadAsync();
+                const uri = recordingRef.current.getURI();
+                recordingRef.current = null;
+                // Nettoyer le fichier audio
+                if (uri) {
+                  await FileSystem.deleteAsync(uri, { idempotent: true });
+                }
+              } catch (error) {
+                console.error('Erreur lors de l\'arrêt de l\'enregistrement:', error);
+              }
+            }
             setIsRecording(false);
             setRecordingTime(0);
+            setJournalText('');
+            setShowJournalModal(false);
           }}
           title="Daily Journal"
           subtitle={isProcessingJournal ? 'Processing your thoughts...' : isRecording ? "I'm listening..." : 'Tell me about your day'}
@@ -1005,6 +1128,8 @@ export default function AssistantScreen() {
           isProcessing={isProcessingJournal}
           onStartRecording={startRecording}
           onStopRecording={stopRecording}
+          journalText={journalText}
+          onJournalTextChange={setJournalText}
           prompt="Share what went well and what needs improvement"
         />
 
@@ -1248,6 +1373,206 @@ function VoiceModal({
 
                 <Text style={styles.voicePrompt}>
                   {isRecording ? 'Tap again to stop recording' : 'Tap the microphone to start'}
+                </Text>
+                <Text style={styles.voicePromptHint}>{prompt}</Text>
+              </>
+            )}
+          </View>
+
+          {!isProcessing && (
+            <TouchableOpacity onPress={onClose} style={styles.voiceModalCancel}>
+              <Text style={styles.voiceModalCancelText}>Cancel</Text>
+            </TouchableOpacity>
+          )}
+        </Pressable>
+      </BlurView>
+    </Modal>
+  );
+}
+
+// Journal Modal Component (avec champ de texte)
+function JournalModal({
+  visible,
+  onClose,
+  title,
+  subtitle,
+  emoji,
+  isRecording,
+  recordingTime,
+  isProcessing,
+  onStartRecording,
+  onStopRecording,
+  journalText,
+  onJournalTextChange,
+  prompt,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  title: string;
+  subtitle: string;
+  emoji: string;
+  isRecording: boolean;
+  recordingTime: number;
+  isProcessing: boolean;
+  onStartRecording: () => void;
+  onStopRecording: () => void;
+  journalText: string;
+  onJournalTextChange: (text: string) => void;
+  prompt: string;
+}) {
+  const micScale = useSharedValue(1);
+  const processingRotation = useSharedValue(0);
+  const pulseRings = [useSharedValue(1), useSharedValue(1), useSharedValue(1)];
+
+  useEffect(() => {
+    if (isRecording) {
+      micScale.value = withRepeat(withTiming(1.1, { duration: 1500 }), -1, true);
+      pulseRings.forEach((ring, i) => {
+        ring.value = withRepeat(
+          withTiming(2.2, { duration: 2000 }),
+          -1,
+          false
+        );
+      });
+    } else {
+      micScale.value = 1;
+      pulseRings.forEach((ring) => {
+        ring.value = 1;
+      });
+    }
+  }, [isRecording]);
+
+  useEffect(() => {
+    if (isProcessing) {
+      processingRotation.value = withRepeat(
+        withTiming(360, { duration: 2000 }),
+        -1,
+        false
+      );
+    } else {
+      processingRotation.value = 0;
+    }
+  }, [isProcessing]);
+
+  const micAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: micScale.value }],
+  }));
+
+  const processingRotationStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${processingRotation.value}deg` }],
+  }));
+
+  const pulseRingStyle1 = useAnimatedStyle(() => ({
+    transform: [{ scale: pulseRings[0].value }],
+    opacity: interpolate(pulseRings[0].value, [1, 2.2], [0.5, 0], Extrapolate.CLAMP),
+  }));
+
+  const pulseRingStyle2 = useAnimatedStyle(() => ({
+    transform: [{ scale: pulseRings[1].value }],
+    opacity: interpolate(pulseRings[1].value, [1, 2.2], [0.5, 0], Extrapolate.CLAMP),
+  }));
+
+  const pulseRingStyle3 = useAnimatedStyle(() => ({
+    transform: [{ scale: pulseRings[2].value }],
+    opacity: interpolate(pulseRings[2].value, [1, 2.2], [0.5, 0], Extrapolate.CLAMP),
+  }));
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <BlurView intensity={20} style={styles.voiceModalBackdrop}>
+        <Pressable style={styles.voiceModalContent} onPress={(e) => e.stopPropagation()}>
+          <LinearGradient
+            colors={['#00C27A', '#00D68F']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.voiceModalHeader}
+          >
+            <Text style={styles.voiceModalEmoji}>{emoji}</Text>
+            <Text style={styles.voiceModalTitle}>{title}</Text>
+            <Text style={styles.voiceModalSubtitle}>{subtitle}</Text>
+          </LinearGradient>
+
+          <View style={styles.voiceModalBody}>
+            {isProcessing ? (
+              <View style={styles.processingContainer}>
+                <Animated.View style={[styles.processingIcon, processingRotationStyle]}>
+                  <Ionicons name="flash" size={32} color="#00C27A" />
+                </Animated.View>
+                <Text style={styles.processingText}>
+                  Analyzing your reflections...
+                </Text>
+              </View>
+            ) : (
+              <>
+                {/* Champ de texte pour saisie manuelle */}
+                <View style={styles.journalTextContainer}>
+                  <Text style={styles.journalTextLabel}>Écrivez votre note de journée :</Text>
+                  <TextInput
+                    style={styles.journalTextInput}
+                    value={journalText}
+                    onChangeText={onJournalTextChange}
+                    placeholder="Partagez ce qui s'est bien passé aujourd'hui et ce qui peut être amélioré..."
+                    placeholderTextColor="#9CA3AF"
+                    multiline
+                    numberOfLines={6}
+                    textAlignVertical="top"
+                    editable={!isRecording}
+                  />
+                </View>
+
+                <View style={styles.micContainer}>
+                  <Animated.View style={micAnimatedStyle}>
+                    <TouchableOpacity
+                      onPress={isRecording ? onStopRecording : onStartRecording}
+                      activeOpacity={0.8}
+                      style={[
+                        styles.micButtonLarge,
+                        isRecording && styles.micButtonRecording,
+                        { zIndex: 10 },
+                      ]}
+                    >
+                      <LinearGradient
+                        colors={isRecording ? ['#EF4444', '#DC2626'] : ['#00C27A', '#00D68F']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={styles.micButtonGradient}
+                      >
+                        <Ionicons name="mic" size={48} color="#FFFFFF" />
+                      </LinearGradient>
+                    </TouchableOpacity>
+                  </Animated.View>
+
+                  {isRecording && (
+                    <>
+                      <Animated.View
+                        style={[styles.pulseRing, pulseRingStyle1]}
+                        pointerEvents="none"
+                      />
+                      <Animated.View
+                        style={[styles.pulseRing, pulseRingStyle2]}
+                        pointerEvents="none"
+                      />
+                      <Animated.View
+                        style={[styles.pulseRing, pulseRingStyle3]}
+                        pointerEvents="none"
+                      />
+                      <View style={styles.recordingDot} pointerEvents="none" />
+                    </>
+                  )}
+                </View>
+
+                {isRecording && (
+                  <Text style={styles.recordingTime}>{formatTime(recordingTime)}</Text>
+                )}
+
+                <Text style={styles.voicePrompt}>
+                  {isRecording ? 'Tap again to stop recording' : journalText.trim() ? 'Vous pouvez aussi enregistrer votre voix' : 'Écrivez votre note ou enregistrez votre voix'}
                 </Text>
                 <Text style={styles.voicePromptHint}>{prompt}</Text>
               </>
@@ -2161,6 +2486,29 @@ const styles = StyleSheet.create({
   voiceModalCancelText: {
     fontSize: 16,
     color: '#6B7280',
+  },
+  // Journal Text Input Styles
+  journalTextContainer: {
+    width: '100%',
+    marginBottom: 24,
+  },
+  journalTextLabel: {
+    fontSize: 14,
+    color: '#374151',
+    marginBottom: 8,
+    fontWeight: '600',
+  },
+  journalTextInput: {
+    width: '100%',
+    minHeight: 120,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 16,
+    padding: 16,
+    fontSize: 15,
+    color: '#1F2937',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    textAlignVertical: 'top',
   },
   // Habits Modal Styles
   habitsModalBackdrop: {
