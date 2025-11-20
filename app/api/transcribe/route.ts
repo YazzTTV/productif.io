@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUserFromRequest } from '@/lib/auth'
 import { verifyApiToken } from '@/lib/api-token'
-import OpenAI from 'openai'
+import { VoiceTranscriptionService } from '@/src/services/ai/VoiceTranscriptionService'
+import * as fs from 'fs'
+import * as path from 'path'
+import { tmpdir } from 'os'
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-})
+// Augmenter le timeout pour Vercel (max 60 secondes pour Pro)
+export const maxDuration = 60
 
 export async function POST(req: NextRequest) {
   try {
@@ -51,32 +53,49 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Fichier audio requis' }, { status: 400 })
     }
 
-    // Convertir le File en Buffer puis créer un File pour OpenAI
+    // Convertir le File en Buffer
     const arrayBuffer = await audioFile.arrayBuffer()
     const buffer = Buffer.from(arrayBuffer)
-    
-    // Créer un File object pour OpenAI Whisper
-    // OpenAI accepte un File avec un stream ou un buffer
-    const audioFileForOpenAI = new File(
-      [buffer],
-      `audio-${Date.now()}.${audioFile.name.split('.').pop() || 'm4a'}`,
-      { type: audioFile.type || 'audio/m4a' }
-    )
 
-    // Transcrire avec OpenAI Whisper
-    const transcription = await openai.audio.transcriptions.create({
-      file: audioFileForOpenAI,
-      model: 'whisper-1',
-      language: 'fr', // Français par défaut
-      response_format: 'text'
-    })
+    // Sauvegarder temporairement le fichier
+    // Sur Vercel, utiliser /tmp qui est le seul dossier accessible en écriture
+    const tempDir = process.env.VERCEL ? '/tmp' : path.join(process.cwd(), 'temp')
+    if (!fs.existsSync(tempDir)) {
+      fs.mkdirSync(tempDir, { recursive: true })
+    }
 
-    const transcriptionText = typeof transcription === 'string' ? transcription : transcription.text || ''
+    const tempFilePath = path.join(tempDir, `audio_${userId}_${Date.now()}.${audioFile.name.split('.').pop() || 'm4a'}`)
+    fs.writeFileSync(tempFilePath, buffer)
 
-    return NextResponse.json({
-      transcription: transcriptionText.trim(),
-      success: true
-    })
+    try {
+      // Utiliser VoiceTranscriptionService comme pour WhatsApp
+      const voiceService = new VoiceTranscriptionService()
+      const result = await voiceService.transcribeAudio(tempFilePath)
+
+      if (!result.success || !result.text) {
+        return NextResponse.json(
+          { 
+            error: 'Erreur lors de la transcription',
+            details: result.error || 'Transcription échouée'
+          },
+          { status: 500 }
+        )
+      }
+
+      return NextResponse.json({
+        transcription: result.text,
+        success: true
+      })
+    } finally {
+      // Nettoyer le fichier temporaire
+      try {
+        if (fs.existsSync(tempFilePath)) {
+          fs.unlinkSync(tempFilePath)
+        }
+      } catch (cleanupError) {
+        console.error('Erreur lors du nettoyage du fichier temporaire:', cleanupError)
+      }
+    }
 
   } catch (error: any) {
     console.error('Erreur lors de la transcription:', error)
