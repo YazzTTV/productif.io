@@ -1,6 +1,6 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getAuthUser } from '@/lib/auth';
+import { getAuthUser, getAuthUserFromRequest } from '@/lib/auth';
 import { parseISO } from 'date-fns';
 import { GamificationService } from '@/services/gamification';
 
@@ -11,9 +11,16 @@ function normalizeDate(date: Date): Date {
   return normalized;
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
-    const user = await getAuthUser();
+    // Essayer d'abord avec getAuthUserFromRequest (tokens utilisateur dans headers)
+    let user = await getAuthUserFromRequest(req);
+    
+    // Si pas d'utilisateur, essayer avec getAuthUser (cookies pour web)
+    if (!user) {
+      user = await getAuthUser();
+    }
+    
     if (!user) {
       return NextResponse.json({ error: 'Non authentifié' }, { status: 401 });
     }

@@ -1,7 +1,7 @@
-import { NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { startOfDay } from "date-fns"
-import { getAuthUser } from "@/lib/auth"
+import { getAuthUser, getAuthUserFromRequest } from "@/lib/auth"
 
 // Habitudes par défaut
 const DEFAULT_HABITS = [
@@ -23,14 +23,21 @@ const DEFAULT_HABITS = [
   },
 ]
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const startTime = Date.now()
   const routeName = "[HABITS]"
   
   try {
     console.log(`${routeName} ⏱️  DÉBUT - Route: /api/habits - Timestamp: ${new Date().toISOString()}`)
     
-    const user = await getAuthUser()
+    // Essayer d'abord avec getAuthUserFromRequest (tokens utilisateur dans headers)
+    let user = await getAuthUserFromRequest(req)
+    
+    // Si pas d'utilisateur, essayer avec getAuthUser (cookies pour web)
+    if (!user) {
+      user = await getAuthUser()
+    }
+    
     if (!user) {
       console.log(`${routeName} ❌ ERREUR - Non authentifié après ${Date.now() - startTime}ms`)
       return NextResponse.json({ error: "Non authentifié" }, { status: 401 })
@@ -153,9 +160,16 @@ export async function GET() {
   }
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
-    const user = await getAuthUser()
+    // Essayer d'abord avec getAuthUserFromRequest (tokens utilisateur dans headers)
+    let user = await getAuthUserFromRequest(req)
+    
+    // Si pas d'utilisateur, essayer avec getAuthUser (cookies pour web)
+    if (!user) {
+      user = await getAuthUser()
+    }
+    
     if (!user) {
       return NextResponse.json({ error: "Non authentifié" }, { status: 401 })
     }
