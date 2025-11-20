@@ -122,6 +122,8 @@ export default function AssistantScreen() {
   const [isPlanningRecording, setIsPlanningRecording] = useState(false);
   const [planningRecordingTime, setPlanningRecordingTime] = useState(0);
   const [isProcessingPlanning, setIsProcessingPlanning] = useState(false);
+  const [planningText, setPlanningText] = useState('');
+  const planningRecordingRef = useRef<Audio.Recording | null>(null);
 
   // Learning Voice State
   const [showLearningModal, setShowLearningModal] = useState(false);
@@ -219,7 +221,7 @@ export default function AssistantScreen() {
     };
   }, [isLearningRecording]);
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!inputText.trim()) return;
 
     const userMessage: Message = {
@@ -229,19 +231,50 @@ export default function AssistantScreen() {
       timestamp: new Date(),
     };
 
+    const messageText = inputText;
     setMessages([...messages, userMessage]);
     setInputText('');
 
-    setTimeout(() => {
-      const aiMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        text: "Great question! Based on your productivity profile, I recommend focusing on your most challenging task during your peak hours (9-11am). Would you like me to help you plan that?",
-        isAI: true,
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, aiMessage]);
+    // Afficher un indicateur de chargement
+    const loadingMessageId = (Date.now() + 1).toString();
+    const loadingMessage: Message = {
+      id: loadingMessageId,
+      text: '...',
+      isAI: true,
+      timestamp: new Date(),
+    };
+    setMessages((prev) => [...prev, loadingMessage]);
+
+    try {
+      // Appeler l'API pour obtenir la réponse de l'agent IA
+      const response = await assistantService.sendChatMessage(messageText);
+      
+      // Remplacer le message de chargement par la vraie réponse
+      setMessages((prev) => 
+        prev.map((msg) => 
+          msg.id === loadingMessageId
+            ? {
+                ...msg,
+                text: response.response || "Désolé, je n'ai pas pu générer de réponse.",
+              }
+            : msg
+        )
+      );
       setXp((prev) => Math.min(prev + 10, maxXp));
-    }, 1000);
+    } catch (error: any) {
+      console.error('Erreur lors de l\'envoi du message:', error);
+      // Remplacer le message de chargement par un message d'erreur
+      setMessages((prev) => 
+        prev.map((msg) => 
+          msg.id === loadingMessageId
+            ? {
+                ...msg,
+                text: "Désolé, j'ai rencontré une erreur. Pouvez-vous réessayer ?",
+              }
+            : msg
+        )
+      );
+    }
   };
 
   const handleQuickAction = (action: string) => {
@@ -522,25 +555,129 @@ export default function AssistantScreen() {
     }
   };
 
-  const startPlanningRecording = () => {
-    setIsPlanningRecording(true);
-    setPlanningRecordingTime(0);
+  const startPlanningRecording = async () => {
+    try {
+      // Demander la permission d'utiliser le microphone
+      const { status } = await Audio.requestPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission requise', 'L\'accès au microphone est nécessaire pour enregistrer votre voix.');
+        return;
+      }
+
+      // Configurer le mode audio
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+      });
+
+      // Créer un nouvel enregistrement
+      const { recording } = await Audio.Recording.createAsync(
+        Audio.RecordingOptionsPresets.HIGH_QUALITY
+      );
+
+      planningRecordingRef.current = recording;
+      setIsPlanningRecording(true);
+      setPlanningRecordingTime(0);
+    } catch (error: any) {
+      console.error('Erreur lors du démarrage de l\'enregistrement:', error);
+      Alert.alert('Erreur', 'Impossible de démarrer l\'enregistrement');
+    }
   };
 
   const stopPlanningRecording = async () => {
+    if (!planningRecordingRef.current) {
+      return;
+    }
+
     setIsPlanningRecording(false);
     setIsProcessingPlanning(true);
 
     try {
-      // Pour l'instant, on simule la transcription
-      // TODO: Intégrer un vrai système d'enregistrement vocal
-      const userInput = `Plan pour demain: ${planningRecordingTime} secondes d'enregistrement. [À remplacer par la vraie transcription vocale]`;
+      // Arrêter l'enregistrement
+      await planningRecordingRef.current.stopAndUnloadAsync();
+      const uri = planningRecordingRef.current.getURI();
+      planningRecordingRef.current = null;
 
-      // Appeler l'API plan tomorrow
-      const result = await assistantService.planTomorrow(userInput);
+      // Réinitialiser le mode audio
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+      });
+
+      let transcription = planningText.trim();
+
+      // Si un enregistrement audio existe, le transcrire
+      if (uri) {
+        try {
+          // Lire le fichier audio
+          const fileInfo = await FileSystem.getInfoAsync(uri);
+          if (fileInfo.exists) {
+            // Créer un FormData pour envoyer l'audio
+            const formData = new FormData();
+            const filename = uri.split('/').pop() || 'recording.m4a';
+            const fileType = 'audio/m4a';
+
+            formData.append('audio', {
+              uri: uri,
+              name: filename,
+              type: fileType,
+            } as any);
+
+            // Appeler l'API de transcription
+            const token = await getAuthToken();
+            const API_BASE_URL = 'https://www.productif.io/api';
+
+            const transcriptionResponse = await fetch(`${API_BASE_URL}/transcribe`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${token}`,
+              },
+              body: formData,
+            });
+
+            if (transcriptionResponse.ok) {
+              const transcriptionData = await transcriptionResponse.json();
+              if (transcriptionData.success && transcriptionData.transcription) {
+                transcription = transcriptionData.transcription;
+                // Mettre à jour le champ de texte avec la transcription
+                setPlanningText(transcription);
+              }
+            } else {
+              console.error('Erreur transcription:', await transcriptionResponse.text());
+            }
+
+            // Nettoyer le fichier audio temporaire
+            try {
+              await FileSystem.deleteAsync(uri, { idempotent: true });
+            } catch (cleanupError) {
+              console.error('Erreur lors du nettoyage du fichier audio:', cleanupError);
+            }
+          }
+        } catch (transcriptionError: any) {
+          console.error('Erreur lors de la transcription:', transcriptionError);
+          // Continuer avec le texte manuel si la transcription échoue
+          // Nettoyer le fichier audio même en cas d'erreur
+          try {
+            if (uri) {
+              await FileSystem.deleteAsync(uri, { idempotent: true });
+            }
+          } catch (cleanupError) {
+            console.error('Erreur lors du nettoyage du fichier audio:', cleanupError);
+          }
+        }
+      }
+
+      // Si pas de transcription et pas de texte manuel, utiliser un placeholder
+      if (!transcription) {
+        transcription = `Plan pour demain: ${planningRecordingTime} secondes d'enregistrement.`;
+      }
+
+      // Appeler l'API plan tomorrow avec la transcription
+      const result = await assistantService.planTomorrow(transcription);
 
       setIsProcessingPlanning(false);
       setShowPlanningModal(false);
+      setPlanningText(''); // Réinitialiser le texte
+      setPlanningRecordingTime(0);
 
       // Construire le message de réponse
       let responseMessage = `📅 Parfait ! J'ai créé ${result.tasksCreated} tâche${result.tasksCreated > 1 ? 's' : ''} pour demain !\n\n`;
@@ -570,7 +707,6 @@ export default function AssistantScreen() {
 
       setMessages((prev) => [...prev, planningResponse]);
       setXp((prev) => Math.min(prev + 30, maxXp));
-      setPlanningRecordingTime(0);
     } catch (error: any) {
       console.error('Erreur lors de la planification:', error);
       setIsProcessingPlanning(false);
@@ -1250,12 +1386,29 @@ export default function AssistantScreen() {
         />
 
         {/* Voice Planning Modal */}
-        <VoiceModal
+        <JournalModal
           visible={showPlanningModal}
-          onClose={() => {
-            setShowPlanningModal(false);
+          onClose={async () => {
+            // Arrêter l'enregistrement si en cours
+            if (planningRecordingRef.current) {
+              try {
+                await planningRecordingRef.current.stopAndUnloadAsync();
+                const uri = planningRecordingRef.current.getURI();
+                planningRecordingRef.current = null;
+                // Nettoyer le fichier audio
+                if (uri) {
+                  await FileSystem.deleteAsync(uri, { idempotent: true });
+                }
+              } catch (error) {
+                console.error('Erreur lors de l\'arrêt de l\'enregistrement:', error);
+              }
+            }
+            await Audio.setAudioModeAsync({
+              allowsRecordingIOS: false,
+            });
             setIsPlanningRecording(false);
             setPlanningRecordingTime(0);
+            setShowPlanningModal(false);
           }}
           title="Plan Tomorrow"
           subtitle={isProcessingPlanning ? 'Creating your personalized plan...' : isPlanningRecording ? "I'm listening..." : 'Tell me about your day tomorrow'}
@@ -1265,6 +1418,8 @@ export default function AssistantScreen() {
           isProcessing={isProcessingPlanning}
           onStartRecording={startPlanningRecording}
           onStopRecording={stopPlanningRecording}
+          journalText={planningText}
+          onJournalTextChange={setPlanningText}
           prompt="Share your tasks, meetings, and priorities for tomorrow"
         />
 
@@ -1758,7 +1913,13 @@ function HabitsModal({
             </Text>
           </LinearGradient>
 
-          <ScrollView style={styles.habitsList} contentContainerStyle={styles.habitsListContent}>
+          <View style={styles.habitsListContainer}>
+            <ScrollView 
+              style={styles.habitsList} 
+              contentContainerStyle={styles.habitsListContent}
+              showsVerticalScrollIndicator={true}
+              nestedScrollEnabled={true}
+            >
             {isLoadingHabits ? (
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="small" color="#00C27A" />
@@ -1767,7 +1928,13 @@ function HabitsModal({
             ) : habits.length === 0 ? (
               <Text style={styles.emptyText}>Aucune habitude trouvée</Text>
             ) : (
-              habits.map((habit, index) => (
+              // Trier les habitudes : non complétées en premier
+              (() => {
+                const sortedHabits = [...habits].sort((a, b) => {
+                  if (a.completed === b.completed) return 0;
+                  return a.completed ? 1 : -1;
+                });
+                return sortedHabits.map((habit, index) => (
                 <Animated.View
                   key={habit.id}
                   entering={FadeInDown.delay(index * 50).duration(300)}
@@ -1819,9 +1986,11 @@ function HabitsModal({
                     </View>
                   </TouchableOpacity>
                 </Animated.View>
-              ))
+                ));
+              })()
             )}
-          </ScrollView>
+            </ScrollView>
+          </View>
 
           <View style={styles.habitsFooter}>
             <View style={styles.habitsStatsGrid}>
@@ -1835,14 +2004,18 @@ function HabitsModal({
               <View style={styles.habitStatCard}>
                 <Text style={styles.habitStatCardIcon}>📈</Text>
                 <Text style={styles.habitStatCardValue}>
-                  {Math.round(habits.reduce((acc, h) => acc + h.completionRate, 0) / habits.length)}%
+                  {habits.length > 0
+                    ? Math.round((habits.filter((h) => h.completed).length / habits.length) * 100)
+                    : 0}%
                 </Text>
                 <Text style={styles.habitStatCardLabel}>Avg Rate</Text>
               </View>
               <View style={styles.habitStatCard}>
                 <Text style={styles.habitStatCardIcon}>🔥</Text>
                 <Text style={styles.habitStatCardValue}>
-                  {Math.max(...habits.map((h) => h.streak))}
+                  {habits.length > 0
+                    ? Math.max(...habits.map((h) => h.streak || 0))
+                    : 0}
                 </Text>
                 <Text style={styles.habitStatCardLabel}>Top Streak</Text>
               </View>
@@ -2685,12 +2858,18 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     opacity: 0.9,
   },
+  habitsListContainer: {
+    flexShrink: 1,
+    minHeight: 200,
+    maxHeight: 350,
+  },
   habitsList: {
     flex: 1,
   },
   habitsListContent: {
     padding: 24,
     gap: 12,
+    paddingBottom: 24,
   },
   habitItem: {
     flexDirection: 'row',
