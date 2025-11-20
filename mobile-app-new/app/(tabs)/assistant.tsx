@@ -33,7 +33,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { Audio } from 'expo-av';
 import * as FileSystem from 'expo-file-system';
-import { assistantService, tasksService, habitsService } from '@/lib/api';
+import { assistantService, tasksService, habitsService, getAuthToken } from '@/lib/api';
 import { format } from 'date-fns';
 
 interface Message {
@@ -128,6 +128,8 @@ export default function AssistantScreen() {
   const [isLearningRecording, setIsLearningRecording] = useState(false);
   const [learningRecordingTime, setLearningRecordingTime] = useState(0);
   const [isProcessingLearning, setIsProcessingLearning] = useState(false);
+  const [learningText, setLearningText] = useState('');
+  const learningRecordingRef = useRef<Audio.Recording | null>(null);
 
   // Habit Tracking State
   const [showHabitsModal, setShowHabitsModal] = useState(false);
@@ -192,6 +194,18 @@ export default function AssistantScreen() {
       if (interval) clearInterval(interval);
     };
   }, [isPlanningRecording]);
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isLearningRecording) {
+      interval = setInterval(() => {
+        setLearningRecordingTime((prev) => prev + 1);
+      }, 1000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isLearningRecording]);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -427,8 +441,7 @@ export default function AssistantScreen() {
             } as any);
 
             // Appeler l'API de transcription
-            const tokenStorage = (await import('@/lib/api')).TokenStorage.getInstance();
-            const token = await tokenStorage.getToken();
+            const token = await getAuthToken();
             const API_BASE_URL = 'https://www.productif.io/api';
 
             const transcriptionResponse = await fetch(`${API_BASE_URL}/transcribe`, {
@@ -565,25 +578,127 @@ export default function AssistantScreen() {
     }
   };
 
-  const startLearningRecording = () => {
-    setIsLearningRecording(true);
-    setLearningRecordingTime(0);
+  const startLearningRecording = async () => {
+    try {
+      // Demander la permission d'utiliser le microphone
+      const { status } = await Audio.requestPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission requise', 'L\'accès au microphone est nécessaire pour enregistrer votre voix.');
+        return;
+      }
+
+      // Configurer le mode audio
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+      });
+
+      // Créer un nouvel enregistrement
+      const { recording } = await Audio.Recording.createAsync(
+        Audio.RecordingOptionsPresets.HIGH_QUALITY
+      );
+
+      learningRecordingRef.current = recording;
+      setIsLearningRecording(true);
+      setLearningRecordingTime(0);
+    } catch (error: any) {
+      console.error('Erreur lors du démarrage de l\'enregistrement:', error);
+      Alert.alert('Erreur', 'Impossible de démarrer l\'enregistrement');
+    }
   };
 
   const stopLearningRecording = async () => {
+    if (!learningRecordingRef.current) {
+      return;
+    }
+
     setIsLearningRecording(false);
     setIsProcessingLearning(true);
 
     try {
-      // Pour l'instant, on simule la transcription
-      // TODO: Intégrer un vrai système d'enregistrement vocal
-      const learningNote = `Apprentissage du jour: ${learningRecordingTime} secondes d'enregistrement. [À remplacer par la vraie transcription vocale]`;
+      // Arrêter l'enregistrement
+      await learningRecordingRef.current.stopAndUnloadAsync();
+      const uri = learningRecordingRef.current.getURI();
+      learningRecordingRef.current = null;
+
+      // Réinitialiser le mode audio
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+      });
+
+      let transcription = learningText.trim();
+
+      // Si un enregistrement audio existe, le transcrire
+      if (uri) {
+        try {
+          // Lire le fichier audio
+          const fileInfo = await FileSystem.getInfoAsync(uri);
+          if (fileInfo.exists) {
+            // Créer un FormData pour envoyer l'audio
+            const formData = new FormData();
+            const filename = uri.split('/').pop() || 'recording.m4a';
+            const fileType = 'audio/m4a';
+
+            formData.append('audio', {
+              uri: uri,
+              name: filename,
+              type: fileType,
+            } as any);
+
+            // Appeler l'API de transcription
+            const token = await getAuthToken();
+            const API_BASE_URL = 'https://www.productif.io/api';
+
+            const transcriptionResponse = await fetch(`${API_BASE_URL}/transcribe`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${token}`,
+              },
+              body: formData,
+            });
+
+            if (transcriptionResponse.ok) {
+              const transcriptionData = await transcriptionResponse.json();
+              if (transcriptionData.success && transcriptionData.transcription) {
+                transcription = transcriptionData.transcription;
+                // Mettre à jour le champ de texte avec la transcription
+                setLearningText(transcription);
+              }
+            } else {
+              console.error('Erreur transcription:', await transcriptionResponse.text());
+            }
+
+            // Nettoyer le fichier audio temporaire
+            try {
+              await FileSystem.deleteAsync(uri, { idempotent: true });
+            } catch (cleanupError) {
+              console.error('Erreur lors du nettoyage du fichier audio:', cleanupError);
+            }
+          }
+        } catch (transcriptionError: any) {
+          console.error('Erreur lors de la transcription:', transcriptionError);
+          // Continuer avec le texte manuel si la transcription échoue
+          // Nettoyer le fichier audio même en cas d'erreur
+          try {
+            if (uri) {
+              await FileSystem.deleteAsync(uri, { idempotent: true });
+            }
+          } catch (cleanupError) {
+            console.error('Erreur lors du nettoyage du fichier audio:', cleanupError);
+          }
+        }
+      }
+
+      // Si pas de transcription et pas de texte manuel, utiliser un placeholder
+      if (!transcription) {
+        transcription = `Apprentissage du jour: ${learningRecordingTime} secondes d'enregistrement.`;
+      }
 
       // Trouver l'habitude "Apprentissage"
       const learningHabit = await assistantService.findHabitByName('apprentissage');
       if (learningHabit) {
         const today = format(new Date(), 'yyyy-MM-dd');
-        await assistantService.saveHabitEntry(learningHabit.id, today, learningNote);
+        await assistantService.saveHabitEntry(learningHabit.id, today, transcription);
         // Recharger les habitudes
         await loadHabits();
       } else {
@@ -592,17 +707,18 @@ export default function AssistantScreen() {
 
       setIsProcessingLearning(false);
       setShowLearningModal(false);
+      setLearningText(''); // Réinitialiser le texte
+      setLearningRecordingTime(0);
 
       const learningResponse: Message = {
         id: Date.now().toString(),
-        text: `💡 Excellent ! J'ai enregistré tes apprentissages du jour.\n\n📚 Tes apprentissages sont maintenant sauvegardés dans l'habitude "Apprentissage" et visibles sur /mon-espace apprentissage.\n\n✨ Continue à apprendre et à grandir chaque jour !\n\nTu as gagné 20 XP ! 🌟`,
+        text: `💡 Excellent ! J'ai enregistré tes apprentissages du jour.\n\n📚 Tes apprentissages sont maintenant sauvegardés dans l'habitude "Apprentissage" et visibles sur /mon-espace de l'app web.\n\n✨ Continue à apprendre et à grandir chaque jour !\n\nTu as gagné 20 XP ! 🌟`,
         isAI: true,
         timestamp: new Date(),
       };
 
       setMessages((prev) => [...prev, learningResponse]);
       setXp((prev) => Math.min(prev + 20, maxXp));
-      setLearningRecordingTime(0);
     } catch (error: any) {
       console.error('Erreur lors de l\'enregistrement de l\'apprentissage:', error);
       setIsProcessingLearning(false);
@@ -1153,12 +1269,29 @@ export default function AssistantScreen() {
         />
 
         {/* Voice Learning Modal */}
-        <VoiceModal
+        <JournalModal
           visible={showLearningModal}
-          onClose={() => {
-            setShowLearningModal(false);
+          onClose={async () => {
+            // Arrêter l'enregistrement si en cours
+            if (learningRecordingRef.current) {
+              try {
+                await learningRecordingRef.current.stopAndUnloadAsync();
+                const uri = learningRecordingRef.current.getURI();
+                learningRecordingRef.current = null;
+                // Nettoyer le fichier audio
+                if (uri) {
+                  await FileSystem.deleteAsync(uri, { idempotent: true });
+                }
+              } catch (error) {
+                console.error('Erreur lors de l\'arrêt de l\'enregistrement:', error);
+              }
+            }
+            await Audio.setAudioModeAsync({
+              allowsRecordingIOS: false,
+            });
             setIsLearningRecording(false);
             setLearningRecordingTime(0);
+            setShowLearningModal(false);
           }}
           title="What I Learned Today"
           subtitle={isProcessingLearning ? 'Processing your insights...' : isLearningRecording ? "I'm listening..." : 'Share what you learned today'}
@@ -1168,6 +1301,8 @@ export default function AssistantScreen() {
           isProcessing={isProcessingLearning}
           onStartRecording={startLearningRecording}
           onStopRecording={stopLearningRecording}
+          journalText={learningText}
+          onJournalTextChange={setLearningText}
           prompt="Describe new skills, insights, or knowledge you gained"
         />
 
