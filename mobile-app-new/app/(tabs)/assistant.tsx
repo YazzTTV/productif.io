@@ -1152,6 +1152,22 @@ function VoiceModal({
     transform: [{ rotate: `${processingRotation.value}deg` }],
   }));
 
+  // Créer les styles animés pour chaque pulse ring en dehors du map
+  const pulseRingStyle1 = useAnimatedStyle(() => ({
+    transform: [{ scale: pulseRings[0].value }],
+    opacity: interpolate(pulseRings[0].value, [1, 2.2], [0.5, 0], Extrapolate.CLAMP),
+  }));
+
+  const pulseRingStyle2 = useAnimatedStyle(() => ({
+    transform: [{ scale: pulseRings[1].value }],
+    opacity: interpolate(pulseRings[1].value, [1, 2.2], [0.5, 0], Extrapolate.CLAMP),
+  }));
+
+  const pulseRingStyle3 = useAnimatedStyle(() => ({
+    transform: [{ scale: pulseRings[2].value }],
+    opacity: interpolate(pulseRings[2].value, [1, 2.2], [0.5, 0], Extrapolate.CLAMP),
+  }));
+
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
@@ -1189,9 +1205,11 @@ function VoiceModal({
                   <Animated.View style={micAnimatedStyle}>
                     <TouchableOpacity
                       onPress={isRecording ? onStopRecording : onStartRecording}
+                      activeOpacity={0.8}
                       style={[
                         styles.micButtonLarge,
                         isRecording && styles.micButtonRecording,
+                        { zIndex: 10 },
                       ]}
                     >
                       <LinearGradient
@@ -1207,19 +1225,19 @@ function VoiceModal({
 
                   {isRecording && (
                     <>
-                      {pulseRings.map((ring, i) => {
-                        const ringStyle = useAnimatedStyle(() => ({
-                          transform: [{ scale: ring.value }],
-                          opacity: interpolate(ring.value, [1, 2.2], [0.5, 0], Extrapolate.CLAMP),
-                        }));
-                        return (
-                          <Animated.View
-                            key={i}
-                            style={[styles.pulseRing, ringStyle]}
-                          />
-                        );
-                      })}
-                      <View style={styles.recordingDot} />
+                      <Animated.View
+                        style={[styles.pulseRing, pulseRingStyle1]}
+                        pointerEvents="none"
+                      />
+                      <Animated.View
+                        style={[styles.pulseRing, pulseRingStyle2]}
+                        pointerEvents="none"
+                      />
+                      <Animated.View
+                        style={[styles.pulseRing, pulseRingStyle3]}
+                        pointerEvents="none"
+                      />
+                      <View style={styles.recordingDot} pointerEvents="none" />
                     </>
                   )}
                 </View>
@@ -2088,6 +2106,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 16,
     elevation: 8,
+    zIndex: 10,
   },
   micButtonGradient: {
     width: '100%',

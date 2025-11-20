@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { apiAuth } from '@/middleware/api-auth'
+import { getAuthUserFromRequest } from '@/lib/auth'
+import { verifyApiToken, hasRequiredScopes } from '@/lib/api-token'
 import { analyzeJournalEntry } from '@/lib/ai/journal-analysis'
 
 // Normalise une date à minuit (00:00:00)
@@ -11,13 +13,43 @@ function normalizeToDay(date: Date): Date {
 }
 
 export async function GET(req: NextRequest) {
-  const authResponse = await apiAuth(req, { requiredScopes: ['journal:read'], checkTrial: false })
-  if (authResponse) return authResponse
+  const authHeader = req.headers.get('authorization') || ''
+  const token = authHeader.startsWith('Bearer ') ? authHeader.substring(7) : ''
+  
+  let userId: string | null = null
+  
+  // Essayer d'abord avec un token utilisateur (JWT) - pour l'app mobile
+  if (token) {
+    const user = await getAuthUserFromRequest(req)
+    if (user) {
+      userId = user.id
+    }
+  }
+  
+  // Si pas d'utilisateur, essayer avec un token API
+  if (!userId && token) {
+    try {
+      const payload = await verifyApiToken(token)
+      if (payload) {
+        // Vérifier les scopes pour les tokens API
+        if (!hasRequiredScopes(payload.scopes, ['journal:read'])) {
+          return NextResponse.json({ error: 'Permissions insuffisantes', requiredScopes: ['journal:read'] }, { status: 403 })
+        }
+        userId = payload.userId
+      }
+    } catch (error) {
+      // Si la vérification du token API échoue, on continue avec null
+      console.error('Erreur lors de la vérification du token API:', error)
+    }
+  }
+  
+  if (!userId) {
+    return NextResponse.json({ error: 'Token invalide ou expiré' }, { status: 401 })
+  }
 
   try {
     const { searchParams } = new URL(req.url)
     const days = parseInt(searchParams.get('days') || '7', 10)
-    const userId = req.headers.get('x-api-user-id')!
 
     const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000)
     const entries = await prisma.journalEntry.findMany({
@@ -33,11 +65,41 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const authResponse = await apiAuth(req, { requiredScopes: ['journal:write'], checkTrial: false })
-  if (authResponse) return authResponse
+  const authHeader = req.headers.get('authorization') || ''
+  const token = authHeader.startsWith('Bearer ') ? authHeader.substring(7) : ''
+  
+  let userId: string | null = null
+  
+  // Essayer d'abord avec un token utilisateur (JWT) - pour l'app mobile
+  if (token) {
+    const user = await getAuthUserFromRequest(req)
+    if (user) {
+      userId = user.id
+    }
+  }
+  
+  // Si pas d'utilisateur, essayer avec un token API
+  if (!userId && token) {
+    try {
+      const payload = await verifyApiToken(token)
+      if (payload) {
+        // Vérifier les scopes pour les tokens API
+        if (!hasRequiredScopes(payload.scopes, ['journal:write'])) {
+          return NextResponse.json({ error: 'Permissions insuffisantes', requiredScopes: ['journal:write'] }, { status: 403 })
+        }
+        userId = payload.userId
+      }
+    } catch (error) {
+      // Si la vérification du token API échoue, on continue avec null
+      console.error('Erreur lors de la vérification du token API:', error)
+    }
+  }
+  
+  if (!userId) {
+    return NextResponse.json({ error: 'Token invalide ou expiré' }, { status: 401 })
+  }
 
   try {
-    const userId = req.headers.get('x-api-user-id')!
     const body = await req.json().catch(() => ({})) as { transcription?: string; date?: string }
 
     if (!body?.transcription || typeof body.transcription !== 'string') {
