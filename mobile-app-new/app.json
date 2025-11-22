@@ -1,13 +1,12 @@
 {
   "expo": {
-    "name": "mobile-app-new",
-    "slug": "mobile-app-new",
+    "name": "Productif.io",
+    "slug": "productif-io",
     "version": "1.0.7",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "mobileappnew",
+    "scheme": "productifio",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": false,
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "io.productif.app"
@@ -35,6 +34,12 @@
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"
+        }
+      ],
+      [
+        "expo-av",
+        {
+          "microphonePermission": "Autoriser l'accès au microphone pour enregistrer votre voix."
         }
       ],
       [
