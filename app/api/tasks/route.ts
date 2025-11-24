@@ -95,20 +95,10 @@ export async function GET(request: Request) {
         shouldFilterByCompany = true
         targetCompanyId = companyId
       }
-    } else {
-      // Pour les membres normaux, récupérer leur entreprise
-      const userCompany = await prisma.$queryRaw`
-        SELECT "companyId" 
-        FROM "UserCompany" 
-        WHERE "userId" = ${userId}
-        LIMIT 1
-      `
-      
-      if (userCompany && Array.isArray(userCompany) && userCompany.length > 0) {
-        shouldFilterByCompany = true
-        targetCompanyId = userCompany[0].companyId
-      }
     }
+    // Pour les membres normaux, NE PAS filtrer par entreprise par défaut
+    // Ils doivent voir uniquement leurs propres tâches
+    // Le filtrage par entreprise ne doit se faire que si explicitement demandé (via companyIdParam)
     
     if (shouldFilterByCompany && targetCompanyId) {
       // Récupérer les utilisateurs de l'entreprise

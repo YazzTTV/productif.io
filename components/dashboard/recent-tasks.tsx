@@ -2,13 +2,14 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
+import { motion } from "framer-motion"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
 import { CheckCircle, Circle, Clock, ArrowRight, Edit, RefreshCcw, CalendarDays } from "lucide-react"
 import { format, formatDistanceToNow, isToday, isTomorrow } from "date-fns"
 import { fr } from "date-fns/locale"
 import { cn } from "@/lib/utils"
+import { safeJsonResponse } from "@/lib/api-utils"
 
 interface TaskWithProject {
   id: string
@@ -52,13 +53,7 @@ export function RecentTasks() {
     
     try {
       const response = await fetch("/api/tasks/today")
-      
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: "Erreur inconnue" }))
-        throw new Error(errorData.error || `Erreur: ${response.status}`)
-      }
-      
-      const data = await response.json()
+      const data = await safeJsonResponse(response, "tasks/today")
       
       // Convertir les dates
       const formattedData = Array.isArray(data) ? data.map(task => ({
@@ -90,10 +85,7 @@ export function RecentTasks() {
         })
       })
 
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || "Erreur lors de la mise à jour de la tâche")
-      }
+      await safeJsonResponse(response, "tasks/update")
 
       // Mise à jour locale de l'état pour un rendu immédiat
       setTasks(prev => 
@@ -152,9 +144,14 @@ export function RecentTasks() {
       <Card>
         <CardHeader className="pb-3 flex flex-row items-center justify-between">
           <CardTitle>Tâches d'aujourd'hui</CardTitle>
-          <Button variant="ghost" size="icon" onClick={fetchTasks}>
-            <RefreshCcw className="h-4 w-4" />
-          </Button>
+          <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={fetchTasks}
+          className="p-2 hover:bg-gray-100 rounded-xl transition-colors"
+        >
+          <RefreshCcw className="h-4 w-4" />
+        </motion.button>
         </CardHeader>
         <CardContent>
           <div className="text-center text-red-600">{error}</div>
@@ -168,9 +165,14 @@ export function RecentTasks() {
       <Card>
         <CardHeader className="pb-3 flex flex-row items-center justify-between">
           <CardTitle>Tâches d'aujourd'hui</CardTitle>
-          <Button variant="ghost" size="icon" onClick={fetchTasks}>
-            <RefreshCcw className="h-4 w-4" />
-          </Button>
+          <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={fetchTasks}
+          className="p-2 hover:bg-gray-100 rounded-xl transition-colors"
+        >
+          <RefreshCcw className="h-4 w-4" />
+        </motion.button>
         </CardHeader>
         <CardContent>
           <div className="text-center py-8">
@@ -206,21 +208,21 @@ export function RecentTasks() {
             >
               <div className="flex items-start justify-between">
                 <div className="flex items-start gap-2">
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className="p-0 h-auto mt-0.5"
+                  <motion.button
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
+                    className="p-0 h-auto mt-0.5 bg-transparent border-none cursor-pointer"
                     onClick={() => toggleTaskCompletion(task.id, task.completed)}
                     disabled={isUpdating === task.id}
                   >
                     {isUpdating === task.id ? (
                       <RefreshCcw className="h-5 w-5 text-gray-400 animate-spin" />
                     ) : task.completed ? (
-                      <CheckCircle className="h-5 w-5 text-green-500" />
+                      <CheckCircle className="h-5 w-5 text-[#00C27A]" />
                     ) : (
                       <Circle className="h-5 w-5 text-gray-300" />
                     )}
-                  </Button>
+                  </motion.button>
                   <div>
                     <h3 className={cn(
                       "font-medium", 
@@ -237,9 +239,13 @@ export function RecentTasks() {
                 </div>
                 <div className="flex flex-col items-end gap-2">
                   <Link href={`/dashboard/tasks/${task.id}/edit`}>
-                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                    <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      className="h-8 w-8 p-2 hover:bg-gray-100 rounded-xl transition-colors"
+                    >
                       <Edit className="h-4 w-4" />
-                    </Button>
+                    </motion.button>
                   </Link>
                   <div className="flex gap-2 flex-wrap justify-end">
                     {task.priority !== null && priorityLabels[task.priority] && (
@@ -280,10 +286,14 @@ export function RecentTasks() {
         
         <div className="mt-4 text-center">
           <Link href="/dashboard/tasks">
-            <Button variant="outline" size="sm">
-              Toutes les tâches
-              <ArrowRight className="h-4 w-4 ml-2" />
-            </Button>
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              className="px-5 py-2.5 bg-gradient-to-r from-[#00C27A] to-[#00D68F] text-white rounded-xl shadow-sm flex items-center gap-2 mx-auto"
+            >
+              <span>Toutes les tâches</span>
+              <ArrowRight className="h-4 w-4" />
+            </motion.button>
           </Link>
         </div>
       </CardContent>

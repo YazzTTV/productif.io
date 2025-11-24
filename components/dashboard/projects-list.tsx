@@ -1,6 +1,6 @@
 import Link from "next/link"
+import { motion } from "framer-motion"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
 import { ArrowRight, PlusCircle } from "lucide-react"
 
 interface Project {
@@ -24,10 +24,14 @@ export function ProjectsList({ projects }: ProjectsListProps) {
         <div className="flex items-center justify-between">
           <CardTitle>Projets</CardTitle>
           <Link href="/dashboard/projects/new">
-            <Button variant="ghost" size="sm">
-              <PlusCircle className="h-4 w-4 mr-1" />
-              Nouveau
-            </Button>
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              className="px-4 py-2 bg-gradient-to-r from-[#00C27A] to-[#00D68F] text-white rounded-xl shadow-sm flex items-center gap-2 text-sm"
+            >
+              <PlusCircle className="h-4 w-4" />
+              <span>Nouveau</span>
+            </motion.button>
           </Link>
         </div>
       </CardHeader>
@@ -56,10 +60,14 @@ export function ProjectsList({ projects }: ProjectsListProps) {
 
             <div className="pt-2">
               <Link href="/dashboard/projects">
-                <Button variant="ghost" className="w-full justify-between">
-                  Voir tous les projets
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="w-full px-4 py-2.5 hover:bg-gray-100 text-gray-700 rounded-xl flex items-center justify-between transition-colors"
+                >
+                  <span>Voir tous les projets</span>
                   <ArrowRight className="h-4 w-4" />
-                </Button>
+                </motion.button>
               </Link>
             </div>
           </div>

@@ -14,8 +14,8 @@ type ThemeProviderProps = {
 export function ThemeProvider({ children, ...props }: ThemeProviderProps) {
   return <NextThemesProvider 
     {...props}
-    themes={['light']}
-    forcedTheme="light"
+    themes={['light', 'dark']}
+    enableSystem={false}
   >
     {children}
   </NextThemesProvider>

@@ -48,13 +48,13 @@ export function TasksTable({ tasks: initialTasks }: TasksTableProps) {
       })
 
       if (!response.ok) {
-        throw new Error("Erreur lors de la mise à jour de la tâche")
+        throw new Error("Error updating task")
       }
 
-      // Mettre à jour l'état local
+      // Update local state
       setTasks(tasks.map((task) => (task.id === taskId ? { ...task, status: newStatus } : task)))
     } catch (error) {
-      console.error("Erreur:", error)
+      console.error("Error:", error)
     }
   }
 
@@ -65,13 +65,13 @@ export function TasksTable({ tasks: initialTasks }: TasksTableProps) {
       })
 
       if (!response.ok) {
-        throw new Error("Erreur lors de la suppression de la tâche")
+        throw new Error("Error deleting task")
       }
 
-      // Mettre à jour l'état local
+      // Update local state
       setTasks(tasks.filter((task) => task.id !== taskId))
     } catch (error) {
-      console.error("Erreur:", error)
+      console.error("Error:", error)
     }
   }
 
@@ -116,12 +116,12 @@ export function TasksTable({ tasks: initialTasks }: TasksTableProps) {
         <TableHeader>
           <TableRow>
             <TableHead className="w-[50px]"></TableHead>
-            <TableHead>Titre</TableHead>
-            <TableHead>Statut</TableHead>
-            <TableHead>Priorité</TableHead>
-            <TableHead>Projet</TableHead>
-            <TableHead>Échéance</TableHead>
-            <TableHead>Créée</TableHead>
+            <TableHead>Title</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead>Priority</TableHead>
+            <TableHead>Project</TableHead>
+            <TableHead>Due Date</TableHead>
+            <TableHead>Created</TableHead>
             <TableHead className="w-[70px]"></TableHead>
           </TableRow>
         </TableHeader>
@@ -129,7 +129,7 @@ export function TasksTable({ tasks: initialTasks }: TasksTableProps) {
           {tasks.length === 0 ? (
             <TableRow>
               <TableCell colSpan={8} className="text-center py-6 text-gray-500">
-                Aucune tâche trouvée. Créez votre première tâche !
+                No tasks found. Create your first task!
               </TableCell>
             </TableRow>
           ) : (
@@ -186,11 +186,11 @@ export function TasksTable({ tasks: initialTasks }: TasksTableProps) {
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem onClick={() => router.push(`/dashboard/tasks/${task.id}/edit`)}>
                         <Pencil className="h-4 w-4 mr-2" />
-                        Modifier
+                        Edit
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => deleteTask(task.id)}>
                         <Trash2 className="h-4 w-4 mr-2" />
-                        Supprimer
+                        Delete
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>

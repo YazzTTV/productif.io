@@ -65,14 +65,14 @@ export function TaskForm({ initialData, projects }: TaskFormProps) {
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.error || "Une erreur est survenue")
+        throw new Error(data.error || "An error occurred")
       }
 
       router.push("/dashboard/tasks")
       router.refresh()
     } catch (error) {
-      console.error("Erreur lors de la sauvegarde de la tâche:", error)
-      setError(error instanceof Error ? error.message : "Une erreur est survenue")
+      console.error("Error saving task:", error)
+      setError(error instanceof Error ? error.message : "An error occurred")
     } finally {
       setIsLoading(false)
     }
@@ -82,21 +82,21 @@ export function TaskForm({ initialData, projects }: TaskFormProps) {
     { value: "P0_QUICK_WIN", label: "P0 - Quick Win" },
     { value: "P1_URGENT", label: "P1 - Urgent" },
     { value: "P2_IMPORTANT", label: "P2 - Important" },
-    { value: "P3_TODO", label: "P3 - À faire" },
-    { value: "P4_LATER", label: "P4 - Plus tard" },
+    { value: "P3_TODO", label: "P3 - To Do" },
+    { value: "P4_LATER", label: "P4 - Later" },
   ]
 
   const energyOptions = [
-    { value: "EXTREME", label: "Extrême" },
-    { value: "HIGH", label: "Élevé" },
-    { value: "MEDIUM", label: "Moyen" },
-    { value: "LOW", label: "Faible" },
+    { value: "EXTREME", label: "Extreme" },
+    { value: "HIGH", label: "High" },
+    { value: "MEDIUM", label: "Medium" },
+    { value: "LOW", label: "Low" },
   ]
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{initialData ? "Modifier la tâche" : "Nouvelle tâche"}</CardTitle>
+        <CardTitle>{initialData ? "Edit Task" : "New Task"}</CardTitle>
       </CardHeader>
       <form onSubmit={handleSubmit}>
         <CardContent className="space-y-4">
@@ -106,7 +106,7 @@ export function TaskForm({ initialData, projects }: TaskFormProps) {
             </Alert>
           )}
           <div className="space-y-2">
-            <Label htmlFor="title">Titre</Label>
+            <Label htmlFor="title">Title</Label>
             <Input
               id="title"
               value={formData.title}
@@ -124,13 +124,13 @@ export function TaskForm({ initialData, projects }: TaskFormProps) {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="priority">Priorité</Label>
+            <Label htmlFor="priority">Priority</Label>
             <Select
               value={formData.priority}
               onValueChange={(value) => setFormData({ ...formData, priority: value })}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Sélectionnez une priorité" />
+                <SelectValue placeholder="Select a priority" />
               </SelectTrigger>
               <SelectContent>
                 {priorityOptions.map((option) => (
@@ -142,13 +142,13 @@ export function TaskForm({ initialData, projects }: TaskFormProps) {
             </Select>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="energyLevel">Niveau d'énergie requis</Label>
+            <Label htmlFor="energyLevel">Required Energy Level</Label>
             <Select
               value={formData.energyLevel}
               onValueChange={(value) => setFormData({ ...formData, energyLevel: value })}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Sélectionnez un niveau d'énergie" />
+                <SelectValue placeholder="Select an energy level" />
               </SelectTrigger>
               <SelectContent>
                 {energyOptions.map((option) => (
@@ -160,16 +160,16 @@ export function TaskForm({ initialData, projects }: TaskFormProps) {
             </Select>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="project">Projet (optionnel)</Label>
+            <Label htmlFor="project">Project (optional)</Label>
             <Select
               value={formData.projectId}
               onValueChange={(value) => setFormData({ ...formData, projectId: value })}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Sélectionnez un projet" />
+                <SelectValue placeholder="Select a project" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Aucun projet</SelectItem>
+                <SelectItem value="">No project</SelectItem>
                 {projects.map((project) => (
                   <SelectItem key={project.id} value={project.id}>
                     {project.name}
@@ -181,7 +181,7 @@ export function TaskForm({ initialData, projects }: TaskFormProps) {
         </CardContent>
         <CardFooter>
           <Button type="submit" className="w-full" disabled={isLoading}>
-            {isLoading ? "Enregistrement..." : initialData ? "Mettre à jour" : "Créer"}
+            {isLoading ? "Saving..." : initialData ? "Update" : "Create"}
           </Button>
         </CardFooter>
       </form>

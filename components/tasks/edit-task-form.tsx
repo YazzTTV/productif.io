@@ -37,7 +37,7 @@ import { ProjectSelect } from "./project-select"
 import { toast } from "@/components/ui/use-toast"
 
 const formSchema = z.object({
-  title: z.string().min(1, "Le titre est requis"),
+  title: z.string().min(1, "Title is required"),
   description: z.string().optional(),
   priority: z.string(),
   energyLevel: z.string(),
@@ -60,7 +60,7 @@ export function EditTaskForm({ taskId }: EditTaskFormProps) {
       title: "",
       description: "",
       priority: "P3",
-      energyLevel: "Moyen",
+      energyLevel: "Medium",
       projectId: "",
     },
   })
@@ -74,32 +74,32 @@ export function EditTaskForm({ taskId }: EditTaskFormProps) {
         if (!response.ok) {
           // Gérer les différents cas d'erreur HTTP
           if (response.status === 404) {
-            throw new Error("Cette tâche n'existe pas ou a été supprimée.")
+            throw new Error("This task does not exist or has been deleted.")
           } else if (response.status === 403) {
-            throw new Error("Vous n'avez pas l'autorisation d'accéder à cette tâche.")
+            throw new Error("You do not have permission to access this task.")
           } else if (response.status === 401) {
-            throw new Error("Veuillez vous connecter pour accéder à cette tâche.")
+            throw new Error("Please log in to access this task.")
           } else {
-            throw new Error("Erreur lors de la récupération de la tâche. Veuillez réessayer.")
+            throw new Error("Error retrieving task. Please try again.")
           }
         }
         
         const task = await response.json()
         
-        // Mappage pour convertir les valeurs priorité en chaînes
-        let priorityString = 'P2'; // Valeur par défaut
+        // Mapping to convert priority values to strings
+        let priorityString = 'P2'; // Default value
         if (task.priority === 0) priorityString = 'P0';
         else if (task.priority === 1) priorityString = 'P1';
         else if (task.priority === 2) priorityString = 'P2';
         else if (task.priority === 3) priorityString = 'P3';
         else if (task.priority === 4) priorityString = 'P4';
         
-        // Mappage pour convertir les valeurs niveau d'énergie en chaînes
-        let energyLevelString = 'Moyen'; // Valeur par défaut
-        if (task.energyLevel === 0) energyLevelString = 'Faible';
-        else if (task.energyLevel === 1) energyLevelString = 'Moyen';
-        else if (task.energyLevel === 2) energyLevelString = 'Élevé';
-        else if (task.energyLevel === 3) energyLevelString = 'Extrême';
+        // Mapping to convert energy level values to strings
+        let energyLevelString = 'Medium'; // Default value
+        if (task.energyLevel === 0) energyLevelString = 'Low';
+        else if (task.energyLevel === 1) energyLevelString = 'Medium';
+        else if (task.energyLevel === 2) energyLevelString = 'High';
+        else if (task.energyLevel === 3) energyLevelString = 'Extreme';
         
         form.reset({
           title: task.title,
@@ -110,11 +110,11 @@ export function EditTaskForm({ taskId }: EditTaskFormProps) {
           projectId: task.projectId || "",
         })
       } catch (error) {
-        console.error("Erreur:", error)
+        console.error("Error:", error)
         if (error instanceof Error) {
           setError(error.message)
         } else {
-          setError("Impossible de charger la tâche")
+          setError("Unable to load task")
         }
       } finally {
         setIsLoading(false)
@@ -130,10 +130,10 @@ export function EditTaskForm({ taskId }: EditTaskFormProps) {
     try {
       // Convertir le niveau d'énergie en valeur numérique
       let energyLevelValue: number | null = null;
-      if (data.energyLevel === 'Faible') energyLevelValue = 0;
-      else if (data.energyLevel === 'Moyen') energyLevelValue = 1;
-      else if (data.energyLevel === 'Élevé') energyLevelValue = 2;
-      else if (data.energyLevel === 'Extrême') energyLevelValue = 3;
+      if (data.energyLevel === 'Low') energyLevelValue = 0;
+      else if (data.energyLevel === 'Medium') energyLevelValue = 1;
+      else if (data.energyLevel === 'High') energyLevelValue = 2;
+      else if (data.energyLevel === 'Extreme') energyLevelValue = 3;
       
       const formData = {
         ...data,
@@ -152,26 +152,26 @@ export function EditTaskForm({ taskId }: EditTaskFormProps) {
       })
 
       if (!response.ok) {
-        throw new Error("Erreur lors de la modification de la tâche")
+        throw new Error("Error updating task")
       }
 
       router.refresh()
       
-      // Vérifier s'il existe une page de retour stockée
+      // Check if there's a stored return page
       const returnTo = localStorage.getItem('returnTo');
       if (returnTo) {
-        // Supprimer la valeur du localStorage pour ne pas affecter les éditions futures
+        // Remove the value from localStorage to not affect future edits
         localStorage.removeItem('returnTo');
         router.push(returnTo);
       } else {
-        // Comportement par défaut si aucune page de retour n'est spécifiée
+        // Default behavior if no return page is specified
         router.push("/dashboard/tasks");
       }
     } catch (error) {
-      console.error("Erreur:", error)
+      console.error("Error:", error)
       toast({
-        title: "Erreur",
-        description: "Une erreur est survenue lors de la modification de la tâche",
+        title: "Error",
+        description: "An error occurred while updating the task",
         variant: "destructive",
       })
     } finally {
@@ -189,7 +189,7 @@ export function EditTaskForm({ taskId }: EditTaskFormProps) {
             </svg>
           </div>
           <div className="ml-3">
-            <h3 className="text-sm font-medium text-red-800">Erreur</h3>
+            <h3 className="text-sm font-medium text-red-800">Error</h3>
             <div className="mt-2 text-sm text-red-700">
               <p>{error}</p>
             </div>
@@ -208,7 +208,7 @@ export function EditTaskForm({ taskId }: EditTaskFormProps) {
                   }
                 }}
               >
-                Retour au tableau des tâches
+                Back to tasks table
               </button>
             </div>
           </div>
@@ -221,7 +221,7 @@ export function EditTaskForm({ taskId }: EditTaskFormProps) {
     return (
       <div className="flex justify-center items-center h-32">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-        <span className="ml-2">Chargement de la tâche...</span>
+        <span className="ml-2">Loading task...</span>
       </div>
     )
   }
@@ -234,9 +234,9 @@ export function EditTaskForm({ taskId }: EditTaskFormProps) {
           name="title"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Titre</FormLabel>
+              <FormLabel>Title</FormLabel>
               <FormControl>
-                <Input placeholder="Titre de la tâche" {...field} />
+                <Input placeholder="Task title" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -251,7 +251,7 @@ export function EditTaskForm({ taskId }: EditTaskFormProps) {
               <FormLabel>Description</FormLabel>
               <FormControl>
                 <Textarea
-                  placeholder="Description de la tâche"
+                  placeholder="Task description"
                   {...field}
                 />
               </FormControl>
@@ -266,11 +266,11 @@ export function EditTaskForm({ taskId }: EditTaskFormProps) {
             name="priority"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Priorité</FormLabel>
+                <FormLabel>Priority</FormLabel>
                 <Select onValueChange={field.onChange} value={field.value}>
                   <FormControl>
                     <SelectTrigger>
-                      <SelectValue placeholder="Sélectionner une priorité" />
+                      <SelectValue placeholder="Select a priority" />
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
@@ -295,14 +295,14 @@ export function EditTaskForm({ taskId }: EditTaskFormProps) {
                 <Select onValueChange={field.onChange} value={field.value}>
                   <FormControl>
                     <SelectTrigger>
-                      <SelectValue placeholder="Sélectionner un niveau d'énergie" />
+                      <SelectValue placeholder="Select an energy level" />
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    <SelectItem value="Extrême">Extrême</SelectItem>
-                    <SelectItem value="Élevé">Élevé</SelectItem>
-                    <SelectItem value="Moyen">Moyen</SelectItem>
-                    <SelectItem value="Faible">Faible</SelectItem>
+                    <SelectItem value="Extreme">Extreme</SelectItem>
+                    <SelectItem value="High">High</SelectItem>
+                    <SelectItem value="Medium">Medium</SelectItem>
+                    <SelectItem value="Low">Low</SelectItem>
                   </SelectContent>
                 </Select>
                 <FormMessage />
@@ -384,10 +384,10 @@ export function EditTaskForm({ taskId }: EditTaskFormProps) {
               }
             }}
           >
-            Annuler
+            Cancel
           </Button>
           <Button type="submit" disabled={isLoading}>
-            {isLoading ? "Modification..." : "Modifier la tâche"}
+            {isLoading ? "Updating..." : "Update Task"}
           </Button>
         </div>
       </form>

@@ -1,9 +1,9 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { motion } from "framer-motion"
 import Link from "next/link"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Trophy, Crown, Medal, Star, Users, ChevronRight } from "lucide-react"
 import { LeaderboardEntry } from "@/services/gamification"
@@ -180,10 +180,14 @@ export function LeaderboardCompact() {
         {/* Lien vers le classement complet */}
         <div className="mt-4">
           <Link href="/dashboard/leaderboard">
-            <Button variant="outline" size="sm" className="w-full">
-              Voir le classement complet
-              <ChevronRight className="h-4 w-4 ml-2" />
-            </Button>
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              className="w-full px-4 py-2.5 bg-white border border-gray-200 text-gray-700 rounded-xl shadow-sm hover:bg-gray-50 transition-colors flex items-center justify-center gap-2 text-sm"
+            >
+              <span>Voir le classement complet</span>
+              <ChevronRight className="h-4 w-4" />
+            </motion.button>
           </Link>
         </div>
       </CardContent>
