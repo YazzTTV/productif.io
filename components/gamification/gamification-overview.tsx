@@ -1,10 +1,11 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { safeJsonResponse } from "@/lib/api-utils"
+import { motion } from "framer-motion"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
 import { 
   Trophy, 
   Flame, 
@@ -81,10 +82,8 @@ export function GamificationOverview() {
   const fetchGamificationStats = async () => {
     try {
       const response = await fetch('/api/gamification/stats')
-      if (response.ok) {
-        const data = await response.json()
-        setStats(data)
-      }
+      const data = await safeJsonResponse(response, 'gamification/stats')
+      setStats(data)
     } catch (error) {
       console.error('Erreur lors du chargement des stats de gamification:', error)
     } finally {
@@ -253,9 +252,13 @@ export function GamificationOverview() {
             
             <div className="mt-4">
               <Link href="/dashboard/achievements">
-                <Button variant="outline" className="w-full">
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="w-full px-4 py-2.5 bg-white border border-gray-200 text-gray-700 rounded-xl shadow-sm hover:bg-gray-50 transition-colors"
+                >
                   Voir tous les achievements
-                </Button>
+                </motion.button>
               </Link>
             </div>
           </CardContent>

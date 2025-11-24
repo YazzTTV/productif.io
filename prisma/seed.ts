@@ -3,145 +3,145 @@ import { PrismaClient } from '@prisma/client'
 const prisma = new PrismaClient()
 
 async function main() {
-  // Créer les achievements de base
+  // Create base achievements
   const achievements = [
-    // Achievements de Streak
+    // Streak Achievements
     {
-      name: "Premier pas",
-      description: "Complétez votre première habitude",
+      name: "First Step",
+      description: "Complete your first habit",
       type: "STREAK",
       threshold: 1,
       points: 10
     },
     {
-      name: "Une semaine de feu",
-      description: "Maintenez un streak de 7 jours",
+      name: "Week on Fire",
+      description: "Maintain a 7-day streak",
       type: "STREAK",
       threshold: 7,
       points: 50
     },
     {
-      name: "Maître de la constance",
-      description: "Maintenez un streak de 30 jours",
+      name: "Consistency Master",
+      description: "Maintain a 30-day streak",
       type: "STREAK",
       threshold: 30,
       points: 200
     },
     {
-      name: "Légende vivante",
-      description: "Maintenez un streak de 100 jours",
+      name: "Living Legend",
+      description: "Maintain a 100-day streak",
       type: "STREAK",
       threshold: 100,
       points: 1000
     },
 
-    // Achievements de Completion
+    // Completion Achievements
     {
-      name: "Débutant motivé",
-      description: "Complétez 10 habitudes au total",
+      name: "Motivated Beginner",
+      description: "Complete 10 habits in total",
       type: "HABITS",
       threshold: 10,
       points: 25
     },
     {
-      name: "Habitué des habitudes",
-      description: "Complétez 100 habitudes au total",
+      name: "Habit Enthusiast",
+      description: "Complete 100 habits in total",
       type: "HABITS",
       threshold: 100,
       points: 100
     },
     {
-      name: "Machine à habitudes",
-      description: "Complétez 500 habitudes au total",
+      name: "Habit Machine",
+      description: "Complete 500 habits in total",
       type: "HABITS",
       threshold: 500,
       points: 500
     },
     {
-      name: "Maître suprême",
-      description: "Complétez 1000 habitudes au total",
+      name: "Supreme Master",
+      description: "Complete 1000 habits in total",
       type: "HABITS",
       threshold: 1000,
       points: 1500
     },
 
-    // Achievements de Consistency
+    // Consistency Achievements
     {
-      name: "Journée parfaite",
-      description: "Complétez toutes vos habitudes en une journée",
+      name: "Perfect Day",
+      description: "Complete all your habits in one day",
       type: "PERFECT_DAY",
       threshold: 1,
       points: 30
     },
 
-    // Achievements de Points
+    // Points Achievements
     {
-      name: "Collectionneur de points",
-      description: "Atteignez 100 points",
+      name: "Points Collector",
+      description: "Reach 100 points",
       type: "POINTS",
       threshold: 100,
       points: 20
     },
     {
-      name: "Riche en points",
-      description: "Atteignez 500 points",
+      name: "Points Rich",
+      description: "Reach 500 points",
       type: "POINTS",
       threshold: 500,
       points: 50
     },
     {
-      name: "Millionnaire des points",
-      description: "Atteignez 1000 points",
+      name: "Points Millionaire",
+      description: "Reach 1000 points",
       type: "POINTS",
       threshold: 1000,
       points: 100
     },
 
-    // Achievements de Tâches
+    // Tasks Achievements
     {
-      name: "Première tâche",
-      description: "Complétez votre première tâche",
+      name: "First Task",
+      description: "Complete your first task",
       type: "TASKS",
       threshold: 1,
       points: 10
     },
     {
-      name: "Productif",
-      description: "Complétez 10 tâches",
+      name: "Productive",
+      description: "Complete 10 tasks",
       type: "TASKS",
       threshold: 10,
       points: 50
     },
     {
-      name: "Super productif",
-      description: "Complétez 100 tâches",
+      name: "Super Productive",
+      description: "Complete 100 tasks",
       type: "TASKS",
       threshold: 100,
       points: 200
     },
 
-    // Achievements d'Objectifs
+    // Objectives Achievements
     {
-      name: "Premier objectif",
-      description: "Créez votre premier objectif",
+      name: "First Objective",
+      description: "Create your first objective",
       type: "OBJECTIVES",
       threshold: 1,
       points: 20
     },
     {
-      name: "Stratège",
-      description: "Complétez 5 objectifs",
+      name: "Strategist",
+      description: "Complete 5 objectives",
       type: "OBJECTIVES",
       threshold: 5,
       points: 100
     }
   ]
 
-  // Supprimer tous les achievements existants pour éviter les doublons
+  // Delete all existing achievements to avoid duplicates
   await prisma.achievement.deleteMany({})
-  console.log('Achievements existants supprimés')
+  console.log('Existing achievements deleted')
 
-  // Créer les nouveaux achievements
+  // Create the new achievements
   for (const achievement of achievements) {
     await prisma.achievement.create({
       data: achievement

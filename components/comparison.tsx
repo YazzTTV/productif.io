@@ -84,7 +84,7 @@ export function Comparison() {
               if (v) params.set(k, v)
             })
             params.set('offer', 'early-access')
-            window.location.href = `/onboarding?${params.toString()}`
+            window.location.href = `/onboarding/welcome?${params.toString()}`
           }}
           className="px-8 py-4 bg-gradient-to-r from-[#00C27A] to-[#00D68F] text-white rounded-full shadow-xl text-lg"
         >

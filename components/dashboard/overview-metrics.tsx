@@ -1,10 +1,10 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { motion } from "framer-motion"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { CheckCircle, Clock, Target, Activity, RefreshCw, Info } from "lucide-react"
-import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
 interface OverviewMetricsProps {
@@ -53,19 +53,12 @@ export function OverviewMetrics({ className }: OverviewMetricsProps) {
       // Récupérer les métriques générales
       const response = await fetch("/api/dashboard/metrics")
       
-      if (!response.ok) {
-        throw new Error("Erreur lors du chargement des métriques")
-      }
-      
-      const data = await response.json()
+      const data = await safeJsonResponse(response, "dashboard/metrics")
       
       // Récupérer les tâches du jour directement depuis l'API tâches du jour
       // pour assurer la cohérence avec le composant TodayStats
       const tasksResponse = await fetch("/api/tasks/today")
-      if (!tasksResponse.ok) {
-        throw new Error("Erreur lors du chargement des tâches du jour")
-      }
-      const tasksData = await tasksResponse.json()
+      const tasksData = await safeJsonResponse(tasksResponse, "tasks/today")
       
       // Calculer les métriques des tâches du jour
       const todayTasks = {
@@ -149,15 +142,16 @@ export function OverviewMetrics({ className }: OverviewMetricsProps) {
           )}
         </div>
         <div className="flex gap-2">
-          <Button 
-            variant="outline" 
-            size="sm" 
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
             onClick={fetchMetrics}
             disabled={isRefreshing}
+            className="px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-xl shadow-sm flex items-center gap-2 text-sm hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-            Rafraîchir
-          </Button>
+            <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            <span>Rafraîchir</span>
+          </motion.button>
         </div>
       </div>
 

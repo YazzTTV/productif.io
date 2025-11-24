@@ -1,9 +1,8 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { useState, useEffect, useCallback } from "react"
+import { motion } from "framer-motion"
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
 import { 
   Trophy, 
   Crown, 
@@ -17,6 +16,7 @@ import {
   RotateCcw
 } from "lucide-react"
 import { LeaderboardEntry } from "@/services/gamification"
+import { safeJsonResponse } from "@/lib/api-utils"
 
 interface LeaderboardProps {
   limit?: number
@@ -34,26 +34,42 @@ const LEVEL_COLORS = {
 const getRankIcon = (rank: number) => {
   switch (rank) {
     case 1:
-      return <Trophy className="h-5 w-5 text-yellow-500" />
+      return (
+        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-yellow-400 to-amber-500 flex items-center justify-center shadow-lg">
+          <Trophy className="h-5 w-5 text-white" />
+        </div>
+      )
     case 2:
-      return <Medal className="h-5 w-5 text-gray-400" />
+      return (
+        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-gray-300 to-gray-500 flex items-center justify-center shadow-lg">
+          <Medal className="h-5 w-5 text-white" />
+        </div>
+      )
     case 3:
-      return <Medal className="h-5 w-5 text-amber-600" />
+      return (
+        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-lg">
+          <Medal className="h-5 w-5 text-white" />
+        </div>
+      )
     default:
-      return <span className="text-sm font-bold text-gray-500">#{rank}</span>
+      return (
+        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center">
+          <span className="text-sm font-bold text-gray-600">#{rank}</span>
+        </div>
+      )
   }
 }
 
 const getRankBadgeColor = (rank: number) => {
   switch (rank) {
     case 1:
-      return "bg-gradient-to-r from-yellow-400 to-yellow-600 text-white"
+      return "bg-gradient-to-r from-yellow-400 to-amber-500 text-white shadow-md"
     case 2:
-      return "bg-gradient-to-r from-gray-300 to-gray-500 text-white"
+      return "bg-gradient-to-r from-gray-300 to-gray-500 text-white shadow-md"
     case 3:
-      return "bg-gradient-to-r from-amber-400 to-amber-600 text-white"
+      return "bg-gradient-to-r from-amber-400 to-orange-500 text-white shadow-md"
     default:
-      return "bg-gray-100 text-gray-700"
+      return "bg-gradient-to-r from-gray-100 to-gray-200 text-gray-700"
   }
 }
 
@@ -61,17 +77,14 @@ export function Leaderboard({ limit = 50, showUserRank = true }: LeaderboardProp
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([])
   const [userRank, setUserRank] = useState<number | undefined>()
   const [totalUsers, setTotalUsers] = useState(0)
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showAll, setShowAll] = useState(false)
 
   const displayLimit = showAll ? limit : 10
 
-  useEffect(() => {
-    fetchLeaderboard()
-  }, [limit, showUserRank])
-
-  const fetchLeaderboard = async () => {
+  const fetchLeaderboard = useCallback(async () => {
     try {
       setLoading(true)
       setError(null)
@@ -84,235 +97,292 @@ export function Leaderboard({ limit = 50, showUserRank = true }: LeaderboardProp
       const response = await fetch(`/api/gamification/leaderboard?${params}`)
       
       if (!response.ok) {
-        throw new Error("Erreur lors du chargement du classement")
+        throw new Error("Error loading leaderboard")
       }
       
-      const data = await response.json()
-      setLeaderboard(data.leaderboard)
+      const data = await safeJsonResponse(response, "gamification/leaderboard")
+      setLeaderboard(data.leaderboard || [])
       setUserRank(data.userRank)
-      setTotalUsers(data.totalUsers)
+      setTotalUsers(data.totalUsers || 0)
+      
+      // Get current user ID
+      try {
+        const userRes = await fetch("/api/auth/me")
+        const user = await safeJsonResponse(userRes, "auth/me")
+        setCurrentUserId(user.id || null)
+      } catch (err) {
+        console.error("Error fetching user:", err)
+      }
     } catch (error) {
-      console.error('Erreur lors du chargement du leaderboard:', error)
-      setError("Impossible de charger le classement")
+      console.error('Error loading leaderboard:', error)
+      setError("Unable to load leaderboard")
     } finally {
       setLoading(false)
     }
-  }
+  }, [limit, showUserRank])
+
+  useEffect(() => {
+    fetchLeaderboard()
+  }, [fetchLeaderboard])
 
   if (loading) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Trophy className="h-5 w-5" />
-            Classement
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="flex items-center gap-4 p-3 bg-gray-50 rounded-lg animate-pulse">
-                <div className="w-8 h-8 bg-gray-200 rounded-full" />
-                <div className="flex-1">
-                  <div className="h-4 bg-gray-200 rounded w-1/3 mb-2" />
-                  <div className="h-3 bg-gray-200 rounded w-1/2" />
-                </div>
-                <div className="h-6 bg-gray-200 rounded w-16" />
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="bg-white rounded-3xl p-8 shadow-lg border border-gray-100"
+      >
+        <div className="flex items-center gap-2 mb-6">
+          <Trophy className="h-5 w-5 text-[#00C27A]" />
+          <h3 className="text-gray-800 text-lg">Leaderboard</h3>
+        </div>
+        <div className="space-y-4">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="flex items-center gap-4 p-3 bg-gray-50 rounded-xl animate-pulse">
+              <div className="w-8 h-8 bg-gray-200 rounded-full" />
+              <div className="flex-1">
+                <div className="h-4 bg-gray-200 rounded w-1/3 mb-2" />
+                <div className="h-3 bg-gray-200 rounded w-1/2" />
               </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+              <div className="h-6 bg-gray-200 rounded w-16" />
+            </div>
+          ))}
+        </div>
+      </motion.div>
     )
   }
 
   if (error) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Trophy className="h-5 w-5" />
-            Classement
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-center py-8">
-            <p className="text-red-500 mb-4">{error}</p>
-            <Button onClick={fetchLeaderboard} variant="outline" size="sm">
-              <RotateCcw className="h-4 w-4 mr-2" />
-              Réessayer
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="bg-white rounded-3xl p-8 shadow-lg border border-gray-100"
+      >
+        <div className="flex items-center gap-2 mb-6">
+          <Trophy className="h-5 w-5 text-[#00C27A]" />
+          <h3 className="text-gray-800 text-lg">Leaderboard</h3>
+        </div>
+        <div className="text-center py-8">
+          <p className="text-red-500 mb-4">{error}</p>
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={fetchLeaderboard}
+            className="px-4 py-2 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors flex items-center gap-2 mx-auto"
+          >
+            <RotateCcw className="h-4 w-4" />
+            Retry
+          </motion.button>
+        </div>
+      </motion.div>
     )
   }
 
+  // Vérifier que leaderboard est un tableau
+  const safeLeaderboard = Array.isArray(leaderboard) ? leaderboard : []
+
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
-              <Trophy className="h-5 w-5" />
-              Classement Global
-            </CardTitle>
-            <div className="flex items-center gap-2 text-sm text-gray-500">
-              <Users className="h-4 w-4" />
-              {totalUsers} utilisateurs
-            </div>
+      <div className="space-y-6">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-white rounded-3xl p-8 shadow-lg border border-gray-100"
+        >
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-2">
+            <Trophy className="h-5 w-5 text-[#00C27A]" />
+            <h3 className="text-gray-800 text-lg">Global Leaderboard</h3>
           </div>
-        </CardHeader>
-        <CardContent>
-          {/* Rang de l'utilisateur actuel */}
+          <div className="flex items-center gap-2 text-sm text-gray-500">
+            <Users className="h-4 w-4" />
+            {totalUsers} users
+          </div>
+        </div>
+        <div>
+          {/* Current user rank */}
           {showUserRank && userRank && userRank > displayLimit && (
-            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-              <div className="flex items-center gap-2 text-sm text-blue-700">
-                <Target className="h-4 w-4" />
-                <span className="font-medium">Votre position : #{userRank}</span>
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mb-6 p-5 bg-gradient-to-r from-[#00C27A]/20 via-[#00D68F]/20 to-[#00C27A]/20 border-2 border-[#00C27A] rounded-2xl shadow-md"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#00C27A] to-[#00D68F] flex items-center justify-center">
+                  <Target className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Your position</p>
+                  <p className="text-lg font-bold text-[#00C27A]">#{userRank}</p>
+                </div>
               </div>
-            </div>
+            </motion.div>
           )}
 
-          {/* Liste du classement */}
-          <div className="space-y-2">
-            {leaderboard.slice(0, displayLimit).map((entry, index) => (
-              <div
-                key={entry.userId}
-                className={`flex items-center gap-4 p-3 rounded-lg transition-colors ${
-                  entry.rank <= 3 
-                    ? 'bg-gradient-to-r from-yellow-50 to-amber-50 border border-yellow-200' 
-                    : 'bg-gray-50 hover:bg-gray-100'
-                }`}
-              >
-                {/* Rang */}
-                <div className="flex items-center justify-center w-8">
-                  {getRankIcon(entry.rank)}
-                </div>
+          {/* Leaderboard list */}
+          <div className="space-y-3">
+            {safeLeaderboard.slice(0, displayLimit).map((entry, index) => {
+              if (!entry || !entry.userId) return null
+              
+              const isTop3 = (entry.rank || 0) <= 3
+              const isUser = currentUserId ? entry.userId === currentUserId : false
+              
+              return (
+                <motion.div
+                  key={entry.userId}
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: index * 0.05 }}
+                  whileHover={{ scale: 1.02, y: -2 }}
+                  className={`flex items-center gap-4 p-5 rounded-2xl transition-all ${
+                    isUser
+                      ? 'bg-gradient-to-r from-[#00C27A]/10 to-[#00D68F]/10 border-2 border-[#00C27A] shadow-md'
+                      : isTop3
+                      ? 'bg-gradient-to-r from-yellow-50 via-amber-50 to-orange-50 border-2 border-yellow-300 shadow-lg' 
+                      : 'bg-white hover:bg-gray-50 border border-gray-200 shadow-sm'
+                  }`}
+                >
+                  {/* Rang avec icône */}
+                  {getRankIcon(entry.rank || 0)}
 
-                {/* Informations utilisateur */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <p className="font-medium text-sm truncate">
-                      {entry.userName}
-                    </p>
-                    <Crown className={`h-4 w-4 ${LEVEL_COLORS[Math.min(entry.level, 5) as keyof typeof LEVEL_COLORS] || 'text-gray-600'}`} />
-                    <span className="text-xs text-gray-500">
-                      Niv. {entry.level}
-                    </span>
-                  </div>
+                  {/* Informations utilisateur */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-2">
+                      <p className={`font-semibold text-base truncate ${
+                        isUser ? 'text-[#00C27A]' : 'text-gray-800'
+                      }`}>
+                        {entry.userName || 'Unknown user'}
+                      </p>
+                      {isUser && (
+                        <span className="px-2 py-0.5 bg-[#00C27A] text-white text-xs rounded-full font-medium">
+                          You
+                        </span>
+                      )}
+                    </div>
+                    
+                    <div className="flex items-center gap-3 mb-2">
+                      <Crown className={`h-4 w-4 ${LEVEL_COLORS[Math.min(entry.level || 1, 5) as keyof typeof LEVEL_COLORS] || 'text-gray-600'}`} />
+                      <span className="text-xs font-medium text-gray-600 bg-gray-100 px-2 py-0.5 rounded-full">
+                        Lvl. {entry.level || 1}
+                      </span>
+                    </div>
                   
-                  <div className="flex items-center gap-4 text-xs text-gray-500">
-                    <div className="flex items-center gap-1">
-                      <Star className="h-3 w-3" />
-                      <span>{entry.totalPoints.toLocaleString()} pts</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Flame className="h-3 w-3" />
-                      <span>{entry.currentStreak}j</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Target className="h-3 w-3" />
-                      <span>{entry.totalHabitsCompleted}</span>
-                    </div>
-                    {entry.achievements > 0 && (
-                      <div className="flex items-center gap-1">
-                        <Trophy className="h-3 w-3" />
-                        <span>{entry.achievements}</span>
+                    <div className="flex items-center gap-4 text-xs text-gray-600">
+                      <div className="flex items-center gap-1.5 bg-white/60 px-2 py-1 rounded-lg">
+                        <Star className="h-3.5 w-3.5 text-yellow-500" />
+                        <span className="font-medium">{(entry.points || 0).toLocaleString()} pts</span>
                       </div>
-                    )}
+                      <div className="flex items-center gap-1.5 bg-white/60 px-2 py-1 rounded-lg">
+                        <Flame className="h-3.5 w-3.5 text-orange-500" />
+                        <span className="font-medium">{entry.currentStreak || 0}j</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 bg-white/60 px-2 py-1 rounded-lg">
+                        <Trophy className="h-3.5 w-3.5 text-purple-500" />
+                        <span className="font-medium">{entry.longestStreak || 0}j max</span>
+                      </div>
+                    </div>
                   </div>
-                </div>
 
-                {/* Badge de rang */}
-                <Badge className={`${getRankBadgeColor(entry.rank)} border-0 text-xs`}>
-                  #{entry.rank}
-                </Badge>
-              </div>
-            ))}
+                  {/* Badge de rang */}
+                  <div className={`${getRankBadgeColor(entry.rank || 0)} rounded-xl px-4 py-2 font-bold text-sm min-w-[60px] text-center`}>
+                    #{entry.rank || 0}
+                  </div>
+                </motion.div>
+              )
+            })}
           </div>
 
-          {/* Bouton pour afficher plus/moins */}
-          {leaderboard.length > 10 && (
-            <div className="mt-4 text-center">
-              <Button
-                variant="outline"
-                size="sm"
+          {/* Show more/less button */}
+          {safeLeaderboard.length > 10 && (
+            <div className="mt-6 text-center">
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
                 onClick={() => setShowAll(!showAll)}
+                className="px-6 py-3 bg-gradient-to-r from-gray-100 to-gray-200 text-gray-700 rounded-xl hover:from-gray-200 hover:to-gray-300 transition-all flex items-center gap-2 mx-auto shadow-sm font-medium"
               >
                 {showAll ? (
                   <>
-                    <ChevronUp className="h-4 w-4 mr-2" />
-                    Afficher moins
+                    <ChevronUp className="h-4 w-4" />
+                    Show less
                   </>
                 ) : (
                   <>
-                    <ChevronDown className="h-4 w-4 mr-2" />
-                    Afficher plus ({leaderboard.length - displayLimit} autres)
+                    <ChevronDown className="h-4 w-4" />
+                    Show more ({safeLeaderboard.length - displayLimit} more)
                   </>
                 )}
-              </Button>
+              </motion.button>
             </div>
           )}
 
-          {/* Message si pas de données */}
-          {leaderboard.length === 0 && (
-            <div className="text-center py-8 text-gray-500">
+          {/* Empty state message */}
+          {safeLeaderboard.length === 0 && (
+            <div className="text-center py-12 text-gray-500">
               <Trophy className="h-12 w-12 mx-auto text-gray-300 mb-3" />
-              <p>Aucun utilisateur dans le classement pour le moment.</p>
-              <p className="text-sm">Commencez à compléter des habitudes pour apparaître ici !</p>
+              <p>No users in the leaderboard yet.</p>
+              <p className="text-sm">Start completing habits to appear here!</p>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </motion.div>
 
       {/* Statistiques additionnelles */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-yellow-100 rounded-lg">
-                <Trophy className="h-5 w-5 text-yellow-600" />
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">Champion</p>
-                <p className="font-bold">
-                  {leaderboard[0]?.userName || "Aucun"}
-                </p>
-              </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="bg-white rounded-3xl p-6 shadow-lg border border-gray-100"
+        >
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-gradient-to-br from-yellow-400 to-amber-500 rounded-xl">
+              <Trophy className="h-5 w-5 text-white" />
             </div>
-          </CardContent>
-        </Card>
+            <div>
+              <p className="text-sm text-gray-500">Champion</p>
+              <p className="font-bold text-gray-800">
+                {safeLeaderboard[0]?.userName || "None"}
+              </p>
+            </div>
+          </div>
+        </motion.div>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <Users className="h-5 w-5 text-blue-600" />
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">Participants</p>
-                <p className="font-bold">{totalUsers}</p>
-              </div>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="bg-white rounded-3xl p-6 shadow-lg border border-gray-100"
+        >
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-gradient-to-br from-blue-400 to-indigo-500 rounded-xl">
+              <Users className="h-5 w-5 text-white" />
             </div>
-          </CardContent>
-        </Card>
+            <div>
+              <p className="text-sm text-gray-500">Participants</p>
+              <p className="font-bold text-gray-800">{totalUsers || 0}</p>
+            </div>
+          </div>
+        </motion.div>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-green-100 rounded-lg">
-                <Star className="h-5 w-5 text-green-600" />
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">Top Points</p>
-                <p className="font-bold">
-                  {leaderboard[0]?.totalPoints.toLocaleString() || "0"}
-                </p>
-              </div>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="bg-white rounded-3xl p-6 shadow-lg border border-gray-100"
+        >
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-gradient-to-br from-[#00C27A] to-[#00D68F] rounded-xl">
+              <Star className="h-5 w-5 text-white" />
             </div>
-          </CardContent>
-        </Card>
+            <div>
+              <p className="text-sm text-gray-500">Top Points</p>
+              <p className="font-bold text-gray-800">
+                {safeLeaderboard[0]?.points ? safeLeaderboard[0].points.toLocaleString() : "0"}
+              </p>
+            </div>
+          </div>
+        </motion.div>
       </div>
     </div>
   )
