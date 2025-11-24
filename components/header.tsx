@@ -25,7 +25,7 @@ export function Header({ bg = "transparent", hideAuth = false, hideCTA = false }
       if (v) params.set(k, v);
     });
     params.set('offer', 'early-access');
-    router.push(`/onboarding?${params.toString()}`);
+    router.push(`/onboarding/welcome?${params.toString()}`);
   };
 
   return (

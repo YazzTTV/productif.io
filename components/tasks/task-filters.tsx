@@ -13,19 +13,19 @@ interface TaskFiltersProps {
 export function TaskFilters({ projects }: TaskFiltersProps) {
   return (
     <div className="bg-white p-4 rounded-lg shadow space-y-4">
-      <h2 className="font-semibold text-gray-900">Filtres</h2>
+      <h2 className="font-semibold text-gray-900">Filters</h2>
       
       <div className="space-y-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Projet
+            Project
           </label>
           <Select>
             <SelectTrigger>
-              <SelectValue placeholder="Tous les projets" />
+              <SelectValue placeholder="All projects" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Tous les projets</SelectItem>
+              <SelectItem value="">All projects</SelectItem>
               {projects.map((project) => (
                 <SelectItem key={project.id} value={project.id}>
                   <div className="flex items-center">
@@ -43,34 +43,34 @@ export function TaskFilters({ projects }: TaskFiltersProps) {
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Statut
+            Status
           </label>
           <Select>
             <SelectTrigger>
-              <SelectValue placeholder="Tous les statuts" />
+              <SelectValue placeholder="All statuses" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Tous les statuts</SelectItem>
-              <SelectItem value="TODO">À faire</SelectItem>
-              <SelectItem value="IN_PROGRESS">En cours</SelectItem>
-              <SelectItem value="DONE">Terminé</SelectItem>
+              <SelectItem value="">All statuses</SelectItem>
+              <SelectItem value="TODO">To Do</SelectItem>
+              <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
+              <SelectItem value="DONE">Done</SelectItem>
             </SelectContent>
           </Select>
         </div>
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Priorité
+            Priority
           </label>
           <Select>
             <SelectTrigger>
-              <SelectValue placeholder="Toutes les priorités" />
+              <SelectValue placeholder="All priorities" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Toutes les priorités</SelectItem>
-              <SelectItem value="LOW">Basse</SelectItem>
-              <SelectItem value="MEDIUM">Moyenne</SelectItem>
-              <SelectItem value="HIGH">Haute</SelectItem>
+              <SelectItem value="">All priorities</SelectItem>
+              <SelectItem value="LOW">Low</SelectItem>
+              <SelectItem value="MEDIUM">Medium</SelectItem>
+              <SelectItem value="HIGH">High</SelectItem>
             </SelectContent>
           </Select>
         </div>

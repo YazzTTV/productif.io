@@ -44,37 +44,37 @@ body {
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
   .dark {
-    --background: 0 0% 100%;
-    --foreground: 210 40% 98%;
+    --background: 0 0% 0%;
+    --foreground: 222.2 84% 4.9%;
     --card: 0 0% 100%;
-    --card-foreground: 210 40% 98%;
+    --card-foreground: 222.2 84% 4.9%;
     --popover: 0 0% 100%;
-    --popover-foreground: 210 40% 98%;
+    --popover-foreground: 222.2 84% 4.9%;
     --primary: 142.1 76.2% 36.3%;
     --primary-foreground: 355.7 100% 97.3%;
-    --secondary: 0 0% 96%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 0 0% 96%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 0 0% 96%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
-    --border: 0 0% 90%;
-    --input: 0 0% 90%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
     --ring: 142.1 76.2% 36.3%;
     --chart-1: 220 70% 50%;
     --chart-2: 160 60% 45%;
     --chart-3: 30 80% 55%;
     --chart-4: 280 65% 60%;
     --chart-5: 340 75% 55%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
     --sidebar-ring: 217.2 91.2% 59.8%;
     --radius: 0.5rem;
   }
@@ -86,6 +86,103 @@ body {
   }
   body {
     @apply bg-background text-foreground;
+  }
+  
+  /* Mode sombre - uniquement les fonds changent en noir */
+  .dark body {
+    @apply bg-black;
+  }
+  
+  /* Fonds blancs deviennent noirs en mode sombre */
+  .dark .bg-white,
+  .dark [class*="bg-white"] {
+    background-color: #000000 !important;
+  }
+  
+  /* Fonds gris clairs deviennent noirs en mode sombre */
+  .dark .bg-gray-50,
+  .dark .bg-gray-100,
+  .dark [class*="bg-gray-50"],
+  .dark [class*="bg-gray-100"] {
+    background-color: #000000 !important;
+  }
+  
+  .dark .bg-gray-200,
+  .dark [class*="bg-gray-200"] {
+    background-color: #111111 !important;
+  }
+  
+  /* Fonds avec gradient from-gray-50/white deviennent noirs */
+  .dark [class*="from-gray-50"],
+  .dark [class*="from-white"],
+  .dark [class*="via-white"],
+  .dark [class*="to-gray-50"],
+  .dark [class*="to-gray-100"],
+  .dark [class*="to-white"] {
+    --tw-gradient-from: #000000 !important;
+    --tw-gradient-to: #000000 !important;
+    --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important;
+  }
+  
+  /* Override pour tous les gradients qui commencent par from-gray-50 ou from-white */
+  .dark [class*="bg-gradient"][class*="from-gray-50"],
+  .dark [class*="bg-gradient"][class*="from-white"] {
+    background-image: linear-gradient(to bottom right, #000000, #000000) !important;
+  }
+  
+  /* Gradients avec via-white */
+  .dark [class*="bg-gradient"][class*="via-white"] {
+    background-image: linear-gradient(to bottom right, #000000, #000000, #000000) !important;
+  }
+  
+  /* Tous les textes deviennent blancs en mode sombre */
+  .dark .text-gray-900,
+  .dark .text-gray-800,
+  .dark .text-gray-700,
+  .dark .text-gray-600,
+  .dark .text-gray-500,
+  .dark .text-gray-400,
+  .dark .text-gray-300,
+  .dark [class*="text-gray-900"],
+  .dark [class*="text-gray-800"],
+  .dark [class*="text-gray-700"],
+  .dark [class*="text-gray-600"],
+  .dark [class*="text-gray-500"],
+  .dark [class*="text-gray-400"],
+  .dark [class*="text-gray-300"] {
+    color: #ffffff !important;
+  }
+  
+  /* Tous les textes par défaut deviennent blancs */
+  .dark {
+    color: #ffffff !important;
+  }
+  
+  /* Tous les éléments de texte deviennent blancs */
+  .dark p,
+  .dark span,
+  .dark div:not([class*="bg-"]):not([class*="border-"]),
+  .dark h1,
+  .dark h2,
+  .dark h3,
+  .dark h4,
+  .dark h5,
+  .dark h6,
+  .dark a:not([class*="text-"]),
+  .dark li,
+  .dark td,
+  .dark th,
+  .dark label {
+    color: #ffffff !important;
+  }
+  
+  /* Les couleurs vertes restent vertes */
+  .dark .text-[#00C27A],
+  .dark .text-[#00D68F],
+  .dark [class*="text-[#00C27A"],
+  .dark [class*="text-[#00D68F"],
+  .dark [class*="text-green"] {
+    color: inherit !important;
   }
 }
 

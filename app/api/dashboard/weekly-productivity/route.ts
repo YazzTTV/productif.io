@@ -100,6 +100,10 @@ export async function GET(request: NextRequest) {
     let endDate: Date = today
 
     switch (period) {
+      case 'day':
+        startDate = startOfDay(today)
+        endDate = today
+        break
       case 'week':
         startDate = startOfDay(subDays(today, 7))
         break
@@ -262,7 +266,58 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    if (period === 'week') {
+    if (period === 'day') {
+      // Calculer les données pour aujourd'hui par heures
+      const todayStart = startOfDay(today)
+      const hours = []
+      for (let h = 0; h < 24; h++) {
+        const hourStart = new Date(todayStart)
+        hourStart.setHours(h, 0, 0, 0)
+        const hourEnd = new Date(hourStart)
+        hourEnd.setHours(h, 59, 59, 999)
+
+        const dayName = hourStart.toLocaleDateString("en-US", { weekday: "long" }).toLowerCase()
+        const hourHabits = allHabits.filter(habit => habit.daysOfWeek.includes(dayName))
+        const activeHabits = hourHabits.length
+        const completedHabits = hourHabits.filter(h => {
+          return h.entries.some(entry => {
+            const entryDate = new Date(entry.date)
+            return entryDate >= todayStart && entryDate <= today
+          })
+        }).length
+        const habitsProgress = activeHabits > 0 ? (completedHabits / activeHabits) * 100 : 0
+
+        const tasksForHour = allTasks.filter(task => {
+          const updatedAt = task.updatedAt ? new Date(task.updatedAt) : null
+          return updatedAt && updatedAt >= hourStart && updatedAt <= hourEnd
+        })
+
+        const totalTasks = tasksForHour.length
+        const completedTasks = tasksForHour.filter(t => t.completed).length
+        const tasksProgress = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0
+
+        let productivityScore = 0
+        if (activeHabits > 0 && totalTasks > 0) {
+          productivityScore = Math.round((habitsProgress + tasksProgress) / 2)
+        } else if (activeHabits > 0) {
+          productivityScore = Math.round(habitsProgress)
+        } else if (totalTasks > 0) {
+          productivityScore = Math.round(tasksProgress)
+        }
+
+        chartData.push({
+          day: `${h}h`,
+          date: format(hourStart, "yyyy-MM-dd HH:mm"),
+          score: productivityScore,
+          habitsProgress: Math.round(habitsProgress),
+          tasksProgress: Math.round(tasksProgress),
+          completedHabits,
+          activeHabits,
+          completedTasks,
+          totalTasks
+        })
+      }
+    } else if (period === 'week') {
       // Calculer les données pour les 7 derniers jours
       for (let i = 6; i >= 0; i--) {
         const date = subDays(today, i)
