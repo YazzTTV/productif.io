@@ -1,6 +1,6 @@
 "use client"
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { motion } from "framer-motion"
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from "recharts"
 
 interface TimeByProjectData {
@@ -22,12 +22,11 @@ export function TimeByProjectChart({ data }: TimeByProjectChartProps) {
     color: item.color || "#6366F1",
   }))
 
-  // Formater le temps (format: XXh XXm)
-  const formatTime = (seconds: number) => {
-    const hours = Math.floor(seconds / 3600)
-    const minutes = Math.floor((seconds % 3600) / 60)
-
-    return `${hours}h ${minutes}m`
+  // Formater le temps (format: XXh XXm) - les données sont déjà en heures
+  const formatTime = (hours: number) => {
+    const wholeHours = Math.floor(hours)
+    const minutes = Math.round((hours - wholeHours) * 60)
+    return `${wholeHours}h ${minutes}m`
   }
 
   // Personnaliser le tooltip
@@ -45,13 +44,15 @@ export function TimeByProjectChart({ data }: TimeByProjectChartProps) {
   }
 
   return (
-    <Card className="stat-card">
-      <CardHeader>
-        <CardTitle>Temps par projet</CardTitle>
-      </CardHeader>
-      <CardContent className="h-80">
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="bg-white rounded-3xl p-8 shadow-lg border border-gray-100"
+    >
+      <h3 className="text-gray-800 text-xl mb-6">Projects and time</h3>
+      <div className="h-80">
         {chartData.length === 0 ? (
-          <div className="flex items-center justify-center h-full text-gray-500">Aucune donnée disponible</div>
+          <div className="flex items-center justify-center h-full text-gray-500">No data available</div>
         ) : (
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
@@ -65,8 +66,8 @@ export function TimeByProjectChart({ data }: TimeByProjectChartProps) {
             </PieChart>
           </ResponsiveContainer>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </motion.div>
   )
 }
 

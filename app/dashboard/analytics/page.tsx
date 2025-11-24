@@ -3,10 +3,11 @@ import { verify } from "jsonwebtoken"
 import { redirect } from "next/navigation"
 import { prisma } from "@/lib/prisma"
 import { TimeByProjectChart } from "@/components/analytics/time-by-project-chart"
-import { TimeByDayChart } from "@/components/analytics/time-by-day-chart"
 import { AnalyticsSummary } from "@/components/analytics/analytics-summary"
-import { DeepWorkSummary } from "@/components/analytics/deepwork-summary"
-import { USER_TIMEZONE } from "@/lib/date-utils"
+import { BackToDashboardButton } from "@/components/analytics/back-to-dashboard-button"
+import { ProductivityChart } from "@/components/analytics/productivity-chart"
+import { HabitStreaks } from "@/components/analytics/habit-streaks"
+import { DeepWorkData } from "@/components/analytics/deepwork-data"
 
 export default async function AnalyticsPage() {
   // Vérifier l'authentification côté serveur
@@ -117,7 +118,7 @@ export default async function AnalyticsPage() {
   if (noProjectTime > 0) {
     timeByProject.push({
       id: "no-project",
-      name: "Sans projet",
+      name: "No project",
       color: "#CBD5E1", // Couleur grise pour les tâches sans projet
       total_duration: noProjectTime
     });
@@ -126,24 +127,6 @@ export default async function AnalyticsPage() {
   // Log pour déboguer
   console.log(`[ANALYTICS] Temps passé sur des tâches sans projet: ${noProjectTime}h`)
   
-  // 2. Temps par jour de la semaine
-  const timeByDayRaw = await prisma.$queryRaw`
-    SELECT 
-      EXTRACT(DOW FROM te."startTime" AT TIME ZONE ${USER_TIMEZONE}) as day_of_week,
-      SUM(EXTRACT(EPOCH FROM (te."endTime" - te."startTime"))/3600) as total_duration
-    FROM "TimeEntry" te
-    LEFT JOIN "Task" t ON te."taskId" = t.id
-    WHERE (t."userId" = ${userId} OR te."userId" = ${userId})
-      AND te."endTime" IS NOT NULL
-    GROUP BY day_of_week
-    ORDER BY day_of_week
-  `
-  
-  // Convertir les objets Decimal en nombres pour le passage aux composants client
-  const timeByDay = (timeByDayRaw as any[]).map(item => ({
-    day_of_week: Number(item.day_of_week),
-    total_duration: Number(item.total_duration)
-  }));
 
   // 3. Statistiques générales - Calcul du temps total (requête plus directe)
   const totalTimeTracked = await prisma.$queryRaw`
@@ -190,64 +173,45 @@ export default async function AnalyticsPage() {
   // Log des statistiques pour débogage
   console.log(`[ANALYTICS] Statistiques calculées:`, JSON.stringify(stats))
 
-  // 4. Deep Work: calcul (7 jours et total)
-  const deepWorkLast7DaysRaw = await prisma.$queryRaw`
-    SELECT COALESCE(SUM(EXTRACT(EPOCH FROM (te."endTime" - te."startTime"))/3600), 0) as total_hours
-    FROM "DeepWorkSession" dws
-    JOIN "TimeEntry" te ON te.id = dws."timeEntryId"
-    WHERE dws."userId" = ${userId}
-      AND dws.status = 'completed'
-      AND te."endTime" IS NOT NULL
-      AND te."startTime" >= NOW() - INTERVAL '7 days'
-  `
-  const deepWorkAllTimeRaw = await prisma.$queryRaw`
-    SELECT 
-      COALESCE(SUM(EXTRACT(EPOCH FROM (te."endTime" - te."startTime"))/3600), 0) as total_hours,
-      COUNT(*) as sessions
-    FROM "DeepWorkSession" dws
-    JOIN "TimeEntry" te ON te.id = dws."timeEntryId"
-    WHERE dws."userId" = ${userId}
-      AND dws.status = 'completed'
-      AND te."endTime" IS NOT NULL
-  `
-  const deepWorkSessionsThisWeekRaw = await prisma.$queryRaw`
-    SELECT COUNT(*) as sessions
-    FROM "DeepWorkSession" dws
-    JOIN "TimeEntry" te ON te.id = dws."timeEntryId"
-    WHERE dws."userId" = ${userId}
-      AND dws.status = 'completed'
-      AND te."endTime" IS NOT NULL
-      AND te."startTime" >= NOW() - INTERVAL '7 days'
-  `
-
-  const weekHours = Number((deepWorkLast7DaysRaw as any)[0]?.total_hours || 0)
-  const allTimeHours = Number((deepWorkAllTimeRaw as any)[0]?.total_hours || 0)
-  const allTimeSessions = Number((deepWorkAllTimeRaw as any)[0]?.sessions || 0)
-  const sessionsThisWeek = Number((deepWorkSessionsThisWeekRaw as any)[0]?.sessions || 0)
-  const avgSessionMinutes = allTimeSessions > 0 ? (allTimeHours * 60) / allTimeSessions : null
 
   return (
-    <div className="max-w-7xl mx-auto">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900">Statistiques</h1>
-        <p className="text-gray-600 mt-1">Visualisez votre productivité et votre temps de travail</p>
-      </div>
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100">
+      <div className="max-w-[1400px] mx-auto px-8 py-8">
+        {/* Welcome Section */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h1 className="text-gray-800 text-3xl mb-2">Statistics</h1>
+              <p className="text-gray-600 text-lg">Visualize your productivity and work time</p>
+            </div>
+            <BackToDashboardButton />
+          </div>
+        </div>
 
-      <AnalyticsSummary stats={stats} />
+        <AnalyticsSummary stats={stats} />
 
-      {/* Deep Work summary */}
-      <div className="mt-6">
-        <DeepWorkSummary 
-          weekHours={weekHours} 
-          allTimeHours={allTimeHours} 
-          sessionsThisWeek={sessionsThisWeek} 
-          avgSessionMinutes={avgSessionMinutes ?? undefined}
-        />
-      </div>
+        {/* Graphique de productivité */}
+        <div className="mt-8">
+          <ProductivityChart />
+        </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-        <TimeByProjectChart data={timeByProject} />
-        <TimeByDayChart data={timeByDay} />
+        {/* Grille principale */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-8">
+          {/* Colonne gauche - 2 colonnes */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Projets et temps */}
+            <TimeByProjectChart data={timeByProject} />
+          </div>
+
+          {/* Colonne droite */}
+          <div className="space-y-6">
+            {/* Streaks d'habitudes */}
+            <HabitStreaks />
+
+            {/* Deep Work Data */}
+            <DeepWorkData />
+          </div>
+        </div>
       </div>
     </div>
   )
