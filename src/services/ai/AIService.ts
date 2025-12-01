@@ -2572,20 +2572,28 @@ export class AIService {
     }
 
     private async listHabits(userId: string): Promise<AIResponse> {
+        // On aligne la logique avec l'API web `/api/habits/date` pour éviter les bugs de fuseau horaire
+        // et avoir exactement le même résultat que sur la page Habitudes.
         const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const endOfDay = new Date(today);
-        endOfDay.setHours(23, 59, 59, 999);
+        // Normaliser à midi pour éviter les décalages de fuseau
+        today.setHours(12, 0, 0, 0);
+        const dayOfWeek = today
+            .toLocaleDateString('en-US', { weekday: 'long' })
+            .toLowerCase();
 
         const habits = await this.prisma.habit.findMany({
-            where: { userId },
+            where: {
+                userId,
+                // Ne garder que les habitudes prévues pour ce jour de la semaine
+                daysOfWeek: {
+                    has: dayOfWeek
+                }
+            },
             include: {
                 entries: {
                     where: {
-                        date: {
-                            gte: today,
-                            lte: endOfDay
-                        }
+                        // Les entrées sont stockées avec la date normalisée (midi)
+                        date: today
                     },
                     take: 1
                 }

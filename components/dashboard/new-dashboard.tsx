@@ -33,6 +33,14 @@ interface DashboardData {
     streak: number
     time?: string
   }>
+  todayTasks: Array<{
+    id: string
+    title: string
+    completed: boolean
+    priority: number
+    dueDate?: string
+    project?: { name: string }
+  }>
   leaderboard: Array<{
     rank: number
     name: string
@@ -75,12 +83,13 @@ export function NewDashboard() {
   const fetchDashboardData = async () => {
     try {
       // Fetch all dashboard data in parallel
-      const [metricsRes, weeklyRes, habitsRes, leaderboardRes, userRes] = await Promise.all([
+      const [metricsRes, weeklyRes, habitsRes, leaderboardRes, userRes, todayTasksRes] = await Promise.all([
         fetch("/api/dashboard/metrics"),
         fetch("/api/dashboard/weekly-productivity?period=week"),
         fetch("/api/habits"),
         fetch("/api/gamification/leaderboard?limit=3"),
-        fetch("/api/auth/me")
+        fetch("/api/auth/me"),
+        fetch("/api/tasks/today")
       ])
 
       const metrics = await safeJsonResponse(metricsRes, "dashboard/metrics")
@@ -88,22 +97,75 @@ export function NewDashboard() {
       const habits = await safeJsonResponse(habitsRes, "habits")
       const leaderboard = await safeJsonResponse(leaderboardRes, "gamification/leaderboard")
       const user = await safeJsonResponse(userRes, "auth/me")
+      const todayTasks = await safeJsonResponse(todayTasksRes, "tasks/today")
 
-      // Calculate today's progress - utiliser le productivityScore qui combine tâches ET habitudes
-      // Le productivityScore est calculé comme: (tasksCompletionRate * 0.6) + (habitsCompletionRate * 0.4)
-      const todayProgress = metrics.productivity?.score || 0
+      // Calculate today's progress - même logique que l'app mobile
       const tasksCompleted = metrics.tasks?.completed || 0
       const totalTasks = metrics.tasks?.today || 0
 
-      // Get focus hours from deep work stats
+      // Préparer la date du jour au format AAAA-MM-JJ (comme sur mobile)
+      const todayStr = new Date().toISOString().split("T")[0]
+
+      // Normaliser les habitudes comme sur mobile: peut être un tableau brut ou { habits: [...] }
+      const habitsList = Array.isArray(habits)
+        ? habits
+        : Array.isArray(habits?.habits)
+          ? habits.habits
+          : []
+
+      // Habitudes actives (isActive !== false)
+      const activeHabits = habitsList.filter((h: any) => h.isActive !== false)
+
+      // Nombre d'habitudes complétées aujourd'hui (même logique que mobile-app-new)
+      const completedHabitsToday = activeHabits.filter((habit: any) => {
+        const entries = habit.entries || habit.completions || []
+        const todayEntry = entries.find((entry: any) => {
+          const entryDate = new Date(entry.date).toISOString().split("T")[0]
+          return entryDate === todayStr && entry.completed === true
+        })
+        return !!todayEntry
+      }).length
+
+      // Pourcentages de progression
+      const habitsProgress =
+        activeHabits.length > 0 ? (completedHabitsToday / activeHabits.length) * 100 : 0
+      const tasksProgress = totalTasks > 0 ? (tasksCompleted / totalTasks) * 100 : 0
+
+      // Progression quotidienne = uniquement le pourcentage d'habitudes complétées
+      const todayProgress = Math.round(habitsProgress)
+
+      // Score de productivité global (habitudes + tâches), même logique que l'app mobile
+      let productivityScore = 0
+      if (activeHabits.length > 0 && totalTasks > 0) {
+        productivityScore = Math.round((habitsProgress + tasksProgress) / 2)
+      } else if (activeHabits.length > 0) {
+        productivityScore = Math.round(habitsProgress)
+      } else if (totalTasks > 0) {
+        productivityScore = Math.round(tasksProgress)
+      }
+
+      // Get focus hours from deep work stats (même endpoint que sur mobile)
       const deepWorkRes = await fetch("/api/dashboard/deepwork-stats")
       const deepWork = await safeJsonResponse(deepWorkRes, "dashboard/deepwork-stats")
-      const focusHours = deepWork?.today?.total_hours || 0
+
+      let focusHours = 0
+      if (deepWork?.today) {
+        if (typeof deepWork.today.seconds === "number") {
+          focusHours = deepWork.today.seconds / 3600
+        } else if (typeof deepWork.today.hours === "number") {
+          focusHours = deepWork.today.hours
+        }
+      }
+
+      // Get deep work metrics for performance section
+      const totalDeepWorkHours = Math.round(deepWork?.allTime?.hours || 0)
+      const weeklyDeepWorkHours = Math.round(deepWork?.week?.hours || 0)
+      const bestSession = deepWork?.bestSession || 'N/A'
 
       // Get streak from gamification
       const gamificationRes = await fetch("/api/gamification/stats")
       const gamification = await safeJsonResponse(gamificationRes, "gamification/stats")
-      const streakDays = gamification?.currentStreak || 0
+      const streakDays = gamification?.currentStreak || gamification?.streak || 0
 
       // Get achievements
       const achievementsRes = await fetch("/api/gamification/achievements")
@@ -148,15 +210,24 @@ export function NewDashboard() {
       
       setRecentAchievements(combined)
 
-      // Format weekly data - le score combine déjà habitudes et tâches
+      // Format weekly data - le score combine déjà habitudes et tâches (même logique que l'API mobile)
       const dayNames = [t('monday'), t('tuesday'), t('wednesday'), t('thursday'), t('friday'), t('saturday'), t('sunday')]
-      const weeklyData = weekly?.weeklyData?.slice(-7).map((item: any, index: number) => ({
-        day: dayNames[index] || item.day,
-        score: item.score || 0
-      })) || dayNames.map(day => ({ day, score: 0 }))
+      const rawWeeklyData = weekly?.weeklyData?.slice(-7) || []
+      const weeklyData = rawWeeklyData.length > 0
+        ? rawWeeklyData.map((item: any, index: number) => ({
+            day: dayNames[index] || item.day,
+            score: item.score || 0
+          }))
+        : dayNames.map(day => ({ day, score: 0 }))
+
+      // Score de productivité du jour utilisé par le graphique (dernier point)
+      const todayWeeklyScore =
+        rawWeeklyData.length > 0 && typeof rawWeeklyData[rawWeeklyData.length - 1]?.score === "number"
+          ? rawWeeklyData[rawWeeklyData.length - 1].score
+          : productivityScore
 
       // Format habits - afficher toutes les habitudes de l'utilisateur
-      const allHabits = Array.isArray(habits) ? habits : []
+      const allHabits = Array.isArray(habitsList) ? habitsList : []
 
       const formattedHabits = allHabits.map((habit: any) => ({
         id: habit.id,
@@ -172,13 +243,32 @@ export function NewDashboard() {
 
       setHabitStates(formattedHabits)
 
-      // Format leaderboard
-      const formattedLeaderboard = Array.isArray(leaderboard) ? leaderboard.slice(0, 3).map((user: any, index: number) => ({
+      // Format leaderboard (supporte à la fois un tableau brut ou un objet { leaderboard, userRank, totalUsers })
+      const leaderboardArray = Array.isArray(leaderboard)
+        ? leaderboard
+        : Array.isArray(leaderboard?.leaderboard)
+          ? leaderboard.leaderboard
+          : []
+
+      // Identifier l'utilisateur courant à partir de la réponse /api/auth/me
+      const currentUserId = user?.id || user?.userId || user?.sub
+
+      const formattedLeaderboard = leaderboardArray.slice(0, 3).map((entry: any, index: number) => ({
         rank: index + 1,
-        name: user.name || user.userName || "User",
-        score: user.totalPoints || user.score || 0,
-        avatar: (user.name || user.userName || "U")[0].toUpperCase(),
-        isUser: user.id === user?.id
+        name: entry.name || entry.userName || entry.user?.name || "User",
+        score: entry.totalPoints ?? entry.points ?? entry.score ?? 0,
+        avatar: (entry.name || entry.userName || entry.user?.name || "U")[0].toUpperCase(),
+        isUser: currentUserId ? (entry.userId === currentUserId || entry.id === currentUserId) : false
+      }))
+
+      // Format today's tasks
+      const formattedTodayTasks = Array.isArray(todayTasks) ? todayTasks.slice(0, 5).map((task: any) => ({
+        id: task.id,
+        title: task.title,
+        completed: task.completed || task.status === 'COMPLETED',
+        priority: task.priority || 0,
+        dueDate: task.dueDate,
+        project: task.project
       })) : []
 
       setData({
@@ -189,17 +279,19 @@ export function NewDashboard() {
           todayProgress,
           focusHours: Math.round(focusHours * 10) / 10,
           streakDays,
-          productivityScore: metrics.productivity?.score || 0,
+          // IMPORTANT: on aligne le score d'aujourd'hui sur celui utilisé par le graphique hebdomadaire
+          productivityScore: todayWeeklyScore,
           tasksCompleted,
           totalTasks
         },
         weeklyData,
         habits: formattedHabits,
+        todayTasks: formattedTodayTasks,
         leaderboard: formattedLeaderboard,
         performanceMetrics: {
-          totalHours: Math.round((deepWork?.total?.total_hours || 0)),
-          tasksDone: tasksCompleted,
-          peakTime: "9-11am",
+          totalDeepWorkHours,
+          weeklyDeepWorkHours,
+          bestSession,
           rank: formattedLeaderboard.findIndex(u => u.isUser) + 1 || 1
         }
       })
@@ -242,6 +334,40 @@ export function NewDashboard() {
       }
     } catch (error) {
       console.error("Error completing habit:", error)
+    }
+  }
+
+  const toggleTask = async (taskId: string) => {
+    if (!data) return
+
+    const task = data.todayTasks.find(t => t.id === taskId)
+    if (!task) return
+
+    try {
+      const response = await fetch(`/api/tasks/${taskId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          completed: !task.completed
+        })
+      })
+
+      if (response.ok) {
+        // Update local state
+        setData(prev => prev ? {
+          ...prev,
+          todayTasks: prev.todayTasks.map(t => 
+            t.id === taskId ? { ...t, completed: !t.completed } : t
+          )
+        } : null)
+        
+        // Refresh dashboard data to update metrics
+        fetchDashboardData()
+      }
+    } catch (error) {
+      console.error('Error toggling task:', error)
     }
   }
 
@@ -337,7 +463,7 @@ export function NewDashboard() {
               </motion.button>
 
               <motion.button
-                onClick={() => router.push("/dashboard/mon-espace")}
+                onClick={() => router.push("/dashboard/assistant-ia")}
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 className="px-6 py-2.5 hover:bg-gray-100 text-gray-700 rounded-2xl flex items-center gap-2 transition-all"
@@ -471,7 +597,7 @@ export function NewDashboard() {
             {/* Productivity Score Card */}
             <div className="bg-gradient-to-br from-purple-500 to-indigo-600 rounded-3xl p-6 shadow-xl text-white relative overflow-hidden">
               <Award size={28} className="mb-3 opacity-90" />
-              <p className="text-white/80 mb-2 text-sm">{t('score')}</p>
+              <p className="text-white/80 mb-2 text-sm">Score d'aujourd'hui</p>
               <div className="flex items-baseline gap-2 mb-1">
                 <p className="text-4xl">{data.metrics.productivityScore}</p>
                 <span className="text-2xl">/100</span>
@@ -493,8 +619,8 @@ export function NewDashboard() {
               >
                 <div className="flex items-center justify-between mb-6">
                   <div>
-                    <h3 className="text-gray-800 text-xl mb-1">{t('weeklyPerformance')}</h3>
-                    <p className="text-gray-500 text-sm">{t('productivityTrendWeek')}</p>
+                    <h3 className="text-gray-800 text-xl mb-1">Performance hebdomadaire</h3>
+                    <p className="text-gray-500 text-sm">Moyenne de productivité sur 7 jours</p>
                   </div>
                   <motion.button
                     whileHover={{ scale: 1.05 }}
@@ -531,7 +657,7 @@ export function NewDashboard() {
                 </ResponsiveContainer>
               </motion.div>
 
-              {/* Stats Overview */}
+              {/* Stats Overview - Deep Work Metrics */}
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -544,22 +670,22 @@ export function NewDashboard() {
                     <div className="w-16 h-16 bg-gradient-to-br from-[#00C27A]/10 to-[#00D68F]/10 rounded-2xl flex items-center justify-center mx-auto mb-3">
                       <Clock size={28} className="text-[#00C27A]" />
                     </div>
-                    <p className="text-sm text-gray-500 mb-1">{t('totalHours')}</p>
-                    <p className="text-[#00C27A] text-2xl">{data.performanceMetrics.totalHours}h</p>
+                    <p className="text-sm text-gray-500 mb-1">Temps total Deep Work</p>
+                    <p className="text-[#00C27A] text-2xl">{data.performanceMetrics.totalDeepWorkHours}h</p>
                   </div>
                   <div className="text-center">
                     <div className="w-16 h-16 bg-gradient-to-br from-purple-500/10 to-indigo-600/10 rounded-2xl flex items-center justify-center mx-auto mb-3">
                       <Target size={28} className="text-purple-600" />
                     </div>
-                    <p className="text-sm text-gray-500 mb-1">{t('tasksDone')}</p>
-                    <p className="text-purple-600 text-2xl">{data.performanceMetrics.tasksDone}</p>
+                    <p className="text-sm text-gray-500 mb-1">Deep Work semaine</p>
+                    <p className="text-purple-600 text-2xl">{data.performanceMetrics.weeklyDeepWorkHours}h</p>
                   </div>
                   <div className="text-center">
                     <div className="w-16 h-16 bg-gradient-to-br from-orange-400/10 to-pink-500/10 rounded-2xl flex items-center justify-center mx-auto mb-3">
                       <Zap size={28} className="text-orange-500" />
                     </div>
-                    <p className="text-sm text-gray-500 mb-1">{t('peakTime')}</p>
-                    <p className="text-orange-500 text-2xl">{data.performanceMetrics.peakTime}</p>
+                    <p className="text-sm text-gray-500 mb-1">Meilleure session</p>
+                    <p className="text-orange-500 text-2xl">{data.performanceMetrics.bestSession}</p>
                   </div>
                   <div className="text-center">
                     <div className="w-16 h-16 bg-gradient-to-br from-cyan-400/10 to-blue-500/10 rounded-2xl flex items-center justify-center mx-auto mb-3">
@@ -590,20 +716,64 @@ export function NewDashboard() {
                         {t('viewAll')} →
                       </button>
                     </div>
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <span className="text-gray-600">{t('completed')}</span>
-                        <span className="text-[#00C27A] text-2xl font-bold">{data.metrics.tasksCompleted}/{data.metrics.totalTasks}</span>
+                    
+                    {/* Tasks List */}
+                    <div className="space-y-3">
+                      {data.todayTasks.length > 0 ? (
+                        data.todayTasks.map((task) => (
+                          <motion.div
+                            key={task.id}
+                            initial={{ opacity: 0, x: -20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors"
+                          >
+                            <motion.div
+                              className={`w-5 h-5 rounded-full border-2 flex items-center justify-center cursor-pointer transition-all ${
+                                task.completed
+                                  ? 'bg-[#00C27A] border-[#00C27A]' 
+                                  : 'border-gray-300 hover:border-[#00C27A]/50'
+                              }`}
+                              whileHover={{ scale: task.completed ? 1 : 1.1 }}
+                              whileTap={{ scale: 0.9 }}
+                              onClick={() => toggleTask(task.id)}
+                            >
+                              {task.completed && (
+                                <CheckCircle2 size={12} className="text-white" />
+                              )}
+                            </motion.div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between">
+                                <span className={`text-sm ${task.completed ? 'text-gray-400 line-through' : 'text-gray-800'}`}>
+                                  {task.title}
+                                </span>
+                                {task.project && (
+                                  <span className="text-xs text-gray-400 bg-gray-200 px-2 py-1 rounded-full">
+                                    {task.project.name}
+                                  </span>
+                                )}
+                              </div>
+                              {task.dueDate && (
+                                <div className="text-xs text-gray-400 mt-1">
+                                  Échéance: {new Date(task.dueDate).toLocaleDateString('fr-FR')}
+                                </div>
+                              )}
+                            </div>
+                          </motion.div>
+                        ))
+                      ) : (
+                        <div className="text-center py-8">
+                          <p className="text-gray-500 text-sm">Aucune tâche pour aujourd'hui</p>
+                          <p className="text-gray-400 text-xs mt-1">Excellent travail ! 🎉</p>
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Summary at bottom */}
+                    <div className="mt-6 pt-4 border-t border-gray-200">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-gray-600">Terminé</span>
+                        <span className="text-[#00C27A] font-bold">{data.metrics.tasksCompleted}/{data.metrics.totalTasks}</span>
                       </div>
-                      <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
-                        <motion.div
-                          initial={{ width: 0 }}
-                          animate={{ width: `${data.metrics.totalTasks > 0 ? (data.metrics.tasksCompleted / data.metrics.totalTasks) * 100 : 0}%` }}
-                          transition={{ duration: 1, delay: 0.5 }}
-                          className="h-full bg-gradient-to-r from-[#00C27A] to-[#00D68F]"
-                        />
-                      </div>
-                      <p className="text-sm text-gray-500 pt-2">{t('greatProgress')}</p>
                     </div>
                   </div>
 
@@ -669,8 +839,16 @@ export function NewDashboard() {
               >
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-gray-800 text-lg">{t('dailyHabits')}</h3>
-                  <div className="bg-gradient-to-r from-[#00C27A] to-[#00D68F] text-white px-3 py-1 rounded-full text-xs">
-                    {sortedHabits.filter(h => h.completed).length}/{sortedHabits.length} {t('done')}
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => router.push("/dashboard/habits")}
+                      className="text-[#00C27A] text-xs hover:underline"
+                    >
+                      {t('viewAll')} →
+                    </button>
+                    <div className="bg-gradient-to-r from-[#00C27A] to-[#00D68F] text-white px-3 py-1 rounded-full text-xs">
+                      {sortedHabits.filter(h => h.completed).length}/{sortedHabits.length} {t('done')}
+                    </div>
                   </div>
                 </div>
                 

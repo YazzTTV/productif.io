@@ -1,4 +1,4 @@
-import prisma from '@/lib/prisma'
+import { prisma } from '@/lib/prisma'
 import OpenAI from 'openai'
 
 const openai = new OpenAI({
@@ -34,7 +34,7 @@ export async function analyzeBehaviorPatterns(
     orderBy: { timestamp: 'asc' }
   })
 
-  if (checkIns.length < 5) {
+  if (checkIns.length < 3) {
     return {
       patterns: {},
       insights: ['Continue à renseigner tes états pour recevoir une analyse'],

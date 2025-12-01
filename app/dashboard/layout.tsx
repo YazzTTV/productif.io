@@ -27,8 +27,8 @@ export default function DashboardLayout({
     setIsNativeMobile(Capacitor.isNativePlatform());
   }, []);
 
-  // Masquer le header et la sidebar pour la page dashboard principale (nouveau design)
-  const isDashboardPage = pathname === "/dashboard";
+  // Masquer le header global pour toutes les pages du dashboard (nouveau design plein écran)
+  const isDashboardPage = pathname.startsWith("/dashboard");
   
   return (
     <ClientAuthProvider>

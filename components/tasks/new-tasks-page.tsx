@@ -626,73 +626,80 @@ export function NewTasksPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#f8fafc] flex items-center justify-center">
+      <div className="h-full bg-gradient-to-b from-gray-50 to-gray-100 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#22c55e] mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading tasks...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#00C27A] mx-auto mb-4"></div>
+          <p className="text-gray-600">Chargement de tes tâches…</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-[#f8fafc]">
-      <div className="max-w-4xl mx-auto px-5 py-8">
+    <div className="h-full bg-gradient-to-b from-gray-50 to-gray-100">
+      <div className="max-w-[1200px] mx-auto px-8 py-8">
         {/* Header */}
-        <div className="mb-6 bg-white border-b border-gray-200 pb-5">
-          <div className="flex items-center justify-between mb-4">
+        <div className="mb-6 flex items-center justify-between gap-4">
+          <div>
             <button
               onClick={() => router.push('/dashboard')}
-              className="flex items-center gap-2 text-gray-600 hover:text-[#22c55e] transition-colors"
+              className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-[#00C27A] transition-colors mb-2"
             >
-              <ArrowLeft className="w-5 h-5" />
-              <span className="text-sm">Back to dashboard</span>
+              <ArrowLeft className="w-4 h-4" />
+              <span>Retour au dashboard</span>
             </button>
+
+            <h1 className="text-2xl font-bold text-gray-900">Tâches</h1>
+            <p className="text-sm text-gray-600">
+              Organise et priorise tes tâches pour rester focalisé sur l’essentiel.
+            </p>
           </div>
 
-          <h1 className="text-2xl font-bold text-gray-900 mb-1">Tasks</h1>
-          <p className="text-sm text-gray-600 mb-4">Manage and organize your tasks efficiently</p>
-          
           <Button
             onClick={() => {
               resetForm()
               setShowCreateModal(true)
             }}
-            className="bg-[#22c55e] hover:bg-[#16a34a] text-white px-4 py-2.5 rounded-lg text-sm font-semibold"
+            className="bg-[#00C27A] hover:bg-[#00A767] text-white px-4 py-2.5 rounded-xl text-sm font-semibold shadow-sm"
           >
             <Plus className="w-4 h-4 mr-2" />
-            New Task
+            Nouvelle tâche
           </Button>
         </div>
 
-        {/* Task groups list */}
-        <div className="space-y-6 px-5">
-          {tasks.length === 0 ? (
-            <div className="text-center py-12">
-              <CheckCircle2 className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-gray-800 mb-2">No tasks found</h3>
-              <p className="text-gray-600 mb-6">Create your first task!</p>
-              <Button
-                onClick={() => {
-                  resetForm()
-                  setShowCreateModal(true)
-                }}
-                className="bg-[#22c55e] hover:bg-[#16a34a] text-white px-5 py-2.5 rounded-lg text-sm font-semibold"
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                New Task
-              </Button>
-            </div>
-          ) : (
-            <>
-              {renderTaskGroup("Overdue", groupedTasks.overdue)}
-              {renderTaskGroup("Today", groupedTasks.today)}
-              {renderTaskGroup("Tomorrow", groupedTasks.tomorrow)}
-              {renderTaskGroup("This Week", groupedTasks.thisWeek)}
-              {renderTaskGroup("Later", groupedTasks.later)}
-              {renderTaskGroup("No Due Date", groupedTasks.noDueDate)}
-            </>
-          )}
+        {/* Carte principale des tâches */}
+        <div className="bg-white rounded-3xl shadow-lg border border-gray-100 p-6">
+          {/* Task groups list */}
+          <div className="space-y-6">
+            {tasks.length === 0 ? (
+              <div className="text-center py-12">
+                <CheckCircle2 className="w-16 h-16 text-gray-200 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-gray-800 mb-2">Aucune tâche pour le moment</h3>
+                <p className="text-gray-500 mb-6">
+                  Crée ta première tâche pour structurer ta journée.
+                </p>
+                <Button
+                  onClick={() => {
+                    resetForm()
+                    setShowCreateModal(true)
+                  }}
+                  className="bg-[#00C27A] hover:bg-[#00A767] text-white px-5 py-2.5 rounded-xl text-sm font-semibold shadow-sm"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Nouvelle tâche
+                </Button>
+              </div>
+            ) : (
+              <>
+                {renderTaskGroup("En retard", groupedTasks.overdue)}
+                {renderTaskGroup("Aujourd’hui", groupedTasks.today)}
+                {renderTaskGroup("Demain", groupedTasks.tomorrow)}
+                {renderTaskGroup("Cette semaine", groupedTasks.thisWeek)}
+                {renderTaskGroup("Plus tard", groupedTasks.later)}
+                {renderTaskGroup("Sans date", groupedTasks.noDueDate)}
+              </>
+            )}
+          </div>
         </div>
 
         {/* Create Modal */}
