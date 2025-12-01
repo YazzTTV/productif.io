@@ -15,17 +15,7 @@ export function LanguageSelectionPage({ onNavigate, onLanguageSelect }: Language
 
   const languages = [
     { code: 'en' as Language, name: 'English', nativeName: 'English', flag: '🇬🇧' },
-    { code: 'es' as Language, name: 'Spanish', nativeName: 'Español', flag: '🇪🇸' },
     { code: 'fr' as Language, name: 'French', nativeName: 'Français', flag: '🇫🇷' },
-    { code: 'de' as Language, name: 'German', nativeName: 'Deutsch', flag: '🇩🇪' },
-    { code: 'it' as Language, name: 'Italian', nativeName: 'Italiano', flag: '🇮🇹' },
-    { code: 'pt' as Language, name: 'Portuguese', nativeName: 'Português', flag: '🇵🇹' },
-    { code: 'ru' as Language, name: 'Russian', nativeName: 'Русский', flag: '🇷🇺' },
-    { code: 'ja' as Language, name: 'Japanese', nativeName: '日本語', flag: '🇯🇵' },
-    { code: 'zh' as Language, name: 'Chinese', nativeName: '中文', flag: '🇨🇳' },
-    { code: 'ar' as Language, name: 'Arabic', nativeName: 'العربية', flag: '🇸🇦' },
-    { code: 'hi' as Language, name: 'Hindi', nativeName: 'हिन्दी', flag: '🇮🇳' },
-    { code: 'ko' as Language, name: 'Korean', nativeName: '한국어', flag: '🇰🇷' },
   ];
 
   const handleContinue = () => {

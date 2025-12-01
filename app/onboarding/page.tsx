@@ -1,14 +1,30 @@
 "use client"
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { signIn } from 'next-auth/react'
 import { OnboardingQuestion } from '@/components/onboarding/onboarding-question'
 import { ProcessingPage } from '@/components/onboarding/processing-page'
 import { ProfileRevealScreen } from '@/components/onboarding/profile-reveal-screen'
+import { useLocale } from '@/lib/i18n'
+import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Separator } from '@/components/ui/separator'
+import { Label } from '@/components/ui/label'
+import { Input } from '@/components/ui/input'
+import { CheckCircle2 } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
 
-const questions = [
+type QuestionOption = { id: string; text: string }
+type Question = {
+  question: string
+  options: QuestionOption[]
+  socialProof?: string
+}
+
+const questionsEn: Question[] = [
   {
     question: "When you work on an important project, you tend to…",
     options: [
@@ -67,7 +83,66 @@ const questions = [
   }
 ]
 
-const profileTypes: { [key: string]: { type: string; emoji: string; description: string } } = {
+const questionsFr: Question[] = [
+  {
+    question: "Quand vous travaillez sur un projet important, vous avez tendance à…",
+    options: [
+      { id: 'A', text: "Vous perdre dans les détails" },
+      { id: 'B', text: "Procrastiner" },
+      { id: 'C', text: "Passer d'une tâche à l'autre" },
+      { id: 'D', text: "Commencer fort, puis perdre la motivation" }
+    ]
+  },
+  {
+    question: "À la fin de votre journée, vous vous sentez généralement…",
+    options: [
+      { id: 'A', text: "Frustré de ne pas en avoir fait assez" },
+      { id: 'B', text: "Fatigué sans vraiment savoir pourquoi" },
+      { id: 'C', text: "Fier, mais sans vision claire d'ensemble" },
+      { id: 'D', text: "Perdu dans vos priorités" }
+    ]
+  },
+  {
+    question: "Votre téléphone pendant que vous travaillez est…",
+    options: [
+      { id: 'A', text: "Mon pire ennemi" },
+      { id: 'B', text: "'Juste 2 minutes'… puis 2 heures plus tard" },
+      { id: 'C', text: "Je le range mais je finis par le reprendre" },
+      { id: 'D', text: "J'ai appris à le gérer" }
+    ],
+    socialProof: "Vous n'êtes pas seul — 92% des utilisateurs de Productif.io avaient le même problème avant de commencer."
+  },
+  {
+    question: "Quand vous sentez-vous le plus productif ?",
+    options: [
+      { id: 'A', text: "Tôt le matin (5h-9h)" },
+      { id: 'B', text: "En milieu de journée (10h-14h)" },
+      { id: 'C', text: "L'après-midi / en soirée (15h-20h)" },
+      { id: 'D', text: "Tard le soir (21h+)" }
+    ],
+    socialProof: "Comprendre vos heures de pointe nous aide à optimiser votre planning pour un focus maximal."
+  },
+  {
+    question: "Comment gérez-vous les pauses pendant le travail ?",
+    options: [
+      { id: 'A', text: "J'oublie de les prendre" },
+      { id: 'B', text: "Les pauses courtes deviennent longues" },
+      { id: 'C', text: "Je les prends mais je me sens coupable" },
+      { id: 'D', text: "Je les planifie stratégiquement" }
+    ]
+  },
+  {
+    question: "Quel est votre objectif principal en ce moment ?",
+    options: [
+      { id: 'A', text: "Faire grandir mon business / projet" },
+      { id: 'B', text: "Mieux gérer mes études" },
+      { id: 'C', text: "Construire plus de discipline" },
+      { id: 'D', text: "Trouver un meilleur équilibre vie / travail" }
+    ]
+  }
+]
+
+const profileTypesEn: { [key: string]: { type: string; emoji: string; description: string } } = {
   'AAAA': {
     type: 'The Focused Perfectionist',
     emoji: '🎯',
@@ -95,17 +170,49 @@ const profileTypes: { [key: string]: { type: string; emoji: string; description:
   }
 }
 
+const profileTypesFr: { [key: string]: { type: string; emoji: string; description: string } } = {
+  'AAAA': {
+    type: 'Le Perfectionniste Focalisé',
+    emoji: '🎯',
+    description: "Vous avez une attention incroyable aux détails et des standards élevés. Ce qui manque, c’est savoir quand avancer. Productif.io vous aide à équilibrer perfection et progrès."
+  },
+  'BBBB': {
+    type: 'Le Stratège Débordé',
+    emoji: '🔥',
+    description: "Vous avez des objectifs ambitieux mais vous luttez sur l’exécution. Ce qui manque, c’est un plan d’action clair. Productif.io transforme votre vision en victoires quotidiennes."
+  },
+  'CCCC': {
+    type: 'L’Étourdi Déterminé',
+    emoji: '🌀',
+    description: "Vous avez l’énergie et l’ambition — ce qui manque, c’est la clarté et la structure. Productif.io vous aide à transformer votre chaos en focus avec votre coach IA personnel."
+  },
+  'DDDD': {
+    type: 'L’Explorateur Motivé',
+    emoji: '🚀',
+    description: "Vous commencez fort et adorez les nouveaux défis. Ce qui manque, c’est un élan durable. Productif.io vous garde engagé et sur la bonne voie chaque jour."
+  },
+  'default': {
+    type: 'L’Ambitieux Performant',
+    emoji: '💭',
+    description: "Vous avez le potentiel et l’envie — ce qui manque, c’est le bon système. Productif.io vous donne la structure et les insights pour avancer de façon régulière."
+  }
+}
+
 type OnboardingStep = 'questions' | 'processing' | 'profile'
 
 export default function OnboardingPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { locale } = useLocale()
   const step = searchParams.get('step') as OnboardingStep | null
   
   const [currentStep, setCurrentStep] = useState<OnboardingStep>(step || 'questions')
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
   const [answers, setAnswers] = useState<string[]>([])
   const [userProfile, setUserProfile] = useState<{ type: string; emoji: string; description: string } | null>(null)
+
+  const questions = locale === 'fr' ? questionsFr : questionsEn
+  const profileTypes = locale === 'fr' ? profileTypesFr : profileTypesEn
 
   const handleAnswer = (answer: string) => {
     const newAnswers = [...answers, answer]
@@ -330,6 +437,7 @@ function useAuthInfo() {
 function OnboardingContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { locale } = useLocale()
 
   const offer = searchParams.get("offer") || "early-access"
   const utmParams = useMemo(() => {
@@ -353,7 +461,7 @@ function OnboardingContent() {
     frustration: "",
     whatsappNumber: "",
     whatsappConsent: false,
-    language: "fr",
+    language: locale === "fr" ? "fr" : "en",
   })
 
   const auth = useAuthInfo()
@@ -1182,7 +1290,9 @@ function OnboardingContent() {
           )}
         </CardContent>
         <CardFooter className="justify-center">
-          <div className="text-xs text-muted-foreground">Step {step} / 9</div>
+          <div className="text-xs text-muted-foreground">
+            {answers.language === "fr" ? `Étape ${step} / 9` : `Step ${step} / 9`}
+          </div>
         </CardFooter>
       </Card>
     </div>

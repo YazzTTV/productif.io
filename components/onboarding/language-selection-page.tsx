@@ -14,7 +14,7 @@ function seededRandom(seed: number) {
 
 export function LanguageSelectionPage() {
   const router = useRouter()
-  const { locale: currentLocale, setLocale } = useLocale()
+  const { locale: currentLocale, setLocale, t } = useLocale()
   const [selectedLanguage, setSelectedLanguage] = useState<Locale>(currentLocale)
   const [isMounted, setIsMounted] = useState(false)
 
@@ -88,8 +88,12 @@ export function LanguageSelectionPage() {
             </div>
           </motion.div>
 
-          <h1 className="text-gray-800 mb-3 text-3xl font-bold">Choose Your Language</h1>
-          <p className="text-gray-600 text-lg">Select your preferred language</p>
+          <h1 className="text-gray-800 mb-3 text-3xl font-bold">
+            {t('onboardingChooseLanguageTitle') || 'Choose Your Language'}
+          </h1>
+          <p className="text-gray-600 text-lg">
+            {t('onboardingChooseLanguageSubtitle') || 'Select your preferred language'}
+          </p>
         </motion.div>
 
         {/* Language List */}
@@ -161,14 +165,14 @@ export function LanguageSelectionPage() {
               transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
             />
             <span className="relative z-10 flex items-center justify-center gap-2 text-lg font-medium">
-              Continue
+              {t('onboardingContinue') || 'Continue'}
               <span className="text-xl">→</span>
             </span>
           </motion.button>
 
           {/* Language Info */}
           <p className="text-center text-gray-400 text-xs mt-4">
-            You can change this later in settings
+            {t('onboardingChangeLanguageInfo') || 'You can change this later in settings'}
           </p>
         </motion.div>
       </div>

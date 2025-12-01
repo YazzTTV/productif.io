@@ -40,16 +40,37 @@ export default function SuperAdminDashboardPage() {
   useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true)
+      setError(null)
       
-      // Statistiques globales
       try {
-        const statsResponse = await fetch("/api/admin/statistics")
-        if (statsResponse.ok) {
-          const statsData = await statsResponse.json()
-          setStatistics(statsData)
-        } else {
-          console.error("Erreur lors de la récupération des statistiques globales:", statsResponse.status)
-          // En cas d'échec, utiliser des données fictives pour éviter des erreurs d'affichage
+        // Statistiques globales
+        try {
+          const statsResponse = await fetch("/api/admin/statistics", {
+            credentials: 'include'
+          })
+          if (statsResponse.ok) {
+            const statsData = await statsResponse.json()
+            setStatistics(statsData)
+          } else {
+            const errorData = await statsResponse.json().catch(() => ({}))
+            console.error("Erreur lors de la récupération des statistiques globales:", statsResponse.status, errorData)
+            // En cas d'échec, utiliser des données par défaut
+            setStatistics({
+              totalUsers: 0,
+              activeUsers: 0,
+              totalCompanies: 0,
+              totalTasks: 0,
+              completedTasks: 0,
+              totalHabits: 0,
+              activeHabits: 0,
+              totalObjectives: 0,
+              weeklyActiveUsers: 0,
+              monthlyActiveUsers: 0,
+              weeklyGrowth: 0
+            })
+          }
+        } catch (error) {
+          console.error("Erreur lors de la récupération des statistiques globales:", error)
           setStatistics({
             totalUsers: 0,
             activeUsers: 0,
@@ -64,84 +85,80 @@ export default function SuperAdminDashboardPage() {
             weeklyGrowth: 0
           })
         }
-      } catch (error) {
-        console.error("Erreur lors de la récupération des statistiques globales:", error)
-        setStatistics({
-          totalUsers: 0,
-          activeUsers: 0,
-          totalCompanies: 0,
-          totalTasks: 0,
-          completedTasks: 0,
-          totalHabits: 0,
-          activeHabits: 0,
-          totalObjectives: 0,
-          weeklyActiveUsers: 0,
-          monthlyActiveUsers: 0,
-          weeklyGrowth: 0
-        })
-      }
 
-      // Utilisateurs récents
-      try {
-        const recentUsersResponse = await fetch("/api/admin/users/recent")
-        if (recentUsersResponse.ok) {
-          const recentUsersData = await recentUsersResponse.json()
-          setRecentUsers(recentUsersData.users || [])
-        } else {
-          console.error("Erreur lors de la récupération des utilisateurs récents:", recentUsersResponse.status)
+        // Utilisateurs récents
+        try {
+          const recentUsersResponse = await fetch("/api/admin/users/recent", {
+            credentials: 'include'
+          })
+          if (recentUsersResponse.ok) {
+            const recentUsersData = await recentUsersResponse.json()
+            setRecentUsers(recentUsersData.users || [])
+          } else {
+            console.error("Erreur lors de la récupération des utilisateurs récents:", recentUsersResponse.status)
+            setRecentUsers([])
+          }
+        } catch (error) {
+          console.error("Erreur lors de la récupération des utilisateurs récents:", error)
           setRecentUsers([])
         }
-      } catch (error) {
-        console.error("Erreur lors de la récupération des utilisateurs récents:", error)
-        setRecentUsers([])
-      }
 
-      // Utilisateurs actifs
-      try {
-        const activeUsersResponse = await fetch("/api/admin/users/active")
-        if (activeUsersResponse.ok) {
-          const activeUsersData = await activeUsersResponse.json()
-          setTopActiveUsers(activeUsersData.users || [])
-        } else {
-          console.error("Erreur lors de la récupération des utilisateurs actifs:", activeUsersResponse.status)
+        // Utilisateurs actifs
+        try {
+          const activeUsersResponse = await fetch("/api/admin/users/active", {
+            credentials: 'include'
+          })
+          if (activeUsersResponse.ok) {
+            const activeUsersData = await activeUsersResponse.json()
+            setTopActiveUsers(activeUsersData.users || [])
+          } else {
+            console.error("Erreur lors de la récupération des utilisateurs actifs:", activeUsersResponse.status)
+            setTopActiveUsers([])
+          }
+        } catch (error) {
+          console.error("Erreur lors de la récupération des utilisateurs actifs:", error)
           setTopActiveUsers([])
         }
-      } catch (error) {
-        console.error("Erreur lors de la récupération des utilisateurs actifs:", error)
-        setTopActiveUsers([])
-      }
 
-      // Statistiques des entreprises
-      try {
-        const companiesResponse = await fetch("/api/admin/companies/statistics")
-        if (companiesResponse.ok) {
-          const companiesData = await companiesResponse.json()
-          setCompaniesStats(companiesData.companies || [])
-        } else {
-          console.error("Erreur lors de la récupération des statistiques des entreprises:", companiesResponse.status)
-          // Utiliser des données fictives pour éviter des erreurs d'affichage
-          setCompaniesStats([
-            { id: "c1", name: "Entreprise 1", userCount: 5, activeUserCount: 3, tasksCompletion: 70, habitsAdoption: 65, objectivesProgress: 60 },
-            { id: "c2", name: "Entreprise 2", userCount: 3, activeUserCount: 2, tasksCompletion: 50, habitsAdoption: 55, objectivesProgress: 45 }
-          ])
+        // Statistiques des entreprises
+        try {
+          const companiesResponse = await fetch("/api/admin/companies/statistics", {
+            credentials: 'include'
+          })
+          if (companiesResponse.ok) {
+            const companiesData = await companiesResponse.json()
+            setCompaniesStats(companiesData.companies || [])
+          } else {
+            console.error("Erreur lors de la récupération des statistiques des entreprises:", companiesResponse.status)
+            setCompaniesStats([])
+          }
+        } catch (error) {
+          console.error("Erreur lors de la récupération des statistiques des entreprises:", error)
+          setCompaniesStats([])
         }
-      } catch (error) {
-        console.error("Erreur lors de la récupération des statistiques des entreprises:", error)
-        setCompaniesStats([
-          { id: "c1", name: "Entreprise 1", userCount: 5, activeUserCount: 3, tasksCompletion: 70, habitsAdoption: 65, objectivesProgress: 60 },
-          { id: "c2", name: "Entreprise 2", userCount: 3, activeUserCount: 2, tasksCompletion: 50, habitsAdoption: 55, objectivesProgress: 45 }
-        ])
-      }
 
-      // Tendances hebdomadaires
-      try {
-        const weeklyResponse = await fetch("/api/admin/activity/weekly")
-        if (weeklyResponse.ok) {
-          const weeklyData = await weeklyResponse.json()
-          setWeeklyTrendsData(weeklyData.weeklyData || [])
-        } else {
-          console.error("Erreur lors de la récupération des tendances hebdomadaires:", weeklyResponse.status)
-          // Données fictives pour les tendances
+        // Tendances hebdomadaires
+        try {
+          const weeklyResponse = await fetch("/api/admin/activity/weekly", {
+            credentials: 'include'
+          })
+          if (weeklyResponse.ok) {
+            const weeklyData = await weeklyResponse.json()
+            setWeeklyTrendsData(weeklyData.weeklyData || [])
+          } else {
+            console.error("Erreur lors de la récupération des tendances hebdomadaires:", weeklyResponse.status)
+            setWeeklyTrendsData([
+              { name: 'Lun', tasks: 0, habits: 0, objectives: 0 },
+              { name: 'Mar', tasks: 0, habits: 0, objectives: 0 },
+              { name: 'Mer', tasks: 0, habits: 0, objectives: 0 },
+              { name: 'Jeu', tasks: 0, habits: 0, objectives: 0 },
+              { name: 'Ven', tasks: 0, habits: 0, objectives: 0 },
+              { name: 'Sam', tasks: 0, habits: 0, objectives: 0 },
+              { name: 'Dim', tasks: 0, habits: 0, objectives: 0 }
+            ])
+          }
+        } catch (error) {
+          console.error("Erreur lors de la récupération des tendances hebdomadaires:", error)
           setWeeklyTrendsData([
             { name: 'Lun', tasks: 0, habits: 0, objectives: 0 },
             { name: 'Mar', tasks: 0, habits: 0, objectives: 0 },
@@ -153,20 +170,14 @@ export default function SuperAdminDashboardPage() {
           ])
         }
       } catch (error) {
-        console.error("Erreur lors de la récupération des tendances hebdomadaires:", error)
-        setWeeklyTrendsData([
-          { name: 'Lun', tasks: 0, habits: 0, objectives: 0 },
-          { name: 'Mar', tasks: 0, habits: 0, objectives: 0 },
-          { name: 'Mer', tasks: 0, habits: 0, objectives: 0 },
-          { name: 'Jeu', tasks: 0, habits: 0, objectives: 0 },
-          { name: 'Ven', tasks: 0, habits: 0, objectives: 0 },
-          { name: 'Sam', tasks: 0, habits: 0, objectives: 0 },
-          { name: 'Dim', tasks: 0, habits: 0, objectives: 0 }
-        ])
+        console.error("Erreur globale lors du chargement des données:", error)
+        setError("Une erreur est survenue lors du chargement des données. Veuillez réessayer.")
+      } finally {
+        setIsLoading(false)
       }
-
-      setIsLoading(false)
     }
+
+    fetchData()
 
     // Comme les APIs peuvent ne pas être disponibles, utilisons des données fictives pour la démo
     const useMockData = false  // Toujours utiliser les vraies données

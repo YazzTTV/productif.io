@@ -21,7 +21,8 @@ import { LeaderboardPage } from './components/LeaderboardPage';
 import { AchievementsPage } from './components/AchievementsPage';
 import { LanguageSelectionPage } from './components/LanguageSelectionPage';
 import { SocialProofPage } from './components/SocialProofPage';
-import { Language } from './utils/translations';
+import { Header } from './components/Header';
+import { Language, useTranslation } from './utils/translations';
 
 export type Screen = 
   | 'welcome' 
@@ -60,6 +61,8 @@ export default function App() {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedLanguage, setSelectedLanguage] = useState<Language>('en');
 
+  const t = useTranslation(selectedLanguage);
+
   const navigateTo = (screen: Screen) => {
     setCurrentScreen(screen);
   };
@@ -70,88 +73,88 @@ export default function App() {
 
   const questions = [
     {
-      question: "When you work on an important project, you tend to…",
+      question: t('onboardingQ1'),
       options: [
-        { id: 'A', text: "Get lost in details" },
-        { id: 'B', text: "Procrastinate" },
-        { id: 'C', text: "Jump between tasks" },
-        { id: 'D', text: "Start strong, then lose motivation" }
+        { id: 'A', text: t('onboardingQ1A') },
+        { id: 'B', text: t('onboardingQ1B') },
+        { id: 'C', text: t('onboardingQ1C') },
+        { id: 'D', text: t('onboardingQ1D') }
       ]
     },
     {
-      question: "At the end of your day, you usually feel…",
+      question: t('onboardingQ2'),
       options: [
-        { id: 'A', text: "Frustrated for not doing enough" },
-        { id: 'B', text: "Tired without knowing why" },
-        { id: 'C', text: "Proud, but unclear about the big picture" },
-        { id: 'D', text: "Lost in your priorities" }
+        { id: 'A', text: t('onboardingQ2A') },
+        { id: 'B', text: t('onboardingQ2B') },
+        { id: 'C', text: t('onboardingQ2C') },
+        { id: 'D', text: t('onboardingQ2D') }
       ]
     },
     {
-      question: "Your phone while working is…",
+      question: t('onboardingQ3'),
       options: [
-        { id: 'A', text: "My worst enemy" },
-        { id: 'B', text: "'Just 2 minutes'… then 2 hours later" },
-        { id: 'C', text: "I put it away but take it back" },
-        { id: 'D', text: "I've learned to manage it" }
+        { id: 'A', text: t('onboardingQ3A') },
+        { id: 'B', text: t('onboardingQ3B') },
+        { id: 'C', text: t('onboardingQ3C') },
+        { id: 'D', text: t('onboardingQ3D') }
       ],
-      socialProof: "You're not alone — 92% of Productif.io users had the same issue before starting."
+      socialProof: t('onboardingQ3Social')
     },
     {
-      question: "When do you feel most productive?",
+      question: t('onboardingQ4'),
       options: [
-        { id: 'A', text: "Early morning (5am-9am)" },
-        { id: 'B', text: "Midday (10am-2pm)" },
-        { id: 'C', text: "Afternoon/Evening (3pm-8pm)" },
-        { id: 'D', text: "Late night (9pm+)" }
+        { id: 'A', text: t('onboardingQ4A') },
+        { id: 'B', text: t('onboardingQ4B') },
+        { id: 'C', text: t('onboardingQ4C') },
+        { id: 'D', text: t('onboardingQ4D') }
       ],
-      socialProof: "Understanding your peak hours helps us optimize your schedule for maximum focus."
+      socialProof: t('onboardingQ4Social')
     },
     {
-      question: "How do you handle breaks during work?",
+      question: t('onboardingQ5'),
       options: [
-        { id: 'A', text: "I forget to take them" },
-        { id: 'B', text: "Short breaks turn into long ones" },
-        { id: 'C', text: "I take them but feel guilty" },
-        { id: 'D', text: "I schedule them strategically" }
+        { id: 'A', text: t('onboardingQ5A') },
+        { id: 'B', text: t('onboardingQ5B') },
+        { id: 'C', text: t('onboardingQ5C') },
+        { id: 'D', text: t('onboardingQ5D') }
       ]
     },
     {
-      question: "What's your main goal right now?",
+      question: t('onboardingQ6'),
       options: [
-        { id: 'A', text: "Grow my business/project" },
-        { id: 'B', text: "Manage my studies better" },
-        { id: 'C', text: "Build discipline" },
-        { id: 'D', text: "Find work-life balance" }
+        { id: 'A', text: t('onboardingQ6A') },
+        { id: 'B', text: t('onboardingQ6B') },
+        { id: 'C', text: t('onboardingQ6C') },
+        { id: 'D', text: t('onboardingQ6D') }
       ]
     }
   ];
 
   const profileTypes: { [key: string]: { type: string; emoji: string; description: string } } = {
     'AAAA': {
-      type: 'The Focused Perfectionist',
+      type: t('profileFocusedPerfectionist'),
       emoji: '🎯',
-      description: "You have incredible attention to detail and high standards. What's missing is knowing when to move forward. Productif.io helps you balance perfection with progress."
+      description: t('profileFocusedPerfectionistDesc')
     },
     'BBBB': {
-      type: 'The Overwhelmed Strategist',
+      type: t('profileOverwhelmedStrategist'),
       emoji: '🔥',
-      description: "You have ambitious goals but struggle with execution. What's missing is a clear action plan. Productif.io turns your vision into daily wins."
+      description: t('profileOverwhelmedStrategistDesc')
     },
     'CCCC': {
-      type: 'The Determined Scatterbrain',
+      type: t('profileDeterminedScatterbrain'),
       emoji: '🌀',
-      description: "You have the energy and ambition — what's missing is clarity and structure. Productif.io helps you turn your chaos into focus with your personal AI coach."
+      description: t('profileDeterminedScatterbrainDesc')
     },
     'DDDD': {
-      type: 'The Motivated Explorer',
+      type: t('profileMotivatedExplorer'),
       emoji: '🚀',
-      description: "You start strong and love new challenges. What's missing is sustainable momentum. Productif.io keeps you engaged and on track every day."
+      description: t('profileMotivatedExplorerDesc')
     },
     'default': {
-      type: 'The Ambitious Achiever',
+      type: t('profileAmbitiousAchiever'),
       emoji: '💭',
-      description: "You have the drive and potential — what's missing is the right system. Productif.io provides the structure and insights to help you reach your goals consistently."
+      description: t('profileAmbitiousAchieverDesc')
     }
   };
 
@@ -200,7 +203,7 @@ export default function App() {
     
     switch (currentScreen) {
       case 'welcome':
-        return <WelcomePage onNavigate={navigateTo} />;
+        return <WelcomePage onNavigate={navigateTo} language={selectedLanguage} />;
       case 'language':
         return <LanguageSelectionPage onNavigate={navigateTo} onLanguageSelect={handleLanguageSelect} />;
       case 'login':
@@ -244,7 +247,7 @@ export default function App() {
           />
         );
       case 'building-plan':
-        return <BuildingPlanScreen onComplete={() => navigateTo('symptoms-analysis')} />;
+        return <BuildingPlanScreen onComplete={() => navigateTo('symptoms-analysis')} language={selectedLanguage} />;
       case 'symptoms-analysis':
         return <SymptomsAnalysisPage onComplete={() => navigateTo('social-proof')} />;
       case 'social-proof':
@@ -273,9 +276,8 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
-      {/* Full Screen Content - No iPhone Frame */}
+      <Header />
       <div className="w-full min-h-screen bg-white">
-        {/* Screen Content */}
         <div className="w-full h-full">
           {renderScreen()}
         </div>
