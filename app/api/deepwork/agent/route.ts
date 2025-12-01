@@ -40,10 +40,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Token invalide ou expiré' }, { status: 401 })
     }
 
-    const { plannedDuration, type = 'deepwork', description } = await req.json()
+    const { plannedDuration, type = 'deepwork', description, taskId } = await req.json()
 
     if (!plannedDuration || plannedDuration < 1) {
       return NextResponse.json({ error: 'plannedDuration requis (en minutes)' }, { status: 400 })
+    }
+
+    // Vérifier que la tâche existe et appartient à l'utilisateur si taskId fourni
+    if (taskId) {
+      const task = await prisma.task.findFirst({
+        where: { id: taskId, userId, completed: false }
+      })
+      if (!task) {
+        return NextResponse.json({ error: 'Tâche introuvable ou déjà complétée' }, { status: 404 })
+      }
     }
 
     const activeSession = await prisma.deepWorkSession.findFirst({
@@ -64,7 +74,8 @@ export async function POST(req: NextRequest) {
       data: {
         userId,
         startTime,
-        description: description || `Session Deep Work (${plannedDuration}min)`
+        taskId: taskId || null,
+        description: description || (taskId ? undefined : `Session Deep Work (${plannedDuration}min)`)
       }
     })
 

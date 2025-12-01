@@ -35,6 +35,10 @@ class WhatsAppService {
         this.apiUrl = `https://graph.facebook.com/v17.0/${phoneNumberId}`;
         this.token = process.env.WHATSAPP_ACCESS_TOKEN || '';
         this.prisma = new PrismaClient();
+        
+        // Configuration des templates WhatsApp
+        this.useTemplates = process.env.WHATSAPP_USE_TEMPLATES === 'true' || false;
+        this.templateLanguage = process.env.WHATSAPP_TEMPLATE_LANGUAGE || 'fr';
 
         NotificationLogger.log('INFO', 'WHATSAPP_CONFIG_LOADED', {
             serviceId: this.serviceId,
@@ -52,12 +56,16 @@ class WhatsAppService {
         console.log('WHATSAPP_BUSINESS_ACCOUNT_ID:', process.env.WHATSAPP_BUSINESS_ACCOUNT_ID ? '✅' : '❌');
         console.log('WHATSAPP_VERIFY_TOKEN:', process.env.WHATSAPP_VERIFY_TOKEN ? '✅' : '❌');
         console.log('WHATSAPP_PHONE_NUMBER_ID:', process.env.WHATSAPP_PHONE_NUMBER_ID ? '✅' : '❌');
+        console.log('WHATSAPP_USE_TEMPLATES:', this.useTemplates ? '✅ Activé' : '❌ Désactivé');
         console.log('Configuration WhatsApp :');
         console.log('API_URL:', this.apiUrl);
         console.log('PHONE_NUMBER_ID:', phoneNumberId);
         console.log('🔍 Configuration WhatsApp chargée');
         console.log('🔗 URL de l\'API configurée:', this.apiUrl);
         console.log('🔑 Token configuré:', this.token ? `${this.token.substring(0, 10)}...` : '❌');
+        if (this.useTemplates) {
+            console.log('📋 Templates activés');
+        }
     }
 
     formatPhoneNumber(phoneNumber) {
@@ -84,7 +92,106 @@ class WhatsAppService {
         return cleaned;
     }
 
-    async sendMessage(phoneNumber, message, notificationId = null) {
+    /**
+     * Envoie un message via template WhatsApp (peut être envoyé même après 24h)
+     * @param {string} phoneNumber - Numéro de téléphone
+     * @param {string} templateName - Nom du template
+     * @param {string|object} messageContent - Contenu (string pour 1 variable, {var1, var2} pour plusieurs)
+     * @param {string|null} notificationId - ID de notification optionnel
+     */
+    async sendTemplateMessage(phoneNumber, templateName, messageContent, notificationId = null) {
+        const sendId = uuidv4();
+        const requestStart = Date.now();
+        const formattedPhone = this.formatPhoneNumber(phoneNumber);
+        
+        console.log(`📋 [${sendId}] Envoi via template "${templateName}" pour ${formattedPhone}`);
+        
+        // Gérer les templates à 1 ou plusieurs variables
+        let parameters = [];
+        
+        if (typeof messageContent === 'string') {
+            // Template à 1 variable : {{1}}
+            parameters = [
+                {
+                    type: 'text',
+                    text: messageContent.substring(0, 1024)
+                }
+            ];
+        } else if (typeof messageContent === 'object' && messageContent !== null) {
+            // Template à plusieurs variables : {{1}}, {{2}}, etc.
+            // Ordre : var1, var2, var3...
+            const vars = [messageContent.var1, messageContent.var2, messageContent.var3, messageContent.var4]
+                .filter(v => v !== undefined && v !== null);
+            
+            parameters = vars.map(varContent => ({
+                type: 'text',
+                text: String(varContent).substring(0, 1024)
+            }));
+        }
+        
+        // Préparer le payload pour template
+        const payload = {
+            messaging_product: 'whatsapp',
+            to: formattedPhone,
+            type: 'template',
+            template: {
+                name: templateName,
+                language: {
+                    code: this.templateLanguage
+                },
+                components: [
+                    {
+                        type: 'body',
+                        parameters: parameters
+                    }
+                ]
+            }
+        };
+
+        const httpStart = Date.now();
+        const response = await fetch(`${this.apiUrl}/messages`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${this.token}`
+            },
+            body: JSON.stringify(payload)
+        });
+
+        const httpDuration = Date.now() - httpStart;
+        const responseText = await response.text();
+
+        if (!response.ok) {
+            NotificationLogger.log('ERROR', 'WHATSAPP_TEMPLATE_ERROR', {
+                sendId,
+                notificationId,
+                templateName,
+                status: response.status,
+                response: responseText
+            });
+            throw new Error(`WhatsApp Template API error: ${response.status} ${response.statusText}\n${responseText}`);
+        }
+
+        const responseData = JSON.parse(responseText);
+        const totalDuration = Date.now() - requestStart;
+
+        NotificationLogger.logWhatsAppSuccess({
+            sendId,
+            notificationId,
+            whatsappMessageId: responseData.messages?.[0]?.id,
+            whatsappWaId: responseData.contacts?.[0]?.wa_id,
+            requestDuration: httpDuration,
+            totalDuration,
+            method: 'template',
+            templateName
+        });
+
+        console.log(`✅ [${sendId}] Template "${templateName}" envoyé avec succès`);
+        
+        return responseData;
+    }
+
+    async sendMessage(phoneNumber, message, notificationId = null, templateName = null) {
         const sendId = uuidv4();
         const requestStart = Date.now();
         this.requestCounter++;
@@ -121,7 +228,19 @@ class WhatsAppService {
             // Formater le numéro de téléphone
             const formattedPhone = this.formatPhoneNumber(phoneNumber);
             
-            // Préparer le payload
+            // Si les templates sont activés ET un templateName est fourni, utiliser le template
+            if (this.useTemplates && templateName) {
+                console.log(`📋 [${sendId}] Utilisation du template "${templateName}" pour ${formattedPhone}`);
+                try {
+                    const templateResult = await this.sendTemplateMessage(phoneNumber, templateName, message, notificationId);
+                    return templateResult;
+                } catch (templateError) {
+                    console.error(`❌ [${sendId}] Erreur avec template "${templateName}", fallback sur message texte:`, templateError.message);
+                    // Fallback sur message texte si le template échoue
+                }
+            }
+            
+            // Préparer le payload pour message texte classique
             const payload = {
                 messaging_product: 'whatsapp',
                 to: formattedPhone,
@@ -143,6 +262,8 @@ class WhatsAppService {
 
             const httpStart = Date.now();
             
+            console.log(`🔵 [${sendId}] ⚡ APPEL API WHATSAPP IMMINENT - notificationId: ${notificationId}, phoneNumber: ${formattedPhone}`);
+            
             // Envoi de la requête
             const response = await fetch(`${this.apiUrl}/messages`, {
                 method: 'POST',
@@ -155,6 +276,8 @@ class WhatsAppService {
 
             const httpDuration = Date.now() - httpStart;
             const responseText = await response.text();
+            
+            console.log(`🔵 [${sendId}] ✅ API WHATSAPP RÉPONDU - status: ${response.status}, duration: ${httpDuration}ms`);
             
             // Log de réponse reçue
             NotificationLogger.logWhatsAppResponse({

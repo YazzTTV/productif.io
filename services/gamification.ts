@@ -28,9 +28,12 @@ export interface LeaderboardEntry {
   userName: string
   userEmail: string
   points: number
+  totalPoints?: number // Alias pour points (compatibilité)
   level: number
   currentStreak: number
   longestStreak: number
+  totalHabitsCompleted?: number
+  achievements?: number
   rank: number
 }
 

@@ -61,6 +61,8 @@ model User {
   createdGroups          LeaderboardGroup[]           @relation("GroupCreator")
   groupInvitations       LeaderboardGroupInvitation[] @relation("GroupInviter")
   LeaderboardGroupMember LeaderboardGroupMember[]
+  agentInteractions      AgentInteraction[]
+  onboardingData         OnboardingData?
 }
 
 model Company {
@@ -651,4 +653,66 @@ model TrialNotification {
 
   @@index([userId, type])
   @@index([sentAt])
+}
+
+/// Interactions avec l'agent IA pour analytics et amélioration
+model AgentInteraction {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  message        String @db.Text
+  intentType     String // action, question, conversation
+  intentCategory String // create_task, advice_request, etc.
+  confidence     Float
+
+  actionExecuted String? // Quelle action a été réalisée
+  handled        Boolean @default(false)
+
+  emotionalContext String? // positive, negative, stressed, etc.
+
+  responseTime Int? // Temps de traitement en ms
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([intentCategory])
+  @@index([emotionalContext])
+}
+
+/// Données collectées lors de l'onboarding
+model OnboardingData {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Informations de base
+  mainGoal    String? // Objectif principal
+  role        String? // Rôle de l'utilisateur
+  frustration String? // Frustration principale
+  language    String? @default("fr") // Langue choisie
+
+  // WhatsApp
+  whatsappNumber  String?
+  whatsappConsent Boolean @default(false)
+
+  // Questionnaire de diagnostic
+  diagBehavior String? // details, procrastination, distraction, abandon
+  timeFeeling  String? // frustrated, tired, proud, lost
+  phoneHabit   String? // enemy, twoMinutes, farButBack, managed
+
+  // Métadonnées
+  offer         String? // early-access, waitlist, etc.
+  utmParams     Json? // Paramètres UTM
+  emailFallback String? // Email utilisé avant connexion
+  billingCycle  String? // monthly, yearly
+
+  // Progression
+  currentStep Int?    @default(1)
+  completed   Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
 }

@@ -35,7 +35,7 @@ interface JWTPayload {
 
 interface GPTResponse {
     actions: Array<{
-        action: 'voir_taches' | 'voir_habitudes' | 'voir_taches_prioritaires' | 'completer_tache' | 'completer_habitude' | 'completer_toutes_taches' | 'completer_toutes_habitudes' | 'creer_tache' | 'creer_tache_interactive' | 'creer_habitude' | 'reponse_creation_tache' | 'voir_processus' | 'creer_processus' | 'creer_processus_interactif' | 'reponse_creation_processus' | 'creer_rappel';
+        action: 'voir_taches' | 'voir_habitudes' | 'voir_taches_prioritaires' | 'completer_tache' | 'completer_habitude' | 'completer_toutes_taches' | 'completer_toutes_habitudes' | 'creer_tache' | 'creer_tache_interactive' | 'creer_habitude' | 'reponse_creation_tache' | 'voir_processus' | 'creer_processus' | 'creer_processus_interactif' | 'reponse_creation_processus' | 'creer_rappel' | 'aide' | 'help_request';
         details: {
             nom?: string;
             description?: string;
@@ -440,16 +440,34 @@ export class AIService {
 
                 // Réponse attendue pour la durée
                 if (this.deepWorkStates.get(key)?.state === 'awaiting_deepwork_duration') {
-                    const match = message.match(/(\d+)/);
-                    if (!match) {
-                        return { response: `🤔 Je n'ai pas compris... Réponds simplement avec un nombre de minutes !\n\nExemples : 25, 90, 120`, contextual: true };
-                    }
-                    const duration = parseInt(match[1], 10);
-                    if (duration < 5) {
-                        return { response: `⚠️ Minimum 5 minutes pour une session Deep Work !\n\nRéessaye avec une durée plus longue.`, contextual: true };
-                    }
-                    if (duration > 240) {
-                        return { response: `⚠️ Maximum 240 minutes (4h) !\n\nAu-delà, tu risques de perdre en concentration. Réessaye avec une durée plus courte.`, contextual: true };
+                    const state = this.deepWorkStates.get(key) as any;
+                    const taskId = state.taskId || null;
+                    const taskTitle = state.taskTitle || null;
+                    
+                    // Vérifier si l'utilisateur dit "pas de temps" ou similaire
+                    const noTimePattern = /(?:pas\s+de\s+temps?|sans\s+temps?|libre|illimité|indéfini)/i;
+                    const noTimeMatch = message.match(noTimePattern);
+                    
+                    let duration: number;
+                    
+                    if (noTimeMatch) {
+                        // Session libre : utiliser une durée par défaut de 90 minutes (mais sans limite stricte)
+                        duration = 90;
+                    } else {
+                        const match = message.match(/(\d+)/);
+                        if (!match) {
+                            return { 
+                                response: `🤔 Je n'ai pas compris... Réponds avec :\n• Un nombre de minutes (ex: 25, 90, 120)\n• "pas de temps" pour une session libre\n\nExemples : 25, 90, 120, ou "pas de temps"`, 
+                                contextual: true 
+                            };
+                        }
+                        duration = parseInt(match[1], 10);
+                        if (duration < 5) {
+                            return { response: `⚠️ Minimum 5 minutes pour une session Deep Work !\n\nRéessaye avec une durée plus longue.`, contextual: true };
+                        }
+                        if (duration > 240) {
+                            return { response: `⚠️ Maximum 240 minutes (4h) !\n\nAu-delà, tu risques de perdre en concentration. Réessaye avec une durée plus courte.`, contextual: true };
+                        }
                     }
 
                     // Vérifier session active
@@ -460,13 +478,18 @@ export class AIService {
                     if (active) {
                         const elapsed = Math.floor((Date.now() - active.timeEntry.startTime.getTime()) / 60000);
                         this.deepWorkStates.delete(key);
-                        return { response: `⚠️ Tu as déjà une session en cours !\n\n⏱️ Temps écoulé : ${elapsed}/${active.plannedDuration} minutes\n\nÉcris "termine session" pour la terminer ou "pause session" pour faire une pause.`, contextual: true };
+                        return { response: `⚠️ Tu as déjà une session en cours !\n\n⏱️ Temps écoulé : ${elapsed}/${active.plannedDuration} minutes\n\nÉcris "termine session" pour la terminer ou "je fais une pause" pour faire une pause.`, contextual: true };
                     }
 
-                    // Créer TimeEntry + DeepWorkSession
+                    // Créer TimeEntry + DeepWorkSession avec taskId si présent
                     const startTime = new Date();
                     const timeEntry = await this.prisma.timeEntry.create({
-                        data: { userId: user.id, startTime, description: `Session Deep Work (${duration}min)` }
+                        data: { 
+                            userId: user.id, 
+                            startTime, 
+                            taskId: taskId || null,
+                            description: taskTitle ? undefined : `Session Deep Work (${duration}min)`
+                        }
                     });
                     await this.prisma.deepWorkSession.create({
                         data: { userId: user.id, timeEntryId: timeEntry.id, plannedDuration: duration, type: 'deepwork', status: 'active' }
@@ -474,15 +497,186 @@ export class AIService {
 
                     this.deepWorkStates.delete(key);
                     const endTime = new Date(startTime.getTime() + duration * 60000);
-                    return { response: `✅ *Session Deep Work lancée !*\n\n⏱️ Durée : ${duration} minutes\n🎯 Fin prévue : ${endTime.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}\n\n🔥 Reste concentré, tu peux le faire ! 💪\n\n_Je te préviendrai 5 minutes avant la fin._`, contextual: true };
+                    
+                    let response = `✅ *Session Deep Work lancée !*\n\n`;
+                    if (taskTitle) {
+                        response += `📝 Tâche : **${taskTitle}**\n`;
+                    }
+                    response += `⏱️ Durée : ${duration} minutes`;
+                    if (noTimeMatch) {
+                        response += ` (session libre)`;
+                    }
+                    response += `\n🎯 Fin prévue : ${endTime.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}\n\n`;
+                    response += `🔥 Reste concentré, tu peux le faire ! 💪\n\n`;
+                    if (!noTimeMatch) {
+                        response += `_Je te préviendrai 5 minutes avant la fin._`;
+                    } else {
+                        response += `💡 _Tu peux dire "j'ai fini la tâche" quand tu as terminé !_`;
+                    }
+                    
+                    return { response, contextual: true };
                 }
 
-                // Commandes Deep Work
+                // 🎯 DÉTECTION : "je vais commencer la tâche X" ou "je vais commencer [nom tâche]"
+                const taskStartPattern = /(?:je\s+vais\s+)?(?:commencer|démarre?r?|faire|travailler?\s+sur)\s+(?:la\s+)?(?:tâche|tache)\s*(\d+)|(?:je\s+vais\s+)?(?:commencer|démarre?r?|faire|travailler?\s+sur)\s+(.+)/i;
+                const taskStartMatch = message.match(taskStartPattern);
+                
+                if (taskStartMatch) {
+                    // Vérifier session active
+                    const active = await this.prisma.deepWorkSession.findFirst({ 
+                        where: { userId: user.id, status: 'active' }, 
+                        include: { timeEntry: true } 
+                    });
+                    if (active) {
+                        const elapsed = Math.floor((Date.now() - active.timeEntry.startTime.getTime()) / 60000);
+                        return { 
+                            response: `⚠️ Tu as déjà une session en cours !\n\n⏱️ Temps écoulé : ${elapsed}/${active.plannedDuration} minutes\n\nÉcris "termine session" pour la terminer ou "je fais une pause" pour faire une pause.`, 
+                            contextual: true 
+                        };
+                    }
+
+                    let task = null;
+                    
+                    // Si c'est un numéro (tâche 1, tâche 2, etc.)
+                    if (taskStartMatch[1]) {
+                        const taskNumber = parseInt(taskStartMatch[1], 10);
+                        const allTasks = await this.prisma.task.findMany({
+                            where: { userId: user.id, completed: false },
+                            orderBy: [
+                                { priority: 'desc' },
+                                { dueDate: 'asc' },
+                                { createdAt: 'asc' }
+                            ]
+                        });
+                        if (taskNumber > 0 && taskNumber <= allTasks.length) {
+                            task = allTasks[taskNumber - 1]; // Index 0-based
+                        }
+                    } 
+                    // Sinon, chercher par nom (matching flexible)
+                    else if (taskStartMatch[2]) {
+                        const taskName = taskStartMatch[2].trim();
+                        const allTasks = await this.prisma.task.findMany({
+                            where: { userId: user.id, completed: false }
+                        });
+                        // Matching flexible : cherche dans le titre
+                        task = allTasks.find(t => 
+                            this.normalizeText(t.title).includes(this.normalizeText(taskName)) ||
+                            this.normalizeText(taskName).includes(this.normalizeText(t.title))
+                        );
+                        // Si plusieurs matches, prendre le premier par priorité
+                        if (!task) {
+                            const matches = allTasks.filter(t => 
+                                this.levenshteinDistance(this.normalizeText(t.title), this.normalizeText(taskName)) < 5
+                            );
+                            if (matches.length > 0) {
+                                matches.sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
+                                task = matches[0];
+                            }
+                        }
+                    }
+
+                    if (!task) {
+                        return { 
+                            response: `❌ Je n'ai pas trouvé de tâche correspondante.\n\n💡 Tu peux dire :\n• "je vais commencer la tâche 1" (par numéro)\n• "je vais commencer [nom de la tâche]" (par nom)\n\nDis "mes tâches" pour voir tes tâches en cours !`, 
+                            contextual: true 
+                        };
+                    }
+
+                    // Stocker la tâche dans l'état pour la prochaine réponse (durée)
+                    this.deepWorkStates.set(key, { 
+                        state: 'awaiting_deepwork_duration',
+                        taskId: task.id,
+                        taskTitle: task.title
+                    } as any);
+                    
+                    return { 
+                        response: `🚀 *C'est parti pour travailler sur :*\n📝 **${task.title}**\n\n⏱️ Combien de temps veux-tu y consacrer ?\n\n💡 Choix rapides :\n• 25 (Pomodoro)\n• 50 (Session courte)\n• 90 (Deep Work classique)\n• 120 (Session intensive)\n\n💬 Ou réponds avec un nombre de minutes !\n\n💡 _Tu peux aussi répondre "pas de temps" pour une session libre._`, 
+                        contextual: true 
+                    };
+                }
+
+                // 🎯 DÉTECTION : "j'ai fini la tâche" (termine la session Deep Work associée)
+                const taskFinishPattern = /(?:j'?ai\s+)?(?:fini|terminé|complété)\s+(?:la\s+)?(?:tâche|tache)(?:\s+(\d+))?/i;
+                const taskFinishMatch = message.match(taskFinishPattern);
+                
+                if (taskFinishMatch) {
+                    const active = await this.prisma.deepWorkSession.findFirst({ 
+                        where: { userId: user.id, status: { in: ['active', 'paused'] } }, 
+                        include: { timeEntry: { include: { task: true } } } 
+                    });
+                    
+                    if (!active) {
+                        return { 
+                            response: `ℹ️ Aucune session Deep Work en cours.\n\nÉcris "je vais commencer la tâche X" pour démarrer une session !`, 
+                            contextual: true 
+                        };
+                    }
+
+                    // Si une tâche est mentionnée, vérifier qu'elle correspond
+                    if (taskFinishMatch[1]) {
+                        const taskNumber = parseInt(taskFinishMatch[1], 10);
+                        const allTasks = await this.prisma.task.findMany({
+                            where: { userId: user.id, completed: false },
+                            orderBy: [
+                                { priority: 'desc' },
+                                { dueDate: 'asc' },
+                                { createdAt: 'asc' }
+                            ]
+                        });
+                        if (taskNumber > 0 && taskNumber <= allTasks.length) {
+                            const expectedTask = allTasks[taskNumber - 1];
+                            if (active.timeEntry.taskId !== expectedTask.id) {
+                                return { 
+                                    response: `⚠️ La session en cours n'est pas associée à la tâche ${taskNumber}.\n\nLa session actuelle est pour : ${active.timeEntry.task?.title || 'une tâche non spécifiée'}`, 
+                                    contextual: true 
+                                };
+                            }
+                        }
+                    }
+
+                    // Terminer la session
+                    const now = new Date();
+                    const actualDuration = Math.floor((now.getTime() - active.timeEntry.startTime.getTime()) / 60000);
+                    await this.prisma.deepWorkSession.update({ 
+                        where: { id: active.id }, 
+                        data: { status: 'completed', updatedAt: now } 
+                    });
+                    await this.prisma.timeEntry.update({ 
+                        where: { id: active.timeEntry.id }, 
+                        data: { endTime: now } 
+                    });
+
+                    // Marquer la tâche comme complétée si elle est associée
+                    if (active.timeEntry.taskId) {
+                        await this.prisma.task.update({
+                            where: { id: active.timeEntry.taskId },
+                            data: { completed: true, updatedAt: now }
+                        });
+                    }
+
+                    const wasOnTime = actualDuration <= active.plannedDuration + 2;
+                    let response = `✅ *Tâche terminée !*\n\n`;
+                    if (active.timeEntry.task) {
+                        response += `📝 Tâche : ${active.timeEntry.task.title}\n`;
+                    }
+                    response += `⏱️ Durée prévue : ${active.plannedDuration} min\n`;
+                    response += `⏱️ Durée réelle : ${actualDuration} min\n\n`;
+                    if (wasOnTime) {
+                        response += `🎉 Parfait ! Tu as tenu ton objectif !\n\n`;
+                    } else {
+                        const diff = actualDuration - active.plannedDuration;
+                        response += `Tu as ${diff > 0 ? 'dépassé de' : 'terminé'} ${Math.abs(diff)} minutes ${diff > 0 ? 'plus tard' : 'plus tôt'}.\n\n`;
+                    }
+                    response += `💪 Bien joué ! Profite d'une pause bien méritée !`;
+                    return { response, contextual: true };
+                }
+
+                // Commandes Deep Work (générales)
                 const isStart = (lower.includes('commence') || lower.includes('démarre')) && (lower.includes('travailler') || lower.includes('travail') || lower.includes('deep work') || lower.includes('deepwork'));
                 const isEnd = (lower.includes('termine') || lower.includes('fini') || lower.includes('stop')) && (lower.includes('session') || lower.includes('deep work') || lower.includes('travail'));
                 const isStatus = (lower.includes('session') || lower.includes('deep work')) && (lower.includes('en cours') || lower.includes('active') || lower.includes('statut'));
-                const isPause = lower.includes('pause') && (lower.includes('session') || lower.includes('deep work'));
-                const isResume = (lower.includes('reprend') || lower.includes('continue') || lower.includes('reprise')) && (lower.includes('session') || lower.includes('deep work'));
+                const isPause = (lower.includes('pause') || lower.includes('je fais une pause')) && (lower.includes('session') || lower.includes('deep work') || lower.match(/^pause$/i));
+                const isResume = (lower.includes('reprend') || lower.includes('continue') || lower.includes('reprise') || lower.match(/^reprends?$/i)) && (lower.includes('session') || lower.includes('deep work') || lower.match(/^reprends?$/i));
                 const isHistory = (lower.includes('historique') || lower.includes('sessions')) && (lower.includes('deep work') || lower.includes('travail'));
 
                 if (isStart) {
@@ -520,23 +714,92 @@ export class AIService {
                 }
 
                 if (isPause) {
-                    const active = await this.prisma.deepWorkSession.findFirst({ where: { userId: user.id, status: 'active' }, include: { timeEntry: true } });
+                    const active = await this.prisma.deepWorkSession.findFirst({ 
+                        where: { userId: user.id, status: 'active' }, 
+                        include: { timeEntry: { include: { task: true } } } 
+                    });
                     if (!active) {
                         return { response: `ℹ️ Aucune session active à mettre en pause.`, contextual: true };
                     }
-                    await this.prisma.deepWorkSession.update({ where: { id: active.id }, data: { status: 'paused' } });
-                    const elapsed = Math.floor((Date.now() - active.timeEntry.startTime.getTime()) / 60000);
-                    return { response: `⏸️ *Session mise en pause*\n\n⏱️ Temps écoulé : ${elapsed} min\n\nÉcris "reprendre session" quand tu es prêt(e) à continuer !`, contextual: true };
+                    
+                    // Calculer le temps écoulé avant la pause
+                    const elapsedBeforePause = Math.floor((Date.now() - active.timeEntry.startTime.getTime()) / 60000);
+                    
+                    // Stocker le temps écoulé dans notes (format JSON simple)
+                    const pauseData = {
+                        elapsedAtPause: elapsedBeforePause,
+                        pausedAt: new Date().toISOString()
+                    };
+                    
+                    await this.prisma.deepWorkSession.update({ 
+                        where: { id: active.id }, 
+                        data: { 
+                            status: 'paused',
+                            notes: JSON.stringify(pauseData),
+                            interruptions: active.interruptions + 1
+                        } 
+                    });
+                    
+                    let response = `⏸️ *Session mise en pause*\n\n`;
+                    if (active.timeEntry.task) {
+                        response += `📝 Tâche : ${active.timeEntry.task.title}\n`;
+                    }
+                    response += `⏱️ Temps écoulé : ${elapsedBeforePause} min\n`;
+                    response += `⏱️ Temps restant : ${active.plannedDuration - elapsedBeforePause} min\n\n`;
+                    response += `💬 Écris "je reprends" ou "reprendre" quand tu es prêt(e) à continuer !`;
+                    return { response, contextual: true };
                 }
 
                 if (isResume) {
-                    const paused = await this.prisma.deepWorkSession.findFirst({ where: { userId: user.id, status: 'paused' }, include: { timeEntry: true } });
+                    const paused = await this.prisma.deepWorkSession.findFirst({ 
+                        where: { userId: user.id, status: 'paused' }, 
+                        include: { timeEntry: { include: { task: true } } } 
+                    });
                     if (!paused) {
                         return { response: `ℹ️ Aucune session en pause.\n\nTu veux démarrer une nouvelle session ?`, contextual: true };
                     }
-                    await this.prisma.deepWorkSession.update({ where: { id: paused.id }, data: { status: 'active' } });
-                    const remaining = paused.plannedDuration - Math.floor((Date.now() - paused.timeEntry.startTime.getTime()) / 60000);
-                    return { response: `▶️ *Session reprise !*\n\n⏱️ Temps restant : ${remaining} min\n\n🔥 Allez, on y retourne ! 💪`, contextual: true };
+                    
+                    // Récupérer le temps écoulé au moment de la pause
+                    let elapsedBeforePause = 0;
+                    if (paused.notes) {
+                        try {
+                            const pauseData = JSON.parse(paused.notes);
+                            elapsedBeforePause = pauseData.elapsedAtPause || 0;
+                        } catch (e) {
+                            // Si le parsing échoue, calculer depuis le début
+                            elapsedBeforePause = Math.floor((Date.now() - paused.timeEntry.startTime.getTime()) / 60000);
+                        }
+                    } else {
+                        // Fallback : calculer depuis le début
+                        elapsedBeforePause = Math.floor((Date.now() - paused.timeEntry.startTime.getTime()) / 60000);
+                    }
+                    
+                    // Ajuster le startTime virtuellement en soustrayant le temps de pause
+                    // On met à jour le startTime pour que le temps écoulé soit correct
+                    const now = new Date();
+                    const adjustedStartTime = new Date(now.getTime() - elapsedBeforePause * 60000);
+                    await this.prisma.timeEntry.update({
+                        where: { id: paused.timeEntry.id },
+                        data: { startTime: adjustedStartTime }
+                    });
+                    
+                    await this.prisma.deepWorkSession.update({ 
+                        where: { id: paused.id }, 
+                        data: { 
+                            status: 'active',
+                            notes: null // Nettoyer les données de pause
+                        } 
+                    });
+                    
+                    const remaining = paused.plannedDuration - elapsedBeforePause;
+                    let response = `▶️ *Session reprise !*\n\n`;
+                    if (paused.timeEntry.task) {
+                        response += `📝 Tâche : ${paused.timeEntry.task.title}\n`;
+                    }
+                    response += `⏱️ Temps écoulé : ${elapsedBeforePause} min\n`;
+                    response += `⏱️ Temps restant : ${remaining} min\n\n`;
+                    response += `🔥 Allez, on y retourne ! 💪`;
+                    return { response, contextual: true };
                 }
 
                 if (isStatus) {
@@ -884,15 +1147,21 @@ export class AIService {
             const prompt = `
             Tu es un assistant qui aide à comprendre les intentions des utilisateurs concernant leurs tâches, habitudes et processus.
             Analyse le message suivant et détermine :
-            1. Le type d'action (voir_taches, voir_habitudes, voir_taches_prioritaires, completer_tache, completer_habitude, creer_tache, creer_tache_interactive, creer_habitude, reponse_creation_tache, voir_processus, creer_processus, creer_processus_interactif, reponse_creation_processus, creer_rappel)
+            1. Le type d'action (voir_taches, voir_habitudes, voir_taches_prioritaires, completer_tache, completer_habitude, creer_tache, creer_tache_interactive, creer_habitude, reponse_creation_tache, voir_processus, creer_processus, creer_processus_interactif, reponse_creation_processus, creer_rappel, aide, help_request)
             2. Les détails pertinents (nom, description, etc.)
             
             RÈGLES CRUCIALES :
             
+            0. DEMANDES D'AIDE - PRIORITÉ ABSOLUE :
+               - Si le message contient "comment", "aide", "processus", "process", "étapes", "explique", "guide", "tutoriel", "je ne sais pas", "je comprends pas" → utilise 'aide' ou 'help_request'
+               - EXEMPLES : "comment faire la tâche X", "aide-moi à faire X", "c'est quoi le processus pour X", "comment je peux faire X", "explique-moi comment", "je ne sais pas comment faire"
+               - IMPORTANT : Ne confonds PAS une demande d'aide avec une création de tâche. Si l'utilisateur demande COMMENT faire quelque chose, c'est une demande d'aide, pas une création de tâche.
+            
             1. CRÉATION DE TÂCHES - Quand utiliser creer_tache_interactive :
-               - Si le message mentionne seulement le nom de la tâche → utilise 'creer_tache_interactive'
+               - Si le message mentionne seulement le nom de la tâche SANS demander comment faire → utilise 'creer_tache_interactive'
                - Si le message contient priorité ET niveau d'énergie → utilise 'creer_tache'
                - Si le message a des dates relatives (demain, aujourd'hui) → extrait l'échéance
+               - ATTENTION : Si le message contient "comment faire" ou "aide-moi à faire", c'est une demande d'aide, PAS une création de tâche !
             
             2. DATES RELATIVES pour les tâches :
                - "demain" → echeance: "demain"
@@ -914,6 +1183,80 @@ export class AIService {
             
             Réponds au format JSON uniquement.
             
+            EXEMPLES CRITIQUES - DEMANDES D'AIDE (PRIORITÉ ABSOLUE) :
+            
+            Message: "comment je peux faire la tâche Finaliser l'UX de l'application mobile ?"
+            {
+                "actions": [{
+                    "action": "aide",
+                    "details": {}
+                }]
+            }
+            
+            Message: "aide moi à faire finaliser l'ux de l'application mobile je dois faire comment ?"
+            {
+                "actions": [{
+                    "action": "aide",
+                    "details": {}
+                }]
+            }
+            
+            Message: "c'est quoi le processus pour finaliser l'UX de l'application mobile"
+            {
+                "actions": [{
+                    "action": "aide",
+                    "details": {}
+                }]
+            }
+            
+            Message: "cest quoi le process pour finaliser l'uc de l'application mobile"
+            {
+                "actions": [{
+                    "action": "aide",
+                    "details": {}
+                }]
+            }
+            
+            Message: "comment faire la tâche X"
+            {
+                "actions": [{
+                    "action": "aide",
+                    "details": {}
+                }]
+            }
+            
+            Message: "explique-moi comment faire X"
+            {
+                "actions": [{
+                    "action": "aide",
+                    "details": {}
+                }]
+            }
+            
+            Message: "je ne sais pas comment faire X"
+            {
+                "actions": [{
+                    "action": "aide",
+                    "details": {}
+                }]
+            }
+            
+            Message: "processus pour faire X"
+            {
+                "actions": [{
+                    "action": "aide",
+                    "details": {}
+                }]
+            }
+            
+            Message: "étapes pour faire X"
+            {
+                "actions": [{
+                    "action": "aide",
+                    "details": {}
+                }]
+            }
+            
             DISTINCTION CRITIQUE - Tâches normales VS prioritaires :
             
             Message: "mes tâches" → voir_taches (toutes les tâches)
@@ -925,9 +1268,19 @@ export class AIService {
 
             RÈGLE ABSOLUE : Si le message contient "hier", "avant-hier" ou une date (JJ/MM/YYYY), tu DOIS extraire date_completion !
 
-            Message: "j'ai fais toutes mes habitudes hier" → completer_toutes_habitudes + date_completion: "hier"
-            Message: "j'ai fait toutes mes tâches avant-hier" → completer_toutes_taches + date_completion: "avant-hier"
-            Message: "toutes mes habitudes du 15/12/2024" → completer_toutes_habitudes + date_completion: "15/12/2024"
+            DISTINCTION CRITIQUE - Questions VS Actions pour les habitudes :
+            
+            QUESTIONS (lecture seule - ne PAS compléter) :
+            - "quels habitudes me restaient hier ?" → voir_habitudes (juste lister, NE PAS compléter)
+            - "quelles habitudes il me reste ?" → voir_habitudes (juste lister, NE PAS compléter)
+            - "quels habitudes ils me restaient ?" → voir_habitudes (juste lister, NE PAS compléter)
+            
+            ACTIONS (complétion) :
+            - "j'ai fais toutes mes habitudes hier" → completer_toutes_habitudes + date_completion: "hier"
+            - "j'ai fait toutes mes tâches avant-hier" → completer_toutes_taches + date_completion: "avant-hier"
+            - "toutes mes habitudes du 15/12/2024" → completer_toutes_habitudes + date_completion: "15/12/2024"
+            
+            RÈGLE : Si le message contient "quels", "quelles", "quelles" + "restaient", "restaient", "reste", "restent" → C'EST UNE QUESTION (voir_habitudes), PAS une action de complétion !
             
             Exemples TRÈS IMPORTANTS pour les habitudes :
             
@@ -1569,10 +1922,21 @@ export class AIService {
                     { role: "system", content: prompt },
                     { role: "user", content: message }
                 ],
-                temperature: 0
+                temperature: 0,
+                // Forcer une réponse JSON valide
+                response_format: { type: 'json_object' as any }
             });
 
-            const result = JSON.parse(completion.choices[0].message.content || '{"actions": []}') as GPTResponse;
+            let parsed: any = { actions: [] };
+            try {
+                const content = completion.choices?.[0]?.message?.content;
+                parsed = content ? JSON.parse(content) : { actions: [] };
+            } catch (e) {
+                console.error('JSON parse error in AIService.processMessage:', e);
+                parsed = { actions: [] };
+            }
+
+            const result = parsed as GPTResponse;
             console.log('Analyse GPT:', result);
 
             // Traiter chaque action
@@ -1593,6 +1957,11 @@ export class AIService {
                         break;
                     case 'voir_processus':
                         response = await this.listProcesses(user.id);
+                        break;
+                    case 'aide':
+                    case 'help_request':
+                        // Détection d'une demande d'aide - générer une réponse contextuelle avec GPT
+                        response = await this.generateHelpResponse(message, user.id);
                         break;
                     case 'creer_rappel':
                         response = await this.createReminder(user.id, item.details);
@@ -2203,14 +2572,25 @@ export class AIService {
     }
 
     private async listHabits(userId: string): Promise<AIResponse> {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const endOfDay = new Date(today);
+        endOfDay.setHours(23, 59, 59, 999);
+
         const habits = await this.prisma.habit.findMany({
             where: { userId },
             include: {
                 entries: {
-                    orderBy: { date: 'desc' },
-                    take: 5
+                    where: {
+                        date: {
+                            gte: today,
+                            lte: endOfDay
+                        }
+                    },
+                    take: 1
                 }
-            }
+            },
+            orderBy: { order: 'asc' }
         });
 
         if (habits.length === 0) {
@@ -2220,14 +2600,32 @@ export class AIService {
             };
         }
 
-        const habitsList = habits.map(habit => {
-            const lastEntry = habit.entries[0];
-            const status = lastEntry ? `(Dernière completion: ${new Date(lastEntry.date).toLocaleDateString()})` : '(Pas encore commencé)';
-            return `- ${habit.name} ${status}`;
-        }).join('\n');
+        // Formater la date
+        const dateStr = today.toLocaleDateString('fr-FR', { 
+            weekday: 'long',
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric'
+        });
+
+        let message = `📋 **Tes habitudes ${dateStr}**\n\n`;
+        
+        habits.forEach((habit, idx) => {
+            const emoji = habit.frequency === 'daily' ? '🔁' : habit.frequency === 'weekly' ? '📅' : '⭐';
+            const isCompleted = habit.entries.length > 0 && habit.entries[0].completed;
+            const statusEmoji = isCompleted ? '✅' : '⏳';
+            
+            message += `${idx + 1}. ${emoji} ${habit.name} ${statusEmoji}\n`;
+            
+            if (habit.description) {
+                message += `   ${habit.description}\n`;
+            }
+        });
+
+        message += `\n💪 Continue tes efforts !`;
 
         return {
-            response: `Voici vos habitudes :\n${habitsList}\n\nPour marquer une habitude comme complétée, dites par exemple 'Marquer habitude Méditer comme complétée'`,
+            response: message,
             contextual: true
         };
     }
@@ -2604,22 +3002,84 @@ ${confirmations.map(c => `• ${c}`).join('\n')}`,
     }
 
     private async listTasks(userId: string): Promise<AIResponse> {
-        const tasks = await this.prisma.task.findMany({
+        // Récupérer toutes les tâches non complétées de l'utilisateur
+        const allTasks = await this.prisma.task.findMany({
             where: { userId, completed: false },
-            orderBy: { createdAt: 'desc' }
+            orderBy: [
+                { priority: 'desc' },
+                { dueDate: 'asc' },
+                { createdAt: 'asc' }
+            ]
         });
 
-        if (tasks.length === 0) {
+        if (allTasks.length === 0) {
             return {
-                response: "Vous n'avez pas de tâches en cours. Pour créer une nouvelle tâche, dites par exemple 'Créer une tâche: Appeler le client'",
+                response: "🎉 Félicitations ! Vous n'avez aucune tâche en cours.\n\nVoulez-vous :\n• Créer de nouvelles tâches importantes\n• Planifier votre prochaine journée\n• Voir vos tâches complétées",
                 contextual: true
             };
         }
 
-        const tasksList = tasks.map(task => `- ${task.title}`).join('\n');
+        // Trier les tâches : date (en retard/aujourd'hui/demain) > priorité > énergie > dueDate croissante
+        const today = new Date();
+        const todayOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+        const tomorrowOnly = new Date(todayOnly);
+        tomorrowOnly.setDate(tomorrowOnly.getDate() + 1);
+
+        const dateScore = (d: Date | null): number => {
+            if (!d) return 0; // sans date
+            const due = new Date(d);
+            const dueOnly = new Date(due.getFullYear(), due.getMonth(), due.getDate());
+            if (dueOnly < todayOnly) return 5;      // en retard
+            if (dueOnly.getTime() === todayOnly.getTime()) return 4; // aujourd'hui
+            if (dueOnly.getTime() === tomorrowOnly.getTime()) return 3; // demain
+            return 1; // plus tard
+        };
+
+        allTasks.sort((a, b) => {
+            const da = dateScore(a.dueDate as any);
+            const db = dateScore(b.dueDate as any);
+            if (da !== db) return db - da;
+
+            const pa = (a.priority ?? -1);
+            const pb = (b.priority ?? -1);
+            if (pa !== pb) return pb - pa;
+
+            const ea = (a.energyLevel ?? -1);
+            const eb = (b.energyLevel ?? -1);
+            if (ea !== eb) return eb - ea;
+
+            if (a.dueDate && b.dueDate) {
+                return new Date(a.dueDate as any).getTime() - new Date(b.dueDate as any).getTime();
+            }
+            if (a.createdAt && b.createdAt) {
+                return new Date(a.createdAt as any).getTime() - new Date(b.createdAt as any).getTime();
+            }
+            return 0;
+        });
+
+        // Formatter la réponse avec le même style que les tâches prioritaires
+        let response = `📋 VOS ${allTasks.length} TÂCHE${allTasks.length > 1 ? 'S' : ''} EN COURS :\n\n`;
+
+        allTasks.forEach((task, index) => {
+            const priorityEmoji = this.getPriorityEmoji(task.priority);
+            const priorityLabel = this.getPriorityLabel(task.priority);
+            const energyLabel = this.getEnergyLabel(task.energyLevel);
+            const dueDateText = task.dueDate 
+                ? this.formatDueDate(task.dueDate)
+                : "Pas d'échéance";
+
+            response += `${index + 1}. ${priorityEmoji} ${task.title} (${priorityLabel})\n`;
+            response += `   📅 Échéance : ${dueDateText} | ⚡ Énergie : ${energyLabel}\n\n`;
+        });
+
+        // Ajouter un conseil personnalisé basé sur la première tâche
+        if (allTasks.length > 0) {
+            const advice = this.getPriorityAdvice(allTasks[0].priority);
+            response += `💡 ${advice}`;
+        }
 
         return {
-            response: `Voici vos tâches en cours :\n${tasksList}\n\nPour marquer une tâche comme complétée, dites 'Marquer tâche [nom] comme complétée'`,
+            response,
             contextual: true
         };
     }
@@ -3466,6 +3926,132 @@ ${confirmations.map(c => `• ${c}`).join('\n')}`,
             console.error('Erreur lors de la création du processus:', error);
             return {
                 response: "Une erreur est survenue lors de la création du processus. Veuillez réessayer.",
+                contextual: true
+            };
+        }
+    }
+
+    private async generateHelpResponse(message: string, userId: string): Promise<AIResponse> {
+        try {
+            // Récupérer le contexte utilisateur
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const tomorrow = new Date(today);
+            tomorrow.setDate(tomorrow.getDate() + 1);
+
+            const [pendingTasks, completedToday, activeSession] = await Promise.all([
+                this.prisma.task.count({
+                    where: {
+                        userId,
+                        completed: false
+                    }
+                }),
+                this.prisma.task.count({
+                    where: {
+                        userId,
+                        dueDate: { gte: today, lt: tomorrow },
+                        completed: true
+                    }
+                }),
+                this.prisma.deepWorkSession.findFirst({
+                    where: {
+                        userId,
+                        status: 'active'
+                    }
+                })
+            ]);
+
+            // Estimer le niveau d'énergie
+            const hour = new Date().getHours();
+            let energyLevel = 'moyen';
+            if (hour >= 8 && hour < 12) energyLevel = 'élevé';
+            else if (hour >= 20 || hour < 7) energyLevel = 'faible';
+
+            const systemPrompt = `Tu es l'assistant IA personnel de productivité Productif.io.
+
+Ton rôle : Aider l'utilisateur à comprendre comment faire quelque chose, lui expliquer un processus, ou le guider dans la réalisation d'une tâche.
+
+**STYLE DE RÉPONSE** :
+- Sois clair, concis et actionnable
+- Utilise des emojis pertinents pour rendre la réponse agréable
+- Structure ta réponse avec des étapes numérotées si c'est un processus
+- Donne des exemples concrets quand c'est pertinent
+- Sois encourageant et bienveillant
+- Limite-toi à 300 mots maximum
+
+**CONTEXTE UTILISATEUR** :
+- ${pendingTasks} tâche(s) en attente
+- ${completedToday} tâche(s) complétée(s) aujourd'hui
+- Session Deep Work active : ${activeSession ? 'Oui' : 'Non'}
+- Niveau d'énergie : ${energyLevel}
+
+**FONCTIONNALITÉS DISPONIBLES DANS PRODUCTIF.IO** :
+1. **Création de tâches** : L'utilisateur peut dire "j'ai à faire X" ou "créer une tâche X"
+2. **Planification intelligente** : "planifie demain" ou "organise ma journée"
+3. **Deep Work** : "je commence à travailler" pour démarrer une session de concentration
+4. **Journaling** : "note de ma journée" pour enregistrer sa journée
+5. **Habitudes** : Suivi des habitudes quotidiennes
+6. **Statistiques** : Voir ses performances et progrès
+7. **Processus** : Créer et suivre des processus étape par étape
+
+**TYPES D'AIDE COURANTS** :
+- Comment planifier efficacement sa journée
+- Comment utiliser le Deep Work pour se concentrer
+- Comment créer et gérer des tâches
+- Comment être plus productif
+- Comment organiser son temps
+- Comment gérer ses priorités
+- Comment suivre ses habitudes
+- Comment utiliser les fonctionnalités de Productif.io
+- Comment réaliser une tâche spécifique (ex: "comment faire la tâche X")
+
+Si la demande est vague, pose des questions pour clarifier ou donne des exemples de ce que tu peux aider.
+
+Réponds de manière naturelle et conversationnelle, comme un ami bienveillant qui veut vraiment aider.`;
+
+            const userPrompt = `Demande de l'utilisateur : "${message}"
+
+Génère une réponse d'aide utile, claire et actionnable. Si c'est un processus, décompose-le en étapes. Si c'est vague, propose des options ou pose des questions pour clarifier.`;
+
+            const completion = await this.openai.chat.completions.create({
+                model: "gpt-4-turbo-preview",
+                messages: [
+                    { role: "system", content: systemPrompt },
+                    { role: "user", content: userPrompt }
+                ],
+                temperature: 0.7,
+                max_tokens: 500
+            });
+
+            const helpText = completion.choices[0]?.message?.content || 
+                "Je suis là pour t'aider ! Peux-tu préciser ce sur quoi tu as besoin d'aide ? 🤔"
+
+            // Ajouter une suggestion de suivi si pertinent
+            let followUpSuggestion = "";
+            const lowerMessage = message.toLowerCase();
+            
+            if (lowerMessage.includes('planif') || lowerMessage.includes('organis')) {
+                followUpSuggestion = "\n\n💡 *Astuce :* Tu peux me dire \"planifie demain\" et je t'aiderai à organiser ta journée !";
+            } else if (lowerMessage.includes('tâche') || lowerMessage.includes('tache') || lowerMessage.includes('todo')) {
+                if (pendingTasks > 0) {
+                    followUpSuggestion = `\n\n📋 Tu as ${pendingTasks} tâche(s) en attente. Dis-moi \"mes tâches\" pour les voir !`;
+                } else {
+                    followUpSuggestion = "\n\n💡 *Astuce :* Dis-moi simplement \"j'ai à faire X\" et je créerai la tâche pour toi !";
+                }
+            } else if (lowerMessage.includes('concentr') || lowerMessage.includes('travail') || lowerMessage.includes('productif')) {
+                if (!activeSession) {
+                    followUpSuggestion = "\n\n🚀 *Astuce :* Dis-moi \"je commence à travailler\" pour démarrer une session Deep Work !";
+                }
+            }
+
+            return {
+                response: helpText + followUpSuggestion,
+                contextual: true
+            };
+        } catch (error) {
+            console.error('Erreur lors de la génération de réponse d\'aide:', error);
+            return {
+                response: "Je suis là pour t'aider ! Peux-tu préciser ce sur quoi tu as besoin d'aide ? 🤔\n\nPar exemple :\n• Comment planifier ma journée ?\n• Comment utiliser le Deep Work ?\n• Comment créer une tâche ?",
                 contextual: true
             };
         }

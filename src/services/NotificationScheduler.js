@@ -439,12 +439,16 @@ class NotificationScheduler {
     }
 
     async processNotifications() {
+        const batchId = Math.random().toString(36).substring(7);
+        console.log(`🟢 [${batchId}] processNotifications() APPELÉ - PID: ${process.pid} - ${new Date().toISOString()}`);
+        
         try {
             const now = new Date();
             const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000);
             const twoMinutesInFuture = new Date(now.getTime() + 2 * 60 * 1000);
 
             // Récupérer les notifications en attente qui doivent être envoyées
+            console.log(`🟢 [${batchId}] Récupération des notifications entre ${fiveMinutesAgo.toISOString()} et ${twoMinutesInFuture.toISOString()}`);
             const pendingNotifications = await this.prisma.notificationHistory.findMany({
                 where: {
                     status: 'pending',
@@ -462,17 +466,24 @@ class NotificationScheduler {
                 }
             });
 
+            console.log(`🟢 [${batchId}] Notifications récupérées: ${pendingNotifications.length}`);
+            
             if (pendingNotifications.length > 0) {
-                console.log(`🔄 Traitement de ${pendingNotifications.length} notifications...`);
+                console.log(`🔄 [${batchId}] Traitement de ${pendingNotifications.length} notifications...`);
                 
                 for (const notification of pendingNotifications) {
                     try {
+                        console.log(`🟢 [${batchId}] Traitement notification ${notification.id}`);
                         await this.notificationService.processNotification(notification);
                     }
                     catch (error) {
                         NotificationLogger.logError(`Traitement de la notification ${notification.id}`, error);
                     }
                 }
+                
+                console.log(`✅ [${batchId}] Batch terminé - ${pendingNotifications.length} notifications traitées`);
+            } else {
+                console.log(`🟢 [${batchId}] Aucune notification à traiter`);
             }
         }
         catch (error) {

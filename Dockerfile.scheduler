@@ -6,6 +6,9 @@ WORKDIR /app
 # Set timezone for cron correctness
 ENV TZ=Europe/Paris
 
+# Install system dependencies (curl for healthcheck)
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+
 # Copy package files
 COPY package*.json ./
 COPY .npmrc ./
@@ -27,9 +30,6 @@ EXPOSE $PORT
 # Add healthcheck using dynamic PORT
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
   CMD curl -fsS http://localhost:$PORT/health || exit 1
-
-# Install curl for healthcheck
-RUN apt-get update && apt-get install -y curl
 
 # Start the scheduler service (run DB migrations first)
 CMD ["sh", "-lc", "npx prisma migrate deploy && npm run start:scheduler"]

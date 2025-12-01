@@ -1,5 +1,6 @@
 import { whatsappService } from '@/lib/whatsapp'
 import prisma from '@/lib/prisma'
+import { FlexibleMatcher } from '@/lib/utils/FlexibleMatcher'
 
 // Helpers pour l'état conversationnel
 async function getUserConversationState(userId: string) {
@@ -35,8 +36,6 @@ export async function handleTaskPlanningCommand(
   phoneNumber: string,
   apiToken: string
 ): Promise<boolean> {
-  const lowerMessage = message.toLowerCase()
-
   // Vérifier si l'utilisateur est en mode planification
   const currentState = await getUserConversationState(userId)
 
@@ -44,23 +43,9 @@ export async function handleTaskPlanningCommand(
     return await processTasksList(message, userId, phoneNumber, apiToken)
   }
 
-  // Déclencheurs de planification
-  const planningTriggers = [
-    'demain',
-    'planning',
-    'planifier',
-    'organiser ma journée',
-    'tout ce que j\'ai à faire',
-    'mes tâches de demain',
-    'préparer demain',
-    'ma to-do demain',
-    'planifie demain',
-    'organise demain'
-  ]
-
-  const isPlanning = planningTriggers.some(trigger => lowerMessage.includes(trigger))
-
-  if (isPlanning) {
+  // Utiliser le système de matching flexible
+  const planMatch = FlexibleMatcher.matchesCommand(message, 'plan_tomorrow')
+  if (planMatch.matches && planMatch.confidence >= 0.7) {
     return await startTaskPlanning(userId, phoneNumber)
   }
 
