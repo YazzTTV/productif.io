@@ -78,6 +78,8 @@ const NotificationSettings: React.FC<NotificationSettingsProps> = ({ userId, pre
     });
     const [loading, setLoading] = useState(!initialPreferences);
     const [saving, setSaving] = useState(false);
+    const [checkInEnabled, setCheckInEnabled] = useState(false);
+    const [checkInLoading, setCheckInLoading] = useState(true);
 
     useEffect(() => {
         if (initialPreferences) {
@@ -94,7 +96,63 @@ const NotificationSettings: React.FC<NotificationSettingsProps> = ({ userId, pre
         } else {
             loadPreferences();
         }
+        loadCheckInSchedule();
     }, [userId, initialPreferences]);
+
+    const loadCheckInSchedule = async () => {
+        try {
+            setCheckInLoading(true);
+            const response = await fetch('/api/check-in-schedule', {
+                credentials: 'include',
+            });
+
+            if (response.status === 401) {
+                // Rediriger vers la page de login si non authentifié
+                router.push('/login?redirect=' + encodeURIComponent(window.location.pathname));
+                return;
+            }
+
+            if (response.ok) {
+                const data = await response.json();
+                setCheckInEnabled(data.schedule?.enabled ?? false);
+            }
+        } catch (error) {
+            console.error('Erreur chargement check-in schedule:', error);
+        } finally {
+            setCheckInLoading(false);
+        }
+    };
+
+    const handleCheckInToggle = async (enabled: boolean) => {
+        try {
+            setCheckInEnabled(enabled);
+            const response = await fetch('/api/check-in-schedule', {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                credentials: 'include',
+                body: JSON.stringify({ enabled }),
+            });
+
+            if (response.status === 401) {
+                // Rediriger vers la page de login si non authentifié
+                router.push('/login?redirect=' + encodeURIComponent(window.location.pathname));
+                return;
+            }
+
+            if (!response.ok) {
+                throw new Error('Erreur lors de la mise à jour');
+            }
+
+            toast.success(enabled ? 'Check-ins quotidiens activés !' : 'Check-ins quotidiens désactivés');
+        } catch (error) {
+            console.error('Erreur:', error);
+            toast.error('Erreur lors de la mise à jour');
+            // Restaurer l'état précédent en cas d'erreur
+            setCheckInEnabled(!enabled);
+        }
+    };
 
     const loadPreferences = async () => {
         try {
@@ -316,6 +374,48 @@ const NotificationSettings: React.FC<NotificationSettingsProps> = ({ userId, pre
                                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                                 />
                             </label>
+                        </div>
+                    )}
+                </div>
+
+                {/* Check-ins quotidiens */}
+                <div className="space-y-4">
+                    <h3 className="text-lg font-semibold">Check-ins quotidiens</h3>
+                    <p className="text-sm text-gray-600">
+                        Recevez des questions quotidiennes sur votre humeur, énergie, focus, motivation et stress via WhatsApp.
+                    </p>
+                    {checkInLoading ? (
+                        <div className="flex items-center space-x-2">
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-900"></div>
+                            <span className="text-sm text-gray-500">Chargement...</span>
+                        </div>
+                    ) : (
+                        <label className="flex items-center space-x-2">
+                            <input
+                                type="checkbox"
+                                checked={checkInEnabled}
+                                onChange={(e) => handleCheckInToggle(e.target.checked)}
+                                className="form-checkbox h-5 w-5 text-blue-600"
+                                disabled={!preferences.whatsappEnabled}
+                            />
+                            <span>
+                                Activer les check-ins quotidiens
+                                {!preferences.whatsappEnabled && (
+                                    <span className="text-xs text-gray-500 ml-2">(WhatsApp doit être activé)</span>
+                                )}
+                            </span>
+                        </label>
+                    )}
+                    {checkInEnabled && (
+                        <div className="ml-8 p-3 bg-blue-50 rounded-md">
+                            <p className="text-sm text-gray-700">
+                                <strong>Horaires des check-ins :</strong>
+                            </p>
+                            <ul className="text-sm text-gray-600 mt-1 space-y-1">
+                                <li>• ~9h00 : humeur, énergie</li>
+                                <li>• ~14h00 : focus, motivation</li>
+                                <li>• ~18h00 : stress, énergie</li>
+                            </ul>
                         </div>
                     )}
                 </div>

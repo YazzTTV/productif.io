@@ -1,10 +1,12 @@
 "use client"
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { OnboardingQuestion } from '@/components/onboarding/onboarding-question'
 import { ProcessingPage } from '@/components/onboarding/processing-page'
 import { ProfileRevealScreen } from '@/components/onboarding/profile-reveal-screen'
+
+export const dynamic = 'force-dynamic'
 
 const questions = [
   {
@@ -94,6 +96,1128 @@ const profileTypes: { [key: string]: { type: string; emoji: string; description:
 }
 
 type OnboardingStep = 'questions' | 'processing' | 'profile'
+
+export default function OnboardingPage() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const step = searchParams.get('step') as OnboardingStep | null
+  
+  const [currentStep, setCurrentStep] = useState<OnboardingStep>(step || 'questions')
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
+  const [answers, setAnswers] = useState<string[]>([])
+  const [userProfile, setUserProfile] = useState<{ type: string; emoji: string; description: string } | null>(null)
+
+  const handleAnswer = (answer: string) => {
+    const newAnswers = [...answers, answer]
+    setAnswers(newAnswers)
+
+    if (currentQuestionIndex < questions.length - 1) {
+      setCurrentQuestionIndex(currentQuestionIndex + 1)
+    } else {
+      // Calculate profile
+      const answerKey = newAnswers.join('')
+      const profile = profileTypes[answerKey] || profileTypes['default']
+      setUserProfile(profile)
+      setCurrentStep('processing')
+      router.push('/onboarding?step=processing')
+    }
+  }
+
+  const handleBack = () => {
+    if (currentQuestionIndex > 0) {
+      const newAnswers = answers.slice(0, -1)
+      setAnswers(newAnswers)
+      setCurrentQuestionIndex(currentQuestionIndex - 1)
+    } else {
+      router.push('/onboarding/intro')
+    }
+  }
+
+  const handleProcessingComplete = () => {
+    setCurrentStep('profile')
+    router.push('/onboarding?step=profile')
+  }
+
+  const currentQuestion = questions[currentQuestionIndex]
+
+  if (currentStep === 'processing') {
+    return <ProcessingPage onComplete={handleProcessingComplete} />
+  }
+
+  if (currentStep === 'profile' && userProfile) {
+    return (
+      <ProfileRevealScreen
+        profileType={userProfile.type}
+        profileEmoji={userProfile.emoji}
+        description={userProfile.description}
+      />
+    )
+  }
+
+  return (
+    <OnboardingQuestion
+      key={currentQuestionIndex}
+      questionNumber={currentQuestionIndex + 1}
+      totalQuestions={questions.length}
+      question={currentQuestion.question}
+      options={currentQuestion.options}
+      onAnswer={handleAnswer}
+      onBack={handleBack}
+      socialProof={currentQuestion.socialProof}
+    />
+  )
+}
+    insight: "Vous n'avez plus besoin de penser à quoi faire — l'IA le fait pour vous.",
+    image: "/dashboard-productif.jpg",
+    icon: Bot,
+  },
+  {
+    title: "Tableau de bord de performance",
+    description:
+      "Un seul écran pour suivre votre niveau de productivité, de concentration et la progression de vos OKR.",
+    insight:
+      "Enfin, un tableau de bord qui montre si vous avancez vraiment, pas seulement si vous cochez des cases.",
+    image: "/placeholder.jpg",
+    icon: LayoutDashboard,
+  },
+  {
+    title: "Suivi en temps réel avec WhatsApp",
+    description:
+      "Votre IA vous écrit directement sur WhatsApp pour vous aider à rester aligné, vous remotiver ou célébrer vos victoires.",
+    insight: "Votre coach est littéralement dans votre poche.",
+    image: "/placeholder-user.jpg",
+    icon: MessageCircle,
+  },
+  {
+    title: "Priorités claires, exécution rapide",
+    description:
+      "Capture rapide, priorisation et échéances ; regroupement par projets, assignation, suivi ; un bouton 'faire la tâche' → focus instantané",
+    insight: "",
+    image: "/placeholder-logo.png",
+    icon: ListChecks,
+  },
+]
+
+const TRANSLATIONS = {
+  en: {
+    step2Title: "Choose your language",
+    step2Description: "Select the language for the rest of the onboarding",
+    step3Title: "Discover the key features",
+    step4Title: "What people say",
+    step6EarlyAccess: "Early access",
+    step6Waitlist: "Join the waitlist",
+    step5QuizTitle: "Discover your productivity profile.",
+    step5QuizDescription: "Answer 4 questions to find out why you're not moving forward… and how Productif.io can help you skyrocket your results.",
+    step5QuizCTA: "Let's go",
+    step5QuizTime: "Estimated time: 1 minute",
+    step5QuizQuickQuestions: "A few quick questions to understand your habits",
+    step7ProfileTitle: "Your profile",
+    step7ProfileDescription: "Based on your answers, we'll tailor your interface and priorities for faster execution.",
+    step8SetupInProgress: "One moment, we're setting up your workspace…",
+    step8SetupComplete: "Setup complete",
+    step8SetupDescription: "Personalizing habits, priorities, and notifications.",
+    step9Title: "Activate your assistant now — 7‑day free trial",
+    step9Description: "You've got the energy and ambition. Your biggest blocker is clarity and structure. Productif.io helps you turn chaos into focus with your personal AI assistant.",
+    step9Monthly: "Monthly",
+    step9Yearly: "Yearly (-€60)",
+    step9Save: "save €60",
+    step9BilledMonthly: "Billed monthly",
+    step9BilledYearly: "Billed yearly",
+    step9Feature1Title: "AI-powered task management",
+    step9Feature1Desc: "Your AI organizes, prioritizes, and suggests what to tackle next.",
+    step9Feature2Title: "WhatsApp AI assistant",
+    step9Feature2Desc: "Smart reminders and guidance without opening another app.",
+    step9Feature3Title: "Habits & goals that stick",
+    step9Feature3Desc: "Build adaptive routines with contextual reminders; track OKRs.",
+    step9Feature4Title: "Complete privacy & lifetime updates",
+    step9Feature4Desc: "Your data stays yours. Encryption, backups, future updates included.",
+    step9StartNow: "Start Now for Free",
+    step9Start: "Start",
+    step9Skip: "Skip – continue free trial",
+    buttonBack: "Back",
+    buttonContinue: "Continue",
+    buttonNext: "Next",
+    buttonSkip: "Skip",
+    buttonPrevious: "Previous",
+    testimonial1: "I finally have a real co‑pilot that keeps me aligned.",
+    testimonial2: "The dashboard showed me where I was truly blocked.",
+    testimonial3: "The AI nudges me at the right time and I execute faster.",
+    profileDistractor: "The determined distractor",
+    profileStrategist: "The overwhelmed strategist",
+    profileDreamer: "The disorganized dreamer",
+    profileOrganizer: "The motivated organizer",
+    question: "Question",
+    analysis92: "You're not alone: 92% of Productif.io users have this problem before starting.",
+    step6EarlyAccessDesc: "Early access for €1 — Limited spots.",
+    step6EarlyAccessButton: "Pay €1 now",
+    step6EarlyAccessLoading: "Redirecting…",
+    step6WaitlistDesc: "Join the waitlist for free.",
+    step6WaitlistButton: "Join",
+    step6WaitlistLoading: "Validating…",
+    step6Later: "Later",
+  },
+  fr: {
+    step2Title: "Choisissez votre langue",
+    step2Description: "Sélectionnez la langue pour la suite de l'onboarding",
+    step3Title: "Découvrez les fonctionnalités clés",
+    step4Title: "Ce qu'ils en disent",
+    step6EarlyAccess: "Accès anticipé",
+    step6Waitlist: "Rejoindre la liste d'attente",
+    step5QuizTitle: "Découvrez votre profil de productivité.",
+    step5QuizDescription: "Répondez à 4 questions pour découvrir pourquoi vous n'avancez pas… et comment Productif.io peut vous aider à faire décoller vos résultats.",
+    step5QuizCTA: "C'est parti",
+    step5QuizTime: "Temps estimé : 1 minute",
+    step5QuizQuickQuestions: "Quelques questions rapides pour comprendre vos habitudes",
+    step7ProfileTitle: "Votre profil",
+    step7ProfileDescription: "D'après vos réponses, nous allons personnaliser votre interface et vos priorités pour une exécution plus rapide.",
+    step8SetupInProgress: "Un instant, nous configurons votre espace de travail…",
+    step8SetupComplete: "Configuration terminée",
+    step8SetupDescription: "Personnalisation des habitudes, priorités et notifications.",
+    step9Title: "Activez votre assistant maintenant — 7 jours d'essai gratuit",
+    step9Description: "Vous avez l'énergie et l'ambition. Votre plus gros blocage est la clarté et la structure. Productif.io vous aide à transformer le chaos en focus avec votre assistant IA personnel.",
+    step9Monthly: "Mensuel",
+    step9Yearly: "Annuel (-60€)",
+    step9Save: "économisez 60€",
+    step9BilledMonthly: "Facturé mensuellement",
+    step9BilledYearly: "Facturé annuellement",
+    step9Feature1Title: "Gestion des tâches par IA",
+    step9Feature1Desc: "Votre IA organise, priorise et suggère quoi faire ensuite.",
+    step9Feature2Title: "Assistant IA WhatsApp",
+    step9Feature2Desc: "Rappels intelligents et conseils sans ouvrir une autre application.",
+    step9Feature3Title: "Habitudes & objectifs qui tiennent",
+    step9Feature3Desc: "Construisez des routines adaptatives avec des rappels contextuels ; suivez vos OKR.",
+    step9Feature4Title: "Confidentialité totale & mises à jour à vie",
+    step9Feature4Desc: "Vos données restent les vôtres. Chiffrement, sauvegardes, mises à jour futures incluses.",
+    step9StartNow: "Commencer maintenant gratuitement",
+    step9Start: "Commencer",
+    step9Skip: "Passer – continuer l'essai gratuit",
+    buttonBack: "Retour",
+    buttonContinue: "Continuer",
+    buttonNext: "Suivant",
+    buttonSkip: "Passer",
+    buttonPrevious: "Précédent",
+    testimonial1: "J'ai enfin un vrai copilote qui me garde aligné.",
+    testimonial2: "Le tableau de bord m'a montré où j'étais vraiment bloqué.",
+    testimonial3: "L'IA me relance au bon moment et j'exécute plus vite.",
+    profileDistractor: "Le distrait déterminé",
+    profileStrategist: "Le stratège submergé",
+    profileDreamer: "Le rêveur désorganisé",
+    profileOrganizer: "L'organisateur motivé",
+    question: "Question",
+    analysis92: "Vous n'êtes pas seul : 92% des utilisateurs de Productif.io ont ce problème avant de commencer.",
+    step6EarlyAccessDesc: "Accès anticipé pour 1€ — Places limitées.",
+    step6EarlyAccessButton: "Payer 1€ maintenant",
+    step6EarlyAccessLoading: "Redirection…",
+    step6WaitlistDesc: "Rejoindre la liste d'attente gratuitement.",
+    step6WaitlistButton: "Rejoindre",
+    step6WaitlistLoading: "Validation…",
+    step6Later: "Plus tard",
+  },
+}
+
+type Questionnaire = {
+  mainGoal: string
+  role: string
+  frustration: string
+  whatsappNumber: string
+  whatsappConsent: boolean
+  language: "fr" | "en"
+  diagBehavior?: "details" | "procrastination" | "distraction" | "abandon"
+  timeFeeling?: "frustrated" | "tired" | "proud" | "lost"
+  phoneHabit?: "enemy" | "twoMinutes" | "farButBack" | "managed"
+}
+
+type AuthInfo = {
+  isAuthenticated: boolean
+  email: string
+}
+
+function useAuthInfo() {
+  const [auth, setAuth] = useState<AuthInfo>({ isAuthenticated: false, email: "" })
+
+  useEffect(() => {
+    let isMounted = true
+    const fetchAuth = async () => {
+      try {
+        const res = await fetch("/api/auth/me", { credentials: "include" })
+        if (res.ok) {
+          const data = await res.json()
+          if (isMounted) setAuth({ isAuthenticated: true, email: data.user?.email || "" })
+        }
+      } catch {
+        // noop
+      }
+    }
+    fetchAuth()
+    return () => {
+      isMounted = false
+    }
+  }, [])
+
+  return auth
+}
+
+function OnboardingContent() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+
+  const offer = searchParams.get("offer") || "early-access"
+  const utmParams = useMemo(() => {
+    const entries: [string, string][] = []
+    searchParams.forEach((v, k) => {
+      if (k.startsWith("utm_") || k === "ref") entries.push([k, v])
+    })
+    return Object.fromEntries(entries)
+  }, [searchParams])
+
+  const [step, setStep] = useState<number>(1)
+  const [featureIndex, setFeatureIndex] = useState<number>(0)
+  const [loading, setLoading] = useState<boolean>(false)
+  const [error, setError] = useState<string>("")
+  const [emailFallback, setEmailFallback] = useState<string>("")
+  const [password, setPassword] = useState<string>("")
+
+  const [answers, setAnswers] = useState<Questionnaire>({
+    mainGoal: "",
+    role: "",
+    frustration: "",
+    whatsappNumber: "",
+    whatsappConsent: false,
+    language: "fr",
+  })
+
+  const auth = useAuthInfo()
+  const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('yearly')
+
+  // Charger les données depuis localStorage ou la base de données
+  useEffect(() => {
+    const loadData = async () => {
+      // D'abord charger depuis localStorage (pour les utilisateurs non connectés)
+      const saved = localStorage.getItem("onboarding_progress")
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved)
+          if (parsed.step) setStep(parsed.step)
+          if (parsed.answers) setAnswers(parsed.answers)
+          if (parsed.emailFallback) setEmailFallback(parsed.emailFallback)
+        } catch {
+          // ignore
+        }
+      }
+
+      // Si l'utilisateur est authentifié, charger depuis la base de données
+      if (auth.isAuthenticated) {
+        try {
+          const response = await fetch('/api/onboarding/data', {
+            credentials: 'include'
+          })
+          if (response.ok) {
+            const { data } = await response.json()
+            if (data) {
+              // Mettre à jour avec les données de la base
+              setStep(data.currentStep || 1)
+              setAnswers({
+                mainGoal: data.mainGoal || "",
+                role: data.role || "",
+                frustration: data.frustration || "",
+                whatsappNumber: data.whatsappNumber || "",
+                whatsappConsent: data.whatsappConsent || false,
+                language: (data.language as "fr" | "en") || "fr",
+                diagBehavior: data.diagBehavior as any,
+                timeFeeling: data.timeFeeling as any,
+                phoneHabit: data.phoneHabit as any,
+              })
+              if (data.emailFallback) setEmailFallback(data.emailFallback)
+              if (data.billingCycle) setBillingCycle(data.billingCycle as 'monthly' | 'yearly')
+            }
+          }
+        } catch (error) {
+          console.error('Erreur chargement onboarding depuis DB:', error)
+          // Continuer avec les données localStorage si la DB échoue
+        }
+      }
+    }
+
+    loadData()
+  }, [auth.isAuthenticated])
+
+  // Sauvegarder dans localStorage
+  useEffect(() => {
+    localStorage.setItem(
+      "onboarding_progress",
+      JSON.stringify({ step, answers, emailFallback, offer, utmParams })
+    )
+  }, [step, answers, emailFallback, offer, utmParams])
+
+  // Sauvegarder en base de données si l'utilisateur est authentifié
+  useEffect(() => {
+    if (!auth.isAuthenticated) return
+
+    const saveToDatabase = async () => {
+      try {
+        await fetch('/api/onboarding/data', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            mainGoal: answers.mainGoal,
+            role: answers.role,
+            frustration: answers.frustration,
+            language: answers.language,
+            whatsappNumber: answers.whatsappNumber,
+            whatsappConsent: answers.whatsappConsent,
+            diagBehavior: answers.diagBehavior,
+            timeFeeling: answers.timeFeeling,
+            phoneHabit: answers.phoneHabit,
+            offer,
+            utmParams,
+            emailFallback,
+            billingCycle,
+            currentStep: step,
+            completed: step >= 9
+          })
+        })
+      } catch (error) {
+        console.error('Erreur sauvegarde onboarding:', error)
+        // Ne pas bloquer l'utilisateur si la sauvegarde échoue
+      }
+    }
+
+    // Délai pour éviter trop de requêtes
+    const timeoutId = setTimeout(saveToDatabase, 500)
+    return () => clearTimeout(timeoutId)
+  }, [auth.isAuthenticated, step, answers, emailFallback, offer, utmParams, billingCycle])
+
+  // Si déjà connecté, passer automatiquement à l'étape 2 (sauf si une étape supérieure est déjà sauvegardée)
+  useEffect(() => {
+    if (auth.isAuthenticated && step === 1) {
+      setStep((s) => Math.max(s, 2))
+    }
+  }, [auth.isAuthenticated, step])
+
+  const next = () => setStep((s) => Math.min(s + 1, 9))
+  const prev = () => setStep((s) => Math.max(s - 1, 1))
+
+  const currentEmail = auth.isAuthenticated ? auth.email : emailFallback
+
+  // Étape 4 — Questionnaire interactif
+  const [q4Stage, setQ4Stage] = useState<number>(0) // 0=intro, 1..4 questions
+  const [q4Selections, setQ4Selections] = useState<Record<number, string>>({})
+
+  // Traductions dynamiques basées sur la langue sélectionnée
+  const t = answers.language === "fr" ? TRANSLATIONS.fr : TRANSLATIONS.en
+  const FEATURES = answers.language === "fr" ? FEATURES_FR : FEATURES_EN
+  const CurrentIcon = FEATURES[featureIndex]?.icon
+
+  const q4Questions = answers.language === "fr" ? [
+    {
+      key: "diagBehavior" as const,
+      title: "Quand vous travaillez sur un projet important, vous avez tendance à…",
+      options: [
+        { key: "details", label: "Vous perdre dans les détails" },
+        { key: "procrastination", label: "Le remettre à demain" },
+        { key: "distraction", label: "Vous laisser distraire par d'autres tâches" },
+        { key: "abandon", label: "Commencer fort… puis l'abandonner" },
+      ],
+    },
+    {
+      key: "timeFeeling" as const,
+      title: "À la fin de votre journée, vous vous sentez plutôt…",
+      options: [
+        { key: "frustrated", label: "Frustré de ne pas en avoir fait assez" },
+        { key: "tired", label: "Fatigué sans savoir pourquoi" },
+        { key: "proud", label: "Fier mais sans vision claire" },
+        { key: "lost", label: "Complètement perdu dans vos priorités" },
+      ],
+    },
+    {
+      key: "phoneHabit" as const,
+      title: "Votre téléphone pendant que vous travaillez, c'est…",
+      options: [
+        { key: "enemy", label: "Mon pire ennemi" },
+        { key: "twoMinutes", label: "Je l'ouvre 'juste 2 minutes'… puis 2 heures passent" },
+        { key: "farButBack", label: "Je le range mais je finis par le reprendre" },
+        { key: "managed", label: "J'ai appris à le gérer" },
+      ],
+      analysis: "Vous n'êtes pas seul : 92% des utilisateurs de Productif.io ont ce problème avant de commencer.",
+    },
+    {
+      key: "mainGoal" as const,
+      title: "Quel est votre objectif principal aujourd'hui ?",
+      options: [
+        { key: "Launch", label: "Lancer / développer mon projet" },
+        { key: "Study", label: "Mieux gérer mes études" },
+        { key: "Discipline", label: "Être plus discipliné" },
+        { key: "Balance", label: "Trouver un équilibre entre travail et vie personnelle" },
+      ],
+    },
+  ] : [
+    {
+      key: "diagBehavior" as const,
+      title: "When you work on an important project, you tend to…",
+      options: [
+        { key: "details", label: "Get lost in the details" },
+        { key: "procrastination", label: "Put it off until tomorrow" },
+        { key: "distraction", label: "Get distracted by other tasks" },
+        { key: "abandon", label: "Start strong… then abandon it" },
+      ],
+    },
+    {
+      key: "timeFeeling" as const,
+      title: "At the end of your day, you feel rather…",
+      options: [
+        { key: "frustrated", label: "Frustrated that you didn't do enough" },
+        { key: "tired", label: "Tired without knowing why" },
+        { key: "proud", label: "Proud but without a clear vision" },
+        { key: "lost", label: "Completely lost in your priorities" },
+      ],
+    },
+    {
+      key: "phoneHabit" as const,
+      title: "Your phone while you work is…",
+      options: [
+        { key: "enemy", label: "My worst enemy" },
+        { key: "twoMinutes", label: "I open it 'just for 2 minutes'… then 2 hours pass" },
+        { key: "farButBack", label: "I put it away but end up picking it back up" },
+        { key: "managed", label: "I've learned to manage it" },
+      ],
+      analysis: "You're not alone: 92% of Productif.io users have this problem before starting.",
+    },
+    {
+      key: "mainGoal" as const,
+      title: "What is your main goal today?",
+      options: [
+        { key: "Launch", label: "Launch / grow my project" },
+        { key: "Study", label: "Better manage my studies" },
+        { key: "Discipline", label: "Be more disciplined" },
+        { key: "Balance", label: "Find a balance between work and personal life" },
+      ],
+    },
+  ]
+
+  const handleQ4Select = (stage: number, key: string, label: string) => {
+    setQ4Selections((prev) => ({ ...prev, [stage]: key }))
+    const idx = stage - 1
+    const meta = q4Questions[idx]
+    if (!meta) return
+    setAnswers((prev) => {
+      const updated = { ...prev }
+      if (meta.key === "diagBehavior") updated.diagBehavior = key as any
+      if (meta.key === "timeFeeling") updated.timeFeeling = key as any
+      if (meta.key === "phoneHabit") updated.phoneHabit = key as any
+      if (meta.key === "mainGoal") updated.mainGoal = label
+      return updated
+    })
+  }
+
+  // Determine a dynamic profile from answers (labels + emoji)
+  const getProfileMeta = (q: Questionnaire): { label: string; emoji: string } => {
+    if (q.diagBehavior === "distraction") return { label: t.profileDistractor, emoji: "💭" }
+    if (q.diagBehavior === "details") return { label: t.profileStrategist, emoji: "🔥" }
+    if (q.timeFeeling === "lost" || q.diagBehavior === "abandon") return { label: t.profileDreamer, emoji: "🌀" }
+    return { label: t.profileOrganizer, emoji: "🚀" }
+  }
+
+  // Écran de configuration (chargement 4s)
+  const [setupDone, setSetupDone] = useState<boolean>(false)
+  useEffect(() => {
+    if (step === 8) {
+      setSetupDone(false)
+      const t = setTimeout(() => setSetupDone(true), 4000)
+      return () => clearTimeout(t)
+    }
+  }, [step])
+
+  // Inscription directe depuis l'onboarding puis connexion automatique
+  const handleSignupWithEmail = async () => {
+    if (!emailFallback || !password) {
+      setError("Email et mot de passe requis")
+      return
+    }
+    setLoading(true)
+    setError("")
+    try {
+      // 1) Tentative de création du compte
+      const defaultName = emailFallback.split("@")[0] || "Utilisateur"
+      const registerResp = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: defaultName, email: emailFallback, password })
+      })
+
+      // 2) Si l'email existe déjà (409), on passe directement au login
+      if (!registerResp.ok && registerResp.status !== 409) {
+        const data = await registerResp.json().catch(() => ({}))
+        throw new Error(data.error || "Impossible de créer le compte")
+      }
+
+      // 3) Connexion
+      const loginResp = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: emailFallback, password })
+      })
+      if (!loginResp.ok) {
+        const data = await loginResp.json().catch(() => ({}))
+        throw new Error(data.error || "Connexion automatique échouée")
+      }
+
+      // 4) Sauvegarder progression et recharger sur /onboarding (pour prendre le cookie en compte)
+      try {
+        const saved = JSON.parse(localStorage.getItem("onboarding_progress") || "{}")
+        localStorage.setItem(
+          "onboarding_progress",
+          JSON.stringify({ ...saved, step: 2, emailFallback })
+        )
+      } catch {}
+      window.location.assign("/onboarding")
+    } catch (e: any) {
+      setError(e?.message || "Erreur inconnue lors de l'inscription")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleSaveNotificationPrefs = async () => {
+    if (!auth.isAuthenticated || !answers.whatsappConsent || !answers.whatsappNumber) return
+    try {
+      await fetch("/api/notifications/preferences", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: "self",
+          isEnabled: true,
+          emailEnabled: true,
+          pushEnabled: false,
+          whatsappEnabled: true,
+          whatsappNumber: answers.whatsappNumber,
+          startHour: 9,
+          endHour: 18,
+          allowedDays: [1, 2, 3, 4, 5],
+          notificationTypes: ["DAILY_SUMMARY", "TASK_DUE", "HABIT_REMINDER"],
+          morningReminder: true,
+          taskReminder: true,
+          habitReminder: true,
+          motivation: true,
+          dailySummary: true,
+          morningTime: "08:00",
+          noonTime: "12:00",
+          afternoonTime: "14:00",
+          eveningTime: "18:00",
+          nightTime: "22:00",
+        }),
+        credentials: "include",
+      })
+    } catch {
+      // ignore errors for now
+    }
+  }
+
+  const handleStartPayment = async () => {
+    if (!currentEmail) {
+      setError("Email requis pour continuer")
+      return
+    }
+
+    setLoading(true)
+    setError("")
+    try {
+      // Récupérer l'ID utilisateur depuis l'auth
+      const resp = await fetch("/api/auth/me")
+      if (!resp.ok) throw new Error("Non authentifié")
+      const { user } = await resp.json()
+      
+      if (!user?.id) {
+        throw new Error("Utilisateur non trouvé")
+      }
+
+      // Créer la session Stripe avec le bon billing cycle
+      const stripeResp = await fetch("/api/stripe/create-checkout-session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          userId: user.id,
+          billingType: billingCycle 
+        }),
+      })
+      
+      if (!stripeResp.ok) {
+        const data = await stripeResp.json().catch(() => ({}))
+        throw new Error(data.error || "Erreur lors de la création du paiement")
+      }
+      
+      const data = await stripeResp.json()
+      if (data.url) {
+        window.location.href = data.url
+      }
+    } catch (e: any) {
+      setError(e?.message || "Erreur inconnue")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleCompleteFreeWaitlist = async () => {
+    if (!currentEmail) {
+      setError("Email requis pour continuer")
+      return
+    }
+    setLoading(true)
+    setError("")
+    try {
+      await fetch("/api/waitlist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: currentEmail, step: 1 }),
+      })
+      await fetch("/api/waitlist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: currentEmail,
+          phone: answers.whatsappNumber || undefined,
+          motivation: answers.mainGoal || "onboarding-waitlist",
+          step: 2,
+        }),
+      })
+      setStep(7)
+    } catch (e: any) {
+      setError(e?.message || "Erreur lors de l'inscription à la waitlist")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="min-h-screen w-full flex items-center justify-center bg-gray-50 p-4">
+      <Card className="w-full max-w-2xl">
+        <CardHeader>
+          {/* Header avec logo (agrandi, sans texte) */}
+          <div className="flex items-center justify-center mb-2">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/P_tech_letter_logo_TEMPLATE-removebg-preview.png" alt="Productif.io" className="h-16 w-auto object-contain" />
+          </div>
+          <CardTitle>
+            {step === 1 && ""}
+            {step === 2 && t.step2Title}
+            {step === 3 && t.step3Title}
+            {step === 4 && t.step4Title}
+            {step === 5 && ""}
+            {step === 6 && (offer === "early-access" ? t.step6EarlyAccess : t.step6Waitlist)}
+            {step === 7 && ""}
+            {step === 8 && ""}
+            {step === 9 && ""}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {error && (
+            <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded p-2">{error}</div>
+          )}
+
+          {step === 1 && (
+            <div className="space-y-6">
+              {auth.isAuthenticated ? (
+                <></>
+              ) : (
+                <div className="space-y-5">
+                  
+
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => signIn("google", { callbackUrl: "/onboarding" })}
+                  >
+                    Continue with Google
+                  </Button>
+
+                  <div className="flex items-center gap-2">
+                    <Separator className="flex-1" />
+                    <span className="text-[11px] text-muted-foreground">OR</span>
+                    <Separator className="flex-1" />
+                  </div>
+
+                  <div className="grid gap-3">
+                    <div className="grid gap-2">
+                      <Label htmlFor="email">Email</Label>
+                      <Input
+                        id="email"
+                        type="email"
+                        placeholder="you@example.com"
+                        value={emailFallback}
+                        onChange={(e) => setEmailFallback(e.target.value)}
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="password">Password</Label>
+                      <Input
+                        id="password"
+                        type="password"
+                        placeholder="••••••••"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                      />
+                    </div>
+                  <Button
+                    className="w-full"
+                    onClick={handleSignupWithEmail}
+                    disabled={loading}
+                  >
+                    {loading ? "Creating account…" : "Sign up with email"}
+                  </Button>
+                  </div>
+
+                  <p className="text-center text-sm text-muted-foreground">
+                    Already have an account? {""}
+                    <Link href="/login?redirect=/onboarding" className="underline underline-offset-4">Sign in</Link>
+                  </p>
+
+                  <p className="text-[11px] text-muted-foreground text-center">
+                    By continuing, you agree to our {""}
+                    <Link href="/terms" className="underline underline-offset-4">Terms of Use</Link> {""}
+                    and our {""}
+                    <Link href="/privacy-policy" className="underline underline-offset-4">Privacy Policy</Link>.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {step === 2 && (
+            <div className="space-y-6">
+              <div className="text-center space-y-4">
+                <h3 className="text-xl font-semibold">{t.step2Title}</h3>
+                <p className="text-sm text-muted-foreground">{t.step2Description}</p>
+                <div className="grid gap-3 max-w-md mx-auto">
+                  <button
+                    onClick={() => {
+                      setAnswers((prev) => ({ ...prev, language: "fr" }))
+                      next()
+                    }}
+                    className={`text-left rounded-lg border px-6 py-4 hover:bg-emerald-50 transition ${
+                      answers.language === "fr" ? "border-emerald-500 bg-emerald-50" : "border-gray-200"
+                    }`}
+                  >
+                    <div className="font-medium">Français</div>
+                    <div className="text-sm text-muted-foreground">French</div>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setAnswers((prev) => ({ ...prev, language: "en" }))
+                      next()
+                    }}
+                    className={`text-left rounded-lg border px-6 py-4 hover:bg-emerald-50 transition ${
+                      answers.language === "en" ? "border-emerald-500 bg-emerald-50" : "border-gray-200"
+                    }`}
+                  >
+                    <div className="font-medium">English</div>
+                    <div className="text-sm text-muted-foreground">Anglais</div>
+                  </button>
+                </div>
+              </div>
+              <div className="flex justify-between">
+                <Button variant="ghost" onClick={prev}>{t.buttonBack}</Button>
+              </div>
+            </div>
+          )}
+
+          {step === 3 && (
+            <div className="space-y-6">
+              <div className="grid gap-6 md:grid-cols-2 items-center">
+                <div className="order-2 md:order-1 text-center md:text-left">
+                  <h3 className="text-xl font-semibold">{FEATURES[featureIndex].title}</h3>
+                  <p className="mt-2 text-muted-foreground">{FEATURES[featureIndex].description}</p>
+                  {FEATURES[featureIndex].insight && (
+                    <p className="mt-2 text-sm italic">“{FEATURES[featureIndex].insight}”</p>
+                  )}
+                </div>
+                <div className="order-1 md:order-2">
+                  <div className="w-full flex items-center justify-center">
+                    <div className="h-28 w-28 rounded-full bg-emerald-50 border border-emerald-100 grid place-items-center text-emerald-600">
+                      {CurrentIcon ? (
+                        <CurrentIcon className="h-14 w-14" />
+                      ) : (
+                        <span className="text-2xl">✨</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center justify-between">
+                <Button
+                  variant="outline"
+                  onClick={() => setFeatureIndex((i) => Math.max(0, i - 1))}
+                  disabled={featureIndex === 0}
+                >
+                  {t.buttonPrevious}
+                </Button>
+                <div className="text-sm text-muted-foreground">{featureIndex + 1} / {FEATURES.length}</div>
+                <Button
+                  onClick={() => {
+                    if (featureIndex < FEATURES.length - 1) {
+                      setFeatureIndex((i) => i + 1)
+                    } else {
+                      next()
+                    }
+                  }}
+                >
+                  {featureIndex < FEATURES.length - 1 ? t.buttonContinue : t.buttonNext}
+                </Button>
+              </div>
+              <div className="flex justify-between">
+                <Button variant="ghost" onClick={prev}>{t.buttonBack}</Button>
+                <Button onClick={next}>{t.buttonSkip}</Button>
+              </div>
+            </div>
+          )}
+
+          {step === 4 && (
+            <div className="space-y-6">
+              <div className="grid gap-4 sm:grid-cols-2">
+                {/* Testimonial 1 */}
+                <div className="rounded-2xl border bg-white p-4 shadow-sm">
+                  <div className="flex items-center gap-3">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src="/testimonials/benjamin-courdrais.jpg" alt="Alex" className="h-9 w-9 rounded-full object-cover" />
+                    <div>
+                      <div className="text-sm font-medium">Alex</div>
+                      <div className="text-xs text-muted-foreground">Maker</div>
+                    </div>
+                  </div>
+                  <p className="mt-3 text-sm leading-6">"{t.testimonial1}"</p>
+                </div>
+
+                {/* Testimonial 2 */}
+                <div className="rounded-2xl border bg-white p-4 shadow-sm">
+                  <div className="flex items-center gap-3">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src="/testimonials/gaetan-silgado.jpg" alt="Léa" className="h-9 w-9 rounded-full object-cover" />
+                    <div>
+                      <div className="text-sm font-medium">Léa</div>
+                      <div className="text-xs text-muted-foreground">Manager</div>
+                    </div>
+                  </div>
+                  <p className="mt-3 text-sm leading-6">"{t.testimonial2}"</p>
+                </div>
+
+                {/* Testimonial 3 */}
+                <div className="rounded-2xl border bg-white p-4 shadow-sm sm:col-span-2">
+                  <div className="flex items-center gap-3">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src="/testimonials/sabrina.jpg" alt="Sabrina" className="h-9 w-9 rounded-full object-cover" />
+                    <div>
+                      <div className="text-sm font-medium">Sabrina</div>
+                      <div className="text-xs text-muted-foreground">Entrepreneur</div>
+                    </div>
+                  </div>
+                  <p className="mt-3 text-sm leading-6">"{t.testimonial3}"</p>
+                </div>
+              </div>
+
+              <div className="flex justify-between">
+                <Button variant="ghost" onClick={prev}>{t.buttonBack}</Button>
+                <Button onClick={next}>{t.buttonContinue}</Button>
+              </div>
+            </div>
+          )}
+
+          {step === 5 && (
+            <div className="space-y-6">
+              {q4Stage === 0 && (
+                <div className="text-center space-y-5">
+                  <h3 className="text-xl font-semibold">{t.step5QuizTitle}</h3>
+                  <p className="text-sm text-muted-foreground">{t.step5QuizDescription}</p>
+                  <div className="mx-auto max-w-sm rounded-2xl border border-emerald-200 bg-emerald-50/40 p-6">
+                    <div className="mx-auto mb-4 h-20 w-20 rounded-full bg-white shadow-sm grid place-items-center">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src="/P_tech_letter_logo_TEMPLATE-removebg-preview.png" alt="Productif.io" className="h-10 w-auto object-contain" />
+                    </div>
+                    <div className="text-base font-semibold text-emerald-700">{t.step5QuizQuickQuestions}</div>
+                    <div className="mt-2 flex items-center justify-center gap-2 text-sm text-emerald-800">
+                      <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                      <span>{t.step5QuizTime}</span>
+                    </div>
+                  </div>
+                  <div className="flex justify-center">
+                    <Button onClick={() => setQ4Stage(1)} className="bg-emerald-500 hover:bg-emerald-600">{t.step5QuizCTA}</Button>
+                  </div>
+                </div>
+              )}
+
+              {q4Stage >= 1 && q4Stage <= 4 && (
+                <div className="space-y-4">
+                  <div className="text-sm text-muted-foreground">{t.question} {q4Stage} / 4</div>
+                  <h4 className="text-lg font-medium">{q4Questions[q4Stage - 1].title}</h4>
+                  <div className="grid gap-3">
+                    {q4Questions[q4Stage - 1].options.map((opt) => (
+                      <button
+                        key={opt.key}
+                        onClick={() => handleQ4Select(q4Stage, opt.key, opt.label)}
+                        className={`text-left rounded-lg border px-4 py-3 hover:bg-emerald-50 transition ${q4Selections[q4Stage] === opt.key ? 'border-emerald-500 bg-emerald-50' : 'border-gray-200'}`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                  {q4Stage === 3 && (
+                    <div className="text-xs text-muted-foreground bg-gray-50 border rounded-md p-2">{t.analysis92}</div>
+                  )}
+                  <div className="flex justify-between">
+                    <Button variant="ghost" onClick={() => setQ4Stage((s) => Math.max(1, s - 1))}>{t.buttonBack}</Button>
+                    <Button onClick={() => (q4Stage < 4 ? setQ4Stage((s) => Math.min(4, s + 1)) : setStep(7))}>
+                      {q4Stage < 4 ? t.buttonContinue : t.buttonNext}
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+            </div>
+          )}
+
+          {step === 6 && (
+            <div className="space-y-4">
+              {offer === "early-access" ? (
+                <>
+                  <p className="text-sm text-muted-foreground">{t.step6EarlyAccessDesc}</p>
+                  <Button disabled={loading} onClick={handleStartPayment}>{loading ? t.step6EarlyAccessLoading : t.step6EarlyAccessButton}</Button>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm text-muted-foreground">{t.step6WaitlistDesc}</p>
+                  <Button disabled={loading} onClick={handleCompleteFreeWaitlist}>{loading ? t.step6WaitlistLoading : t.step6WaitlistButton}</Button>
+                </>
+              )}
+              <div className="flex justify-between">
+                <Button variant="ghost" onClick={prev}>{t.buttonBack}</Button>
+                <Button variant="outline" onClick={() => router.push("/")}>{t.step6Later}</Button>
+              </div>
+            </div>
+          )}
+
+          {/* Étape 7 — Révélation du profil */}
+          {step === 7 && (
+            <div className="space-y-6 text-center">
+              <div className="mx-auto max-w-sm rounded-2xl border bg-white p-6 shadow-sm">
+                {(() => { const meta = getProfileMeta(answers); return (
+                  <>
+                    <div className="mx-auto mb-3 h-16 w-16 rounded-full bg-emerald-50 border border-emerald-100 grid place-items-center text-2xl">
+                      <span>{meta.emoji}</span>
+                    </div>
+                    <div className="text-sm text-muted-foreground">{t.step7ProfileTitle}</div>
+                    <div className="mt-1 text-2xl font-semibold">{meta.label} {meta.emoji}</div>
+                  </>
+                )})()}
+                <p className="mt-3 text-sm text-muted-foreground">{t.step7ProfileDescription}</p>
+              </div>
+              <div className="flex justify-end">
+                <Button onClick={next}>{t.buttonNext}</Button>
+              </div>
+            </div>
+          )}
+
+          {/* Étape 8 — Configuration (loading 4s) */}
+          {step === 8 && (
+            <div className="space-y-6 text-center">
+              <div className="mx-auto max-w-sm rounded-2xl border bg-white p-6 shadow-sm">
+                <div className="flex items-center justify-center gap-3">
+                  <div className="h-3 w-3 animate-pulse rounded-full bg-emerald-500"></div>
+                  <div className="h-3 w-3 animate-pulse rounded-full bg-emerald-500 [animation-delay:150ms]"></div>
+                  <div className="h-3 w-3 animate-pulse rounded-full bg-emerald-500 [animation-delay:300ms]"></div>
+                </div>
+                <div className="mt-3 text-base font-medium">
+                  {setupDone ? (
+                    <span className="inline-flex items-center gap-2 text-emerald-700">
+                      <CheckCircle2 className="h-5 w-5" /> {t.step8SetupComplete}
+                    </span>
+                  ) : (
+                    <>{t.step8SetupInProgress}</>
+                  )}
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">{t.step8SetupDescription}</p>
+              </div>
+              {setupDone && (
+                <div className="flex justify-end">
+                  <Button onClick={next}>{t.buttonNext}</Button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Étape 9 — Fin / Call-to-actions */}
+          {step === 9 && (
+            <div className="space-y-8">
+              <div className="text-center space-y-2">
+                <h3 className="text-xl font-semibold">{t.step9Title}</h3>
+                <p className="text-sm text-muted-foreground max-w-xl mx-auto">
+                  {t.step9Description}
+                </p>
+              </div>
+
+              <div className="mx-auto w-full max-w-2xl rounded-2xl border bg-white p-6 shadow-sm">
+                <div className="flex items-center justify-center mb-4 gap-2">
+                  <button
+                    onClick={() => setBillingCycle('monthly')}
+                    className={`px-3 py-1.5 text-sm rounded-full border ${billingCycle === 'monthly' ? 'bg-green-500 text-white border-green-500' : 'border-gray-300 text-gray-700'}`}
+                  >
+                    {t.step9Monthly}
+                  </button>
+                  <button
+                    onClick={() => setBillingCycle('yearly')}
+                    className={`px-3 py-1.5 text-sm rounded-full border ${billingCycle === 'yearly' ? 'bg-green-500 text-white border-green-500' : 'border-gray-300 text-gray-700'}`}
+                  >
+                    {t.step9Yearly}
+                  </button>
+                </div>
+
+                <div className="text-center space-y-1">
+                  {billingCycle === 'monthly' ? (
+                    <div className="text-3xl font-bold">€14.99<span className="text-base font-medium">/mo</span></div>
+                  ) : (
+                    <div className="text-3xl font-bold">€9.99<span className="text-base font-medium">/mo</span>
+                      <span className="ml-2 text-xs inline-block rounded bg-green-100 text-green-700 px-2 py-0.5">{t.step9Save}</span>
+                    </div>
+                  )}
+                  <div className="text-xs text-muted-foreground">{billingCycle === 'monthly' ? t.step9BilledMonthly : t.step9BilledYearly}</div>
+                </div>
+
+                <ul className="mt-6 space-y-3 text-sm text-gray-700 max-w-md mx-auto text-left">
+                  <li className="flex items-start gap-3">
+                    <CheckCircle2 className="h-5 w-5 text-green-500 mt-0.5" />
+                    <span><strong className="text-gray-900">{t.step9Feature1Title}</strong> — {t.step9Feature1Desc}</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <CheckCircle2 className="h-5 w-5 text-green-500 mt-0.5" />
+                    <span><strong className="text-gray-900">{t.step9Feature2Title}</strong> — {t.step9Feature2Desc}</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <CheckCircle2 className="h-5 w-5 text-green-500 mt-0.5" />
+                    <span><strong className="text-gray-900">{t.step9Feature3Title}</strong> — {t.step9Feature3Desc}</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <CheckCircle2 className="h-5 w-5 text-green-500 mt-0.5" />
+                    <span><strong className="text-gray-900">{t.step9Feature4Title}</strong> — {t.step9Feature4Desc}</span>
+                  </li>
+                </ul>
+
+                <div className="mt-6 grid gap-3 max-w-sm mx-auto">
+                  <Button onClick={handleStartPayment} className="bg-green-500 hover:bg-green-600">
+                    {t.step9StartNow}
+                  </Button>
+                  <Button variant="outline" onClick={handleStartPayment}>{t.step9Start}</Button>
+                  <button onClick={() => router.push('/dashboard')} className="text-[11px] text-muted-foreground underline underline-offset-4">
+                    {t.step9Skip}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </CardContent>
+        <CardFooter className="justify-center">
+          <div className="text-xs text-muted-foreground">Step {step} / 9</div>
+        </CardFooter>
+      </Card>
+    </div>
+  )
+}
 
 export default function OnboardingPage() {
   const router = useRouter()

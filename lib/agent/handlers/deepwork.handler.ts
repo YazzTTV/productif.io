@@ -1,4 +1,5 @@
 import { whatsappService } from '@/lib/whatsapp'
+import { FlexibleMatcher } from '@/lib/utils/FlexibleMatcher'
 
 const userStates = new Map<string, { state: string; data?: any }>()
 
@@ -8,33 +9,39 @@ export async function handleDeepWorkCommand(
   phoneNumber: string,
   apiToken: string
 ): Promise<boolean> {
-  const lower = message.toLowerCase()
-
   const currentState = userStates.get(userId)
   if (currentState?.state === 'awaiting_deepwork_duration') {
     return await processDurationResponse(message, userId, phoneNumber, apiToken)
   }
 
-  if ((lower.includes('commence') || lower.includes('démarre')) && (lower.includes('travailler') || lower.includes('travail') || lower.includes('deep work') || lower.includes('deepwork'))) {
+  // Utiliser le système de matching flexible pour détecter les commandes
+  const startMatch = FlexibleMatcher.matchesCommand(message, 'start_deepwork')
+  if (startMatch.matches && startMatch.confidence >= 0.7) {
     return await startDeepWorkSession(userId, phoneNumber, apiToken)
   }
 
-  if ((lower.includes('termine') || lower.includes('fini') || lower.includes('stop')) && (lower.includes('session') || lower.includes('deep work') || lower.includes('travail'))) {
+  const endMatch = FlexibleMatcher.matchesCommand(message, 'end_deepwork')
+  if (endMatch.matches && endMatch.confidence >= 0.7) {
     return await endDeepWorkSession(userId, phoneNumber, apiToken)
   }
 
-  if ((lower.includes('session') || lower.includes('deep work')) && (lower.includes('en cours') || lower.includes('active') || lower.includes('statut'))) {
-    return await getActiveSession(userId, phoneNumber, apiToken)
-  }
-
-  if (lower.includes('pause') && (lower.includes('session') || lower.includes('deep work'))) {
+  const pauseMatch = FlexibleMatcher.matchesCommand(message, 'pause_deepwork')
+  if (pauseMatch.matches && pauseMatch.confidence >= 0.7) {
     return await pauseSession(userId, phoneNumber, apiToken)
   }
 
-  if ((lower.includes('reprend') || lower.includes('continue') || lower.includes('reprise')) && (lower.includes('session') || lower.includes('deep work'))) {
+  const resumeMatch = FlexibleMatcher.matchesCommand(message, 'resume_deepwork')
+  if (resumeMatch.matches && resumeMatch.confidence >= 0.7) {
     return await resumeSession(userId, phoneNumber, apiToken)
   }
 
+  const statusMatch = FlexibleMatcher.matchesCommand(message, 'status_deepwork')
+  if (statusMatch.matches && statusMatch.confidence >= 0.7) {
+    return await getActiveSession(userId, phoneNumber, apiToken)
+  }
+
+  // Fallback pour l'historique (pas encore dans les variations)
+  const lower = message.toLowerCase()
   if ((lower.includes('historique') || lower.includes('sessions')) && (lower.includes('deep work') || lower.includes('travail'))) {
     return await showHistory(userId, phoneNumber, apiToken)
   }

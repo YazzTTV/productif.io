@@ -270,7 +270,7 @@ export function Leaderboard({ limit = 50, showUserRank = true }: LeaderboardProp
                     <div className="flex items-center gap-4 text-xs text-gray-600">
                       <div className="flex items-center gap-1.5 bg-white/60 px-2 py-1 rounded-lg">
                         <Star className="h-3.5 w-3.5 text-yellow-500" />
-                        <span className="font-medium">{(entry.points || 0).toLocaleString()} pts</span>
+                        <span className="font-medium">{(entry.points || entry.totalPoints || 0).toLocaleString()} pts</span>
                       </div>
                       <div className="flex items-center gap-1.5 bg-white/60 px-2 py-1 rounded-lg">
                         <Flame className="h-3.5 w-3.5 text-orange-500" />
@@ -378,7 +378,7 @@ export function Leaderboard({ limit = 50, showUserRank = true }: LeaderboardProp
             <div>
               <p className="text-sm text-gray-500">Top Points</p>
               <p className="font-bold text-gray-800">
-                {safeLeaderboard[0]?.points ? safeLeaderboard[0].points.toLocaleString() : "0"}
+                {safeLeaderboard[0]?.points || safeLeaderboard[0]?.totalPoints ? (safeLeaderboard[0].points || safeLeaderboard[0].totalPoints || 0).toLocaleString() : "0"}
               </p>
             </div>
           </div>

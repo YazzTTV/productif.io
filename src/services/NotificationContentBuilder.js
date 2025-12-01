@@ -4,6 +4,58 @@ class NotificationContentBuilder {
     constructor() {
         this.prisma = new PrismaClient();
     }
+    /**
+     * Construit uniquement la variable {{1}} du template productif_rappel_matin
+     * (liste des habitudes)
+     */
+    async buildMorningHabitsVariable(userId) {
+        try {
+            console.log('💫 Construction de la variable habitudes pour template');
+            const now = new Date();
+            const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            const offset = today.getTimezoneOffset() * 60000;
+            const todayUTC = new Date(today.getTime() - offset);
+            
+            // Récupérer les habitudes du jour
+            const dayNameEN = todayUTC.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+            const habits = await this.prisma.habit.findMany({
+                where: {
+                    userId,
+                    daysOfWeek: {
+                        has: dayNameEN
+                    }
+                },
+                include: {
+                    entries: {
+                        where: {
+                            date: todayUTC
+                        }
+                    }
+                }
+            });
+            
+            if (habits.length === 0) {
+                return "Aucune habitude prévue aujourd'hui.";
+            }
+            
+            // Construire la liste des habitudes (variable {{1}})
+            // WhatsApp templates n'acceptent pas les sauts de ligne dans les variables
+            // On utilise " • " comme séparateur
+            const habitsList = habits.map((habit, index) => {
+                const completed = habit.entries.length > 0 && habit.entries[0].completed;
+                const status = completed ? "✅" : "⭕";
+                return `${status} ${habit.name}`;
+            }).join(' • ');
+            
+            return habitsList;
+        }
+        catch (error) {
+            console.error('❌ Erreur dans buildMorningHabitsVariable:', error);
+            NotificationLogger.logError('Construction des habitudes du matin', error);
+            return "💫 Tes habitudes pour aujourd'hui";
+        }
+    }
+
     async buildMorningContent(userId) {
         try {
             console.log('🔍 Début de buildMorningContent pour userId:', userId);
@@ -69,80 +121,85 @@ class NotificationContentBuilder {
                 }
             });
             console.log('📋 Habitudes trouvées:', habits);
-            // Construire le message
+            
+            // Construire le message complet du matin
             let message = "🌅 C'est parti pour une nouvelle journée !\n\n";
-            if (tasks.length > 0) {
-                message += "🎯 Voici tes tâches prioritaires pour le deep work :\n";
-                tasks.forEach((task, index) => {
-                    const priorityLabel = task.priority === 4 ? "⚡️" :
-                        task.priority === 3 ? "🔥" :
-                            task.priority === 2 ? "⭐️" :
-                                task.priority === 1 ? "📌" : "📝";
-                    const energyLabel = task.energyLevel === 3 ? "🔋🔋🔋" :
-                        task.energyLevel === 2 ? "🔋🔋" : "🔋";
-                    message += `${index + 1}. ${priorityLabel} ${energyLabel} ${task.title}\n`;
-                });
-                message += "\n";
-            }
+            
             if (habits.length > 0) {
-                message += "💫 Tes habitudes pour aujourd'hui :\n";
+                message += "💫 Tes habitudes pour aujourd'hui :\n\n";
                 habits.forEach((habit, index) => {
                     const completed = habit.entries.length > 0 && habit.entries[0].completed;
-                    const status = completed ? "✅" : "⭕️";
+                    const status = completed ? "✅" : "⭕";
                     message += `${index + 1}. ${status} ${habit.name}\n`;
                 });
+            } else {
+                message += "Aucune habitude prévue aujourd'hui.\n";
             }
-            console.log('📤 Message final:', message);
+            
+            message += "\nBonne journée ! 💙";
+            
+            console.log('📤 Message du matin construit');
+            
             return message;
         }
         catch (error) {
             console.error('❌ Erreur dans buildMorningContent:', error);
             NotificationLogger.logError('Construction du contenu du matin', error);
-            return "🌅 C'est parti pour une nouvelle journée !";
+            return "💫 Tes habitudes pour aujourd'hui";
         }
     }
     async buildNoonContent(userId) {
         try {
+            console.log('💫 Construction des variables pour vérification de midi');
             const now = new Date();
-            // Créer une date pour aujourd'hui en heure locale, puis l'ajuster pour UTC
             const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-            // Ajuster pour que la date soit cohérente avec l'heure locale
-            const offset = today.getTimezoneOffset() * 60000;
-            const todayUTC = new Date(today.getTime() - offset);
-            const noon = new Date(todayUTC);
-            noon.setHours(12, 0, 0, 0);
-            // Récupérer toutes les tâches prioritaires (complétées et non complétées pour le bilan)
-            // Utiliser une date simple pour aujourd'hui sans décalage horaire
-            const todaySimple = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            const tomorrow = new Date(today);
+            tomorrow.setDate(tomorrow.getDate() + 1);
             
+            // Heure de midi pour limiter le temps de travail
+            const noon = new Date(today);
+            noon.setHours(12, 0, 0, 0);
+            
+            // Récupérer TOUTES les tâches du jour (comparer uniquement la date, pas l'heure)
             const morningTasks = await this.prisma.task.findMany({
                 where: {
                     userId,
                     OR: [
-                        { dueDate: { equals: todaySimple } },
-                        { scheduledFor: { equals: todaySimple } }
+                        { 
+                            dueDate: { 
+                                gte: today,
+                                lt: tomorrow
+                            } 
+                        },
+                        { 
+                            scheduledFor: { 
+                                gte: today,
+                                lt: tomorrow
+                            } 
+                        }
                     ],
+                    // Compter toutes les tâches avec une priorité (>=1)
                     priority: {
                         not: null,
-                        gte: 3
+                        gte: 1
                     }
-                },
-                orderBy: [
-                    { completed: 'asc' },
-                    { priority: 'desc' },
-                    { energyLevel: 'desc' }
-                ]
+                }
             });
-            // Récupérer le temps total passé ce matin
+            
+            // Récupérer le temps total passé ce matin (00:00 → 12:00)
             const timeEntries = await this.prisma.timeEntry.findMany({
                 where: {
                     userId,
                     startTime: {
-                        gte: todayUTC,
+                        gte: today,
                         lt: noon
+                    },
+                    endTime: {
+                        not: null
                     }
                 }
             });
+            
             let totalMinutes = 0;
             timeEntries.forEach(entry => {
                 if (entry.endTime) {
@@ -150,207 +207,156 @@ class NotificationContentBuilder {
                     totalMinutes += Math.floor(duration / 1000 / 60);
                 }
             });
-            // Construire le message
-            let message = "🕛 C'est l'heure de la pause déjeuner !\n\n";
             
             const completedTasks = morningTasks.filter(t => t.completed);
-            const pendingTasks = morningTasks.filter(t => !t.completed);
             
-            message += `📊 Bilan de la matinée :\n`;
-            message += `✅ ${completedTasks.length}/${morningTasks.length} tâches accomplies\n`;
-            message += `⏱ ${Math.floor(totalMinutes / 60)}h${totalMinutes % 60}min de travail\n\n`;
+            const hours = Math.floor(totalMinutes / 60);
+            const minutes = totalMinutes % 60;
             
-            if (pendingTasks.length > 0) {
-                message += "📝 Tâches restantes :\n";
-                pendingTasks.forEach((task, index) => {
-                    const priorityLabel = task.priority === 4 ? "⚡️" :
-                        task.priority === 3 ? "🔥" :
-                            task.priority === 2 ? "⭐️" :
-                                task.priority === 1 ? "📌" : "📝";
-                    message += `${index + 1}. ${priorityLabel} ${task.title}\n`;
+            console.log('📊 Bilan du midi:');
+            console.log(`   - ${completedTasks.length} tâches complétées sur ${morningTasks.length} totales`);
+            console.log(`   - ${hours}h${minutes}min de travail ce matin`);
+            if (morningTasks.length > 0) {
+                console.log('   Détail des tâches:');
+                morningTasks.forEach(t => {
+                    console.log(`     - ${t.completed ? '✅' : '❌'} ${t.title}`);
                 });
-                message += "\n";
             }
-            message += "\n💭 Comment s'est passée ta matinée ?\n";
-            message += "🍽 Bonne pause déjeuner ! On se retrouve après manger 😊";
+            
+            // Construire le message complet du midi
+            let message = "🕛 C'est l'heure de la pause déjeuner !\n\n";
+            message += "📊 Bilan de la matinée :\n\n";
+            message += `✅ ${completedTasks.length}/${morningTasks.length} tâches accomplies\n`;
+            message += `⏱ ${hours}h${minutes}min de travail\n\n`;
+            message += "💭 Comment s'est passée ta matinée ?\n\n";
+            message += "🍽 Bonne pause déjeuner ! On se retrouve après manger";
+            
             return message;
         }
         catch (error) {
+            console.error('❌ Erreur dans buildNoonContent:', error);
             NotificationLogger.logError('Construction du contenu du midi', error);
-            return "🕛 C'est l'heure de la pause déjeuner !";
+            return "🕛 C'est l'heure de la pause déjeuner !\n\n💭 Comment s'est passée ta matinée ?";
         }
     }
     async buildAfternoonContent(userId) {
         try {
+            console.log('💫 Construction du contenu rappel après-midi');
             const now = new Date();
-            // Créer une date pour aujourd'hui en heure locale, puis l'ajuster pour UTC
             const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-            // Ajuster pour que la date soit cohérente avec l'heure locale
             const offset = today.getTimezoneOffset() * 60000;
-            const startOfDay = new Date(today.getTime() - offset);
-            // Récupérer les tâches restantes
-            const remainingTasks = await this.prisma.task.findMany({
-                where: {
-                    userId,
-                    completed: false,
-                    OR: [
-                        { dueDate: { equals: startOfDay } },
-                        { scheduledFor: { equals: startOfDay } }
-                    ]
-                },
-                orderBy: [
-                    { priority: 'desc' },
-                    { dueDate: 'asc' }
-                ]
-            });
-            // Récupérer les habitudes non complétées
-            const dayNameEN = startOfDay.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
-            const uncompletedHabits = await this.prisma.habit.findMany({
+            const todayUTC = new Date(today.getTime() - offset);
+            
+            const dayNameEN = todayUTC.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+            const habits = await this.prisma.habit.findMany({
                 where: {
                     userId,
                     daysOfWeek: {
                         has: dayNameEN
-                    },
+                    }
+                },
+                include: {
                     entries: {
-                        none: {
-                            date: startOfDay,
-                            completed: true
+                        where: {
+                            date: todayUTC
                         }
                     }
                 }
             });
-            // Construire le message
+            
+            // Construire le message complet (sans template pour permettre les sauts de ligne)
+            // Le titre sera ajouté par formatWhatsAppMessage
             let message = "💪 Allez, c'est reparti !\n\n";
-            if (remainingTasks.length > 0) {
-                message += "📝 Voici ce qu'il te reste à faire :\n";
-                remainingTasks.forEach((task, index) => {
-                    const priorityLabel = task.priority === 4 ? "⚡️" :
-                        task.priority === 3 ? "🔥" :
-                            task.priority === 2 ? "⭐️" :
-                                task.priority === 1 ? "📌" : "📝";
-                    message += `${index + 1}. ${priorityLabel} ${task.title}\n`;
+            message += "💫 N'oublie pas tes habitudes :\n\n";
+            
+            if (habits.length === 0) {
+                message += "Aucune habitude prévue pour cet après-midi.\n\n";
+            } else {
+                habits.forEach((habit, index) => {
+                    const completed = habit.entries.length > 0 && habit.entries[0].completed;
+                    const status = completed ? "✅" : "⭕";
+                    message += `${index + 1}. ${status} ${habit.name}\n`;
                 });
                 message += "\n";
             }
-            if (uncompletedHabits.length > 0) {
-                message += "💫 N'oublie pas tes habitudes :\n";
-                uncompletedHabits.forEach((habit, index) => {
-                    message += `${index + 1}. ⭕️ ${habit.name}\n`;
-                });
-                message += "\n";
-            }
+            
             message += "🎯 On se retrouve quand tu as fini ! 🚀";
+            
             return message;
         }
         catch (error) {
+            console.error('❌ Erreur dans buildAfternoonContent:', error);
             NotificationLogger.logError('Construction du contenu de l\'après-midi', error);
-            return "💪 Allez, c'est reparti !";
+            return "☀ L'après-midi t'attend ! 💪";
         }
     }
     async buildEveningContent(userId) {
         try {
+            console.log('💫 Construction de la variable tâches pour planification du soir');
             const now = new Date();
-            // Créer une date pour aujourd'hui en heure locale, puis l'ajuster pour UTC
             const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-            // Ajuster pour que la date soit cohérente avec l'heure locale
-            const offset = today.getTimezoneOffset() * 60000;
-            const todayUTC = new Date(today.getTime() - offset);
-            const tomorrow = new Date(todayUTC);
+            const tomorrow = new Date(today);
             tomorrow.setDate(tomorrow.getDate() + 1);
-            // Récupérer les tâches d'aujourd'hui (utiliser date simple comme pour noon)
-            const todaySimple = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            
+            // Récupérer TOUTES les tâches du jour (comparer uniquement la date, pas l'heure)
             const todayTasks = await this.prisma.task.findMany({
                 where: {
                     userId,
                     OR: [
-                        { dueDate: { equals: todaySimple } },
-                        { scheduledFor: { equals: todaySimple } }
+                        { 
+                            dueDate: { 
+                                gte: today,
+                                lt: tomorrow
+                            } 
+                        },
+                        { 
+                            scheduledFor: { 
+                                gte: today,
+                                lt: tomorrow
+                            } 
+                        }
                     ],
+                    // Compter toutes les tâches avec une priorité (>=1)
                     priority: {
                         not: null,
-                        gte: 3
+                        gte: 1
                     }
                 }
             });
-            // Récupérer les tâches prioritaires pour demain
-            const tomorrowTasks = await this.prisma.task.findMany({
-                where: {
-                    userId,
-                    completed: false,
-                    OR: [
-                        { dueDate: { equals: tomorrow } },
-                        { scheduledFor: { equals: tomorrow } }
-                    ]
-                },
-                orderBy: [
-                    { priority: 'desc' },
-                    { dueDate: 'asc' }
-                ],
-                take: 5
-            });
-            // Récupérer les objectifs en cours
-            const objectives = await this.prisma.objective.findMany({
-                where: {
-                    mission: {
-                        userId,
-                        quarter: Math.floor(todayUTC.getMonth() / 3) + 1,
-                        year: todayUTC.getFullYear()
-                    },
-                    progress: {
-                        lt: 100
-                    }
-                },
-                orderBy: {
-                    progress: 'asc'
-                },
-                take: 3
-            });
-            // Construire le message
-            let message = "🌙 C'est l'heure du bilan et de préparer demain !\n\n";
-            // Bilan du jour
+            
             const completedTasks = todayTasks.filter(t => t.completed);
-            message += `📊 Bilan du jour :\n`;
+            
+            console.log('📊 Bilan du soir:');
+            console.log(`   - ${completedTasks.length} tâches complétées sur ${todayTasks.length} totales`);
+            if (todayTasks.length > 0) {
+                console.log('   Détail des tâches:');
+                todayTasks.forEach(t => {
+                    console.log(`     - ${t.completed ? '✅' : '❌'} ${t.title}`);
+                });
+            }
+            
+            // Construire le message complet du soir
+            let message = "🌙 C'est l'heure du bilan et de préparer demain !\n\n";
+            message += "📊 Bilan du jour :\n\n";
             message += `✅ ${completedTasks.length}/${todayTasks.length} tâches accomplies\n\n`;
-            // Objectifs en cours
-            if (objectives.length > 0) {
-                message += "🎯 Objectifs en cours :\n";
-                objectives.forEach((objective, index) => {
-                    const progressBar = this.generateProgressBar(objective.progress);
-                    message += `${index + 1}. ${objective.title}\n   ${progressBar} ${Math.round(objective.progress)}%\n`;
-                });
-                message += "\n";
-            }
-            // Tâches pour demain
-            if (tomorrowTasks.length > 0) {
-                message += "📝 Suggestions pour demain :\n";
-                tomorrowTasks.forEach((task, index) => {
-                    const priorityLabel = task.priority === 4 ? "⚡️" :
-                        task.priority === 3 ? "🔥" :
-                            task.priority === 2 ? "⭐️" :
-                                task.priority === 1 ? "📌" : "📝";
-                    message += `${index + 1}. ${priorityLabel} ${task.title}\n`;
-                });
-            }
-            message += "\n📱 Pour créer une tâche, réponds avec ce format :\n";
-            message += "📌 titre: [Titre de la tâche]\n";
-            message += "⚡️ priorité: 1-4 (1:basse, 4:urgente)\n";
-            message += "🔋 énergie: 1-3 (1:faible, 3:élevée)\n";
-            message += "📅 date: JJ/MM (optionnel)";
+            message += "📱 Pour créer une tâche : dit simplement \"planifie ma journée de demain\"";
+            
             return message;
         }
         catch (error) {
+            console.error('❌ Erreur dans buildEveningContent:', error);
             NotificationLogger.logError('Construction du contenu du soir', error);
             return "🌙 C'est l'heure du bilan et de préparer demain !";
         }
     }
     async buildNightContent(userId) {
         try {
+            console.log('💫 Construction des variables pour vérification de nuit');
             const now = new Date();
-            // Créer une date pour aujourd'hui en heure locale, puis l'ajuster pour UTC
             const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-            // Ajuster pour que la date soit cohérente avec l'heure locale
             const offset = today.getTimezoneOffset() * 60000;
             const todayUTC = new Date(today.getTime() - offset);
+            
             // Récupérer les habitudes du jour
             const dayNameEN = todayUTC.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
             const habits = await this.prisma.habit.findMany({
@@ -368,6 +374,7 @@ class NotificationContentBuilder {
                     }
                 }
             });
+            
             // Récupérer les statistiques de la journée
             const timeEntries = await this.prisma.timeEntry.findMany({
                 where: {
@@ -384,6 +391,7 @@ class NotificationContentBuilder {
                     endTime: true
                 }
             });
+            
             // Calculer la durée totale en minutes
             const totalDuration = timeEntries.reduce((sum, entry) => {
                 if (entry.endTime) {
@@ -393,31 +401,52 @@ class NotificationContentBuilder {
                 }
                 return sum;
             }, 0);
-            // Construire le message
-            let message = "🌙 Dernière étape avant d'aller dormir !\n\n";
-            if (habits.length > 0) {
-                const completedHabits = habits.filter(h => h.entries.length > 0 && h.entries[0].completed);
-                message += `📊 Habitudes du jour : ${completedHabits.length}/${habits.length}\n\n`;
-                message += "💫 État des habitudes :\n";
+            
+            const completedHabits = habits.filter(h => h.entries.length > 0 && h.entries[0].completed);
+            
+            // Calculer le ratio
+            const habitRatio = `${completedHabits.length}/${habits.length}`;
+            
+            // Construire la liste détaillée avec sauts de ligne
+            let habitsList = "";
+            if (habits.length === 0) {
+                habitsList = "Aucune habitude prévue aujourd'hui.";
+            } else {
                 habits.forEach((habit, index) => {
                     const completed = habit.entries.length > 0 && habit.entries[0].completed;
-                    const status = completed ? "✅" : "⭕️";
-                    message += `${index + 1}. ${status} ${habit.name}\n`;
+                    const status = completed ? "✅" : "⭕";
+                    habitsList += `${index + 1}. ${status} ${habit.name}\n`;
                 });
-                message += "\n";
+                habitsList = habitsList.trim();
             }
-            if (totalDuration > 0) {
-                const hours = Math.floor(totalDuration / 60);
-                const minutes = totalDuration % 60;
-                message += `⏱ Temps de travail total : ${hours}h${minutes}min\n\n`;
-            }
+            
+            // Calculer le temps de travail
+            const hours = Math.floor(totalDuration / 60);
+            const minutes = totalDuration % 60;
+            const timeWorked = `${hours}h${minutes}min`;
+            
+            console.log('📊 Bilan de nuit:', { 
+                habitRatio, 
+                habitsCount: habits.length,
+                timeWorked 
+            });
+            
+            // Construire le message complet (sans template pour permettre les sauts de ligne)
+            let message = "✨ Bilan de ta journée\n\n";
+            message += "🌙 Dernière étape avant d'aller dormir !\n\n";
+            message += `📊 Habitudes du jour : ${habitRatio}\n\n`;
+            message += "💫 État des habitudes :\n\n";
+            message += `${habitsList}\n\n`;
+            message += `⏱ Temps de travail total : ${timeWorked}\n\n`;
             message += "💭 Prends 2 minutes pour compléter et noter comment s'est passée ta journée.\n\n";
             message += "🌅 On se retrouve demain matin pour une nouvelle journée productive ! 💪";
+            
             return message;
         }
         catch (error) {
+            console.error('❌ Erreur dans buildNightContent:', error);
             NotificationLogger.logError('Construction du contenu de la nuit', error);
-            return "🌙 Dernière étape avant d'aller dormir !";
+            return "✨ Bilan de ta journée\n\n🌙 Une erreur est survenue lors de la génération du bilan.";
         }
     }
     generateProgressBar(percentage) {

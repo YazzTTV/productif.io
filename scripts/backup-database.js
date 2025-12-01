@@ -53,9 +53,16 @@ try {
   // Exporter le schéma Prisma pour référence
   const schemaPath = path.join(backupDir, `schema_${dateStr}.prisma`);
   try {
-    // Utiliser le schéma web.prisma au lieu du schéma par défaut
-    fs.copyFileSync(path.join(__dirname, '../prisma/schema.web.prisma'), schemaPath);
-    console.log(`Schéma Prisma copié vers ${schemaPath}`);
+    // Utiliser le schéma principal schema.prisma qui contient tous les modèles
+    const schemaSourcePath = path.join(__dirname, '../prisma/schema.prisma');
+    if (fs.existsSync(schemaSourcePath)) {
+      fs.copyFileSync(schemaSourcePath, schemaPath);
+      console.log(`Schéma Prisma copié vers ${schemaPath}`);
+    } else {
+      console.warn(`Le fichier ${schemaSourcePath} n'existe pas, tentative avec schema.web.prisma...`);
+      fs.copyFileSync(path.join(__dirname, '../prisma/schema.web.prisma'), schemaPath);
+      console.log(`Schéma Prisma (web) copié vers ${schemaPath}`);
+    }
   } catch (err) {
     console.error(`Impossible de copier le schéma Prisma: ${err.message}`);
   }
@@ -66,18 +73,41 @@ try {
     datasourceUrl: process.env.DATABASE_URL,
   });
   
-  // Liste complète des modèles à exporter
-  const models = [
+  // Fonction pour détecter automatiquement tous les modèles Prisma disponibles
+  function detectPrismaModels() {
+    const models = [];
+    const excludedKeys = ['$connect', '$disconnect', '$on', '$transaction', '$use', '$extends', '_base', '_dmmf', '_engine', '_fetcher', '_queryEngine', '_runtime'];
+    
+    // Parcourir toutes les propriétés du client Prisma
+    for (const key in prisma) {
+      // Ignorer les méthodes internes et les propriétés système
+      if (excludedKeys.includes(key) || key.startsWith('_') || key.startsWith('$')) {
+        continue;
+      }
+      
+      // Vérifier si c'est un modèle (a une méthode findMany)
+      if (prisma[key] && typeof prisma[key].findMany === 'function') {
+        // Convertir camelCase en PascalCase pour le nom du modèle
+        const modelName = key.charAt(0).toUpperCase() + key.slice(1);
+        models.push(modelName);
+      }
+    }
+    
+    return models.sort(); // Trier par ordre alphabétique
+  }
+  
+  // Liste manuelle des modèles (fallback si la détection automatique échoue)
+  const manualModels = [
     // Tables principales
     'User', 'Company', 'UserCompany', 'Session', 'Project',
-    'Process', 'Task', 'TimeEntry',
+    'Process', 'ProcessStep', 'Task', 'TimeEntry', 'DeepWorkSession',
     
     // Tables de gamification
     'UserGamification', 'Achievement', 'UserAchievement',
     'StreakHistory',
     
     // Tables de notifications
-    'NotificationSettings',
+    'NotificationSettings', 'NotificationHistory',
     
     // Tables de missions et objectifs
     'Mission', 'Objective', 'ObjectiveAction', 'Initiative',
@@ -87,14 +117,46 @@ try {
     'ApiToken', 'WaitlistEntry',
     
     // Tables d'habitudes
-    'Habit', 'HabitEntry'
+    'Habit', 'HabitEntry',
+    
+    // Tables WhatsApp
+    'WhatsAppConversation', 'WhatsAppMessage',
+    
+    // Tables de journal et insights
+    'JournalEntry', 'DailyInsight',
+    
+    // Tables d'analyse comportementale
+    'BehaviorCheckIn', 'BehaviorPattern', 'CheckInSchedule',
+    'UserConversationState',
+    
+    // Tables de notifications d'essai et interactions agent
+    'TrialNotification', 'AgentInteraction'
   ];
+  
+  // Détecter automatiquement les modèles ou utiliser la liste manuelle
+  let models;
+  try {
+    models = detectPrismaModels();
+    console.log(`✅ Détection automatique: ${models.length} modèles trouvés`);
+    if (models.length === 0) {
+      console.warn('⚠️ Aucun modèle détecté automatiquement, utilisation de la liste manuelle');
+      models = manualModels;
+    }
+  } catch (err) {
+    console.warn(`⚠️ Erreur lors de la détection automatique: ${err.message}`);
+    console.log('Utilisation de la liste manuelle des modèles');
+    models = manualModels;
+  }
+  
+  console.log(`📋 Modèles à exporter: ${models.join(', ')}\n`);
   
   // Fonction pour extraire les données
   async function exportData() {
     try {
       const data = {};
       let totalRecords = 0;
+      const exportedModels = [];
+      const skippedModels = [];
       
       // Extraire les données pour chaque modèle
       for (const model of models) {
@@ -104,18 +166,29 @@ try {
           const modelName = model.charAt(0).toLowerCase() + model.slice(1);
           
           // Vérifier si le modèle existe dans le client Prisma
-          if (typeof prisma[modelName] !== 'undefined') {
+          if (typeof prisma[modelName] !== 'undefined' && typeof prisma[modelName].findMany === 'function') {
             data[model] = await prisma[modelName].findMany();
             totalRecords += data[model].length;
-            console.log(`  - ${data[model].length} enregistrements exportés`);
+            exportedModels.push(model);
+            console.log(`  ✅ ${data[model].length} enregistrements exportés`);
           } else {
-            console.warn(`  - Le modèle ${model} n'est pas disponible dans le client Prisma`);
+            console.warn(`  ⚠️ Le modèle ${model} n'est pas disponible dans le client Prisma`);
+            skippedModels.push(model);
+            data[model] = [];
           }
         } catch (err) {
-          console.error(`  - Erreur lors de l'exportation du modèle ${model}: ${err.message}`);
+          console.error(`  ❌ Erreur lors de l'exportation du modèle ${model}: ${err.message}`);
+          skippedModels.push(model);
           // Sauvegarder quand même une liste vide pour ce modèle
           data[model] = [];
         }
+      }
+      
+      // Afficher un résumé
+      console.log(`\n📊 Résumé de l'exportation:`);
+      console.log(`  ✅ Modèles exportés avec succès: ${exportedModels.length}`);
+      if (skippedModels.length > 0) {
+        console.log(`  ⚠️ Modèles ignorés/erreurs: ${skippedModels.length} (${skippedModels.join(', ')})`);
       }
       
       // Écrire les données dans un fichier JSON

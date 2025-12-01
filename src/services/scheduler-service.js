@@ -59,6 +59,23 @@ async function startSchedulerService() {
             }
         });
 
+        // Endpoint de test pour générer des logs
+        app.get('/api/test-logs', (req, res) => {
+            console.log('📝 TEST LOGS - Requête reçue à', new Date().toISOString());
+            console.log('📊 Statut du scheduler:', scheduler ? 'ACTIF' : 'INACTIF');
+            if (scheduler) {
+                const status = scheduler.getStatus();
+                console.log('📈 Jobs actifs:', status.activeJobs);
+                console.log('🔄 Système réactif:', status.reactiveSystem?.isStarted ? 'ACTIF' : 'INACTIF');
+            }
+            res.json({ 
+                success: true, 
+                message: 'Logs générés - Vérifiez les Deploy Logs sur Railway',
+                timestamp: new Date().toISOString(),
+                schedulerActive: scheduler !== null
+            });
+        });
+
         // Endpoint pour déclencher immédiatement le traitement des notifications
         app.post('/api/process-now', async (req, res) => {
             try {
@@ -73,6 +90,31 @@ async function startSchedulerService() {
             } catch (error) {
                 console.error('Erreur process-now:', error);
                 return res.status(500).json({ error: 'Erreur lors du traitement immédiat' });
+            }
+        });
+
+        // Endpoint pour recharger les check-in schedules
+        app.post('/api/reload-checkin-schedules', async (req, res) => {
+            try {
+                const { userId } = req.body;
+                
+                // Importer dynamiquement le BehaviorCheckInScheduler
+                const { behaviorCheckInScheduler } = await import('../../lib/behavior/BehaviorCheckInScheduler.js');
+                
+                if (userId) {
+                    // Recharger le schedule pour un utilisateur spécifique
+                    await behaviorCheckInScheduler.updateUserSchedule(userId);
+                    console.log(`✅ Check-in schedule rechargé pour l'utilisateur ${userId}`);
+                    res.json({ success: true, message: `Schedule rechargé pour ${userId}` });
+                } else {
+                    // Recharger tous les schedules
+                    await behaviorCheckInScheduler.reloadAllSchedules();
+                    console.log('✅ Tous les check-in schedules rechargés');
+                    res.json({ success: true, message: 'Tous les schedules rechargés' });
+                }
+            } catch (error) {
+                console.error('❌ Erreur reload-checkin-schedules:', error);
+                res.status(500).json({ error: 'Erreur serveur' });
             }
         });
 
@@ -134,8 +176,8 @@ async function startSchedulerService() {
         console.log('✅ Planificateur démarré');
 
         // 3. Démarrer le serveur pour le healthcheck
-        // Railway fournit PORT; local on peut utiliser SCHEDULER_PORT ou 3001
-        const port = Number(process.env.SCHEDULER_PORT || process.env.PORT) || 3001;
+        // Railway fournit PORT; local on peut utiliser SCHEDULER_PORT ou 3002
+        const port = Number(process.env.PORT || process.env.SCHEDULER_PORT) || 3002;
         app.listen(port, () => {
             console.log(`🌐 Serveur de monitoring démarré sur le port ${port}`);
             console.log(`📊 Status disponible sur http://localhost:${port}/status`);

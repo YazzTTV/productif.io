@@ -6,8 +6,9 @@ import { TaskAnalysisService } from '@/lib/ai/TaskAnalysisService'
 import { prisma } from '@/lib/prisma'
 import { calculateTaskOrder } from '@/lib/tasks'
 
-// Augmenter le timeout pour permettre l'analyse IA (jusqu'à 60 secondes)
-export const maxDuration = 60
+// Configuration pour augmenter le timeout sur Vercel
+export const maxDuration = 60 // 60 secondes
+export const dynamic = 'force-dynamic'
 
 export async function POST(req: NextRequest) {
   try {
@@ -107,13 +108,22 @@ export async function POST(req: NextRequest) {
     // Analyser avec l'IA
     console.log('🤖 Analyse IA en cours...')
     const analysis = await TaskAnalysisService.analyzeTasks(userInput, userContext)
+    console.log(`📅 Date détectée par l'IA : ${analysis.targetDate || 'Non détectée (demain par défaut)'}`)
 
     // Organiser par moment de la journée
     const organized = TaskAnalysisService.organizeTasks(analysis.tasks)
 
-    // Date cible (demain par défaut)
-    const targetDate = date ? new Date(date) : new Date()
-    if (!date) {
+    // Date cible (détectée par l'IA ou spécifiée par le paramètre, ou demain par défaut)
+    let targetDate: Date
+    if (date) {
+      // Date explicitement fournie dans les paramètres
+      targetDate = new Date(date)
+    } else if (analysis.targetDate) {
+      // Date détectée par l'IA depuis le langage naturel
+      targetDate = new Date(analysis.targetDate)
+    } else {
+      // Par défaut : demain
+      targetDate = new Date()
       targetDate.setDate(targetDate.getDate() + 1)
     }
     targetDate.setHours(0, 0, 0, 0)

@@ -14,6 +14,7 @@ export interface TaskAnalysisResult {
   tasks: AnalyzedTask[]
   summary: string
   totalEstimatedTime: number
+  targetDate?: string // Date ISO pour laquelle planifier (détectée automatiquement)
 }
 
 const openai = new OpenAI({
@@ -72,13 +73,26 @@ Ton rôle : analyser une liste de tâches décrite en langage naturel et extrair
 
 Si une deadline est mentionnée, augmente automatiquement la priorité de +1.
 
+**Détection de la DATE CIBLE** :
+Analyse le contexte pour déterminer QUAND l'utilisateur veut faire ces tâches :
+- "aujourd'hui", "ce matin", "cet après-midi", "ce soir" → aujourd'hui (date actuelle)
+- "demain", "demain matin", "demain après-midi" → demain (+1 jour)
+- "lundi", "mardi", "mercredi", etc. → prochain jour de la semaine mentionné
+- "la semaine prochaine" → lundi prochain
+- "dans 3 jours", "dans une semaine" → calcul de date
+- Par défaut si non mentionné → demain
+
+Retourne la date au format ISO (YYYY-MM-DD).
+
 Réponds UNIQUEMENT au format JSON valide.`
 
-    const userPrompt = `Voici ce que l'utilisateur doit faire demain :
+    const userPrompt = `Voici ce que l'utilisateur doit faire :
 
 """
 ${userInput}
 """
+
+**IMPORTANT** : Détecte QUAND l'utilisateur veut faire ces tâches en analysant les indices temporels dans son message.
 
 ${userContext ? `
 Contexte utilisateur :
@@ -86,8 +100,12 @@ Contexte utilisateur :
 - Projets en cours : ${userContext.projects || 'Non spécifié'}
 ` : ''}
 
+Date et heure actuelles : ${new Date().toISOString()}
+Jour de la semaine actuel : ${new Date().toLocaleDateString('fr-FR', { weekday: 'long' })}
+
 Réponds UNIQUEMENT en JSON avec cette structure :
 {
+  "targetDate": "YYYY-MM-DD (date pour laquelle planifier les tâches)",
   "tasks": [
     {
       "title": "Titre court et clair",
@@ -110,7 +128,8 @@ Réponds UNIQUEMENT en JSON avec cette structure :
           { role: 'user', content: userPrompt }
         ],
         temperature: 0.3,
-        response_format: { type: 'json_object' as any }
+        response_format: { type: 'json_object' as any },
+        max_tokens: 2000 // Limiter pour accélérer la réponse
       })
 
       const content = response.choices[0].message.content
