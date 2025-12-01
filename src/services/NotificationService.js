@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+npimport { PrismaClient } from '@prisma/client';
 import WhatsAppService from './whatsappService.js';
 import NotificationLogger from './NotificationLogger.js';
 import NotificationContentBuilder from './NotificationContentBuilder.js';
@@ -49,46 +49,84 @@ class NotificationService {
         }
     }
     async processNotification(notification) {
+        const processingId = Math.random().toString(36).substring(7);
+        console.log(`🔵 [${processingId}] DÉBUT processNotification pour notification ${notification.id} - PID: ${process.pid}`);
         NotificationLogger.logNotificationProcessing(notification);
         try {
             const now = new Date();
+            
+            // 🛡️ PROTECTION ANTI-DOUBLON : Marquer immédiatement comme 'processing' avec vérification atomique
+            console.log(`🔵 [${processingId}] Tentative de claim pour notification ${notification.id}`);
+            const claimed = await this.prisma.notificationHistory.updateMany({
+                where: {
+                    id: notification.id,
+                    status: 'pending' // Ne mettre à jour QUE si encore 'pending'
+                },
+                data: {
+                    status: 'processing'
+                }
+            });
+
+            console.log(`🔵 [${processingId}] Claim result: ${claimed.count} ligne(s) mises à jour`);
+            
+            // Si aucune ligne mise à jour, la notification a déjà été traitée par un autre processus
+            if (claimed.count === 0) {
+                console.log(`⚠️ [${processingId}] Notification ${notification.id} déjà en cours de traitement, ignorée`);
+                return;
+            }
+
             // Vérifier si l'utilisateur accepte les notifications à cette heure
             if (!this.canSendNotification(notification.user.notificationSettings, now)) {
                 console.log(`⏳ Notification reportée :`);
                 console.log(`  - Raison: Hors plage horaire`);
                 console.log(`  - Heure actuelle: ${now.getHours()}h${now.getMinutes()}`);
                 console.log(`  - Plage autorisée: ${notification.user.notificationSettings.startHour}h-${notification.user.notificationSettings.endHour}h`);
+                
+                // Remettre en pending pour traitement ultérieur
+                await this.prisma.notificationHistory.update({
+                    where: { id: notification.id },
+                    data: { status: 'pending' }
+                });
                 return;
             }
+            
             // Vérifier les canaux de notification disponibles
             const settings = notification.user.notificationSettings;
             const userPhoneNumber = notification.user.whatsappNumber || settings?.whatsappNumber;
 
             if (!settings?.whatsappEnabled || !userPhoneNumber) {
                 NotificationLogger.logError('Configuration WhatsApp', new Error('WhatsApp non configuré pour l\'utilisateur'));
-                return;
-            }
-            // Tentative d'envoi WhatsApp
-            await this.whatsappService.sendMessage(userPhoneNumber, this.formatWhatsAppMessage(notification));
-            // Vérifier si la notification existe toujours
-            const existingNotification = await this.prisma.notificationHistory.findUnique({
-                where: { id: notification.id }
-            });
-            if (existingNotification) {
-                // Marquer comme envoyée
                 await this.prisma.notificationHistory.update({
                     where: { id: notification.id },
                     data: {
-                        status: 'sent',
-                        sentAt: now
+                        status: 'failed',
+                        error: 'WhatsApp non configuré'
                     }
                 });
-                console.log(`✅ Notification envoyée avec succès`);
-                console.log(`  - Heure d'envoi: ${now.toLocaleTimeString()}`);
+                return;
             }
-            else {
-                NotificationLogger.logError('Mise à jour du statut', new Error('Notification non trouvée dans la base de données'));
-            }
+            
+            // Système de templates désactivé - tous les messages sont envoyés en texte normal
+            console.log(`🔵 [${processingId}] Envoi WhatsApp pour notification ${notification.id} (type: ${notification.type}, mode: texte normal)`);
+            
+            // Formater le message avec titre
+            const messageContent = this.formatWhatsAppMessage(notification);
+            
+            // Envoyer sans template
+            await this.whatsappService.sendMessage(userPhoneNumber, messageContent, notification.id, null);
+            console.log(`🔵 [${processingId}] WhatsApp envoyé avec succès pour notification ${notification.id}`);
+            
+            // Marquer comme envoyée
+            await this.prisma.notificationHistory.update({
+                where: { id: notification.id },
+                data: {
+                    status: 'sent',
+                    sentAt: now
+                }
+            });
+            
+            console.log(`✅ [${processingId}] Notification ${notification.id} envoyée avec succès`);
+            console.log(`  - Heure d'envoi: ${now.toLocaleTimeString()}`);
         }
         catch (error) {
             NotificationLogger.logError('Traitement de notification', error);
@@ -129,8 +167,16 @@ class NotificationService {
     }
     formatWhatsAppMessage(notification) {
         const title = getNotificationTitle(notification.type);
-        let message = `${title}\n\n`;
-        message += notification.content;
+        let message = '';
+        
+        // Si le contenu commence déjà par le titre, ne pas le dupliquer
+        if (notification.content && notification.content.startsWith(title)) {
+            message = notification.content;
+        } else {
+            message = `${title}\n\n`;
+            message += notification.content;
+        }
+        
         message += '\n\n_Envoyé via Productif.io_';
         return message;
     }

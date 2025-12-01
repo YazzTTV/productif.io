@@ -27,12 +27,12 @@ RUN npx prisma generate
 # Copy the rest of the application
 COPY . .
 
-ARG PORT=3001
-ENV PORT=$PORT
+# Railway définit automatiquement PORT, on utilise une valeur par défaut si non définie
+ENV PORT=${PORT:-3001}
 EXPOSE $PORT
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-  CMD curl -fsS http://localhost:$PORT/health || exit 1
+  CMD curl -fsS http://localhost:${PORT:-3001}/health || exit 1
 
 # Start: run migrations then launch the AI service
 CMD ["sh", "-lc", "npx prisma migrate deploy && npm run start:ai"]

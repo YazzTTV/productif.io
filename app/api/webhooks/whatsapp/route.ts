@@ -2,11 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { handleDeepWorkCommand } from '@/lib/agent/handlers/deepwork.handler'
 import { generateApiToken } from '@/lib/api-token'
-import { handleJournalVoiceNote, handleJournalTextCommand } from '@/lib/agent/handlers/journal.handler'
+import { handleJournalTextCommand, transcribeVoiceMessage } from '@/lib/agent/handlers/journal.handler'
 import { handleBehaviorCheckInCommand } from '@/lib/agent/handlers/behavior.handler'
 import { handleTaskPlanningCommand } from '@/lib/agent/handlers/task-planning.handler'
+import { handleHelpRequest } from '@/lib/agent/handlers/help.handler'
 import { TrialService } from '@/lib/trial/TrialService'
-import { sendWhatsAppMessage } from '@/lib/whatsapp'
+import { whatsappService } from '@/lib/whatsapp'
+import { IntentDetectionService } from '@/lib/ai/IntentDetectionService'
+import { IntelligentActionRouter } from '@/lib/agent/IntelligentActionRouter'
 
 // GET: Verification endpoint for WhatsApp webhook (optional)
 export async function GET(req: NextRequest) {
@@ -86,7 +89,7 @@ export async function POST(req: NextRequest) {
       message += '💡 *Offre spéciale :* Commencez maintenant et profitez de toutes les fonctionnalités.\n\n'
       message += 'À très bientôt ! 💙'
       
-      await sendWhatsAppMessage(phoneNumber, message)
+      await whatsappService.sendMessage(phoneNumber, message)
       return new NextResponse('OK', { status: 200 })
     }
     
@@ -108,11 +111,31 @@ export async function POST(req: NextRequest) {
     // Ensure we have an API token for calling internal Deep Work API
     const apiToken = await getOrCreateApiTokenForUser(user.id)
 
-    // 1) Audio → Journal
+    // 1) Audio → Transcrire et traiter comme conversation normale
+    // Le journaling sera géré automatiquement par SpecialHabitsHandler lors de la complétion de "note de sa journée"
     if (messageType === 'audio' && audioId) {
-      await handleJournalVoiceNote(audioId, user.id, phoneNumber, apiToken)
-      return new NextResponse('OK', { status: 200 })
+      const transcriptionResult = await transcribeVoiceMessage(audioId, phoneNumber)
+      
+      if (transcriptionResult.success && transcriptionResult.text) {
+        // Traiter comme une conversation normale avec l'agent IA
+        // Le journaling sera enregistré uniquement quand l'utilisateur complète "note de sa journée" via SpecialHabitsHandler
+        messageText = transcriptionResult.text
+        console.log('🎙️ Message vocal transcrit traité comme conversation:', messageText)
+      } else {
+        // Erreur de transcription, répondre avec un message d'erreur
+        await sendWhatsAppMessage(
+          phoneNumber,
+          "❌ Je n'ai pas pu transcrire ton message vocal. Réessaye dans quelques instants."
+        )
+        return new NextResponse('OK', { status: 200 })
+      }
     }
+
+    // 1.5) Text → Help requests (doit être AVANT task planning pour éviter les faux positifs)
+    // Détecter les demandes d'aide en priorité pour éviter qu'elles soient traitées comme des créations de tâches
+    const userContext = await getUserContext(user.id)
+    const helpHandled = await handleHelpRequest(messageText, user.id, phoneNumber, userContext)
+    if (helpHandled) return new NextResponse('OK', { status: 200 })
 
     // 2) Text → Task Planning commands (doit être avant les autres pour intercepter les demandes de planification)
     const planningHandled = await handleTaskPlanningCommand(messageText, user.id, phoneNumber, apiToken)
@@ -130,10 +153,154 @@ export async function POST(req: NextRequest) {
     const handled = await handleDeepWorkCommand(messageText, user.id, phoneNumber, apiToken)
     if (handled) return new NextResponse('OK', { status: 200 })
 
-    return NextResponse.json({ status: 'ignored', reason: 'no deepwork command' })
+    // 6) NOUVEAU SYSTÈME INTELLIGENT : Détection d'intention par IA (fallback)
+    // Si aucun handler existant n'a géré le message, utiliser le système intelligent
+    try {
+      console.log(`📨 Message non géré par handlers existants: "${messageText}"`)
+      console.log('🤖 Détection d\'intention avec IA...')
+
+      const startTime = Date.now()
+
+      // Récupérer le contexte utilisateur (déjà récupéré plus haut, réutiliser)
+      // const userContext = await getUserContext(user.id)
+
+      // Détecter l'intention avec l'IA
+      const intent = await IntentDetectionService.detectIntent(messageText, userContext)
+      const intentTime = Date.now() - startTime
+
+      console.log(`🎯 Intention détectée: ${intent.category} (confiance: ${(intent.confidence * 100).toFixed(0)}%)`)
+
+      // Router vers l'action appropriée
+      const result = await IntelligentActionRouter.routeIntent(
+        intent,
+        user.id,
+        phoneNumber,
+        apiToken,
+        messageText
+      )
+
+      const totalTime = Date.now() - startTime
+
+      // Si action non gérée, générer réponse conversationnelle
+      if (!result.handled || result.response.includes("pas compris")) {
+        console.log('💬 Génération réponse conversationnelle...')
+        
+        const conversationalResponse = await IntentDetectionService.generateConversationalResponse(
+          messageText,
+          intent,
+          userContext
+        )
+
+        await sendWhatsAppMessage(phoneNumber, conversationalResponse)
+
+        // Log de l'interaction
+        await logInteraction(user.id, messageText, intent, {
+          ...result,
+          responseTime: totalTime
+        })
+
+        return new NextResponse('OK', { status: 200 })
+      } else {
+        // Envoyer la réponse générée par l'action (seulement si elle n'est pas vide)
+        // Certains handlers (comme help.handler) envoient déjà le message directement
+        if (result.response && result.response.trim().length > 0) {
+          await sendWhatsAppMessage(phoneNumber, result.response)
+        }
+
+        // Log de l'interaction
+        await logInteraction(user.id, messageText, intent, {
+          ...result,
+          responseTime: totalTime
+        })
+
+        return new NextResponse('OK', { status: 200 })
+      }
+    } catch (error) {
+      console.error('❌ Erreur système intelligent:', error)
+      // En cas d'erreur, ne pas bloquer - retourner OK pour éviter les retries
+      return new NextResponse('OK', { status: 200 })
+    }
   } catch (error: any) {
     console.error('WhatsApp webhook error:', error)
     return NextResponse.json({ error: 'Internal server error', details: error?.message || 'Unknown' }, { status: 500 })
+  }
+}
+
+// ===== FONCTIONS HELPERS =====
+
+async function getUserContext(userId: string) {
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const [pendingTasks, completedToday, activeSession, habits] = await Promise.all([
+      prisma.task.count({
+        where: {
+          userId,
+          completed: false
+        }
+      }),
+      prisma.task.count({
+        where: {
+          userId,
+          dueDate: { gte: today, lt: tomorrow },
+          completed: true
+        }
+      }),
+      prisma.deepWorkSession.findFirst({
+        where: {
+          userId,
+          status: 'active'
+        }
+      }),
+      prisma.habit.count({
+        where: { userId }
+      })
+    ]);
+
+    // Estimer le niveau d'énergie basé sur l'heure
+    const hour = new Date().getHours();
+    let energyLevel = 'moyen';
+    if (hour >= 8 && hour < 12) energyLevel = 'élevé';
+    else if (hour >= 20 || hour < 7) energyLevel = 'faible';
+
+    return {
+      pendingTasks,
+      completedToday,
+      hasActiveSession: !!activeSession,
+      todayHabits: habits,
+      energyLevel
+    };
+  } catch (error) {
+    console.error('Erreur récupération contexte utilisateur:', error);
+    return {};
+  }
+}
+
+async function logInteraction(
+  userId: string,
+  message: string,
+  intent: any,
+  result: any
+) {
+  try {
+    await prisma.agentInteraction.create({
+      data: {
+        userId,
+        message,
+        intentType: intent.type,
+        intentCategory: intent.category,
+        confidence: intent.confidence,
+        actionExecuted: result.actionExecuted || 'none',
+        handled: result.handled,
+        emotionalContext: intent.emotionalContext,
+        responseTime: result.responseTime
+      }
+    });
+  } catch (error) {
+    console.error('Erreur log interaction:', error);
   }
 }
 

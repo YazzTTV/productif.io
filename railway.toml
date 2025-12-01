@@ -1,6 +1,6 @@
 [build]
 builder = "DOCKERFILE"
-dockerfilePath = "Dockerfile.scheduler"
+dockerfilePath = "Dockerfile.ai"
 
 [deploy]
 healthcheckPath = "/health"
@@ -15,3 +15,6 @@ OPENAI_API_KEY = "${{Secrets.OPENAI_API_KEY}}"
 WHATSAPP_ACCESS_TOKEN = "${{Secrets.WHATSAPP_ACCESS_TOKEN}}"
 WHATSAPP_VERIFY_TOKEN = "${{Secrets.WHATSAPP_VERIFY_TOKEN}}"
 WHATSAPP_PHONE_NUMBER_ID = "${{Secrets.WHATSAPP_PHONE_NUMBER_ID}}"
+NEXT_PUBLIC_APP_URL = "${{Secrets.NEXT_PUBLIC_APP_URL}}"
+# Railway définit automatiquement PORT, donc on utilise PORT en production
+# En local, on utilise AI_PORT=3001
