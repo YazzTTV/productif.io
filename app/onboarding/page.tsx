@@ -167,36 +167,6 @@ export default function OnboardingPage() {
     />
   )
 }
-    insight: "Vous n'avez plus besoin de penser à quoi faire — l'IA le fait pour vous.",
-    image: "/dashboard-productif.jpg",
-    icon: Bot,
-  },
-  {
-    title: "Tableau de bord de performance",
-    description:
-      "Un seul écran pour suivre votre niveau de productivité, de concentration et la progression de vos OKR.",
-    insight:
-      "Enfin, un tableau de bord qui montre si vous avancez vraiment, pas seulement si vous cochez des cases.",
-    image: "/placeholder.jpg",
-    icon: LayoutDashboard,
-  },
-  {
-    title: "Suivi en temps réel avec WhatsApp",
-    description:
-      "Votre IA vous écrit directement sur WhatsApp pour vous aider à rester aligné, vous remotiver ou célébrer vos victoires.",
-    insight: "Votre coach est littéralement dans votre poche.",
-    image: "/placeholder-user.jpg",
-    icon: MessageCircle,
-  },
-  {
-    title: "Priorités claires, exécution rapide",
-    description:
-      "Capture rapide, priorisation et échéances ; regroupement par projets, assignation, suivi ; un bouton 'faire la tâche' → focus instantané",
-    insight: "",
-    image: "/placeholder-logo.png",
-    icon: ListChecks,
-  },
-]
 
 const TRANSLATIONS = {
   en: {
@@ -1216,76 +1186,5 @@ function OnboardingContent() {
         </CardFooter>
       </Card>
     </div>
-  )
-}
-
-export default function OnboardingPage() {
-  const router = useRouter()
-  const searchParams = useSearchParams()
-  const step = searchParams.get('step') as OnboardingStep | null
-  
-  const [currentStep, setCurrentStep] = useState<OnboardingStep>(step || 'questions')
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
-  const [answers, setAnswers] = useState<string[]>([])
-  const [userProfile, setUserProfile] = useState<{ type: string; emoji: string; description: string } | null>(null)
-
-  const handleAnswer = (answer: string) => {
-    const newAnswers = [...answers, answer]
-    setAnswers(newAnswers)
-
-    if (currentQuestionIndex < questions.length - 1) {
-      setCurrentQuestionIndex(currentQuestionIndex + 1)
-    } else {
-      // Calculate profile
-      const answerKey = newAnswers.join('')
-      const profile = profileTypes[answerKey] || profileTypes['default']
-      setUserProfile(profile)
-      setCurrentStep('processing')
-      router.push('/onboarding?step=processing')
-    }
-  }
-
-  const handleBack = () => {
-    if (currentQuestionIndex > 0) {
-      const newAnswers = answers.slice(0, -1)
-      setAnswers(newAnswers)
-      setCurrentQuestionIndex(currentQuestionIndex - 1)
-    } else {
-      router.push('/onboarding/intro')
-    }
-  }
-
-  const handleProcessingComplete = () => {
-    setCurrentStep('profile')
-    router.push('/onboarding?step=profile')
-  }
-
-  const currentQuestion = questions[currentQuestionIndex]
-
-  if (currentStep === 'processing') {
-    return <ProcessingPage onComplete={handleProcessingComplete} />
-  }
-
-  if (currentStep === 'profile' && userProfile) {
-    return (
-      <ProfileRevealScreen
-        profileType={userProfile.type}
-        profileEmoji={userProfile.emoji}
-        description={userProfile.description}
-      />
-    )
-  }
-
-  return (
-    <OnboardingQuestion
-      key={currentQuestionIndex}
-      questionNumber={currentQuestionIndex + 1}
-      totalQuestions={questions.length}
-      question={currentQuestion.question}
-      options={currentQuestion.options}
-      onAnswer={handleAnswer}
-      onBack={handleBack}
-      socialProof={currentQuestion.socialProof}
-    />
   )
 }

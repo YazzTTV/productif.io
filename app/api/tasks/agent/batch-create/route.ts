@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { apiAuth } from '@/middleware/api-auth'
-import { getAuthUserFromRequest } from '@/lib/auth'
+import { getAuthUserFromRequest, getAuthUser } from '@/lib/auth'
 import { verifyApiToken, hasRequiredScopes } from '@/lib/api-token'
 import { TaskAnalysisService } from '@/lib/ai/TaskAnalysisService'
 import { prisma } from '@/lib/prisma'
@@ -16,16 +16,19 @@ export async function POST(req: NextRequest) {
     const token = authHeader.startsWith('Bearer ') ? authHeader.substring(7) : ''
     
     let userId: string | null = null
-    
-    // Essayer d'abord avec un token utilisateur (JWT) - pour l'app mobile
-    if (token) {
-      const user = await getAuthUserFromRequest(req)
-      if (user) {
-        userId = user.id
+
+    // 1) Essayer d'abord via l'utilisateur authentifié (cookies ou header)
+    const webUser = await getAuthUserFromRequest(req)
+    if (webUser) {
+      userId = webUser.id
+    } else {
+      const cookieUser = await getAuthUser()
+      if (cookieUser) {
+        userId = cookieUser.id
       }
     }
     
-    // Si pas d'utilisateur, essayer avec un token API
+    // 2) Si pas d'utilisateur web, essayer avec un token API explicite
     if (!userId && token) {
       try {
         const payload = await verifyApiToken(token)
@@ -41,7 +44,7 @@ export async function POST(req: NextRequest) {
       }
     }
     
-    // Si toujours pas d'utilisateur, essayer avec apiAuth (pour compatibilité)
+    // 3) Si toujours pas d'utilisateur, essayer avec apiAuth (compatibilité anciens appels machine-to-machine)
     if (!userId) {
       const authResponse = await apiAuth(req, {
         requiredScopes: ['tasks:write']
@@ -55,7 +58,7 @@ export async function POST(req: NextRequest) {
     }
     
     if (!userId) {
-      return NextResponse.json({ error: 'Token invalide ou expiré' }, { status: 401 })
+      return NextResponse.json({ error: 'Utilisateur non authentifié' }, { status: 401 })
     }
 
     const { userInput, date, projectId } = await req.json()

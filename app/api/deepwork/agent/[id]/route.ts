@@ -1,26 +1,45 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verifyApiToken, hasRequiredScopes } from '@/lib/api-token'
+import { getAuthUserFromRequest, getAuthUser } from '@/lib/auth'
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await context.params
     const authHeader = req.headers.get('authorization') || ''
     const token = authHeader.startsWith('Bearer ') ? authHeader.substring(7) : ''
-    if (!token) {
-      return NextResponse.json({ error: 'Un token API est requis' }, { status: 401 })
+
+    let userId: string | null = null
+
+    // 1) Essayer d'abord via l'utilisateur authentifié (cookies ou header)
+    const webUser = await getAuthUserFromRequest(req)
+    if (webUser) {
+      userId = webUser.id
+    } else {
+      const cookieUser = await getAuthUser()
+      if (cookieUser) {
+        userId = cookieUser.id
+      }
     }
 
-    const payload = await verifyApiToken(token)
-    if (!payload) {
-      return NextResponse.json({ error: 'Token API invalide ou expiré' }, { status: 401 })
+    // 2) Si pas d'utilisateur web, essayer avec un token API explicite
+    if (!userId && token) {
+      const payload = await verifyApiToken(token)
+      if (!payload) {
+        return NextResponse.json({ error: 'Token API invalide ou expiré' }, { status: 401 })
+      }
+      if (!hasRequiredScopes(payload.scopes, ['deepwork:write', 'tasks:write'])) {
+        return NextResponse.json({ error: 'Permissions insuffisantes', requiredScopes: ['deepwork:write', 'tasks:write'] }, { status: 403 })
+      }
+      userId = payload.userId
     }
-    if (!hasRequiredScopes(payload.scopes, ['deepwork:write', 'tasks:write'])) {
-      return NextResponse.json({ error: 'Permissions insuffisantes', requiredScopes: ['deepwork:write', 'tasks:write'] }, { status: 403 })
+
+    if (!userId) {
+      return NextResponse.json({ error: 'Utilisateur non authentifié' }, { status: 401 })
     }
 
     const { action, notes } = await req.json()
-    const sessionId = params.id
-    const userId = payload.userId
+    const sessionId = id
 
     const session = await prisma.deepWorkSession.findFirst({
       where: { id: sessionId, userId },
@@ -91,7 +110,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }
 }
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const authHeader = req.headers.get('authorization') || ''
     const token = authHeader.startsWith('Bearer ') ? authHeader.substring(7) : ''
@@ -107,7 +126,8 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       return NextResponse.json({ error: 'Permissions insuffisantes', requiredScopes: ['deepwork:read', 'tasks:read'] }, { status: 403 })
     }
 
-    const sessionId = params.id
+    const { id } = await context.params
+    const sessionId = id
     const userId = payload.userId
 
     const session = await prisma.deepWorkSession.findFirst({

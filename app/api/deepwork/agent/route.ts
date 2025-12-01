@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verifyApiToken, hasRequiredScopes } from '@/lib/api-token'
-import { getAuthUserFromRequest } from '@/lib/auth'
+import { getAuthUserFromRequest, getAuthUser } from '@/lib/auth'
 
 export async function POST(req: NextRequest) {
   try {
@@ -9,16 +9,19 @@ export async function POST(req: NextRequest) {
     const token = authHeader.startsWith('Bearer ') ? authHeader.substring(7) : ''
     
     let userId: string | null = null
-    
-    // Essayer d'abord avec un token utilisateur (JWT) - pour l'app mobile
-    if (token) {
-      const user = await getAuthUserFromRequest(req)
-      if (user) {
-        userId = user.id
+
+    // 1) Essayer d'abord via l'utilisateur authentifié (cookies ou header)
+    const webUser = await getAuthUserFromRequest(req)
+    if (webUser) {
+      userId = webUser.id
+    } else {
+      const cookieUser = await getAuthUser()
+      if (cookieUser) {
+        userId = cookieUser.id
       }
     }
     
-    // Si pas d'utilisateur, essayer avec un token API
+    // 2) Si pas d'utilisateur web, essayer avec un token API explicite (flows machine-to-machine)
     if (!userId && token) {
       try {
         const payload = await verifyApiToken(token)
@@ -37,7 +40,7 @@ export async function POST(req: NextRequest) {
     }
     
     if (!userId) {
-      return NextResponse.json({ error: 'Token invalide ou expiré' }, { status: 401 })
+      return NextResponse.json({ error: 'Utilisateur non authentifié' }, { status: 401 })
     }
 
     const { plannedDuration, type = 'deepwork', description, taskId } = await req.json()
@@ -104,16 +107,19 @@ export async function GET(req: NextRequest) {
     const token = authHeader.startsWith('Bearer ') ? authHeader.substring(7) : ''
     
     let userId: string | null = null
-    
-    // Essayer d'abord avec un token utilisateur (JWT) - pour l'app mobile
-    if (token) {
-      const user = await getAuthUserFromRequest(req)
-      if (user) {
-        userId = user.id
+
+    // 1) Essayer d'abord via l'utilisateur authentifié (cookies ou header)
+    const webUser = await getAuthUserFromRequest(req)
+    if (webUser) {
+      userId = webUser.id
+    } else {
+      const cookieUser = await getAuthUser()
+      if (cookieUser) {
+        userId = cookieUser.id
       }
     }
     
-    // Si pas d'utilisateur, essayer avec un token API
+    // 2) Si pas d'utilisateur, essayer avec un token API
     if (!userId && token) {
       try {
         const payload = await verifyApiToken(token)
@@ -132,7 +138,7 @@ export async function GET(req: NextRequest) {
     }
     
     if (!userId) {
-      return NextResponse.json({ error: 'Token invalide ou expiré' }, { status: 401 })
+      return NextResponse.json({ error: 'Utilisateur non authentifié' }, { status: 401 })
     }
     const { searchParams } = new URL(req.url)
     const statusParam = searchParams.get('status') // active, completed, all
