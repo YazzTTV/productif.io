@@ -6,17 +6,22 @@ import { Clock, Activity, Timer, Zap } from "lucide-react"
 
 interface DeepWorkData {
   today: {
-    total_hours: number
+    hours: number
+    seconds: number
     sessions: number
   }
   week: {
-    total_hours: number
+    hours: number
+    seconds: number
     sessions: number
   }
-  total: {
-    total_hours: number
+  allTime: {
+    hours: number
+    seconds: number
     sessions: number
   }
+  bestSession: string
+  bestSessionSeconds: number
 }
 
 export function DeepWorkData() {
@@ -78,7 +83,7 @@ export function DeepWorkData() {
                 </div>
               </div>
               <p className="text-2xl font-bold text-[#00C27A]">
-                {formatHours(data.today?.total_hours || 0)}
+                {formatHours(data.today?.hours || 0)}
               </p>
             </div>
           </div>
@@ -94,7 +99,7 @@ export function DeepWorkData() {
                 </div>
               </div>
               <p className="text-2xl font-bold text-gray-800">
-                {formatHours(data.week?.total_hours || 0)}
+                {formatHours(data.week?.hours || 0)}
               </p>
             </div>
           </div>
@@ -106,11 +111,11 @@ export function DeepWorkData() {
                 <Timer className="h-5 w-5 text-purple-600" />
                 <div>
                   <p className="text-sm font-medium text-gray-800">Total</p>
-                  <p className="text-xs text-gray-500">{data.total?.sessions || 0} sessions</p>
+                  <p className="text-xs text-gray-500">{data.allTime?.sessions || 0} sessions</p>
                 </div>
               </div>
               <p className="text-2xl font-bold text-purple-600">
-                {formatHours(data.total?.total_hours || 0)}
+                {formatHours(data.allTime?.hours || 0)}
               </p>
             </div>
           </div>

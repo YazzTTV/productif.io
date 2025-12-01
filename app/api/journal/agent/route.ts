@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { apiAuth } from '@/middleware/api-auth'
-import { getAuthUserFromRequest } from '@/lib/auth'
+import { getAuthUserFromRequest, getAuthUser } from '@/lib/auth'
 import { verifyApiToken, hasRequiredScopes } from '@/lib/api-token'
 import { analyzeJournalEntry } from '@/lib/ai/journal-analysis'
 
@@ -13,41 +13,44 @@ function normalizeToDay(date: Date): Date {
 }
 
 export async function GET(req: NextRequest) {
-  const authHeader = req.headers.get('authorization') || ''
-  const token = authHeader.startsWith('Bearer ') ? authHeader.substring(7) : ''
-  
   let userId: string | null = null
-  
-  // Essayer d'abord avec un token utilisateur (JWT) - pour l'app mobile
-  if (token) {
-    const user = await getAuthUserFromRequest(req)
-    if (user) {
-      userId = user.id
-    }
-  }
-  
-  // Si pas d'utilisateur, essayer avec un token API
-  if (!userId && token) {
-    try {
-      const payload = await verifyApiToken(token)
-      if (payload) {
-        // Vérifier les scopes pour les tokens API
-        if (!hasRequiredScopes(payload.scopes, ['journal:read'])) {
-          return NextResponse.json({ error: 'Permissions insuffisantes', requiredScopes: ['journal:read'] }, { status: 403 })
-        }
-        userId = payload.userId
-      }
-    } catch (error) {
-      // Si la vérification du token API échoue, on continue avec null
-      console.error('Erreur lors de la vérification du token API:', error)
-    }
-  }
-  
-  if (!userId) {
-    return NextResponse.json({ error: 'Token invalide ou expiré' }, { status: 401 })
-  }
 
   try {
+    const authHeader = req.headers.get('authorization') || ''
+    const token = authHeader.startsWith('Bearer ') ? authHeader.substring(7) : ''
+
+    // 1) Essayer d'abord via l'utilisateur authentifié (cookies ou header)
+    const webUser = await getAuthUserFromRequest(req)
+    if (webUser) {
+      userId = webUser.id
+    } else {
+      const cookieUser = await getAuthUser()
+      if (cookieUser) {
+        userId = cookieUser.id
+      }
+    }
+    
+    // 2) Si pas d'utilisateur, essayer avec un token API explicite
+    if (!userId && token) {
+      try {
+        const payload = await verifyApiToken(token)
+        if (payload) {
+          // Vérifier les scopes pour les tokens API
+          if (!hasRequiredScopes(payload.scopes, ['journal:read'])) {
+            return NextResponse.json({ error: 'Permissions insuffisantes', requiredScopes: ['journal:read'] }, { status: 403 })
+          }
+          userId = payload.userId
+        }
+      } catch (error) {
+        // Si la vérification du token API échoue, on continue avec null
+        console.error('Erreur lors de la vérification du token API:', error)
+      }
+    }
+    
+    if (!userId) {
+      return NextResponse.json({ error: 'Utilisateur non authentifié' }, { status: 401 })
+    }
+
     const { searchParams } = new URL(req.url)
     const days = parseInt(searchParams.get('days') || '7', 10)
 
@@ -65,41 +68,44 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const authHeader = req.headers.get('authorization') || ''
-  const token = authHeader.startsWith('Bearer ') ? authHeader.substring(7) : ''
-  
   let userId: string | null = null
-  
-  // Essayer d'abord avec un token utilisateur (JWT) - pour l'app mobile
-  if (token) {
-    const user = await getAuthUserFromRequest(req)
-    if (user) {
-      userId = user.id
-    }
-  }
-  
-  // Si pas d'utilisateur, essayer avec un token API
-  if (!userId && token) {
-    try {
-      const payload = await verifyApiToken(token)
-      if (payload) {
-        // Vérifier les scopes pour les tokens API
-        if (!hasRequiredScopes(payload.scopes, ['journal:write'])) {
-          return NextResponse.json({ error: 'Permissions insuffisantes', requiredScopes: ['journal:write'] }, { status: 403 })
-        }
-        userId = payload.userId
-      }
-    } catch (error) {
-      // Si la vérification du token API échoue, on continue avec null
-      console.error('Erreur lors de la vérification du token API:', error)
-    }
-  }
-  
-  if (!userId) {
-    return NextResponse.json({ error: 'Token invalide ou expiré' }, { status: 401 })
-  }
 
   try {
+    const authHeader = req.headers.get('authorization') || ''
+    const token = authHeader.startsWith('Bearer ') ? authHeader.substring(7) : ''
+
+    // 1) Essayer d'abord via l'utilisateur authentifié (cookies ou header)
+    const webUser = await getAuthUserFromRequest(req)
+    if (webUser) {
+      userId = webUser.id
+    } else {
+      const cookieUser = await getAuthUser()
+      if (cookieUser) {
+        userId = cookieUser.id
+      }
+    }
+    
+    // 2) Si pas d'utilisateur, essayer avec un token API explicite
+    if (!userId && token) {
+      try {
+        const payload = await verifyApiToken(token)
+        if (payload) {
+          // Vérifier les scopes pour les tokens API
+          if (!hasRequiredScopes(payload.scopes, ['journal:write'])) {
+            return NextResponse.json({ error: 'Permissions insuffisantes', requiredScopes: ['journal:write'] }, { status: 403 })
+          }
+          userId = payload.userId
+        }
+      } catch (error) {
+        // Si la vérification du token API échoue, on continue avec null
+        console.error('Erreur lors de la vérification du token API:', error)
+      }
+    }
+    
+    if (!userId) {
+      return NextResponse.json({ error: 'Utilisateur non authentifié' }, { status: 401 })
+    }
+
     const body = await req.json().catch(() => ({})) as { transcription?: string; date?: string }
 
     if (!body?.transcription || typeof body.transcription !== 'string') {

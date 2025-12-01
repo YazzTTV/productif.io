@@ -138,14 +138,17 @@ export async function GET(req: NextRequest) {
       today: {
         hours: todayHours,
         seconds: Math.round(todayHours * 3600),
+        sessions: Number(todayDeepWork[0]?.sessions || 0),
       },
       week: {
         hours: weekHours,
         seconds: Math.round(weekHours * 3600),
+        sessions: Number(weekDeepWork[0]?.sessions || 0),
       },
       allTime: {
         hours: allTimeHours,
         seconds: Math.round(allTimeHours * 3600),
+        sessions: Number(allTimeDeepWork[0]?.sessions || 0),
       },
       bestSession: bestSessionFormatted,
       bestSessionSeconds: bestSessionSeconds,

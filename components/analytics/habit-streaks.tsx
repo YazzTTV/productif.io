@@ -1,8 +1,10 @@
-"use client"
+ "use client"
 
 import { useState, useEffect } from "react"
+import Link from "next/link"
 import { motion } from "framer-motion"
 import { Flame } from "lucide-react"
+import { Button } from "@/components/ui/button"
 
 interface Habit {
   id: string
@@ -43,9 +45,16 @@ export function HabitStreaks() {
       animate={{ opacity: 1, y: 0 }}
       className="bg-white rounded-3xl p-6 shadow-lg border border-gray-100"
     >
-      <div className="flex items-center gap-2 mb-6">
-        <Flame className="h-5 w-5 text-orange-500" />
-        <h3 className="text-gray-800 text-lg">Habit streaks</h3>
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-2">
+          <Flame className="h-5 w-5 text-orange-500" />
+          <h3 className="text-gray-800 text-lg">Habit streaks</h3>
+        </div>
+        <Link href="/dashboard/habits">
+          <Button variant="outline" size="sm">
+            Voir tout
+          </Button>
+        </Link>
       </div>
 
       {loading ? (

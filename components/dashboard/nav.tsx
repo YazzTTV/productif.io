@@ -280,10 +280,10 @@ export function DashboardNav({ viewAsMode = false, viewAsUserId, onNavItemClick 
       
       {!viewAsMode && (
         <Link
-          href={getHref("/dashboard/mon-espace")}
+          href={getHref("/dashboard/assistant-ia")}
           className={cn(
             buttonVariants({
-              variant: isActive("/dashboard/mon-espace") ? "secondary" : "ghost",
+              variant: isActive("/dashboard/assistant-ia") ? "secondary" : "ghost",
               size: "default",
             }),
             "justify-start w-full"

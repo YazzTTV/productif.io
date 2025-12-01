@@ -6,10 +6,21 @@ import { WeeklyHabitsTable } from "@/components/habits/weekly-habits-table"
 import { MobileHabitsCards } from "@/components/habits/mobile-habits-cards"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { Button } from "@/components/ui/button"
-import { Plus } from "lucide-react"
-import { useRouter, usePathname } from "next/navigation"
+import { motion } from "framer-motion"
+import Image from "next/image"
+import Link from "next/link"
+import {
+  Home,
+  Bot,
+  Settings as SettingsIcon,
+  Plus,
+  TrendingUp,
+  CheckCircle2,
+  Trophy,
+} from "lucide-react"
+import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { startOfDay, parseISO } from "date-fns"
+import { useLocale } from "@/lib/i18n"
 
 type HabitWithEntries = Habit & {
   entries: HabitEntry[]
@@ -20,7 +31,7 @@ export default function HabitsPage() {
   const [loading, setLoading] = useState(true)
   const isMobile = useIsMobile()
   const router = useRouter()
-  const pathname = usePathname()
+  const { t } = useLocale()
 
   const fetchHabits = async () => {
     try {
@@ -251,36 +262,153 @@ export default function HabitsPage() {
   }, []);
 
   if (loading) {
-    return <div>Chargement...</div>
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#00C27A] mx-auto mb-4"></div>
+          <p className="text-gray-600">Chargement des habitudes...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
-    <div className="container mx-auto py-6">
-      {/* Interface mobile */}
-      {isMobile ? (
-        <MobileHabitsCards
-          habits={habits}
-          onToggleHabit={handleToggleHabit}
-          onCustomUpdate={handleCustomUpdate}
-          loading={loading}
-        />
-      ) : (
-        /* Interface desktop */
-        <>
-          <div className="flex justify-between items-center mb-6">
-            <h1 className="text-2xl font-bold">Mes Habitudes</h1>
-            <Button onClick={() => router.push("/dashboard/habits/new")}>
-              <Plus className="mr-2 h-4 w-4" />
-              Nouvelle Habitude
-            </Button>
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 flex flex-col">
+      {/* Top Navigation Bar (même header que le dashboard) */}
+      <motion.nav
+        initial={{ y: -100 }}
+        animate={{ y: 0 }}
+        className="bg-white/80 backdrop-blur-lg border-b border-gray-200 shadow-sm sticky top-0 z-50"
+      >
+        <div className="max-w-[1400px] mx-auto px-8 py-4">
+          <div className="flex items-center justify-between">
+            {/* Logo & Brand */}
+            <Link href="/dashboard" className="flex items-center gap-3 mr-auto">
+              <Image
+                src="/P_tech_letter_logo_TEMPLATE-removebg-preview.png"
+                alt="Productif.io"
+                width={64}
+                height={64}
+                className="object-contain"
+              />
+              <h1 className="text-2xl text-gray-900 whitespace-nowrap">
+                Productif.io
+              </h1>
+            </Link>
+
+            {/* Navigation Links */}
+            <div className="flex items-center gap-2">
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => router.push("/dashboard")}
+                className="px-6 py-2.5 bg-gradient-to-r from-[#00C27A] to-[#00D68F] text-white rounded-2xl flex items-center gap-2 shadow-md"
+              >
+                <Home size={20} />
+                <span>{t("dashboard")}</span>
+              </motion.button>
+
+              <motion.button
+                onClick={() => router.push("/dashboard/assistant-ia")}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="px-6 py-2.5 hover:bg-gray-100 text-gray-700 rounded-2xl flex items-center gap-2 transition-all"
+              >
+                <Bot size={20} />
+                <span>{t("aiAssistant")}</span>
+              </motion.button>
+
+              <motion.button
+                onClick={() => router.push("/dashboard/analytics")}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="px-6 py-2.5 hover:bg-gray-100 text-gray-700 rounded-2xl flex items-center gap-2 transition-all"
+              >
+                <TrendingUp size={20} />
+                <span>{t("analytics")}</span>
+              </motion.button>
+
+              <motion.button
+                onClick={() => router.push("/dashboard/tasks")}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="px-6 py-2.5 hover:bg-gray-100 text-gray-700 rounded-2xl flex items-center gap-2 transition-all"
+              >
+                <CheckCircle2 size={20} />
+                <span>{t("tasks")}</span>
+              </motion.button>
+
+              <motion.button
+                onClick={() => router.push("/dashboard/leaderboard")}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="px-6 py-2.5 hover:bg-gray-100 text-gray-700 rounded-2xl flex items-center gap-2 transition-all"
+              >
+                <Trophy size={20} />
+                <span>{t("leaderboard")}</span>
+              </motion.button>
+
+              <motion.button
+                onClick={() => router.push("/dashboard/settings")}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="px-6 py-2.5 hover:bg-gray-100 text-gray-700 rounded-2xl flex items-center gap-2 transition-all"
+              >
+                <SettingsIcon size={20} />
+                <span>{t("settings")}</span>
+              </motion.button>
+            </div>
           </div>
-          <WeeklyHabitsTable 
-            habits={habits} 
-            onToggleHabit={handleToggleHabit}
-            onCustomUpdate={handleCustomUpdate}
-          />
-        </>
-      )}
+        </div>
+      </motion.nav>
+
+      {/* Main Content - même layout que le dashboard */}
+      <main className="flex-1 overflow-y-auto">
+        <div className="max-w-[1400px] mx-auto px-8 py-8">
+          {/* Header de page */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-8 flex items-center justify-between"
+          >
+            <div>
+              <h2 className="text-gray-800 text-3xl mb-2">Mes habitudes</h2>
+              <p className="text-gray-600 text-lg">
+                Suivez vos routines quotidiennes et vos séries jour par jour.
+              </p>
+            </div>
+            <Button
+              onClick={() => router.push("/dashboard/habits/new")}
+              className="flex items-center gap-2 bg-gradient-to-r from-[#00C27A] to-[#00D68F] text-white rounded-2xl px-5 py-2.5 shadow-md"
+            >
+              <Plus className="h-4 w-4" />
+              <span>Nouvelle habitude</span>
+            </Button>
+          </motion.div>
+
+          {/* Interface mobile / desktop */}
+          {isMobile ? (
+            <MobileHabitsCards
+              habits={habits}
+              onToggleHabit={handleToggleHabit}
+              onCustomUpdate={handleCustomUpdate}
+              loading={loading}
+            />
+          ) : (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-white rounded-3xl p-6 shadow-lg border border-gray-100"
+            >
+              <WeeklyHabitsTable
+                habits={habits}
+                onToggleHabit={handleToggleHabit}
+                onCustomUpdate={handleCustomUpdate}
+              />
+            </motion.div>
+          )}
+        </div>
+      </main>
     </div>
   )
 } 

@@ -1,0 +1,631 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                   String                @id @default(cuid())
+  name                 String?
+  email                String                @unique
+  password             String
+  whatsappNumber       String?               @unique
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  managedCompanyId     String?
+  
+  // Free Trial
+  trialStartDate       DateTime?
+  trialEndDate         DateTime?
+  trialStatus          String?               @default("active") // active, expired, converted
+  
+  // Subscription
+  subscriptionStatus   String?               @default("trial") // trial, active, cancelled, expired
+  subscriptionTier     String?               // starter, pro, enterprise
+  stripeCustomerId     String?               @unique
+  stripeSubscriptionId String?               @unique
+  subscriptionEndDate  DateTime?
+  
+  // Historique
+  convertedAt          DateTime?             // Date de conversion trial → paid
+  cancelledAt          DateTime?
+  trialEndsAt          DateTime?             // Keep for backward compatibility
+  
+  role                 String                @default("USER")
+  missions             Mission[]
+  processes            Process[]
+  projects             Project[]
+  sessions             Session[]
+  tasks                Task[]
+  timeEntries          TimeEntry[]
+  deepWorkSessions     DeepWorkSession[]
+  managedCompany       Company?              @relation("CompanyAdmin", fields: [managedCompanyId], references: [id])
+  companies            UserCompany[]
+  gamification         UserGamification?
+  warMapEvents         WarMapEvent[]
+  apiTokens            ApiToken[]
+  habits               Habit[]
+  notificationSettings NotificationSettings?
+  notificationHistory  NotificationHistory[]
+  whatsappConversations WhatsAppConversation[]
+  journalEntries       JournalEntry[]
+  dailyInsights        DailyInsight[]
+  behaviorCheckIns     BehaviorCheckIn[]
+  behaviorPatterns     BehaviorPattern[]
+  checkInSchedule      CheckInSchedule?
+  conversationState    UserConversationState?
+  trialNotifications   TrialNotification[]
+  agentInteractions    AgentInteraction[]
+}
+
+model Company {
+  id             String        @id @default(cuid())
+  name           String
+  description    String?
+  logo           String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  administrators User[]        @relation("CompanyAdmin")
+  users          UserCompany[]
+}
+
+model UserCompany {
+  id        String   @id @default(cuid())
+  userId    String
+  companyId String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, companyId])
+  @@index([userId])
+  @@index([companyId])
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Project {
+  id           String        @id @default(cuid())
+  name         String
+  description  String?
+  color        String?
+  userId       String
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  user         User          @relation(fields: [userId], references: [id])
+  tasks        Task[]
+  timeEntries  TimeEntry[]
+  warMapEvents WarMapEvent[]
+}
+
+model Process {
+  id          String        @id @default(cuid())
+  name        String
+  description String
+  userId      String
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tasks       Task[]        @relation("TaskProcess")
+  steps       ProcessStep[]
+
+  @@index([userId])
+}
+
+model ProcessStep {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  order       Int
+  processId   String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  process     Process  @relation(fields: [processId], references: [id], onDelete: Cascade)
+
+  @@index([processId])
+}
+
+model Task {
+  id           String      @id @default(cuid())
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  title        String
+  description  String?
+  dueDate      DateTime?
+  userId       String
+  projectId    String?
+  completed    Boolean     @default(false)
+  order        Int         @default(500)
+  scheduledFor DateTime?
+  processId    String?
+  priority     Int?
+  energyLevel  Int?
+  process      Process?    @relation("TaskProcess", fields: [processId], references: [id])
+  project      Project?    @relation(fields: [projectId], references: [id])
+  user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  timeEntries  TimeEntry[]
+
+  @@index([userId])
+  @@index([projectId])
+  @@index([processId])
+}
+
+model TimeEntry {
+  id          String    @id @default(cuid())
+  startTime   DateTime
+  endTime     DateTime?
+  userId      String
+  taskId      String?
+  projectId   String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  description String?
+  project     Project?  @relation(fields: [projectId], references: [id])
+  task        Task?     @relation(fields: [taskId], references: [id])
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deepWorkSession DeepWorkSession?
+
+  @@index([userId])
+  @@index([taskId])
+  @@index([projectId])
+}
+
+model DeepWorkSession {
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  timeEntryId    String   @unique
+  timeEntry      TimeEntry @relation(fields: [timeEntryId], references: [id], onDelete: Cascade)
+  plannedDuration Int
+  status         String   @default("active") // active, paused, completed, cancelled
+  type           String   @default("deepwork") // deepwork, focus, pomodoro
+  interruptions  Int      @default(0)
+  notes          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([userId, status])
+  @@index([userId, createdAt])
+}
+
+model Habit {
+  id          String       @id @default(cuid())
+  name        String       @db.VarChar(255)
+  description String?
+  color       String?      @db.VarChar(7)
+  frequency   String       @db.VarChar(10)
+  daysOfWeek  String[]
+  userId      String
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  order       Int          @default(0)
+  entries     HabitEntry[]
+  user        User         @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@map("habits")
+}
+
+model HabitEntry {
+  id        String   @id @default(cuid())
+  habitId   String
+  date      DateTime @db.Date
+  completed Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  note      String?
+  rating    Int?
+  habit     Habit    @relation(fields: [habitId], references: [id], onDelete: Cascade)
+
+  @@unique([habitId, date])
+  @@index([habitId])
+  @@index([date])
+  @@map("habit_entries")
+}
+
+model Mission {
+  id         String      @id @default(cuid())
+  title      String
+  quarter    Int
+  year       Int
+  userId     String
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+  current    Float       @default(0)
+  progress   Float       @default(0)
+  target     Float       @default(100)
+  user       User        @relation(fields: [userId], references: [id])
+  objectives Objective[]
+
+  @@unique([userId, quarter, year])
+}
+
+model Objective {
+  id        String            @id @default(cuid())
+  title     String
+  missionId String
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  current   Float             @default(0)
+  target    Float             @default(100)
+  progress  Float             @default(0)
+  mission   Mission           @relation(fields: [missionId], references: [id])
+  actions   ObjectiveAction[]
+}
+
+model ObjectiveAction {
+  id          String      @id @default(cuid())
+  title       String
+  objectiveId String
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  progress    Float       @default(0)
+  current     Float       @default(0)
+  target      Float       @default(100)
+  initiative  Initiative?
+  objective   Objective   @relation(fields: [objectiveId], references: [id])
+}
+
+model Initiative {
+  id                String          @id @default(cuid())
+  title             String
+  description       String?
+  objectiveActionId String          @unique
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  objectiveAction   ObjectiveAction @relation(fields: [objectiveActionId], references: [id])
+}
+
+model WarMapEvent {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  startDate   DateTime
+  endDate     DateTime
+  userId      String
+  projectId   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  color       String?  @db.VarChar(7)
+  date        DateTime @db.Date
+  project     Project? @relation(fields: [projectId], references: [id])
+  user        User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([projectId])
+}
+
+model ApiToken {
+  id          String    @id @default(cuid())
+  name        String    @db.VarChar(255)
+  token       String    @unique
+  userId      String
+  description String?
+  scopes      String[]  @default([])
+  lastUsed    DateTime?
+  expiresAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("api_tokens")
+}
+
+model UserGamification {
+  id                   String    @id @default(cuid())
+  userId               String    @unique
+  currentStreak        Int       @default(0)
+  longestStreak        Int       @default(0)
+  lastActivityDate     DateTime?
+  points               Int       @default(0)
+  level                Int       @default(1)
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  totalHabitsCompleted Int       @default(0)
+  totalPoints          Int       @default(0)
+  user                 User      @relation(fields: [userId], references: [id])
+}
+
+model Achievement {
+  id          String            @id @default(cuid())
+  name        String            @unique
+  description String
+  type        String
+  threshold   Int
+  points      Int
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  users       UserAchievement[]
+}
+
+model UserAchievement {
+  id            String      @id @default(cuid())
+  userId        String
+  achievementId String
+  unlockedAt    DateTime    @default(now())
+  achievement   Achievement @relation(fields: [achievementId], references: [id])
+
+  @@unique([userId, achievementId])
+  @@index([userId])
+  @@index([achievementId])
+}
+
+model StreakHistory {
+  id        String   @id @default(cuid())
+  userId    String
+  date      DateTime
+  type      String
+  streak    Int
+  createdAt DateTime @default(now())
+
+  @@unique([userId, date])
+  @@index([userId])
+  @@index([date])
+}
+
+model NotificationHistory {
+  id           String    @id @default(cuid())
+  userId       String
+  type         String
+  content      String
+  scheduledFor DateTime
+  sentAt       DateTime?
+  status       String    @default("pending")
+  error        String?
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  settings     NotificationSettings? @relation(fields: [settingsId], references: [id])
+  settingsId   String?
+
+  @@index([userId])
+  @@map("notification_history")
+}
+
+model NotificationSettings {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  isEnabled       Boolean  @default(true)
+  emailEnabled    Boolean  @default(true)
+  pushEnabled     Boolean  @default(true)
+  whatsappEnabled Boolean  @default(false)
+  whatsappNumber  String?
+  startHour       Int      @default(9)
+  endHour         Int      @default(18)
+  allowedDays     Int[]    @default([1, 2, 3, 4, 5])
+  notificationTypes String[] @default([])
+  morningReminder Boolean  @default(true)
+  improvementReminder Boolean @default(false)
+  taskReminder    Boolean  @default(true)
+  habitReminder   Boolean  @default(true)
+  motivation      Boolean  @default(true)
+  dailySummary    Boolean  @default(true)
+  morningTime     String   @default("08:00")
+  improvementTime String   @default("08:30")
+  noonTime        String   @default("12:00")
+  afternoonTime   String   @default("14:00")
+  eveningTime     String   @default("18:00")
+  nightTime       String   @default("22:00")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notificationHistory NotificationHistory[]
+
+  @@index([userId])
+  @@map("notification_settings")
+}
+
+model WaitlistEntry {
+  id              String   @id @default(cuid())
+  email           String   @unique
+  phone           String?
+  motivation      String?
+  status          String   @default("pas_paye")
+  currentStep     Int      @default(1)
+  stripeSessionId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([email])
+  @@index([status])
+  @@index([createdAt])
+  @@map("waitlist_entries")
+}
+
+model WhatsAppConversation {
+  id          String   @id @default(cuid())
+  userId      String
+  phoneNumber String
+  messages    WhatsAppMessage[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([phoneNumber])
+}
+
+model WhatsAppMessage {
+  id              String   @id @default(cuid())
+  conversationId  String
+  content         String
+  isFromUser      Boolean
+  createdAt       DateTime @default(now())
+  conversation    WhatsAppConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  ADMIN
+  USER
+}
+
+/// Journal quotidien de l'utilisateur (entrée par jour)
+model JournalEntry {
+  id             String        @id @default(cuid())
+  userId         String
+  user           User          @relation(fields: [userId], references: [id])
+  date           DateTime      @default(now())
+
+  // Contenu / médias
+  audioId        String?       // ID média WhatsApp (optionnel si non conservé)
+  audioUrl       String?       // URL de stockage externe (S3/R2) si utilisé
+  transcription  String?       @db.Text
+
+  // Analyse IA
+  sentiment      String?
+  themes         Json?
+  highlights     String[]
+  improvements   String[]
+
+  // Statut de traitement
+  processed       Boolean       @default(false)
+  processingError String?
+
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@index([userId, date])
+  @@unique([userId, date])
+}
+
+/// Insight quotidien généré à partir des entrées de journal récentes
+model DailyInsight {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id])
+  date            DateTime @default(now())
+
+  // Recommandations et axes de focus
+  recommendations String[]
+  focusAreas      String[]
+
+  // Méta
+  basedOnDays     Int      @default(7)
+  journalEntries  String[] // IDs de JournalEntry utilisés pour la génération
+  sent            Boolean  @default(false)
+  sentAt          DateTime?
+  createdAt       DateTime @default(now())
+
+  @@index([userId, date])
+  @@unique([userId, date])
+}
+
+/// Modèles pour l'analyse comportementale continue (Feature 3)
+
+/// Check-in comportemental individuel
+model BehaviorCheckIn {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  timestamp   DateTime @default(now())
+  type        String   // mood, focus, motivation, energy, stress
+  value       Int      // Score 1-10
+  note        String?
+  context     Json?    // Contexte (activité en cours, etc.)
+  triggeredBy String   // scheduled, manual, event-based
+  createdAt   DateTime @default(now())
+
+  @@index([userId, timestamp])
+  @@index([userId, type, timestamp])
+}
+
+/// Pattern comportemental analysé sur une période
+model BehaviorPattern {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  startDate       DateTime
+  endDate         DateTime
+  patterns        Json     // { "morning_focus": 8.5, "afternoon_dip": true, ... }
+  avgMood         Float?
+  avgFocus        Float?
+  avgMotivation   Float?
+  avgEnergy       Float?
+  avgStress       Float?
+  insights        String[]
+  recommendations String[]
+  correlations    Json?    // Ex: { "focus_vs_sleep": 0.7, "mood_vs_exercise": 0.6 }
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([userId, startDate])
+}
+
+/// Configuration des check-ins automatiques
+model CheckInSchedule {
+  id           String   @id @default(cuid())
+  userId       String   @unique
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  enabled      Boolean  @default(true)
+  frequency    String   @default("3x_daily") // 3x_daily, hourly, custom
+  schedules    Json     // [{ time: "09:00", types: ["mood", "energy"] }, ...]
+  randomize    Boolean  @default(true) // Varier les horaires de ±15min
+  skipWeekends Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+/// État conversationnel pour les interactions WhatsApp
+model UserConversationState {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  state     String   // awaiting_checkin_mood, awaiting_deepwork_duration, etc.
+  data      Json?    // Données contextuelles
+  expiresAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+/// Notifications de rappel pour les périodes d'essai
+model TrialNotification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String   // reminder_3days, reminder_1day, expired
+  sentAt    DateTime @default(now())
+  channel   String   // email, whatsapp, in_app
+  createdAt DateTime @default(now())
+  
+  @@index([userId, type])
+  @@index([sentAt])
+}
+
+/// Interactions avec l'agent IA pour analytics et amélioration
+model AgentInteraction {
+  id                String   @id @default(cuid())
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  message           String   @db.Text
+  intentType        String   // action, question, conversation
+  intentCategory    String   // create_task, advice_request, etc.
+  confidence        Float
+  
+  actionExecuted    String?  // Quelle action a été réalisée
+  handled           Boolean  @default(false)
+  
+  emotionalContext  String?  // positive, negative, stressed, etc.
+  
+  responseTime      Int?     // Temps de traitement en ms
+  
+  createdAt         DateTime @default(now())
+  
+  @@index([userId, createdAt])
+  @@index([intentCategory])
+  @@index([emotionalContext])
+}

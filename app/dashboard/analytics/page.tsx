@@ -8,6 +8,7 @@ import { BackToDashboardButton } from "@/components/analytics/back-to-dashboard-
 import { ProductivityChart } from "@/components/analytics/productivity-chart"
 import { HabitStreaks } from "@/components/analytics/habit-streaks"
 import { DeepWorkData } from "@/components/analytics/deepwork-data"
+import { AnalyticsKpiGrid } from "@/components/analytics/analytics-kpi-grid"
 
 export default async function AnalyticsPage() {
   // Vérifier l'authentification côté serveur
@@ -173,7 +174,6 @@ export default async function AnalyticsPage() {
   // Log des statistiques pour débogage
   console.log(`[ANALYTICS] Statistiques calculées:`, JSON.stringify(stats))
 
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100">
       <div className="max-w-[1400px] mx-auto px-8 py-8">
@@ -188,6 +188,12 @@ export default async function AnalyticsPage() {
           </div>
         </div>
 
+        {/* KPIs alignés avec l'app mobile (avg productivity, habits, focus, etc.) */}
+        <div className="mb-8">
+          <AnalyticsKpiGrid />
+        </div>
+
+        {/* Résumé détaillé basé sur le temps total et les projets */}
         <AnalyticsSummary stats={stats} />
 
         {/* Graphique de productivité */}
