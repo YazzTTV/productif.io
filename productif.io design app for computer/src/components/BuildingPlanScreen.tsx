@@ -1,21 +1,24 @@
 import { motion } from 'motion/react';
 import { Screen } from '../App';
 import { useState, useEffect } from 'react';
+import { Language, useTranslation } from '../utils/translations';
 
 interface BuildingPlanScreenProps {
   onComplete: () => void;
+  language?: Language;
 }
 
-export function BuildingPlanScreen({ onComplete }: BuildingPlanScreenProps) {
+export function BuildingPlanScreen({ onComplete, language = 'en' }: BuildingPlanScreenProps) {
+  const t = useTranslation(language);
   const [progress, setProgress] = useState(0);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
 
   const loadingSteps = [
-    'Analyzing your answers...',
-    'Identifying patterns...',
-    'Building your profile...',
-    'Personalizing insights...',
-    'Almost ready...',
+    t('buildingPlanTitle'),
+    t('analyzingAnswers'),
+    t('identifyingPatterns'),
+    t('creatingStrategy'),
+    t('buildingPlanTitle'),
   ];
 
   useEffect(() => {

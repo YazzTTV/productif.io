@@ -103,11 +103,11 @@ export default function ConnectionPage() {
           </motion.div>
           
           <h2 className="text-gray-900 mb-4 text-4xl">
-            Connect Your Account
+            {t('onboardingConnectTitle') || 'Connect Your Account'}
           </h2>
           
           <p className="text-gray-700 text-xl mb-8 max-w-xl mx-auto leading-relaxed">
-            Create your account to unlock all features and sync your data across devices
+            {t('onboardingConnectSubtitle') || 'Create your account to unlock all features and sync your data across devices'}
           </p>
 
           {/* Benefits */}
@@ -159,7 +159,9 @@ export default function ConnectionPage() {
                 transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
               />
               <Mail size={24} className="relative z-10" />
-              <span className="relative z-10">Continue with Email</span>
+              <span className="relative z-10">
+                {t('onboardingContinueWithEmail') || 'Continue with Email'}
+              </span>
               <ArrowRight size={22} className="relative z-10" />
             </motion.button>
 
@@ -173,7 +175,7 @@ export default function ConnectionPage() {
               <svg width="24" height="24" viewBox="0 0 24 24" fill="white">
                 <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09l.01-.01zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
               </svg>
-              <span>Continue with Apple</span>
+              <span>{t('onboardingContinueWithApple') || 'Continue with Apple'}</span>
             </motion.button>
 
             {/* Google */}
@@ -189,7 +191,7 @@ export default function ConnectionPage() {
                 <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
                 <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
               </svg>
-              <span>Continue with Google</span>
+              <span>{t('onboardingContinueWithGoogle') || 'Continue with Google'}</span>
             </motion.button>
           </div>
         </motion.div>
@@ -202,7 +204,9 @@ export default function ConnectionPage() {
           className="flex items-center gap-4 mb-8"
         >
           <div className="flex-1 h-px bg-gray-300"></div>
-          <span className="text-gray-500 text-lg">or</span>
+          <span className="text-gray-500 text-lg">
+            {t('onboardingOr') || 'or'}
+          </span>
           <div className="flex-1 h-px bg-gray-300"></div>
         </motion.div>
 
@@ -213,14 +217,16 @@ export default function ConnectionPage() {
           transition={{ delay: 1.2 }}
           className="text-center bg-white/40 backdrop-blur-sm rounded-3xl p-8 shadow-lg border border-gray-200"
         >
-          <p className="text-gray-700 text-lg mb-4">Already have an account?</p>
+          <p className="text-gray-700 text-lg mb-4">
+            {t('onboardingAlreadyHaveAccount') || 'Already have an account?'}
+          </p>
           <motion.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             onClick={() => handleConnect('Login')}
             className="w-full bg-white text-[#00C27A] py-5 rounded-2xl flex items-center justify-center gap-2 shadow-md border-2 border-[#00C27A] text-lg"
           >
-            <span>Log In</span>
+            <span>{t('onboardingLogin') || 'Log In'}</span>
             <ArrowRight size={22} />
           </motion.button>
         </motion.div>
@@ -233,7 +239,7 @@ export default function ConnectionPage() {
           onClick={handleSkip}
           className="w-full text-gray-500 py-4 text-center hover:text-gray-700 mt-6 text-lg transition-colors"
         >
-          Skip for now
+          {t('onboardingSkipForNow') || 'Skip for now'}
         </motion.button>
       </div>
     </div>

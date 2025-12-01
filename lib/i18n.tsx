@@ -128,6 +128,24 @@ export const translations = {
     'accountDeletedDescription': 'Votre compte et toutes vos données ont été supprimés.',
     'invalidConfirmation': 'La confirmation n\'est pas valide. Veuillez écrire SUPPRIMER en majuscules.',
     
+    // Onboarding marketing flow
+    'onboardingWelcomeTitle': 'Productif.io',
+    'onboardingWelcomeSubtitle': 'Maîtrisez votre focus. Mesurez votre progression.',
+    'onboardingGetStarted': 'Commencer',
+    'onboardingLogin': 'Se connecter',
+    'onboardingChooseLanguageTitle': 'Choisissez votre langue',
+    'onboardingChooseLanguageSubtitle': 'Sélectionnez la langue de votre expérience',
+    'onboardingContinue': 'Continuer',
+    'onboardingChangeLanguageInfo': 'Vous pourrez modifier cette langue plus tard dans les paramètres',
+    'onboardingConnectTitle': 'Connectez votre compte',
+    'onboardingConnectSubtitle': 'Créez votre compte pour débloquer toutes les fonctionnalités et synchroniser vos données sur tous vos appareils',
+    'onboardingContinueWithEmail': 'Continuer avec l’email',
+    'onboardingContinueWithApple': 'Continuer avec Apple',
+    'onboardingContinueWithGoogle': 'Continuer avec Google',
+    'onboardingOr': 'ou',
+    'onboardingAlreadyHaveAccount': 'Vous avez déjà un compte ?',
+    'onboardingSkipForNow': 'Passer pour le moment',
+    
     // Settings Page
     'backToDashboard': 'Retour au tableau de bord',
     'account': 'COMPTE',
@@ -321,6 +339,24 @@ export const translations = {
     'accountDeleted': 'Account deleted',
     'accountDeletedDescription': 'Your account and all your data have been deleted.',
     'invalidConfirmation': 'Invalid confirmation. Please type DELETE in capital letters.',
+    
+    // Onboarding marketing flow
+    'onboardingWelcomeTitle': 'Productif.io',
+    'onboardingWelcomeSubtitle': 'Master your focus. Measure your growth.',
+    'onboardingGetStarted': 'Get Started',
+    'onboardingLogin': 'Log in',
+    'onboardingChooseLanguageTitle': 'Choose Your Language',
+    'onboardingChooseLanguageSubtitle': 'Select your preferred language',
+    'onboardingContinue': 'Continue',
+    'onboardingChangeLanguageInfo': 'You can change this later in settings',
+    'onboardingConnectTitle': 'Connect Your Account',
+    'onboardingConnectSubtitle': 'Create your account to unlock all features and sync your data across devices',
+    'onboardingContinueWithEmail': 'Continue with Email',
+    'onboardingContinueWithApple': 'Continue with Apple',
+    'onboardingContinueWithGoogle': 'Continue with Google',
+    'onboardingOr': 'or',
+    'onboardingAlreadyHaveAccount': 'Already have an account?',
+    'onboardingSkipForNow': 'Skip for now',
     
     // Settings Page
     'backToDashboard': 'Back to Dashboard',

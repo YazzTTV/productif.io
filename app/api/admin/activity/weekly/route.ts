@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAuthUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { isUserAdmin } from "@/lib/admin-utils";
 import { startOfDay, subDays, format } from "date-fns";
 import { fr } from "date-fns/locale";
 
@@ -12,8 +13,16 @@ export async function GET() {
     // Vérifier l'authentification et les permissions
     const authUser = await getAuthUser();
     
+    if (!authUser) {
+      return NextResponse.json(
+        { error: "Non authentifié" },
+        { status: 401 }
+      );
+    }
+    
     // Vérifier si l'utilisateur est un super admin
-    if (!authUser || authUser.role !== "SUPER_ADMIN") {
+    const isSuperAdmin = await isUserAdmin(authUser.id, true);
+    if (!isSuperAdmin) {
       return NextResponse.json(
         { error: "Vous n'avez pas les permissions nécessaires" },
         { status: 403 }
