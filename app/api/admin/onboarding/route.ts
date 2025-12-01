@@ -1,30 +1,22 @@
 import { NextResponse } from "next/server"
-import { cookies } from "next/headers"
-import { verify } from "jsonwebtoken"
+import { getAuthUser } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { isUserAdmin } from "@/lib/admin-utils"
 
 // GET /api/admin/onboarding - Récupérer toutes les données d'onboarding (pour super admin)
 export async function GET(request: Request) {
   try {
     // Vérifier l'authentification et les droits
-    const cookieStore = await cookies()
-    const token = cookieStore.get("auth_token")?.value
-
-    if (!token) {
+    const authUser = await getAuthUser()
+    
+    if (!authUser) {
       return NextResponse.json({ error: "Non authentifié" }, { status: 401 })
     }
 
-    const decoded = verify(token, process.env.JWT_SECRET || "fallback_secret") as any
-    const userId = decoded.id || decoded.userId
-
     // Vérifier que l'utilisateur est super admin
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { role: true }
-    })
-
-    if (!user || user.role !== "SUPER_ADMIN") {
-      return NextResponse.json({ error: "Non autorisé" }, { status: 403 })
+    const isSuperAdmin = await isUserAdmin(authUser.id, true)
+    if (!isSuperAdmin) {
+      return NextResponse.json({ error: "Vous n'avez pas les permissions nécessaires" }, { status: 403 })
     }
 
     // Récupérer toutes les données d'onboarding avec les informations utilisateur

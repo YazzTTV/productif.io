@@ -13,6 +13,7 @@ import { Capacitor } from '@capacitor/core'
 import { MobileNav } from "@/components/navigation/mobile-nav"
 import { TrialBanner } from "@/components/trial/TrialBanner"
 import { TrialExpiredOverlay } from "@/components/trial/TrialExpiredOverlay"
+import { SuperAdminMenu } from "@/components/admin/super-admin-menu"
 
 export default function DashboardLayout({
   children,
@@ -74,6 +75,9 @@ export default function DashboardLayout({
           )}>
             {children}
           </main>
+          
+          {/* Menu Super Admin - visible uniquement pour les Super Admin */}
+          {isDashboardPage && <SuperAdminMenu />}
         </div>
 
         <footer className="bg-card border-t border-border z-10 hidden md:block">

@@ -3,6 +3,7 @@
 import { motion } from 'framer-motion'
 import { useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
+import { useLocale } from '@/lib/i18n'
 
 // Fonction pour générer une valeur pseudo-aléatoire déterministe basée sur un seed
 function seededRandom(seed: number) {
@@ -13,6 +14,7 @@ function seededRandom(seed: number) {
 export function WelcomePage() {
   const router = useRouter()
   const [isMounted, setIsMounted] = useState(false)
+  const { t } = useLocale()
 
   useEffect(() => {
     setIsMounted(true)
@@ -89,7 +91,7 @@ export function WelcomePage() {
           transition={{ delay: 0.4, duration: 0.5 }}
           className="text-center text-gray-900 mb-8 text-6xl drop-shadow-sm leading-tight font-bold"
         >
-          Productif.io
+          {t('onboardingWelcomeTitle') || 'Productif.io'}
         </motion.h1>
 
         <motion.p
@@ -98,7 +100,7 @@ export function WelcomePage() {
           transition={{ delay: 0.5, duration: 0.5 }}
           className="text-center text-gray-700 mb-16 text-2xl leading-relaxed max-w-xl mx-auto"
         >
-          Master your focus. Measure your growth.
+          {t('onboardingWelcomeSubtitle') || 'Master your focus. Measure your growth.'}
         </motion.p>
 
         <motion.div
@@ -118,7 +120,9 @@ export function WelcomePage() {
               animate={{ x: ['-100%', '200%'] }}
               transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
             />
-            <span className="relative z-10 text-xl font-semibold">Get Started</span>
+            <span className="relative z-10 text-xl font-semibold">
+              {t('onboardingGetStarted') || 'Get Started'}
+            </span>
           </motion.button>
           
           <motion.button
@@ -127,7 +131,9 @@ export function WelcomePage() {
             whileTap={{ scale: 0.98 }}
             className="w-full bg-white border-2 border-gray-200 text-gray-700 py-6 rounded-3xl transition-all duration-300 shadow-lg hover:border-[#00C27A]"
           >
-            <span className="text-xl font-semibold">Log in</span>
+            <span className="text-xl font-semibold">
+              {t('onboardingLogin') || 'Log in'}
+            </span>
           </motion.button>
         </motion.div>
       </motion.div>

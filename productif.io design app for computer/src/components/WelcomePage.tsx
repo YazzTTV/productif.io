@@ -1,12 +1,15 @@
 import { motion } from 'motion/react';
 import { Screen } from '../App';
 import logoImage from 'figma:asset/5e6ca94c36190e877b3f2f2ae5b2d32ffb6147c1.png';
+import { Language, useTranslation } from '../utils/translations';
 
 interface WelcomePageProps {
   onNavigate: (screen: Screen) => void;
+  language?: Language;
 }
 
-export function WelcomePage({ onNavigate }: WelcomePageProps) {
+export function WelcomePage({ onNavigate, language = 'en' }: WelcomePageProps) {
+  const t = useTranslation(language);
   return (
     <div className="min-h-[844px] bg-gradient-to-b from-[#0a1525] via-[#1a2535] to-[#0a1525] flex flex-col items-center justify-center px-8 relative overflow-hidden">
       {/* Starry Background */}
@@ -157,7 +160,7 @@ export function WelcomePage({ onNavigate }: WelcomePageProps) {
           className="text-center text-white mb-3 bg-gradient-to-r from-[#00C27A] to-[#00D68F] bg-clip-text text-transparent"
           style={{ fontWeight: 700 }}
         >
-          Productif.io
+          {t('welcomeTitle')}
         </motion.h1>
 
         <motion.p
@@ -166,7 +169,7 @@ export function WelcomePage({ onNavigate }: WelcomePageProps) {
           transition={{ delay: 0.6, duration: 0.5 }}
           className="text-center text-gray-300 mb-16"
         >
-          Master your focus. Measure your growth.
+          {t('welcomeSubtitle')}
         </motion.p>
 
         <motion.div
@@ -186,7 +189,7 @@ export function WelcomePage({ onNavigate }: WelcomePageProps) {
               animate={{ x: ['-100%', '200%'] }}
               transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
             />
-            <span className="relative z-10">Get Started</span>
+            <span className="relative z-10">{t('getStarted')}</span>
           </motion.button>
           
           <motion.button
@@ -195,7 +198,7 @@ export function WelcomePage({ onNavigate }: WelcomePageProps) {
             whileTap={{ scale: 0.98 }}
             className="w-full bg-white/10 backdrop-blur-sm border-2 border-[#00C27A] text-white py-4 px-8 rounded-full transition-all duration-300"
           >
-            Log in
+            {t('logIn')}
           </motion.button>
         </motion.div>
       </motion.div>

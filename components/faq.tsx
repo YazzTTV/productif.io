@@ -35,8 +35,8 @@ export function Faq() {
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(null);
 
   return (
-    <section id="faq" className="py-32 bg-gradient-to-br from-gray-50 to-white">
-      <div className="max-w-4xl mx-auto px-6">
+    <section id="faq" className="py-32 bg-gradient-to-b from-white via-gray-50 to-white">
+      <div className="max-w-5xl mx-auto px-6">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -62,7 +62,7 @@ export function Faq() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ delay: index * 0.05 }}
-              className="bg-white rounded-2xl border-2 border-gray-100 overflow-hidden"
+              className="bg-white/90 rounded-2xl border border-gray-100 overflow-hidden backdrop-blur-sm"
             >
               <button
                 onClick={() => setOpenFaqIndex(openFaqIndex === index ? null : index)}

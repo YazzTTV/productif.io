@@ -1,4 +1,4 @@
-import { Header } from "@/components/header"
+import SiteHeader from "@/components/site-header"
 import { Hero } from "@/components/hero"
 import { Stats } from "@/components/stats"
 import { Features } from "@/components/features"
@@ -12,7 +12,7 @@ import Footer from "@/components/footer"
 export default function Home() {
   return (
     <main className="min-h-screen bg-white">
-      <Header />
+      <SiteHeader />
       <Hero />
       <Stats />
       <Features />

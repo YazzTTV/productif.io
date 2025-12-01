@@ -7,7 +7,7 @@ import { motion } from "framer-motion"
 
 export function Testimonials() {
   return (
-    <section id="testimonials" className="py-32 bg-gradient-to-br from-gray-50 to-white">
+    <section id="testimonials" className="py-32 bg-gradient-to-br from-gray-50 via-white to-gray-50">
       <div className="max-w-7xl mx-auto px-6">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -15,15 +15,24 @@ export function Testimonials() {
           viewport={{ once: true }}
           className="text-center mb-16"
         >
-          <h2 className="text-4xl md:text-5xl text-gray-900 mb-6">
-            Loved by Early Adopters
+          <h2 className="text-4xl md:text-5xl text-gray-900 mb-4">
+            Loved by ambitious builders
             <span className="block bg-gradient-to-r from-[#00C27A] to-[#00D68F] bg-clip-text text-transparent">
-              Worldwide
+              around the world
             </span>
           </h2>
-          <p className="text-xl text-gray-600">
-            See what our community has to say about their transformation
+          <p className="text-lg md:text-xl text-gray-600 max-w-2xl mx-auto">
+            Founders, freelancers and knowledge workers use Productif.io to turn scattered days
+            into focused progress.
           </p>
+          <div className="mt-6 flex items-center justify-center gap-3 text-sm text-gray-500">
+            <div className="flex items-center gap-1">
+              {[...Array(5)].map((_, i) => (
+                <Star key={i} className="w-4 h-4 fill-[#00C27A] text-[#00C27A]" />
+              ))}
+            </div>
+            <span>4.9/5 average rating · 50K+ users</span>
+          </div>
         </motion.div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-stretch">
@@ -65,7 +74,7 @@ export function Testimonials() {
             />
           </motion.div>
         </div>
-        <div className="mt-10 text-center">
+        <div className="mt-12 text-center">
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}

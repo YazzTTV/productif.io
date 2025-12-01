@@ -4,6 +4,7 @@ import { motion } from 'framer-motion'
 import { useState, useEffect } from 'react'
 import { ArrowLeft, CheckCircle2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import { useLocale } from '@/lib/i18n'
 
 // Fonction pour générer une valeur pseudo-aléatoire déterministe basée sur un seed
 function seededRandom(seed: number) {
@@ -38,6 +39,7 @@ export function OnboardingQuestion({
   const [selectedOption, setSelectedOption] = useState<string | null>(null)
   const [showSocialProof, setShowSocialProof] = useState(false)
   const [isMounted, setIsMounted] = useState(false)
+  const { locale } = useLocale()
 
   // Réinitialiser l'état quand on change de question
   useEffect(() => {
@@ -127,7 +129,11 @@ export function OnboardingQuestion({
             className="mb-10 bg-white/60 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-gray-200"
           >
             <div className="flex items-center justify-between mb-3">
-              <span className="text-lg text-gray-700">Question {questionNumber} of {totalQuestions}</span>
+              <span className="text-lg text-gray-700">
+                {locale === 'fr'
+                  ? `Question ${questionNumber} sur ${totalQuestions}`
+                  : `Question ${questionNumber} of ${totalQuestions}`}
+              </span>
               <span className="text-lg text-[#00C27A] font-semibold">{Math.round(progress)}%</span>
             </div>
             <div className="h-3 bg-gray-200 rounded-full overflow-hidden">

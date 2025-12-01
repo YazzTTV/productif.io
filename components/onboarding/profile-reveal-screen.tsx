@@ -4,6 +4,7 @@ import { motion } from 'framer-motion'
 import { useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import { Sparkles, Check, Zap } from 'lucide-react'
+import { useLocale } from '@/lib/i18n'
 
 // Fonction pour générer une valeur pseudo-aléatoire déterministe basée sur un seed
 function seededRandom(seed: number) {
@@ -25,10 +26,49 @@ export function ProfileRevealScreen({
   const router = useRouter()
   const [selectedPlan, setSelectedPlan] = useState<'monthly' | 'annual'>('annual')
   const [isMounted, setIsMounted] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const { locale } = useLocale()
+  const isFr = locale === 'fr'
 
   useEffect(() => {
     setIsMounted(true)
   }, [])
+
+  const handleStartTrial = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+
+      const billingType = selectedPlan === 'annual' ? 'yearly' : 'monthly'
+
+      const resp = await fetch('/api/stripe/create-checkout-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ billingType }),
+        credentials: 'include',
+      })
+
+      if (!resp.ok) {
+        const data = await resp.json().catch(() => ({}))
+        throw new Error(
+          data.error ||
+          (isFr ? "Erreur lors de la création du paiement" : "Error while creating payment")
+        )
+      }
+
+      const data = await resp.json()
+      if (data.url) {
+        window.location.href = data.url
+      } else {
+        throw new Error(isFr ? "URL de paiement introuvable" : "Payment URL not found")
+      }
+    } catch (e: any) {
+      setError(e?.message || (isFr ? "Erreur inconnue" : "Unknown error"))
+    } finally {
+      setLoading(false)
+    }
+  }
 
   return (
     <div className="min-h-screen bg-white px-6 py-12 flex flex-col">
@@ -88,7 +128,9 @@ export function ProfileRevealScreen({
           transition={{ delay: 0.5 }}
           className="text-center mb-8"
         >
-          <p className="text-[#00C27A] text-xl mb-3 font-semibold">Your productivity profile</p>
+          <p className="text-[#00C27A] text-xl mb-3 font-semibold">
+            {isFr ? "Votre profil de productivité" : "Your productivity profile"}
+          </p>
           <h1 className="text-gray-900 text-5xl mb-2 flex items-center justify-center gap-3 font-bold">
             <span>{profileType}</span>
             <span className="text-5xl">{profileEmoji}</span>
@@ -135,7 +177,9 @@ export function ProfileRevealScreen({
           transition={{ delay: 0.9 }}
           className="mb-8"
         >
-          <h3 className="text-gray-900 text-2xl mb-6 text-center font-bold">Choose your plan</h3>
+          <h3 className="text-gray-900 text-2xl mb-6 text-center font-bold">
+            {isFr ? "Choisissez votre offre" : "Choose your plan"}
+          </h3>
           
           {/* Annual Plan - Highlighted */}
           <motion.button
@@ -154,21 +198,29 @@ export function ProfileRevealScreen({
             {/* Best Value Badge */}
             <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 bg-gradient-to-r from-[#00C27A] to-[#00D68F] text-white text-lg px-6 py-2 rounded-full shadow-lg flex items-center gap-2">
               <span>⭐</span>
-              <span>Best Value</span>
+              <span>{isFr ? "Meilleure offre" : "Best Value"}</span>
             </div>
             
             <div className="flex items-center justify-between mt-3">
               <div className="text-left">
-                <p className="text-gray-900 text-xl mb-2 font-semibold">Annual Plan</p>
+                <p className="text-gray-900 text-xl mb-2 font-semibold">
+                  {isFr ? "Offre annuelle" : "Annual Plan"}
+                </p>
                 <div className="flex items-center gap-2">
-                  <span className="text-base text-green-600 bg-green-50 px-3 py-1 rounded-full font-medium">💰 Save $60/year</span>
+                  <span className="text-base text-green-600 bg-green-50 px-3 py-1 rounded-full font-medium">
+                    {isFr ? "💰 Économisez 60$/an" : "💰 Save $60/year"}
+                  </span>
                 </div>
               </div>
               <div className="flex items-center gap-4">
                 <div className="text-right">
                   <p className="text-gray-900 text-3xl font-bold">$9.99</p>
-                  <p className="text-base text-gray-500">per month</p>
-                  <p className="text-sm text-gray-400">billed annually</p>
+                  <p className="text-base text-gray-500">
+                    {isFr ? "par mois" : "per month"}
+                  </p>
+                  <p className="text-sm text-gray-400">
+                    {isFr ? "facturé annuellement" : "billed annually"}
+                  </p>
                 </div>
                 <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center ${
                   selectedPlan === 'annual'
@@ -196,13 +248,19 @@ export function ProfileRevealScreen({
           >
             <div className="flex items-center justify-between">
               <div className="text-left">
-                <p className="text-gray-900 text-xl font-semibold">Monthly Plan</p>
-                <p className="text-base text-gray-500">Flexible billing</p>
+                <p className="text-gray-900 text-xl font-semibold">
+                  {isFr ? "Offre mensuelle" : "Monthly Plan"}
+                </p>
+                <p className="text-base text-gray-500">
+                  {isFr ? "Facturation flexible" : "Flexible billing"}
+                </p>
               </div>
               <div className="flex items-center gap-4">
                 <div className="text-right">
                   <p className="text-gray-900 text-3xl font-bold">$14.99</p>
-                  <p className="text-base text-gray-500">per month</p>
+                  <p className="text-base text-gray-500">
+                    {isFr ? "par mois" : "per month"}
+                  </p>
                 </div>
                 <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center ${
                   selectedPlan === 'monthly'
@@ -227,14 +285,16 @@ export function ProfileRevealScreen({
         >
           <div className="flex items-center justify-center gap-3 mb-4">
             <Zap size={24} className="text-[#00C27A]" />
-            <p className="text-gray-900 text-xl font-semibold">7-Day Free Trial</p>
+            <p className="text-gray-900 text-xl font-semibold">
+              {isFr ? "Essai gratuit de 7 jours" : "7-Day Free Trial"}
+            </p>
           </div>
           <div className="flex items-center justify-center gap-6 text-lg text-gray-600">
             <span className="flex items-center gap-2">
-              <span className="text-[#00C27A]">✓</span> 50K+ users
+              <span className="text-[#00C27A]">✓</span> {isFr ? "50K+ utilisateurs" : "50K+ users"}
             </span>
             <span className="flex items-center gap-2">
-              <span className="text-[#00C27A]">✓</span> Cancel anytime
+              <span className="text-[#00C27A]">✓</span> {isFr ? "Annulez à tout moment" : "Cancel anytime"}
             </span>
           </div>
         </motion.div>
@@ -248,7 +308,8 @@ export function ProfileRevealScreen({
         className="space-y-3 mt-6"
       >
         <motion.button
-          onClick={() => router.push('/dashboard')}
+          onClick={handleStartTrial}
+          disabled={loading}
           whileHover={{ scale: 1.02, boxShadow: "0 20px 40px rgba(0, 194, 122, 0.4)" }}
           whileTap={{ scale: 0.98 }}
           animate={{ 
@@ -270,7 +331,9 @@ export function ProfileRevealScreen({
           />
           <span className="relative text-lg flex items-center justify-center gap-2 font-semibold">
             <Zap size={20} />
-            Start My Free Trial
+            {loading
+              ? (isFr ? "Redirection vers le paiement..." : "Redirecting to payment...")
+              : (isFr ? "Démarrer mon essai gratuit" : "Start My Free Trial")}
           </span>
         </motion.button>
 
@@ -280,9 +343,15 @@ export function ProfileRevealScreen({
           whileTap={{ scale: 0.99 }}
           className="w-full text-gray-600 py-3 rounded-2xl hover:text-gray-800 transition-all"
         >
-          Skip
+          {isFr ? "Passer" : "Skip"}
         </motion.button>
       </motion.div>
+
+      {error && (
+        <p className="mt-3 text-center text-sm text-red-600">
+          {error}
+        </p>
+      )}
 
       <motion.p
         initial={{ opacity: 0 }}
@@ -290,7 +359,9 @@ export function ProfileRevealScreen({
         transition={{ delay: 1.5 }}
         className="text-center text-xs text-gray-400 mt-3"
       >
-        By continuing, you agree to our Terms & Privacy Policy
+        {isFr
+          ? "En continuant, vous acceptez nos Conditions générales et notre Politique de confidentialité"
+          : "By continuing, you agree to our Terms & Privacy Policy"}
       </motion.p>
     </div>
   )
