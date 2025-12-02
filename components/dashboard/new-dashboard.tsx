@@ -507,6 +507,7 @@ export function NewDashboard() {
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 className="px-6 py-2.5 hover:bg-gray-100 text-gray-700 rounded-2xl flex items-center gap-2 transition-all"
+                data-allow-click
               >
                 <SettingsIcon size={20} />
                 <span>{t('settings')}</span>
@@ -537,7 +538,7 @@ export function NewDashboard() {
             className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8"
           >
             {/* Daily Progress Card */}
-            <div className="bg-gradient-to-br from-[#00C27A] to-[#00D68F] rounded-3xl p-6 shadow-xl text-white relative overflow-hidden">
+            <div className="stat-card bg-gradient-to-br from-[#00C27A] to-[#00D68F] rounded-3xl p-6 shadow-xl text-white relative overflow-hidden">
               <motion.div
                 className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
                 animate={{ x: ['-100%', '200%'] }}
@@ -561,7 +562,7 @@ export function NewDashboard() {
             </div>
 
             {/* Focus Time Card */}
-            <div className="bg-white rounded-3xl p-6 shadow-lg border border-gray-100">
+            <div className="stat-card bg-white rounded-3xl p-6 shadow-lg border border-gray-100">
               <Clock size={28} className="text-[#00C27A] mb-3" />
               <p className="text-gray-600 mb-2 text-sm">{t('focusTime')}</p>
               <div className="flex items-baseline gap-2 mb-2">
@@ -572,7 +573,7 @@ export function NewDashboard() {
             </div>
 
             {/* Streak Card */}
-            <div className="bg-gradient-to-br from-orange-400 to-pink-500 rounded-3xl p-6 shadow-xl text-white relative overflow-hidden">
+            <div className="stat-card bg-gradient-to-br from-orange-400 to-pink-500 rounded-3xl p-6 shadow-xl text-white relative overflow-hidden">
               <motion.div
                 animate={{ 
                   scale: [1, 1.2, 1],
@@ -595,7 +596,7 @@ export function NewDashboard() {
             </div>
 
             {/* Productivity Score Card */}
-            <div className="bg-gradient-to-br from-purple-500 to-indigo-600 rounded-3xl p-6 shadow-xl text-white relative overflow-hidden">
+            <div className="stat-card bg-gradient-to-br from-purple-500 to-indigo-600 rounded-3xl p-6 shadow-xl text-white relative overflow-hidden">
               <Award size={28} className="mb-3 opacity-90" />
               <p className="text-white/80 mb-2 text-sm">Score d'aujourd'hui</p>
               <div className="flex items-baseline gap-2 mb-1">
@@ -615,7 +616,7 @@ export function NewDashboard() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 }}
-                className="bg-white rounded-3xl p-8 shadow-lg border border-gray-100"
+                className="dashboard-card bg-white rounded-3xl p-8 shadow-lg border border-gray-100"
               >
                 <div className="flex items-center justify-between mb-6">
                   <div>
@@ -702,7 +703,7 @@ export function NewDashboard() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.4 }}
-                className="bg-white rounded-3xl p-8 shadow-lg border border-gray-100 mt-12"
+                className="dashboard-card bg-white rounded-3xl p-8 shadow-lg border border-gray-100 mt-12"
               >
                 <div className="space-y-12">
                   {/* Tasks Summary */}
@@ -835,7 +836,7 @@ export function NewDashboard() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 }}
-                className="bg-white rounded-3xl p-6 shadow-lg border border-gray-100"
+                className="dashboard-card bg-white rounded-3xl p-6 shadow-lg border border-gray-100"
               >
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-gray-800 text-lg">{t('dailyHabits')}</h3>
@@ -1010,7 +1011,7 @@ export function NewDashboard() {
                 <span>{t('viewAllAchievements')}</span>
               </motion.button>
             </div>
-            <div className="grid grid-cols-5 gap-6">
+            <div className="grid grid-cols-5 gap-6 dashboard-card">
               {recentAchievements.length > 0 ? recentAchievements.map((achievement, index) => {
                 const TYPE_ICONS: Record<string, any> = {
                   STREAK: Clock,

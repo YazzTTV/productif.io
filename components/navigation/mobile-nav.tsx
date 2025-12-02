@@ -101,6 +101,7 @@ export function MobileNav() {
                 ? "text-green-600 bg-green-50" 
                 : "text-gray-500 hover:text-green-600"
             )}
+            data-allow-click={item.path === "/dashboard/settings"}
           >
             <div className={cn(
               "w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200",

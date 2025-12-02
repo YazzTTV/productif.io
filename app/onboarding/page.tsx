@@ -1,19 +1,21 @@
 "use client"
 
-import { useState } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { signIn } from 'next-auth/react'
 import { OnboardingQuestion } from '@/components/onboarding/onboarding-question'
 import { ProcessingPage } from '@/components/onboarding/processing-page'
 import { ProfileRevealScreen } from '@/components/onboarding/profile-reveal-screen'
+import { SymptomsPage } from '@/components/onboarding/symptoms-page'
+import { TestimonialsPage } from '@/components/onboarding/testimonials-page'
 import { useLocale } from '@/lib/i18n'
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
-import { CheckCircle2 } from 'lucide-react'
+import { CheckCircle2, Zap, Target, TrendingUp, Users, Brain, MessageCircle, BarChart3 } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
 
@@ -200,7 +202,8 @@ const profileTypesFr: { [key: string]: { type: string; emoji: string; descriptio
 
 type OnboardingStep = 'questions' | 'processing' | 'profile'
 
-export default function OnboardingPage() {
+// Composant d'onboarding avec sauvegarde des réponses
+function OldOnboardingPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { locale } = useLocale()
@@ -210,9 +213,51 @@ export default function OnboardingPage() {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
   const [answers, setAnswers] = useState<string[]>([])
   const [userProfile, setUserProfile] = useState<{ type: string; emoji: string; description: string } | null>(null)
+  const auth = useAuthInfo()
 
   const questions = locale === 'fr' ? questionsFr : questionsEn
   const profileTypes = locale === 'fr' ? profileTypesFr : profileTypesEn
+
+  // Sauvegarder les réponses quand elles changent
+  useEffect(() => {
+    if (!auth.isAuthenticated || answers.length === 0) return
+
+    const saveAnswers = async () => {
+      try {
+        // Mapper les réponses du questionnaire aux champs de la base de données
+        const payload: any = {
+          language: locale === 'fr' ? 'fr' : 'en',
+          currentStep: currentQuestionIndex + 1,
+          completed: currentStep === 'profile'
+        }
+
+        // Si on a au moins 3 réponses, on peut remplir les champs du questionnaire
+        if (answers.length >= 1) payload.diagBehavior = answers[0] === 'A' ? 'details' : answers[0] === 'B' ? 'procrastination' : answers[0] === 'C' ? 'distraction' : 'abandon'
+        if (answers.length >= 2) payload.timeFeeling = answers[1] === 'A' ? 'frustrated' : answers[1] === 'B' ? 'tired' : answers[1] === 'C' ? 'proud' : 'lost'
+        if (answers.length >= 3) payload.phoneHabit = answers[2] === 'A' ? 'enemy' : answers[2] === 'B' ? 'twoMinutes' : answers[2] === 'C' ? 'farButBack' : 'managed'
+
+        console.log('[ONBOARDING] 💾 Sauvegarde des réponses:', payload)
+
+        const response = await fetch('/api/onboarding/data', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(payload)
+        })
+
+        if (!response.ok) {
+          console.error('[ONBOARDING] ❌ Erreur sauvegarde:', response.status)
+        } else {
+          console.log('[ONBOARDING] ✅ Réponses sauvegardées')
+        }
+      } catch (error) {
+        console.error('[ONBOARDING] ❌ Erreur:', error)
+      }
+    }
+
+    const timeoutId = setTimeout(saveAnswers, 500)
+    return () => clearTimeout(timeoutId)
+  }, [answers, currentQuestionIndex, currentStep, auth.isAuthenticated, locale])
 
   const handleAnswer = (answer: string) => {
     const newAnswers = [...answers, answer]
@@ -416,13 +461,18 @@ function useAuthInfo() {
     let isMounted = true
     const fetchAuth = async () => {
       try {
+        console.log('[AUTH] 🔍 Vérification de l\'authentification...')
         const res = await fetch("/api/auth/me", { credentials: "include" })
+        console.log('[AUTH] Réponse reçue:', res.status, res.ok)
         if (res.ok) {
           const data = await res.json()
+          console.log('[AUTH] ✅ Utilisateur authentifié:', data.user?.email)
           if (isMounted) setAuth({ isAuthenticated: true, email: data.user?.email || "" })
+        } else {
+          console.log('[AUTH] ❌ Utilisateur non authentifié')
         }
-      } catch {
-        // noop
+      } catch (error) {
+        console.error('[AUTH] ❌ Erreur lors de la vérification:', error)
       }
     }
     fetchAuth()
@@ -466,6 +516,15 @@ function OnboardingContent() {
 
   const auth = useAuthInfo()
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('yearly')
+  
+  // Log de l'état d'authentification pour débogage
+  useEffect(() => {
+    console.log('[ONBOARDING] État d\'authentification:', {
+      isAuthenticated: auth.isAuthenticated,
+      email: auth.email,
+      step: step
+    })
+  }, [auth.isAuthenticated, auth.email, step])
 
   // Charger les données depuis localStorage ou la base de données
   useEffect(() => {
@@ -529,11 +588,20 @@ function OnboardingContent() {
 
   // Sauvegarder en base de données si l'utilisateur est authentifié
   useEffect(() => {
-    if (!auth.isAuthenticated) return
+    if (!auth.isAuthenticated) {
+      console.log('[ONBOARDING] ⚠️ Sauvegarde ignorée - utilisateur non authentifié')
+      return
+    }
 
     const saveToDatabase = async () => {
       try {
-        await fetch('/api/onboarding/data', {
+        console.log('[ONBOARDING] 💾 Tentative de sauvegarde:', {
+          isAuthenticated: auth.isAuthenticated,
+          step: step,
+          answers: answers
+        })
+        
+        const response = await fetch('/api/onboarding/data', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
@@ -555,8 +623,16 @@ function OnboardingContent() {
             completed: step >= 9
           })
         })
+        
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          console.error('[ONBOARDING] ❌ Erreur sauvegarde:', response.status, errorData)
+        } else {
+          const result = await response.json()
+          console.log('[ONBOARDING] ✅ Sauvegarde réussie:', result)
+        }
       } catch (error) {
-        console.error('Erreur sauvegarde onboarding:', error)
+        console.error('[ONBOARDING] ❌ Erreur sauvegarde onboarding:', error)
         // Ne pas bloquer l'utilisateur si la sauvegarde échoue
       }
     }
@@ -584,8 +660,6 @@ function OnboardingContent() {
 
   // Traductions dynamiques basées sur la langue sélectionnée
   const t = answers.language === "fr" ? TRANSLATIONS.fr : TRANSLATIONS.en
-  const FEATURES = answers.language === "fr" ? FEATURES_FR : FEATURES_EN
-  const CurrentIcon = FEATURES[featureIndex]?.icon
 
   const q4Questions = answers.language === "fr" ? [
     {
@@ -678,12 +752,62 @@ function OnboardingContent() {
     const idx = stage - 1
     const meta = q4Questions[idx]
     if (!meta) return
+    
+    // Mettre à jour les réponses
     setAnswers((prev) => {
       const updated = { ...prev }
       if (meta.key === "diagBehavior") updated.diagBehavior = key as any
       if (meta.key === "timeFeeling") updated.timeFeeling = key as any
       if (meta.key === "phoneHabit") updated.phoneHabit = key as any
       if (meta.key === "mainGoal") updated.mainGoal = label
+      
+      // Sauvegarder immédiatement si l'utilisateur est authentifié
+      if (auth.isAuthenticated) {
+        console.log(`[Q4] Sauvegarde immédiate - ${meta.key} = ${key}`, {
+          authenticated: auth.isAuthenticated,
+          email: auth.email,
+          updatedAnswers: updated
+        })
+        
+        // Utiliser les valeurs mises à jour directement
+        fetch('/api/onboarding/data', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            mainGoal: updated.mainGoal,
+            role: updated.role,
+            frustration: updated.frustration,
+            language: updated.language,
+            whatsappNumber: updated.whatsappNumber,
+            whatsappConsent: updated.whatsappConsent,
+            diagBehavior: updated.diagBehavior,
+            timeFeeling: updated.timeFeeling,
+            phoneHabit: updated.phoneHabit,
+            offer,
+            utmParams,
+            emailFallback,
+            billingCycle,
+            currentStep: step,
+            completed: step >= 9
+          })
+        }).then(async response => {
+          if (!response.ok) {
+            const errorText = await response.text().catch(() => '')
+            console.error('❌ [Q4] Erreur sauvegarde immédiate:', response.status, errorText)
+          } else {
+            console.log(`✅ [Q4] Réponse sauvegardée: ${meta.key} = ${key}`)
+          }
+        }).catch(error => {
+          console.error('❌ [Q4] Erreur sauvegarde immédiate:', error)
+        })
+      } else {
+        console.warn('⚠️ [Q4] Utilisateur NON authentifié lors de la sélection Q4', {
+          isAuthenticated: auth.isAuthenticated,
+          email: auth.email
+        })
+      }
+      
       return updated
     })
   }
@@ -866,6 +990,16 @@ function OnboardingContent() {
     }
   }
 
+  // Pages en plein écran (symptoms, testimonials)
+  if (step === 6 || step === 8) {
+    if (step === 6) {
+      return <SymptomsPage onComplete={() => setStep(8)} />
+    }
+    if (step === 8) {
+      return <TestimonialsPage onComplete={() => setStep(9)} />
+    }
+  }
+
   return (
     <div className="min-h-screen w-full flex items-center justify-center bg-gray-50 p-4">
       <Card className="w-full max-w-2xl">
@@ -1000,50 +1134,58 @@ function OnboardingContent() {
 
           {step === 3 && (
             <div className="space-y-6">
-              <div className="grid gap-6 md:grid-cols-2 items-center">
-                <div className="order-2 md:order-1 text-center md:text-left">
-                  <h3 className="text-xl font-semibold">{FEATURES[featureIndex].title}</h3>
-                  <p className="mt-2 text-muted-foreground">{FEATURES[featureIndex].description}</p>
-                  {FEATURES[featureIndex].insight && (
-                    <p className="mt-2 text-sm italic">“{FEATURES[featureIndex].insight}”</p>
-                  )}
-                </div>
-                <div className="order-1 md:order-2">
-                  <div className="w-full flex items-center justify-center">
-                    <div className="h-28 w-28 rounded-full bg-emerald-50 border border-emerald-100 grid place-items-center text-emerald-600">
-                      {CurrentIcon ? (
-                        <CurrentIcon className="h-14 w-14" />
-                      ) : (
-                        <span className="text-2xl">✨</span>
-                      )}
+              <div className="text-center space-y-4">
+                <h3 className="text-xl font-semibold">{t.step3Title}</h3>
+                <p className="text-sm text-muted-foreground">
+                  {answers.language === 'fr' 
+                    ? 'Productif.io vous aide à rester concentré et organisé'
+                    : 'Productif.io helps you stay focused and organized'}
+                </p>
+                <div className="grid gap-4 max-w-md mx-auto">
+                  <div className="p-4 rounded-lg border border-gray-200 bg-gray-50">
+                    <div className="flex items-center gap-3">
+                      <Brain className="h-8 w-8 text-[#00C27A]" />
+                      <div className="text-left">
+                        <div className="font-medium">
+                          {answers.language === 'fr' ? 'Assistant IA personnel' : 'Personal AI Assistant'}
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          {answers.language === 'fr' ? 'Organisez vos tâches intelligemment' : 'Organize your tasks intelligently'}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="p-4 rounded-lg border border-gray-200 bg-gray-50">
+                    <div className="flex items-center gap-3">
+                      <Target className="h-8 w-8 text-[#00C27A]" />
+                      <div className="text-left">
+                        <div className="font-medium">
+                          {answers.language === 'fr' ? 'Suivi des habitudes' : 'Habit Tracking'}
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          {answers.language === 'fr' ? 'Construisez des routines durables' : 'Build lasting routines'}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="p-4 rounded-lg border border-gray-200 bg-gray-50">
+                    <div className="flex items-center gap-3">
+                      <BarChart3 className="h-8 w-8 text-[#00C27A]" />
+                      <div className="text-left">
+                        <div className="font-medium">
+                          {answers.language === 'fr' ? 'Analyses avancées' : 'Advanced Analytics'}
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          {answers.language === 'fr' ? 'Suivez vos progrès en temps réel' : 'Track your progress in real-time'}
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
-              <div className="flex items-center justify-between">
-                <Button
-                  variant="outline"
-                  onClick={() => setFeatureIndex((i) => Math.max(0, i - 1))}
-                  disabled={featureIndex === 0}
-                >
-                  {t.buttonPrevious}
-                </Button>
-                <div className="text-sm text-muted-foreground">{featureIndex + 1} / {FEATURES.length}</div>
-                <Button
-                  onClick={() => {
-                    if (featureIndex < FEATURES.length - 1) {
-                      setFeatureIndex((i) => i + 1)
-                    } else {
-                      next()
-                    }
-                  }}
-                >
-                  {featureIndex < FEATURES.length - 1 ? t.buttonContinue : t.buttonNext}
-                </Button>
-              </div>
               <div className="flex justify-between">
                 <Button variant="ghost" onClick={prev}>{t.buttonBack}</Button>
-                <Button onClick={next}>{t.buttonSkip}</Button>
+                <Button onClick={next}>{t.buttonContinue}</Button>
               </div>
             </div>
           )}
@@ -1129,7 +1271,10 @@ function OnboardingContent() {
                     {q4Questions[q4Stage - 1].options.map((opt) => (
                       <button
                         key={opt.key}
-                        onClick={() => handleQ4Select(q4Stage, opt.key, opt.label)}
+                        onClick={() => {
+                          console.log(`[Q4] Clic sur option: ${opt.key} (question ${q4Stage})`)
+                          handleQ4Select(q4Stage, opt.key, opt.label)
+                        }}
                         className={`text-left rounded-lg border px-4 py-3 hover:bg-emerald-50 transition ${q4Selections[q4Stage] === opt.key ? 'border-emerald-500 bg-emerald-50' : 'border-gray-200'}`}
                       >
                         {opt.label}
@@ -1141,7 +1286,72 @@ function OnboardingContent() {
                   )}
                   <div className="flex justify-between">
                     <Button variant="ghost" onClick={() => setQ4Stage((s) => Math.max(1, s - 1))}>{t.buttonBack}</Button>
-                    <Button onClick={() => (q4Stage < 4 ? setQ4Stage((s) => Math.min(4, s + 1)) : setStep(7))}>
+                    <Button onClick={async () => {
+                      if (q4Stage < 4) {
+                        setQ4Stage((s) => Math.min(4, s + 1))
+                      } else {
+                        // Attendre un peu pour s'assurer que toutes les réponses sont dans answers
+                        await new Promise(resolve => setTimeout(resolve, 100))
+                        
+                        console.log('[Q4] Fin du questionnaire - État actuel:', {
+                          isAuthenticated: auth.isAuthenticated,
+                          email: auth.email,
+                          answers: answers,
+                          q4Selections: q4Selections
+                        })
+                        
+                        // Sauvegarder toutes les réponses Q4 avant de passer à l'étape suivante
+                        if (auth.isAuthenticated) {
+                          try {
+                            const payload = {
+                              mainGoal: answers.mainGoal || null,
+                              role: answers.role || null,
+                              frustration: answers.frustration || null,
+                              language: answers.language || 'fr',
+                              whatsappNumber: answers.whatsappNumber || null,
+                              whatsappConsent: answers.whatsappConsent || false,
+                              diagBehavior: answers.diagBehavior || null,
+                              timeFeeling: answers.timeFeeling || null,
+                              phoneHabit: answers.phoneHabit || null,
+                              offer: offer || null,
+                              utmParams: utmParams || null,
+                              emailFallback: emailFallback || null,
+                              billingCycle: billingCycle || null,
+                              currentStep: 6,
+                              completed: false
+                            }
+                            
+                            console.log('💾 [Q4] Sauvegarde finale:', payload)
+                            
+                            const response = await fetch('/api/onboarding/data', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              credentials: 'include',
+                              body: JSON.stringify(payload)
+                            })
+                            
+                            if (!response.ok) {
+                              const errorData = await response.json().catch(() => ({}))
+                              console.error('❌ Erreur sauvegarde finale Q4:', errorData)
+                              alert('Erreur lors de la sauvegarde. Veuillez réessayer.')
+                              return
+                            } else {
+                              const result = await response.json()
+                              console.log('✅ Réponses Q4 sauvegardées avec succès:', result)
+                            }
+                          } catch (error) {
+                            console.error('❌ Erreur sauvegarde finale Q4:', error)
+                            alert('Erreur lors de la sauvegarde. Veuillez réessayer.')
+                            return
+                          }
+                        } else {
+                          console.warn('⚠️ Utilisateur non authentifié, impossible de sauvegarder')
+                          alert('Vous devez être connecté pour sauvegarder vos réponses.')
+                          return
+                        }
+                        setStep(6)
+                      }
+                    }}>
                       {q4Stage < 4 ? t.buttonContinue : t.buttonNext}
                     </Button>
                   </div>
@@ -1151,22 +1361,24 @@ function OnboardingContent() {
             </div>
           )}
 
-          {step === 6 && (
-            <div className="space-y-4">
-              {offer === "early-access" ? (
-                <>
-                  <p className="text-sm text-muted-foreground">{t.step6EarlyAccessDesc}</p>
-                  <Button disabled={loading} onClick={handleStartPayment}>{loading ? t.step6EarlyAccessLoading : t.step6EarlyAccessButton}</Button>
-                </>
-              ) : (
-                <>
-                  <p className="text-sm text-muted-foreground">{t.step6WaitlistDesc}</p>
-                  <Button disabled={loading} onClick={handleCompleteFreeWaitlist}>{loading ? t.step6WaitlistLoading : t.step6WaitlistButton}</Button>
-                </>
-              )}
-              <div className="flex justify-between">
-                <Button variant="ghost" onClick={prev}>{t.buttonBack}</Button>
-                <Button variant="outline" onClick={() => router.push("/")}>{t.step6Later}</Button>
+
+          {/* Étape 7 — Révélation du profil (gardée pour compatibilité) */}
+          {step === 7 && (
+            <div className="space-y-6 text-center">
+              <div className="mx-auto max-w-sm rounded-2xl border bg-white p-6 shadow-sm">
+                {(() => { const meta = getProfileMeta(answers); return (
+                  <>
+                    <div className="mx-auto mb-3 h-16 w-16 rounded-full bg-emerald-50 border border-emerald-100 grid place-items-center text-2xl">
+                      <span>{meta.emoji}</span>
+                    </div>
+                    <div className="text-sm text-muted-foreground">{t.step7ProfileTitle}</div>
+                    <div className="mt-1 text-2xl font-semibold">{meta.label} {meta.emoji}</div>
+                  </>
+                )})()}
+                <p className="mt-3 text-sm text-muted-foreground">{t.step7ProfileDescription}</p>
+              </div>
+              <div className="flex justify-end">
+                <Button onClick={next}>{t.buttonNext}</Button>
               </div>
             </div>
           )}
@@ -1192,35 +1404,8 @@ function OnboardingContent() {
             </div>
           )}
 
-          {/* Étape 8 — Configuration (loading 4s) */}
-          {step === 8 && (
-            <div className="space-y-6 text-center">
-              <div className="mx-auto max-w-sm rounded-2xl border bg-white p-6 shadow-sm">
-                <div className="flex items-center justify-center gap-3">
-                  <div className="h-3 w-3 animate-pulse rounded-full bg-emerald-500"></div>
-                  <div className="h-3 w-3 animate-pulse rounded-full bg-emerald-500 [animation-delay:150ms]"></div>
-                  <div className="h-3 w-3 animate-pulse rounded-full bg-emerald-500 [animation-delay:300ms]"></div>
-                </div>
-                <div className="mt-3 text-base font-medium">
-                  {setupDone ? (
-                    <span className="inline-flex items-center gap-2 text-emerald-700">
-                      <CheckCircle2 className="h-5 w-5" /> {t.step8SetupComplete}
-                    </span>
-                  ) : (
-                    <>{t.step8SetupInProgress}</>
-                  )}
-                </div>
-                <p className="mt-1 text-xs text-muted-foreground">{t.step8SetupDescription}</p>
-              </div>
-              {setupDone && (
-                <div className="flex justify-end">
-                  <Button onClick={next}>{t.buttonNext}</Button>
-                </div>
-              )}
-            </div>
-          )}
 
-          {/* Étape 9 — Fin / Call-to-actions */}
+          {/* Étape 9 — Paywall / Pricing */}
           {step === 9 && (
             <div className="space-y-8">
               <div className="text-center space-y-2">
@@ -1276,14 +1461,23 @@ function OnboardingContent() {
                   </li>
                 </ul>
 
-                <div className="mt-6 grid gap-3 max-w-sm mx-auto">
-                  <Button onClick={handleStartPayment} className="bg-green-500 hover:bg-green-600">
-                    {t.step9StartNow}
-                  </Button>
-                  <Button variant="outline" onClick={handleStartPayment}>{t.step9Start}</Button>
-                  <button onClick={() => router.push('/dashboard')} className="text-[11px] text-muted-foreground underline underline-offset-4">
-                    {t.step9Skip}
-                  </button>
+                <div className="mt-6 space-y-4">
+                  <div className="text-center mb-4">
+                    <p className="text-sm text-gray-600">
+                      {answers.language === "fr" 
+                        ? "+1500 early adopters" 
+                        : "+1500 early adopters"}
+                    </p>
+                  </div>
+                  <div className="grid gap-3 max-w-md mx-auto">
+                    <Button onClick={handleStartPayment} className="bg-green-500 hover:bg-green-600 max-w-xs mx-auto">
+                      {t.step9StartNow}
+                    </Button>
+                    <Button variant="outline" onClick={handleStartPayment} className="max-w-xs mx-auto">{t.step9Start}</Button>
+                    <button onClick={() => router.push('/dashboard')} className="text-[11px] text-muted-foreground underline underline-offset-4">
+                      {t.step9Skip}
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1297,4 +1491,9 @@ function OnboardingContent() {
       </Card>
     </div>
   )
+}
+
+// Exporter le composant d'origine (flux moderne avec questions simples)
+export default function OnboardingPage() {
+  return <OldOnboardingPage />
 }

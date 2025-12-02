@@ -7,44 +7,20 @@ export async function createDefaultHabits(userId: string) {
   try {
     const defaultHabits = [
       {
-        name: "Boire 8 verres d'eau",
-        description: "Rester hydraté tout au long de la journée",
-        icon: "💧",
-        category: "Santé",
+        name: "Apprentissage",
+        description: "Notez ce que vous avez appris aujourd'hui",
+        color: "#4338CA", // Indigo
         frequency: "daily",
-        targetValue: 8,
-        unit: "verres",
-        isActive: true,
+        daysOfWeek: ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"],
+        order: 0, // L'apprentissage est toujours en premier
       },
       {
-        name: "Méditation quotidienne",
-        description: "Prendre 10 minutes pour méditer",
-        icon: "🧘",
-        category: "Bien-être",
+        name: "Note de sa journée",
+        description: "Évaluez votre journée sur 10 et expliquez pourquoi",
+        color: "#0EA5E9", // Sky
         frequency: "daily",
-        targetValue: 10,
-        unit: "minutes",
-        isActive: true,
-      },
-      {
-        name: "Exercice physique",
-        description: "Faire au moins 30 minutes d'exercice",
-        icon: "🏃",
-        category: "Santé",
-        frequency: "daily",
-        targetValue: 30,
-        unit: "minutes",
-        isActive: true,
-      },
-      {
-        name: "Lecture",
-        description: "Lire pendant 20 minutes",
-        icon: "📚",
-        category: "Développement personnel",
-        frequency: "daily",
-        targetValue: 20,
-        unit: "minutes",
-        isActive: true,
+        daysOfWeek: ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"],
+        order: 1, // La note de journée est en deuxième
       },
     ]
 

@@ -1,80 +1,146 @@
 'use client';
 
 import { useEffect, useState } from 'react'
-import Link from 'next/link'
-import { X, Lock, Crown } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { usePathname } from 'next/navigation'
+import { Lock } from 'lucide-react'
+import { UpgradeModal } from './UpgradeModal'
 
 export function TrialExpiredOverlay() {
   const [status, setStatus] = useState<'unknown' | 'trial_active' | 'trial_expired' | 'subscribed' | 'cancelled'>('unknown')
   const [showModal, setShowModal] = useState(false)
+  const pathname = usePathname()
 
   useEffect(() => {
     let mounted = true
-    fetch('/api/user/trial-status')
+    fetch('/api/user/trial-status', { credentials: 'include' })
       .then(res => res.ok ? res.json() : Promise.reject(res))
       .then(data => {
         if (!mounted) return
         setStatus(data.status)
-        if (data.status === 'trial_expired') {
-          setShowModal(true)
-        }
+        console.log('[TRIAL_OVERLAY] Statut:', data.status)
       })
       .catch(() => {})
     return () => { mounted = false }
-  }, [])
+  }, [pathname])
+
+  // Intercepter les clics quand le trial est expiré
+  useEffect(() => {
+    if (status !== 'trial_expired') return
+
+    // Ne pas intercepter les clics sur settings ou upgrade
+    if (pathname.startsWith('/dashboard/settings') || pathname.startsWith('/upgrade')) {
+      console.log('[TRIAL_OVERLAY] Page settings/upgrade - clics autorisés')
+      return
+    }
+
+    const handleClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement
+      
+      // Autoriser les clics dans la modal d'upgrade
+      if (
+        target.closest('[data-allow-click]') ||
+        target.closest('[role="dialog"]') ||
+        target.closest('.upgrade-modal')
+      ) {
+        return
+      }
+
+      // Vérifier si c'est un lien ou bouton cliquable dans le dashboard
+      const clickableElement = target.closest('a, button, [role="button"], [onclick]')
+      if (clickableElement && !clickableElement.hasAttribute('data-allow-click')) {
+        // Ne pas bloquer le lien vers settings
+        const href = clickableElement.getAttribute('href')
+        if (href && href.includes('settings')) {
+          console.log('[TRIAL_OVERLAY] Lien vers settings autorisé')
+          return
+        }
+
+        e.preventDefault()
+        e.stopPropagation()
+        console.log('[TRIAL_OVERLAY] Clic bloqué, affichage de la modal')
+        setShowModal(true)
+      }
+    }
+
+    document.addEventListener('click', handleClick, true)
+    return () => document.removeEventListener('click', handleClick, true)
+  }, [status, pathname])
+
+  // Ajouter des styles CSS pour les cadenas sur les sections
+  useEffect(() => {
+    if (status !== 'trial_expired') return
+
+    // Ne pas verrouiller si on est sur settings ou upgrade
+    const isSettingsOrUpgrade = pathname.startsWith('/dashboard/settings') || pathname.startsWith('/upgrade')
+    
+    if (isSettingsOrUpgrade) {
+      console.log('[TRIAL_OVERLAY] Page settings/upgrade - pas de verrouillage')
+      return
+    }
+
+    // Ajouter des styles globaux pour verrouiller les sections
+    const style = document.createElement('style')
+    style.id = 'trial-lock-styles'
+    style.textContent = `
+      /* Verrouiller toutes les cartes et sections */
+      .dashboard-card,
+      .stat-card,
+      .metric-card,
+      [data-lockable="true"] {
+        position: relative;
+      }
+      
+      .dashboard-card::after,
+      .stat-card::after,
+      .metric-card::after,
+      [data-lockable="true"]::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: rgba(255, 255, 255, 0.6);
+        backdrop-filter: blur(1px);
+        border-radius: inherit;
+        z-index: 10;
+        pointer-events: auto;
+        cursor: pointer;
+      }
+      
+      .dashboard-card::before,
+      .stat-card::before,
+      .metric-card::before,
+      [data-lockable="true"]::before {
+        content: '🔒';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        font-size: 2rem;
+        z-index: 20;
+        pointer-events: none;
+      }
+    `
+    document.head.appendChild(style)
+
+    return () => {
+      const existingStyle = document.getElementById('trial-lock-styles')
+      if (existingStyle) {
+        existingStyle.remove()
+      }
+    }
+  }, [status, pathname])
 
   if (status !== 'trial_expired') return null
 
   return (
     <>
-      {showModal && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/50" />
-          <div className="relative z-[71] w-[92vw] max-w-xl bg-white rounded-2xl shadow-2xl p-6 sm:p-8">
-            <button
-              aria-label="Fermer"
-              className="absolute top-3 right-3 p-2 rounded-full hover:bg-gray-100"
-              onClick={() => setShowModal(false)}
-            >
-              <X className="w-5 h-5" />
-            </button>
-
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-lg bg-red-50 flex items-center justify-center">
-                <Lock className="w-5 h-5 text-red-600" />
-              </div>
-              <h2 className="text-xl sm:text-2xl font-bold">Votre essai gratuit est terminé</h2>
-            </div>
-
-            <p className="text-gray-600 leading-relaxed mb-5">
-              Continuez à profiter de Productif.io sans limite: planifiez vos journées, suivez vos habitudes et restez focus. Rejoignez maintenant et débloquez toutes les fonctionnalités.
-            </p>
-
-            <ul className="text-gray-700 space-y-2 mb-6 list-disc list-inside">
-              <li>Accès complet au tableau de bord et aux statistiques</li>
-              <li>Assistant IA productivité et rappels intelligents</li>
-              <li>Historique illimité et export de vos données</li>
-            </ul>
-
-            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-              <Link href="/upgrade" className="inline-flex items-center justify-center gap-2 rounded-lg bg-black text-white px-4 py-2.5 font-medium hover:bg-gray-900">
-                <Crown className="w-5 h-5" />
-                Choisir mon abonnement
-              </Link>
-              <Button
-                variant="secondary"
-                className="bg-gray-100 hover:bg-gray-200"
-                onClick={() => setShowModal(false)}
-              >
-                Je verrai plus tard
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Modal d'upgrade */}
+      <UpgradeModal 
+        isOpen={showModal} 
+        onClose={() => setShowModal(false)} 
+      />
     </>
   )
 }
+
 
 

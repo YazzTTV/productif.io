@@ -1,61 +1,80 @@
-import { NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 import { getAuthUser } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 
-export async function DELETE(req: Request) {
+// GET - Récupérer les informations de l'utilisateur connecté
+export async function GET() {
   try {
-    // Vérifier l'authentification
     const user = await getAuthUser()
+
     if (!user) {
-      return NextResponse.json(
-        { error: "Vous devez être connecté pour accéder à cette ressource" },
-        { status: 401 }
-      )
+      return NextResponse.json({ error: "Non authentifié" }, { status: 401 })
     }
 
-    // Pour des raisons de sécurité, demander une confirmation
-    const { confirmation } = await req.json()
-    if (confirmation !== "SUPPRIMER") {
-      return NextResponse.json(
-        { error: "La confirmation de suppression est incorrecte" },
-        { status: 400 }
-      )
+    const userInfo = await prisma.user.findUnique({
+      where: { id: user.id },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    })
+
+    if (!userInfo) {
+      return NextResponse.json({ error: "Utilisateur non trouvé" }, { status: 404 })
     }
 
-    // Vérifier si l'utilisateur est administrateur en utilisant une requête SQL brute
-    // pour éviter les problèmes avec les types TypeScript
-    const isAdmin = await prisma.$queryRaw`
-      SELECT EXISTS(
-        SELECT 1 FROM "User" 
-        WHERE id = ${user.id} 
-        AND "managedCompanyId" IS NOT NULL
-      ) as "isAdmin"
-    `
+    return NextResponse.json({ user: userInfo })
+  } catch (error) {
+    console.error("Erreur lors de la récupération des informations utilisateur:", error)
+    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 })
+  }
+}
 
-    if (isAdmin && Array.isArray(isAdmin) && isAdmin.length > 0 && isAdmin[0].isAdmin) {
-      return NextResponse.json(
-        { 
-          error: "Vous êtes administrateur d'une entreprise. Veuillez transférer votre rôle à un autre utilisateur avant de supprimer votre compte." 
-        },
-        { status: 403 }
-      )
+// PATCH - Mettre à jour le profil de l'utilisateur connecté
+export async function PATCH(req: NextRequest) {
+  try {
+    const user = await getAuthUser()
+
+    if (!user) {
+      return NextResponse.json({ error: "Non authentifié" }, { status: 401 })
     }
 
-    // Supprimer l'utilisateur - les relations en cascade seront supprimées automatiquement
-    await prisma.user.delete({
-      where: { id: user.id }
+    const body = await req.json()
+    const { name } = body
+
+    // Préparation des données à mettre à jour
+    const updateData: Record<string, any> = {}
+    
+    if (name !== undefined) {
+      updateData.name = name
+    }
+
+    if (Object.keys(updateData).length === 0) {
+      return NextResponse.json({ error: "Aucune donnée à mettre à jour" }, { status: 400 })
+    }
+
+    // Mettre à jour l'utilisateur
+    const updatedUser = await prisma.user.update({
+      where: { id: user.id },
+      data: updateData,
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        createdAt: true,
+        updatedAt: true,
+      },
     })
 
     return NextResponse.json({ 
-      success: true,
-      message: "Votre compte a été supprimé avec succès" 
+      message: "Profil mis à jour avec succès",
+      user: updatedUser
     })
-    
   } catch (error) {
-    console.error("Erreur lors de la suppression du compte:", error)
-    return NextResponse.json(
-      { error: "Une erreur est survenue lors de la suppression de votre compte." },
-      { status: 500 }
-    )
+    console.error("Erreur lors de la mise à jour du profil:", error)
+    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 })
   }
-} 
+}
