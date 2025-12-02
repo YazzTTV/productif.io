@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, Suspense } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { signIn } from 'next-auth/react'
@@ -1493,7 +1493,20 @@ function OnboardingContent() {
   )
 }
 
+// Wrapper avec Suspense pour useSearchParams
+function OnboardingPageWrapper() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#00C27A]"></div>
+      </div>
+    }>
+      <OldOnboardingPage />
+    </Suspense>
+  )
+}
+
 // Exporter le composant d'origine (flux moderne avec questions simples)
 export default function OnboardingPage() {
-  return <OldOnboardingPage />
+  return <OnboardingPageWrapper />
 }
