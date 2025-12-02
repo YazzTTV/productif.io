@@ -143,7 +143,7 @@ export function SettingsForm({ user }: SettingsFormProps) {
             </div>
             
             <button 
-              onClick={() => router.push('/dashboard/settings')}
+              onClick={() => router.push('/dashboard/settings/profile')}
               className="w-full p-7 flex items-center justify-between hover:bg-gray-50 transition-colors"
             >
               <div className="flex items-center gap-4">

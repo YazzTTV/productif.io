@@ -57,6 +57,16 @@ export async function POST(req: Request) {
       // Créer les habitudes par défaut pour le nouvel utilisateur
       await createDefaultHabits(user.id)
       
+      // Créer une entrée d'onboarding vide pour suivre l'utilisateur
+      await prisma.onboardingData.create({
+        data: {
+          userId: user.id,
+          language: 'fr',
+          currentStep: 1,
+          completed: false
+        }
+      })
+      
       // Créer un token JWT pour l'authentification
       const token = await createToken({
         userId: user.id,

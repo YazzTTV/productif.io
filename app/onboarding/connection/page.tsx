@@ -8,10 +8,6 @@ import { useLocale } from '@/lib/i18n'
 export default function ConnectionPage() {
   const router = useRouter()
   const { t } = useLocale()
-  
-  const handleSkip = () => {
-    router.push('/onboarding')
-  }
 
   const handleConnect = (provider: string) => {
     // In a real app, this would handle OAuth
@@ -22,8 +18,15 @@ export default function ConnectionPage() {
       router.push('/login')
       return
     }
-    
-    // Otherwise go to onboarding questions after connecting
+
+    // Si l'utilisateur choisit l'email, on l'envoie sur la vraie page de création de compte
+    // qui redirigera ensuite vers l'onboarding une fois le compte créé.
+    if (provider === 'Email') {
+      router.push('/register?redirect=/onboarding')
+      return
+    }
+
+    // Sinon (Apple / Google), on le laisse passer sur le flux onboarding classique
     router.push('/onboarding')
   }
 
@@ -113,11 +116,11 @@ export default function ConnectionPage() {
           {/* Benefits */}
           <div className="flex flex-col gap-3 mb-8 max-w-lg mx-auto">
             {[
-              { icon: '🤖', text: 'AI Assistant to guide you 24/7' },
-              { icon: '🔥', text: 'Track habits & build streaks' },
-              { icon: '📊', text: 'Advanced analytics & insights' },
-              { icon: '🏆', text: 'Compete with friends' },
-              { icon: '☁️', text: 'Sync across all devices' },
+              { icon: '🤖', textKey: 'onboardingBenefitAI' },
+              { icon: '🔥', textKey: 'onboardingBenefitHabits' },
+              { icon: '📊', textKey: 'onboardingBenefitAnalytics' },
+              { icon: '🏆', textKey: 'onboardingBenefitCompete' },
+              { icon: '☁️', textKey: 'onboardingBenefitSync' },
             ].map((benefit, index) => (
               <motion.div
                 key={benefit.text}
@@ -127,7 +130,7 @@ export default function ConnectionPage() {
                 className="flex items-center justify-center gap-4 bg-white/70 backdrop-blur-sm rounded-2xl p-4 border border-gray-200 shadow-sm"
               >
                 <span className="text-3xl">{benefit.icon}</span>
-                <span className="text-gray-800 text-lg">{benefit.text}</span>
+                <span className="text-gray-800 text-lg">{t(benefit.textKey)}</span>
               </motion.div>
             ))}
           </div>
@@ -141,8 +144,8 @@ export default function ConnectionPage() {
           className="mb-8 bg-white/60 backdrop-blur-md rounded-3xl p-8 shadow-xl border border-gray-200"
         >
           <div className="text-center mb-6">
-            <p className="text-gray-900 text-2xl mb-2">Join the Elite — Create Your Account</p>
-            <p className="text-gray-600 text-lg">Free 7-day trial • No credit card required</p>
+            <p className="text-gray-900 text-2xl mb-2">{t('onboardingCreateAccountTitle')}</p>
+            <p className="text-gray-600 text-lg">{t('onboardingCreateAccountSubtitle')}</p>
           </div>
 
           <div className="space-y-4">
@@ -230,17 +233,6 @@ export default function ConnectionPage() {
             <ArrowRight size={22} />
           </motion.button>
         </motion.div>
-
-        {/* Skip Option */}
-        <motion.button
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 1.3 }}
-          onClick={handleSkip}
-          className="w-full text-gray-500 py-4 text-center hover:text-gray-700 mt-6 text-lg transition-colors"
-        >
-          {t('onboardingSkipForNow') || 'Skip for now'}
-        </motion.button>
       </div>
     </div>
   )

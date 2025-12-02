@@ -145,6 +145,15 @@ export const translations = {
     'onboardingOr': 'ou',
     'onboardingAlreadyHaveAccount': 'Vous avez déjà un compte ?',
     'onboardingSkipForNow': 'Passer pour le moment',
+    'onboardingCreateAccountTitle': 'Rejoignez l\'Élite — Créez votre compte',
+    'onboardingCreateAccountSubtitle': 'Essai gratuit de 7 jours • Aucune carte bancaire requise',
+    'onboardingBenefitAI': 'Assistant IA pour vous guider 24h/24 et 7j/7',
+    'onboardingBenefitHabits': 'Suivez vos habitudes et créez des séries',
+    'onboardingBenefitAnalytics': 'Analyses avancées et insights',
+    'onboardingBenefitCompete': 'Rivalisez avec vos amis',
+    'onboardingBenefitSync': 'Synchronisation sur tous vos appareils',
+    'earlyAdopters': '+1500 early adopters',
+    'earlyAdoptersText': '+1500 premiers utilisateurs',
     
     // Settings Page
     'backToDashboard': 'Retour au tableau de bord',
@@ -357,6 +366,15 @@ export const translations = {
     'onboardingOr': 'or',
     'onboardingAlreadyHaveAccount': 'Already have an account?',
     'onboardingSkipForNow': 'Skip for now',
+    'onboardingCreateAccountTitle': 'Join the Elite — Create Your Account',
+    'onboardingCreateAccountSubtitle': 'Free 7-day trial • No credit card required',
+    'onboardingBenefitAI': 'AI Assistant to guide you 24/7',
+    'onboardingBenefitHabits': 'Track habits & build streaks',
+    'onboardingBenefitAnalytics': 'Advanced analytics & insights',
+    'onboardingBenefitCompete': 'Compete with friends',
+    'onboardingBenefitSync': 'Sync across all devices',
+    'earlyAdopters': '+1500 early adopters',
+    'earlyAdoptersText': '+1500 early adopters',
     
     // Settings Page
     'backToDashboard': 'Back to Dashboard',

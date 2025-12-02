@@ -13,9 +13,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Email et mot de passe requis" }, { status: 400 })
     }
 
+    // Normaliser l'email (minuscules, trim)
+    const normalizedEmail = email.trim().toLowerCase()
+    
     // Récupérer l'utilisateur depuis la base de données
     const user = await prisma.user.findUnique({
-      where: { email },
+      where: { email: normalizedEmail },
     })
 
     // Vérifier si l'utilisateur existe

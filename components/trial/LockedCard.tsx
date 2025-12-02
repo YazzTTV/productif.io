@@ -1,16 +1,19 @@
 'use client';
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { Lock } from 'lucide-react'
 
-export function LockedCard({ children }: { children: React.ReactNode }) {
+interface LockedCardProps {
+  children: React.ReactNode
+  onLockedClick?: () => void
+}
+
+export function LockedCard({ children, onLockedClick }: LockedCardProps) {
   const [locked, setLocked] = useState(false)
-  const router = useRouter()
 
   useEffect(() => {
     let mounted = true
-    fetch('/api/user/trial-status')
+    fetch('/api/user/trial-status', { credentials: 'include' })
       .then(res => res.ok ? res.json() : Promise.reject(res))
       .then(data => {
         if (!mounted) return
@@ -20,20 +23,24 @@ export function LockedCard({ children }: { children: React.ReactNode }) {
     return () => { mounted = false }
   }, [])
 
+  if (!locked) {
+    return <>{children}</>
+  }
+
   return (
-    <div className="relative">
+    <div className="relative group">
       {children}
-      {locked && (
-        <>
-          <div
-            className="absolute inset-0 z-10 cursor-not-allowed"
-            onClick={() => router.push('/upgrade')}
-          />
-          <div className="absolute top-2 right-2 z-20 rounded-full bg-white/90 border border-gray-200 p-1 shadow-sm">
-            <Lock className="w-4 h-4 text-gray-700" />
-          </div>
-        </>
-      )}
+      {/* Overlay semi-transparent */}
+      <div
+        className="absolute inset-0 z-10 bg-white/40 backdrop-blur-[1px] cursor-pointer rounded-lg transition-all group-hover:bg-white/50"
+        onClick={onLockedClick}
+      />
+      {/* Cadenas */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 pointer-events-none">
+        <div className="w-16 h-16 rounded-full bg-white shadow-xl flex items-center justify-center border-2 border-gray-200 group-hover:scale-110 transition-transform">
+          <Lock className="w-8 h-8 text-gray-600" />
+        </div>
+      </div>
     </div>
   )
 }
