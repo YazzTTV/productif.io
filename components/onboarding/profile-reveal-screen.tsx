@@ -28,7 +28,7 @@ export function ProfileRevealScreen({
   const [isMounted, setIsMounted] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const { locale } = useLocale()
+  const { locale, t } = useLocale()
   const isFr = locale === 'fr'
 
   useEffect(() => {
@@ -156,18 +156,18 @@ export function ProfileRevealScreen({
           transition={{ delay: 0.8 }}
           className="grid grid-cols-3 gap-4 mb-8"
         >
-          <div className="bg-green-50 rounded-2xl p-6 text-center border-2 border-green-200 shadow-md">
-            <p className="text-green-600 text-3xl mb-2 font-bold">+87%</p>
-            <p className="text-gray-600 text-lg">Focus</p>
-          </div>
-          <div className="bg-blue-50 rounded-2xl p-6 text-center border-2 border-blue-200 shadow-md">
-            <p className="text-blue-600 text-3xl mb-2 font-bold">3.2x</p>
-            <p className="text-gray-600 text-lg">Tasks</p>
-          </div>
-          <div className="bg-purple-50 rounded-2xl p-6 text-center border-2 border-purple-200 shadow-md">
-            <p className="text-purple-600 text-3xl mb-2 font-bold">-64%</p>
-            <p className="text-gray-600 text-lg">Stress</p>
-          </div>
+           <div className="bg-green-50 rounded-2xl p-6 text-center border-2 border-green-200 shadow-md">
+             <p className="text-green-600 text-3xl mb-2 font-bold">+87%</p>
+             <p className="text-gray-600 text-lg">{isFr ? "Concentration" : "Focus"}</p>
+           </div>
+           <div className="bg-blue-50 rounded-2xl p-6 text-center border-2 border-blue-200 shadow-md">
+             <p className="text-blue-600 text-3xl mb-2 font-bold">3.2x</p>
+             <p className="text-gray-600 text-lg">{isFr ? "Tâches" : "Tasks"}</p>
+           </div>
+           <div className="bg-purple-50 rounded-2xl p-6 text-center border-2 border-purple-200 shadow-md">
+             <p className="text-purple-600 text-3xl mb-2 font-bold">-64%</p>
+             <p className="text-gray-600 text-lg">{isFr ? "Stress" : "Stress"}</p>
+           </div>
         </motion.div>
 
         {/* Pricing Section */}
@@ -291,7 +291,7 @@ export function ProfileRevealScreen({
           </div>
           <div className="flex items-center justify-center gap-6 text-lg text-gray-600">
             <span className="flex items-center gap-2">
-              <span className="text-[#00C27A]">✓</span> {isFr ? "50K+ utilisateurs" : "50K+ users"}
+              <span className="text-[#00C27A]">✓</span> {t('earlyAdoptersText')}
             </span>
             <span className="flex items-center gap-2">
               <span className="text-[#00C27A]">✓</span> {isFr ? "Annulez à tout moment" : "Cancel anytime"}
@@ -305,7 +305,7 @@ export function ProfileRevealScreen({
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 1.3 }}
-        className="space-y-3 mt-6"
+        className="space-y-3 mt-6 flex flex-col items-center"
       >
         <motion.button
           onClick={handleStartTrial}
@@ -322,7 +322,7 @@ export function ProfileRevealScreen({
           transition={{ 
             boxShadow: { duration: 2, repeat: Infinity, ease: "easeInOut" }
           }}
-          className="w-full bg-gradient-to-r from-[#00C27A] to-[#00D68F] text-white py-5 rounded-2xl transition-all shadow-lg relative overflow-hidden"
+          className="max-w-md mx-auto w-full bg-gradient-to-r from-[#00C27A] to-[#00D68F] text-white py-5 rounded-2xl transition-all shadow-lg relative overflow-hidden"
         >
           <motion.div
             className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent"
@@ -341,7 +341,7 @@ export function ProfileRevealScreen({
           onClick={() => router.push('/dashboard')}
           whileHover={{ scale: 1.01 }}
           whileTap={{ scale: 0.99 }}
-          className="w-full text-gray-600 py-3 rounded-2xl hover:text-gray-800 transition-all"
+          className="text-gray-600 py-3 rounded-2xl hover:text-gray-800 transition-all"
         >
           {isFr ? "Passer" : "Skip"}
         </motion.button>

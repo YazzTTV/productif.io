@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { useRouter } from 'next/navigation'
 import { Sparkles } from 'lucide-react'
+import { useLocale } from '@/lib/i18n'
 
 // Fonction pour générer une valeur pseudo-aléatoire déterministe basée sur un seed
 function seededRandom(seed: number) {
@@ -18,6 +19,8 @@ interface ProcessingPageProps {
 
 export function ProcessingPage({ onComplete, redirectTo = '/onboarding/profile-reveal' }: ProcessingPageProps) {
   const router = useRouter()
+  const { locale } = useLocale()
+  const isFr = locale === 'fr'
   const [isMounted, setIsMounted] = useState(false)
 
   useEffect(() => {
@@ -116,8 +119,16 @@ export function ProcessingPage({ onComplete, redirectTo = '/onboarding/profile-r
           </motion.div>
         </div>
 
-        <h2 className="text-gray-800 mb-3 text-2xl font-semibold">Analyzing your productivity profile...</h2>
-        <p className="text-gray-600 mb-8 text-lg">Our AI is discovering your strengths and weaknesses</p>
+        <h2 className="text-gray-800 mb-3 text-2xl font-semibold">
+          {isFr 
+            ? "Analyse de votre profil de productivité..." 
+            : "Analyzing your productivity profile..."}
+        </h2>
+        <p className="text-gray-600 mb-8 text-lg">
+          {isFr
+            ? "Notre IA découvre vos forces et vos faiblesses"
+            : "Our AI is discovering your strengths and weaknesses"}
+        </p>
 
         <motion.div
           initial={{ opacity: 0 }}
@@ -125,7 +136,9 @@ export function ProcessingPage({ onComplete, redirectTo = '/onboarding/profile-r
           transition={{ duration: 2, repeat: Infinity }}
           className="text-[#00C27A] text-lg font-medium"
         >
-          Processing...
+          {isFr 
+            ? "Traitement en cours..." 
+            : "Processing..."}
         </motion.div>
       </motion.div>
     </div>
