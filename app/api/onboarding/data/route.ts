@@ -1,28 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { cookies } from 'next/headers'
-import { verify } from 'jsonwebtoken'
+import { getAuthUserFromRequest } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-
-// Fonction pour obtenir l'utilisateur depuis les cookies
-async function getAuthUser() {
-  try {
-    const cookieStore = await cookies()
-    const token = cookieStore.get('auth_token')?.value
-
-    if (!token) {
-      return null
-    }
-
-    const decoded = verify(token, process.env.JWT_SECRET || 'fallback_secret') as { userId: string }
-    return decoded
-  } catch (error) {
-    return null
-  }
-}
 
 // GET : récupérer les données d'onboarding
 export async function GET(req: NextRequest) {
-  const user = await getAuthUser()
+  const user = await getAuthUserFromRequest(req)
   
   if (!user) {
     return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
@@ -30,7 +12,7 @@ export async function GET(req: NextRequest) {
 
   try {
     const onboardingData = await prisma.onboardingData.findUnique({
-      where: { userId: user.userId }
+      where: { userId: user.id }
     })
 
     return NextResponse.json({ data: onboardingData })
@@ -44,20 +26,30 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   console.log('\n🔔 [ONBOARDING_API] Nouvelle requête POST reçue')
   
-  const user = await getAuthUser()
+  // Log des headers pour déboguer
+  const authHeader = req.headers.get('authorization')
+  console.log('🔍 [ONBOARDING_API] Authorization header:', authHeader ? 'présent' : 'absent')
+  if (authHeader) {
+    console.log('🔍 [ONBOARDING_API] Token (premiers caractères):', authHeader.substring(0, 50) + '...')
+  }
+  
+  const user = await getAuthUserFromRequest(req)
   
   if (!user) {
     console.log('❌ [ONBOARDING_API] Requête non authentifiée - aucun token trouvé')
+    console.log('   - Auth header présent:', !!authHeader)
+    console.log('   - Cookies présents:', !!req.cookies.get('auth_token')?.value)
     console.log('')
     return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
   }
 
-  console.log(`✅ [ONBOARDING_API] Utilisateur authentifié: ${user.userId}`)
+  console.log(`✅ [ONBOARDING_API] Utilisateur authentifié: ${user.id} (${user.email})`)
 
   try {
     const data = await req.json()
     console.log('📥 [ONBOARDING_API] Données reçues:')
-    console.log('   - userId:', user.userId)
+    console.log('   - userId:', user.id)
+    console.log('   - userEmail:', user.email)
     console.log('   - mainGoal:', data.mainGoal || 'N/A')
     console.log('   - role:', data.role || 'N/A')
     console.log('   - frustration:', data.frustration || 'N/A')
@@ -89,9 +81,9 @@ export async function POST(req: NextRequest) {
     if (data.completed !== undefined) updateData.completed = data.completed
     
     const onboardingData = await prisma.onboardingData.upsert({
-      where: { userId: user.userId },
+      where: { userId: user.id },
       create: {
-        userId: user.userId,
+        userId: user.id,
         mainGoal: data.mainGoal || null,
         role: data.role || null,
         frustration: data.frustration || null,
@@ -111,7 +103,7 @@ export async function POST(req: NextRequest) {
       update: updateData
     })
     
-    console.log(`\n📊 [ONBOARDING_DATA] Sauvegardé pour userId: ${user.userId}`)
+    console.log(`\n📊 [ONBOARDING_DATA] Sauvegardé pour userId: ${user.id} (${user.email})`)
     console.log('   - mainGoal:', updateData.mainGoal || 'N/A')
     console.log('   - diagBehavior:', updateData.diagBehavior || 'N/A')
     console.log('   - timeFeeling:', updateData.timeFeeling || 'N/A')
