@@ -3,26 +3,19 @@ import { SafeAreaView, View, Text, StyleSheet, ActivityIndicator, TouchableOpaci
 import { StatusBar } from 'expo-status-bar';
 import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { usePlacement } from 'expo-superwall';
 
 export default function BrandLoadingScreen() {
   const [ready, setReady] = useState(false);
-  const { registerPlacement } = usePlacement({
-    onError: (err: any) => console.error('Placement Error:', err),
-    onPresent: (_info: any) => {},
-    onDismiss: async () => {
-      try {
-        await AsyncStorage.setItem('onboarding_completed', 'true');
-      } finally {
-        router.replace('/(tabs)');
-      }
-    },
-  });
 
   useEffect(() => {
     const t = setTimeout(() => setReady(true), 3000);
     return () => clearTimeout(t);
   }, []);
+
+  const handleContinue = async () => {
+    await AsyncStorage.setItem('onboarding_completed', 'true');
+    router.replace('/(tabs)');
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -45,16 +38,11 @@ export default function BrandLoadingScreen() {
           )}
         </View>
 
-        <TouchableOpacity style={[styles.cta, !ready && { opacity: 0.3 }]} disabled={!ready} onPress={async () => {
-          try {
-            await registerPlacement({ placement: 'campaign_trigger' });
-            return;
-          } catch (e) {
-            console.warn('registerPlacement failed, continue to dashboard', e);
-          }
-          await AsyncStorage.setItem('onboarding_completed', 'true');
-          router.replace('/(tabs)');
-        }}>
+        <TouchableOpacity 
+          style={[styles.cta, !ready && { opacity: 0.3 }]} 
+          disabled={!ready} 
+          onPress={handleContinue}
+        >
           <Text style={styles.ctaText}>Continuer</Text>
         </TouchableOpacity>
       </View>
