@@ -35,6 +35,9 @@ import { Audio } from 'expo-av';
 import * as FileSystem from 'expo-file-system';
 import { assistantService, tasksService, habitsService, getAuthToken, dashboardService } from '@/lib/api';
 import { format } from 'date-fns';
+import { LockedCard } from '@/components/LockedCard';
+import { UpgradeModal } from '@/components/UpgradeModal';
+import { useTrialStatus } from '@/hooks/useTrialStatus';
 
 interface Message {
   id: string;
@@ -85,6 +88,8 @@ const timeOptions = [
 ];
 
 export default function AssistantScreen() {
+  const { isLocked } = useTrialStatus();
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
@@ -1161,12 +1166,13 @@ export default function AssistantScreen() {
           </View>
 
           {/* Messages */}
-          <ScrollView
-            style={styles.messagesContainer}
-            contentContainerStyle={styles.messagesContent}
-            showsVerticalScrollIndicator={false}
-          >
-            {messages.map((message, index) => (
+          <LockedCard onLockedClick={() => setShowUpgradeModal(true)}>
+            <ScrollView
+              style={styles.messagesContainer}
+              contentContainerStyle={styles.messagesContent}
+              showsVerticalScrollIndicator={false}
+            >
+              {messages.map((message, index) => (
               <Animated.View
                 key={message.id}
                 entering={FadeInDown.delay(index * 100).duration(400)}
@@ -1279,33 +1285,37 @@ export default function AssistantScreen() {
                 </View>
               </Animated.View>
             )}
-          </ScrollView>
+            </ScrollView>
+          </LockedCard>
 
           {/* Quick Action Chips */}
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.quickActionsContainer}
-            contentContainerStyle={styles.quickActionsContent}
-          >
-            {quickActions.map((action, index) => (
-              <Animated.View
-                key={action.action}
-                entering={FadeInDown.delay(index * 100).duration(400)}
-              >
-                <TouchableOpacity
-                  onPress={() => handleQuickAction(action.action)}
-                  style={styles.quickActionChip}
+          <LockedCard onLockedClick={() => setShowUpgradeModal(true)}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.quickActionsContainer}
+              contentContainerStyle={styles.quickActionsContent}
+            >
+              {quickActions.map((action, index) => (
+                <Animated.View
+                  key={action.action}
+                  entering={FadeInDown.delay(index * 100).duration(400)}
                 >
-                  <Ionicons name={action.icon} size={16} color="#00C27A" />
-                  <Text style={styles.quickActionText}>{action.label}</Text>
-                </TouchableOpacity>
-              </Animated.View>
-            ))}
-          </ScrollView>
+                  <TouchableOpacity
+                    onPress={() => handleQuickAction(action.action)}
+                    style={styles.quickActionChip}
+                  >
+                    <Ionicons name={action.icon} size={16} color="#00C27A" />
+                    <Text style={styles.quickActionText}>{action.label}</Text>
+                  </TouchableOpacity>
+                </Animated.View>
+              ))}
+            </ScrollView>
+          </LockedCard>
 
           {/* Input Area */}
-          <View style={styles.inputContainer}>
+          <LockedCard onLockedClick={() => setShowUpgradeModal(true)}>
+            <View style={styles.inputContainer}>
             <View style={styles.inputWrapper}>
               <TextInput
                 style={styles.input}
@@ -1332,8 +1342,15 @@ export default function AssistantScreen() {
                 <Ionicons name="send" size={20} color="#FFFFFF" />
               </LinearGradient>
             </TouchableOpacity>
-          </View>
+            </View>
+          </LockedCard>
         </View>
+
+        {/* Upgrade Modal */}
+        <UpgradeModal
+          isOpen={showUpgradeModal}
+          onClose={() => setShowUpgradeModal(false)}
+        />
 
         {/* Time Selector Modal */}
         <Modal

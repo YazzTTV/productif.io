@@ -15,6 +15,9 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { apiCall } from '@/lib/api';
+import { LockedCard } from '@/components/LockedCard';
+import { UpgradeModal } from '@/components/UpgradeModal';
+import { useTrialStatus } from '@/hooks/useTrialStatus';
 
 interface Step {
   id: number;
@@ -39,6 +42,8 @@ interface ApiToken {
 
 export default function AssistantIAPage() {
   const router = useRouter();
+  const { isLocked } = useTrialStatus();
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [apiToken, setApiToken] = useState<string>('');
   const [isGeneratingToken, setIsGeneratingToken] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -209,15 +214,15 @@ export default function AssistantIAPage() {
   };
 
   const renderStepCard = (step: Step, index: number) => (
-    <TouchableOpacity
-      key={step.id}
-      style={[
-        styles.stepCard,
-        step.isCompleted && styles.stepCardCompleted
-      ]}
-      onPress={() => handleStepPress(step)}
-      disabled={step.action === 'generate' && isGeneratingToken}
-    >
+    <LockedCard key={step.id} onLockedClick={() => setShowUpgradeModal(true)}>
+      <TouchableOpacity
+        style={[
+          styles.stepCard,
+          step.isCompleted && styles.stepCardCompleted
+        ]}
+        onPress={() => handleStepPress(step)}
+        disabled={step.action === 'generate' && isGeneratingToken}
+      >
       <View style={styles.stepHeader}>
         <View style={[
           styles.iconContainer,
@@ -276,7 +281,8 @@ export default function AssistantIAPage() {
           </Text>
         </View>
       )}
-    </TouchableOpacity>
+      </TouchableOpacity>
+    </LockedCard>
   );
 
   if (isLoading) {
@@ -335,6 +341,12 @@ export default function AssistantIAPage() {
           </View>
         </View>
       </ScrollView>
+
+      {/* Upgrade Modal */}
+      <UpgradeModal
+        isOpen={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+      />
     </SafeAreaView>
   );
 }

@@ -32,9 +32,9 @@ Après analyse du code de l'application native dans `mobile-app-new`, voici les 
 - Utilisé dans plusieurs écrans : login, onboarding, connection
 
 **Fichiers concernés :**
-- `app/login.tsx` (lignes 350-393)
-- `app/(onboarding-new)/connection.tsx` (lignes 188-228)
-- `app/onboarding/welcome.tsx` (lignes 28-56)
+- `app/login.tsx`
+- `app/(onboarding-new)/connection.tsx` - Nouveau flux d'onboarding moderne
+- `app/onboarding/welcome.tsx` - Ancien flux d'onboarding (legacy)
 - Package : `expo-apple-authentication@~7.2.4`
 
 **Configuration requise :**
@@ -51,9 +51,9 @@ Après analyse du code de l'application native dans `mobile-app-new`, voici les 
 - Le composant `PaymentButton` implémente Apple Pay pour iOS
 
 **Fichiers concernés :**
-- `components/PaymentButton.tsx` (lignes 49-100)
+- `components/PaymentButton.tsx`
 - `app/upgrade.tsx`
-- `app/(onboarding-new)/profile-reveal.tsx`
+- Nouveau flux d'onboarding : `app/(onboarding-new)/` 
 - Package : `@stripe/stripe-react-native@^0.57.0`
 
 **Configuration requise :**
@@ -70,17 +70,16 @@ Après analyse du code de l'application native dans `mobile-app-new`, voici les 
 ### 4. **In-App Purchase** ⚠️ À VÉRIFIER
 
 **Pourquoi :**
-- L'application utilise `expo-superwall` qui peut gérer les achats in-app
-- Cependant, l'app utilise principalement Stripe pour les paiements
-- Superwall est utilisé pour les paywalls mais peut aussi gérer les achats StoreKit
+- L'application utilise Stripe pour les paiements et abonnements
+- Les achats in-app sont gérés via l'API backend
 
 **Fichiers concernés :**
-- Package : `expo-superwall@latest`
-- `ios/Pods 3/SuperwallKit/` (gestion des achats StoreKit)
+- Package : `@stripe/stripe-react-native`
+- Configuration Stripe dans l'application
 
 **Recommandation :**
-- Si vous utilisez uniquement Stripe (Apple Pay) : **NON requis**
-- Si vous prévoyez d'utiliser StoreKit pour les abonnements iOS : **REQUIS**
+- Si vous utilisez uniquement Stripe (Apple Pay) : **NON requis pour In-App Purchase**
+- Les paiements passent par Stripe via l'API backend
 
 **Configuration requise (si activé) :**
 - Activez cette capability dans votre App ID

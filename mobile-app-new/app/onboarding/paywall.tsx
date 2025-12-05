@@ -1,80 +1,16 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import { SafeAreaView, View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StatusBar } from 'expo-status-bar';
 import { router } from 'expo-router';
 
-let usePlacement: any;
-try {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  usePlacement = require('expo-superwall').usePlacement;
-} catch (e) {
-  usePlacement = null;
-}
-
 export default function PaywallScreen() {
   const [selected, setSelected] = useState<'annual' | 'monthly'>('annual');
 
-  const placementApi = useMemo(() => {
-    if (!usePlacement) return null;
-    return usePlacement({
-      onError: (err: any) => console.error('Placement Error:', err),
-      onPresent: (info: any) => console.log('Paywall Presented:', info),
-      onDismiss: async (_info: any, _result: any) => {
-        try {
-          await AsyncStorage.setItem('onboarding_completed', 'true');
-          await AsyncStorage.setItem('selected_plan', selected);
-        } finally {
-          router.replace('/(tabs)');
-        }
-      },
-    });
-  }, [selected]);
-
   const handleStart = async () => {
-    console.log('🚀 Paywall handleStart called');
-    
-    // Temporairement désactivé Superwall - continuer directement vers le dashboard
-    console.log('⚠️ Superwall temporairement désactivé, continuant vers le dashboard');
     await AsyncStorage.setItem('onboarding_completed', 'true');
     await AsyncStorage.setItem('selected_plan', selected);
     router.replace('/(tabs)');
-    
-    /* Code Superwall désactivé temporairement
-    const tryRegister = async (attempt: number): Promise<boolean> => {
-      if (!placementApi?.registerPlacement) {
-        console.error('❌ placementApi.registerPlacement not available');
-        return false;
-      }
-      try {
-        console.log(`🔄 Attempting registerPlacement (attempt ${attempt})`);
-        await placementApi.registerPlacement({ placement: 'campaign_trigger' });
-        console.log('✅ registerPlacement succeeded');
-        return true;
-      } catch (e: any) {
-        const msg = String(e?.message || e);
-        console.error(`❌ registerPlacement attempt ${attempt} failed:`, msg);
-        // Retry on transient Billing timeouts/service unavailable
-        if (attempt < 3 && (msg.includes('Timeout') || msg.includes('ErrorCode: 2') || msg.includes('SERVICE_UNAVAILABLE'))) {
-          console.log(`⏳ Retrying in ${2000 * attempt}ms...`);
-          await new Promise(r => setTimeout(r, 2000 * attempt));
-          return tryRegister(attempt + 1);
-        }
-        return false;
-      }
-    };
-
-    const ok = await tryRegister(1);
-    if (ok) {
-      console.log('✅ Paywall registration successful, staying on paywall screen');
-      return;
-    }
-
-    console.log('⚠️ Paywall registration failed, continuing to dashboard');
-    await AsyncStorage.setItem('onboarding_completed', 'true');
-    await AsyncStorage.setItem('selected_plan', selected);
-    router.replace('/(tabs)');
-    */
   };
 
   const ignore = async () => {

@@ -9,6 +9,7 @@ export default function OnboardingLayout() {
       <Stack.Screen name="social" />
       <Stack.Screen name="survey" />
       <Stack.Screen name="brand" />
+      <Stack.Screen name="paywall" />
     </Stack>
   );
 }

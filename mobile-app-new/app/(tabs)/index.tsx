@@ -30,6 +30,9 @@ import { dashboardService, tasksService, habitsService, gamificationService, api
 import { useFocusEffect } from '@react-navigation/native';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useTranslation } from '@/hooks/useTranslation';
+import { LockedCard } from '@/components/LockedCard';
+import { UpgradeModal } from '@/components/UpgradeModal';
+import { useTrialStatus } from '@/hooks/useTrialStatus';
 
 const { width } = Dimensions.get('window');
 
@@ -316,6 +319,8 @@ const HabitItem = ({ habit, index, isCelebrating, onToggle, colors }: {
 export default function DashboardScreen() {
   const { colors } = useTheme();
   const t = useTranslation();
+  const { isLocked } = useTrialStatus();
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [trialDaysLeft, setTrialDaysLeft] = useState(5);
@@ -804,10 +809,12 @@ export default function DashboardScreen() {
           style={styles.statsGrid}
         >
           {/* Daily Progress Card */}
-          <TouchableOpacity
-            activeOpacity={0.9}
-            style={styles.statCardPrimary}
-          >
+          <LockedCard onLockedClick={() => setShowUpgradeModal(true)}>
+            <View style={{ width: (width - 60) / 2 }}>
+              <TouchableOpacity
+                activeOpacity={0.9}
+                style={styles.statCardPrimary}
+              >
             <LinearGradient
               colors={['#00C27A', '#00D68F']}
               start={{ x: 0, y: 0 }}
@@ -832,10 +839,14 @@ export default function DashboardScreen() {
                 </View>
               </View>
             </LinearGradient>
-          </TouchableOpacity>
+              </TouchableOpacity>
+            </View>
+          </LockedCard>
 
           {/* Focus Time Card */}
-          <View style={[styles.statCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <LockedCard onLockedClick={() => setShowUpgradeModal(true)}>
+            <View style={{ width: (width - 60) / 2 }}>
+              <View style={[styles.statCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <Ionicons name="time" size={24} color={colors.primary} />
             <Text style={[styles.statCardLabelDark, { color: colors.textSecondary }]}>{t('focusTime')}</Text>
             <View style={styles.statCardValueRow}>
@@ -843,10 +854,14 @@ export default function DashboardScreen() {
               <Text style={[styles.statCardUnit, { color: colors.text }]}>h</Text>
             </View>
             <Text style={styles.statCardSubtext}>+2.5h vs yesterday 🎯</Text>
-          </View>
+              </View>
+            </View>
+          </LockedCard>
 
           {/* Tasks Completed Card */}
-          <View style={[styles.statCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <LockedCard onLockedClick={() => setShowUpgradeModal(true)}>
+            <View style={{ width: (width - 60) / 2 }}>
+              <View style={[styles.statCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <View style={styles.statCardHeader}>
               <Ionicons name="checkmark-circle" size={24} color="#00C27A" />
               <TouchableOpacity onPress={() => router.push('/(tabs)/tasks')}>
@@ -869,13 +884,17 @@ export default function DashboardScreen() {
                 />
               ))}
             </View>
-          </View>
+              </View>
+            </View>
+          </LockedCard>
 
           {/* Streak Card */}
-          <TouchableOpacity
-            activeOpacity={0.9}
-            style={styles.statCardStreak}
-          >
+          <LockedCard onLockedClick={() => setShowUpgradeModal(true)}>
+            <View style={{ width: (width - 60) / 2 }}>
+              <TouchableOpacity
+                activeOpacity={0.9}
+                style={styles.statCardStreak}
+              >
             <LinearGradient
               colors={['#FB923C', '#EC4899']}
               start={{ x: 0, y: 0 }}
@@ -890,14 +909,17 @@ export default function DashboardScreen() {
               </View>
               <Text style={styles.statCardSubtextWhite}>Personal best! 🏆</Text>
             </LinearGradient>
-          </TouchableOpacity>
+              </TouchableOpacity>
+            </View>
+          </LockedCard>
         </Animated.View>
 
         {/* Productivity Score Card */}
-        <Animated.View
-          entering={FadeInDown.delay(300).duration(400)}
-          style={[styles.productivityCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
-        >
+        <LockedCard onLockedClick={() => setShowUpgradeModal(true)}>
+          <Animated.View
+            entering={FadeInDown.delay(300).duration(400)}
+            style={[styles.productivityCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+          >
           <View style={styles.productivityHeader}>
             <Text style={[styles.productivityTitle, { color: colors.text }]}>{t('productivityScore')}</Text>
             <View style={styles.trendBadge}>
@@ -980,13 +1002,15 @@ export default function DashboardScreen() {
               </Text>
             </View>
           </View>
-        </Animated.View>
+          </Animated.View>
+        </LockedCard>
 
         {/* Weekly Chart */}
-        <Animated.View
-          entering={FadeInDown.delay(400).duration(400)}
-          style={[styles.chartCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
-        >
+        <LockedCard onLockedClick={() => setShowUpgradeModal(true)}>
+          <Animated.View
+            entering={FadeInDown.delay(400).duration(400)}
+            style={[styles.chartCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+          >
           <View style={styles.chartHeader}>
             <Text style={[styles.chartTitle, { color: colors.text }]}>{t('weeklyTrend')}</Text>
             <TouchableOpacity
@@ -1030,13 +1054,15 @@ export default function DashboardScreen() {
             withOuterLines={false}
             withVerticalLabels={false}
           />
-        </Animated.View>
+          </Animated.View>
+        </LockedCard>
 
         {/* Daily Habits */}
-        <Animated.View
-          entering={FadeInDown.delay(500).duration(400)}
-          style={styles.habitsSection}
-        >
+        <LockedCard onLockedClick={() => setShowUpgradeModal(true)}>
+          <Animated.View
+            entering={FadeInDown.delay(500).duration(400)}
+            style={styles.habitsSection}
+          >
           <View style={styles.habitsSectionHeader}>
             <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('dailyHabits')}</Text>
             <TouchableOpacity
@@ -1064,14 +1090,16 @@ export default function DashboardScreen() {
               );
             })}
           </View>
-        </Animated.View>
+          </Animated.View>
+        </LockedCard>
 
         {/* Achievements Unlocked */}
         {achievements.length > 0 && (
-          <Animated.View
-            entering={FadeInDown.delay(600).duration(400)}
-            style={styles.achievementsSection}
-          >
+          <LockedCard onLockedClick={() => setShowUpgradeModal(true)}>
+            <Animated.View
+              entering={FadeInDown.delay(600).duration(400)}
+              style={styles.achievementsSection}
+            >
             <View style={styles.achievementsHeader}>
               <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('achievementsUnlocked')}</Text>
               <TouchableOpacity
@@ -1121,15 +1149,17 @@ export default function DashboardScreen() {
                 );
               })}
             </View>
-          </Animated.View>
+            </Animated.View>
+          </LockedCard>
         )}
 
         {/* Leaderboard */}
         {leaderboard.length > 0 && (
-          <Animated.View
-            entering={FadeInDown.delay(700).duration(400)}
-            style={styles.leaderboardSection}
-          >
+          <LockedCard onLockedClick={() => setShowUpgradeModal(true)}>
+            <Animated.View
+              entering={FadeInDown.delay(700).duration(400)}
+              style={styles.leaderboardSection}
+            >
             <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('leaderboard')}</Text>
             <View style={[styles.leaderboardCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
               {leaderboard.map((user, index) => {
@@ -1196,11 +1226,18 @@ export default function DashboardScreen() {
               </TouchableOpacity>
             </View>
           </Animated.View>
+          </LockedCard>
         )}
 
         {/* Bottom spacing for tab bar */}
         <View style={{ height: 100 }} />
       </ScrollView>
+
+      {/* Upgrade Modal */}
+      <UpgradeModal
+        isOpen={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+      />
     </View>
   );
 }

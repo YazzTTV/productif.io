@@ -7,7 +7,6 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StripeProvider } from '@stripe/stripe-react-native';
 import 'react-native-reanimated';
 
-import { useColorScheme } from '@/hooks/useColorScheme';
 import { ThemeProvider, useTheme } from '@/contexts/ThemeContext';
 import { LanguageProvider } from '@/contexts/LanguageContext';
 import Constants from 'expo-constants';
@@ -20,7 +19,6 @@ const STRIPE_PUBLISHABLE_KEY =
   'pk_test_51...'; // Replace with your actual test key
 
 function AppContent() {
-  const colorScheme = useColorScheme();
   const { actualTheme } = useTheme();
   const [loaded] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
@@ -37,7 +35,7 @@ function AppContent() {
               <Stack.Screen name="login" options={{ headerShown: false }} />
               <Stack.Screen name="signup" options={{ headerShown: false }} />
               <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="(onboarding-new)" options={{ headerShown: false }} />
+            <Stack.Screen name="(onboarding-new)" options={{ headerShown: false }} />
             <Stack.Screen name="onboarding" options={{ headerShown: false }} />
             <Stack.Screen name="mon-espace" options={{ headerShown: false }} />
             <Stack.Screen name="achievements" options={{ headerShown: false }} />
