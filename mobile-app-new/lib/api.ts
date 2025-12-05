@@ -63,35 +63,42 @@ export class TokenStorage {
 
   async setToken(token: string) {
     this.token = token;
+    console.log('💾 [TokenStorage] Token sauvegardé en mémoire et AsyncStorage');
     if (isAsyncStorageAvailable()) {
       try {
         await AsyncStorage.setItem('auth_token', token);
+        console.log('✅ [TokenStorage] Token sauvegardé dans AsyncStorage');
       } catch (error) {
-        console.error('Error saving token:', error);
+        console.error('❌ [TokenStorage] Error saving token:', error);
       }
     } else {
-      console.warn('AsyncStorage not available, token stored in memory only');
+      console.warn('⚠️ [TokenStorage] AsyncStorage not available, token stored in memory only');
     }
   }
 
   async getToken(): Promise<string | null> {
-    if (this.token) {
-      return this.token;
-    }
-    
+    // Toujours vérifier AsyncStorage en premier pour avoir le token le plus récent
     if (isAsyncStorageAvailable()) {
       try {
         const token = await AsyncStorage.getItem('auth_token');
-        this.token = token;
-        return token;
+        if (token) {
+          this.token = token; // Mettre à jour le token en mémoire
+          console.log('🔑 [TokenStorage] Token récupéré depuis AsyncStorage');
+          return token;
+        }
       } catch (error) {
-        console.error('Error getting token:', error);
-        return null;
+        console.error('❌ [TokenStorage] Error getting token from AsyncStorage:', error);
       }
-    } else {
-      console.warn('AsyncStorage not available, returning memory token only');
+    }
+    
+    // Fallback sur le token en mémoire si AsyncStorage n'est pas disponible
+    if (this.token) {
+      console.log('🔑 [TokenStorage] Token récupéré depuis la mémoire');
       return this.token;
     }
+    
+    console.log('⚠️ [TokenStorage] Aucun token trouvé');
+    return null;
   }
 
   async clearToken() {
@@ -109,10 +116,37 @@ export class TokenStorage {
   }
 }
 
+// Fonction utilitaire pour décoder le token JWT (sans vérification de signature)
+function decodeJWT(token: string): any {
+  try {
+    const base64Url = token.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
+    );
+    return JSON.parse(jsonPayload);
+  } catch (error) {
+    console.error('❌ Erreur lors du décodage du token:', error);
+    return null;
+  }
+}
+
 // Fonction utilitaire pour obtenir le token
 export async function getAuthToken(): Promise<string | null> {
   const tokenStorage = TokenStorage.getInstance();
-  return await tokenStorage.getToken();
+  const token = await tokenStorage.getToken();
+  
+  if (token) {
+    const decoded = decodeJWT(token);
+    if (decoded) {
+      console.log('🔍 [getAuthToken] Token décodé - userId:', decoded.userId, 'email:', decoded.email);
+    }
+  }
+  
+  return token;
 }
 
 // Fonction utilitaire pour les appels API avec timeout
@@ -213,10 +247,25 @@ export const authService = {
 
   // Inscription
   async signup(userData: SignupRequest): Promise<AuthResponse> {
-    return await apiCall<AuthResponse>('/auth/register', {
+    // Nettoyer l'ancien token avant l'inscription pour éviter les conflits
+    console.log('🧹 [SIGNUP] Nettoyage de l\'ancien token avant inscription...');
+    await TokenStorage.getInstance().clearToken();
+    
+    const response = await apiCall<AuthResponse>('/auth/register', {
       method: 'POST',
       body: JSON.stringify(userData),
     });
+
+    // Stocker le token si présent dans la réponse
+    if (response.success && response.token) {
+      await TokenStorage.getInstance().setToken(response.token);
+      console.log('✅ [SIGNUP] Nouveau token sauvegardé après inscription');
+      console.log('👤 [SIGNUP] User ID du nouveau token:', response.user?.id);
+    } else {
+      console.error('❌ [SIGNUP] Aucun token dans la réponse d\'inscription');
+    }
+
+    return response;
   },
 
   // Déconnexion
@@ -241,7 +290,11 @@ export const authService = {
   },
 
   // Récupérer le statut du trial
-  async getTrialStatus(): Promise<{ status: string; daysLeft?: number; hasAccess: boolean }> {
+  async getTrialStatus(): Promise<{ 
+    status: 'trial_active' | 'trial_expired' | 'subscribed' | 'cancelled';
+    daysLeft?: number;
+    hasAccess: boolean;
+  }> {
     return await apiCall('/user/trial-status');
   },
 };
@@ -499,6 +552,68 @@ export const paymentService = {
         billingType,
       }),
     });
+  },
+};
+
+// Service d'onboarding
+export const onboardingService = {
+  // Sauvegarder les données d'onboarding
+  async saveOnboardingData(data: {
+    language?: string;
+    diagBehavior?: string; // Q1: details, procrastination, distraction, abandon
+    timeFeeling?: string; // Q2: frustrated, tired, proud, lost
+    phoneHabit?: string; // Q3: enemy, twoMinutes, farButBack, managed
+    mainGoal?: string; // Q6: growBusiness, manageStudies, buildDiscipline, workLifeBalance
+    symptoms?: string[]; // Liste des symptômes sélectionnés
+    billingCycle?: 'monthly' | 'annual' | 'yearly';
+    currentStep?: number;
+    completed?: boolean;
+    utmParams?: any; // Pour permettre d'autres données
+    [key: string]: any; // Pour permettre d'autres champs
+  }): Promise<{ data: any }> {
+    // Vérifier que le token existe
+    const token = await getAuthToken();
+    if (!token) {
+      console.error('❌ [ONBOARDING] Aucun token trouvé, impossible de sauvegarder');
+      throw new Error('User not authenticated - no token found');
+    }
+
+    console.log('🔑 [ONBOARDING] Token présent:', !!token);
+
+    // Mapper les réponses du questionnaire
+    const payload: any = {};
+    
+    if (data.language !== undefined) payload.language = data.language;
+    if (data.diagBehavior !== undefined) payload.diagBehavior = data.diagBehavior;
+    if (data.timeFeeling !== undefined) payload.timeFeeling = data.timeFeeling;
+    if (data.phoneHabit !== undefined) payload.phoneHabit = data.phoneHabit;
+    if (data.mainGoal !== undefined) payload.mainGoal = data.mainGoal;
+    if (data.billingCycle !== undefined) payload.billingCycle = data.billingCycle;
+    if (data.currentStep !== undefined) payload.currentStep = data.currentStep;
+    if (data.completed !== undefined) payload.completed = data.completed;
+    
+    // Sauvegarder les symptômes dans utmParams (JSON) pour l'instant
+    // TODO: Créer un champ dédié dans le schéma si nécessaire
+    if (data.symptoms !== undefined && data.symptoms.length > 0) {
+      payload.utmParams = { symptoms: data.symptoms };
+    } else if (data.utmParams !== undefined) {
+      payload.utmParams = data.utmParams;
+    }
+
+    console.log('💾 [ONBOARDING] Sauvegarde des données:', JSON.stringify(payload, null, 2));
+
+    try {
+      const result = await apiCall('/onboarding/data', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+      console.log('✅ [ONBOARDING] Données sauvegardées avec succès:', result);
+      return result;
+    } catch (error: any) {
+      console.error('❌ [ONBOARDING] Erreur lors de la sauvegarde:', error);
+      console.error('❌ [ONBOARDING] Message d\'erreur:', error?.message);
+      throw error;
+    }
   },
 };
 

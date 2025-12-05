@@ -14,7 +14,7 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
+        tabBarActiveTintColor: '#00C27A',
         headerShown: false,
         tabBarButton: HapticTab,
         tabBarBackground: TabBarBackground,
@@ -28,43 +28,47 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Dashboard',
-          tabBarIcon: ({ color }) => <Ionicons name="home" size={24} color={color} />,
+          title: 'Accueil',
+          tabBarIcon: ({ color }) => <Ionicons name="home" size={26} color={color} />,
         }}
       />
       <Tabs.Screen
-        name="tasks"
+        name="assistant"
         options={{
-          title: 'Tâches',
-          tabBarIcon: ({ color }) => <Ionicons name="checkmark-circle" size={24} color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="projects"
-        options={{
-          title: 'Projets',
-          tabBarIcon: ({ color }) => <Ionicons name="folder" size={24} color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="timer"
-        options={{
-          title: 'Timer',
-          tabBarIcon: ({ color }) => <Ionicons name="timer" size={24} color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="habits"
-        options={{
-          title: 'Habitudes',
-          tabBarIcon: ({ color }) => <Ionicons name="heart" size={24} color={color} />,
+          title: 'Assistant IA',
+          tabBarIcon: ({ color }) => <Ionicons name="chatbubble-ellipses" size={26} color={color} />,
         }}
       />
       <Tabs.Screen
         name="more"
         options={{
-          title: 'Plus',
-          tabBarIcon: ({ color }) => <Ionicons name="ellipsis-horizontal" size={24} color={color} />,
+          title: 'Réglages',
+          tabBarIcon: ({ color }) => <Ionicons name="settings" size={26} color={color} />,
+        }}
+      />
+      {/* Hidden tabs - accessible via navigation but not in tab bar */}
+      <Tabs.Screen
+        name="tasks"
+        options={{
+          href: null, // Hide from tab bar
+        }}
+      />
+      <Tabs.Screen
+        name="projects"
+        options={{
+          href: null, // Hide from tab bar
+        }}
+      />
+      <Tabs.Screen
+        name="timer"
+        options={{
+          href: null, // Hide from tab bar
+        }}
+      />
+      <Tabs.Screen
+        name="habits"
+        options={{
+          href: null, // Hide from tab bar
         }}
       />
     </Tabs>

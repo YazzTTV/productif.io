@@ -9,14 +9,6 @@ import { authService } from '@/lib/api';
 import productifLogo from '../../assets/images/productif-logo.png';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-let SuperwallCompat: any = null;
-try {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  SuperwallCompat = require('expo-superwall/compat').default;
-} catch (e) {
-  // Expo Go ou module natif indisponible → on bypass
-}
-
 export default function WelcomeScreen() {
   const [step, setStep] = useState<0 | 1 | 2 | 3>(0);
 
@@ -53,10 +45,6 @@ export default function WelcomeScreen() {
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || 'Erreur OAuth Apple');
       if (data?.token) await authService.setToken(data.token);
-      // Identifier l'utilisateur auprès de Superwall (utiliser l'email si disponible)
-      if (email && SuperwallCompat?.shared?.identify) {
-        try { await SuperwallCompat.shared.identify({ userId: email }); } catch {}
-      }
       await AsyncStorage.setItem('onboarding_completed', 'true');
       router.replace('/(tabs)');
     } catch (e: any) {
@@ -76,9 +64,6 @@ export default function WelcomeScreen() {
       setLoadingLogin(true);
       const res = await authService.login({ email, password });
       if (res?.token) await authService.setToken(res.token);
-      if (SuperwallCompat?.shared?.identify) {
-        try { await SuperwallCompat.shared.identify({ userId: email }); } catch {}
-      }
       await AsyncStorage.setItem('onboarding_completed', 'true');
       router.replace('/(tabs)');
     } catch (e: any) {

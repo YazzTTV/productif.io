@@ -13,7 +13,8 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { authService } from '@/lib/api';
+import { authService, onboardingService, getAuthToken } from '@/lib/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function SignupScreen() {
   const [name, setName] = useState('');
@@ -49,18 +50,55 @@ export default function SignupScreen() {
         password,
       });
       
-      if (response.success) {
-        Alert.alert(
-          'Succès', 
-          'Compte créé avec succès ! Vous pouvez maintenant vous connecter.',
-          [
-            {
-              text: 'OK',
-              onPress: () => router.replace('/login')
-            }
-          ]
-        );
+      if (response.success && response.token) {
+        // Le token est déjà sauvegardé automatiquement dans authService.signup()
+        // Mais on le sauvegarde explicitement pour être sûr qu'il est bien mis à jour
+        await authService.setToken(response.token);
+        
+        console.log('✅ [SIGNUP] Compte créé avec succès');
+        console.log('👤 [SIGNUP] User ID:', response.user?.id);
+        console.log('📧 [SIGNUP] Email:', response.user?.email);
+        console.log('🔑 [SIGNUP] Token présent:', response.token ? 'oui' : 'non');
+        
+        // Vérifier que le token est bien récupéré après sauvegarde
+        const tokenAfterSave = await getAuthToken();
+        console.log('🔍 [SIGNUP] Token après sauvegarde:', tokenAfterSave ? 'présent' : 'absent');
+        
+        // Attendre un peu pour que le token soit bien stocké
+        await new Promise(resolve => setTimeout(resolve, 200));
+        
+        // Vérifier à nouveau le token avant de faire l'appel API
+        const tokenBeforeAPI = await getAuthToken();
+        console.log('🔍 [SIGNUP] Token avant appel API:', tokenBeforeAPI ? 'présent' : 'absent');
+        
+        // Synchroniser la langue si elle a été sélectionnée avant l'inscription
+        try {
+          const savedLanguage = await AsyncStorage.getItem('onboarding_language');
+          console.log('🌐 [SIGNUP] Langue sauvegardée trouvée:', savedLanguage);
+          
+          if (savedLanguage) {
+            console.log('💾 [SIGNUP] Tentative de sauvegarde de la langue dans l\'API...');
+            await onboardingService.saveOnboardingData({
+              language: savedLanguage,
+              currentStep: 2, // Étape de sélection de langue (après intro)
+            });
+            console.log('✅ [SIGNUP] Langue synchronisée après inscription:', savedLanguage);
+          } else {
+            console.log('ℹ️ [SIGNUP] Aucune langue sauvegardée trouvée');
+          }
+        } catch (error: any) {
+          console.error('❌ [SIGNUP] Erreur lors de la synchronisation de la langue:', error);
+          console.error('❌ [SIGNUP] Détails:', error?.message);
+          // Ne pas bloquer le flux - on continue quand même
+        }
+        
+        // Rediriger vers le questionnaire d'onboarding
+        router.replace({
+          pathname: '/(onboarding-new)/question',
+          params: { index: 0, answers: '[]' }
+        });
       } else {
+        console.error('❌ [SIGNUP] Réponse d\'inscription invalide:', response);
         Alert.alert('Erreur', response.message || 'Impossible de créer le compte');
       }
       
