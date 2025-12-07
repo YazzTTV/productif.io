@@ -8,7 +8,7 @@ import {
   Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-// import DateTimePicker from '@react-native-community/datetimepicker';
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
@@ -23,16 +23,19 @@ export function DatePicker({ value, onValueChange, placeholder, style }: DatePic
   const [isOpen, setIsOpen] = useState(false);
   const [tempDate, setTempDate] = useState(value || new Date());
 
-  const handleDateChange = (event: any, selectedDate?: Date) => {
+  const handleDateChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
     if (Platform.OS === 'android') {
+      // Android : fermer et valider directement
       setIsOpen(false);
       if (event.type === 'set' && selectedDate) {
         onValueChange(selectedDate);
       }
-    } else {
-      if (selectedDate) {
-        setTempDate(selectedDate);
-      }
+      return;
+    }
+
+    // iOS : on met à jour la tempDate, la validation se fait sur "Confirmer"
+    if (selectedDate) {
+      setTempDate(selectedDate);
     }
   };
 
@@ -84,20 +87,29 @@ export function DatePicker({ value, onValueChange, placeholder, style }: DatePic
                   <Text style={[styles.iosButton, styles.iosConfirmButton]}>Confirmer</Text>
                 </TouchableOpacity>
               </View>
-              <Text style={{ padding: 20, textAlign: 'center' }}>
-                Sélecteur de date temporairement désactivé
-              </Text>
-              {value && (
-                <TouchableOpacity style={styles.clearButton} onPress={handleClear}>
-                  <Text style={styles.clearButtonText}>Supprimer la date</Text>
-                </TouchableOpacity>
-              )}
+              <DateTimePicker
+                value={tempDate}
+                mode="date"
+                display="spinner"
+                onChange={handleDateChange}
+                locale="fr-FR"
+                style={{ alignSelf: 'center' }}
+              />
+              <TouchableOpacity style={styles.clearButton} onPress={handleClear}>
+                <Text style={styles.clearButtonText}>Supprimer la date</Text>
+              </TouchableOpacity>
             </View>
           </View>
         </Modal>
       ) : (
         isOpen && (
-          <Text>Sélecteur Android temporairement désactivé</Text>
+          <DateTimePicker
+            value={value || new Date()}
+            mode="date"
+            display="default"
+            onChange={handleDateChange}
+            locale="fr-FR"
+          />
         )
       )}
     </View>

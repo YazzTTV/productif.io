@@ -4,28 +4,48 @@ import { getAuthUser } from '@/lib/auth';
 import { NotificationSettings, Prisma } from '@prisma/client';
 import EventManager from '@/lib/EventManager';
 
+type TimeWindow = { start: string; end: string };
+
 interface NotificationPreferences {
-    isEnabled: boolean;
-    emailEnabled: boolean;
-    pushEnabled: boolean;
-    whatsappEnabled: boolean;
-    whatsappNumber?: string;
-    startHour: number;
-    endHour: number;
-    allowedDays: number[];
-    notificationTypes: string[];
-    morningReminder: boolean;
-    taskReminder: boolean;
-    habitReminder: boolean;
-    motivation: boolean;
-    dailySummary: boolean;
-    morningTime: string;
+  isEnabled: boolean;
+  emailEnabled: boolean;
+  pushEnabled: boolean;
+  whatsappEnabled: boolean;
+  whatsappNumber?: string;
+  startHour: number;
+  endHour: number;
+  allowedDays: number[];
+  notificationTypes: string[];
+  // Rappels fixes
+  morningReminder: boolean;
+  noonReminder: boolean;
+  afternoonReminder: boolean;
+  eveningReminder: boolean;
+  nightReminder: boolean;
   improvementReminder: boolean;
+  recapReminder: boolean;
+  taskReminder: boolean;
+  habitReminder: boolean;
+  motivation: boolean;
+  dailySummary: boolean;
+  morningTime: string;
   improvementTime: string;
-    noonTime: string;
-    afternoonTime: string;
-    eveningTime: string;
-    nightTime: string;
+  noonTime: string;
+  afternoonTime: string;
+  eveningTime: string;
+  nightTime: string;
+  recapTime: string;
+  timezone: string;
+  // Questions aléatoires
+  moodEnabled: boolean;
+  stressEnabled: boolean;
+  focusEnabled: boolean;
+  moodWindows: TimeWindow[];
+  stressWindows: TimeWindow[];
+  focusWindows: TimeWindow[];
+  moodDailyCount: number;
+  stressDailyCount: number;
+  focusDailyCount: number;
 }
 
 // GET /api/notifications/preferences
@@ -35,18 +55,7 @@ export async function GET(request: Request) {
         if (!user) {
             return NextResponse.json({ error: 'Non authentifié' }, { status: 401 });
         }
-
-        const { searchParams } = new URL(request.url);
-        const userId = searchParams.get('userId');
-
-        if (!userId) {
-            return NextResponse.json({ error: 'userId requis' }, { status: 400 });
-        }
-
-        // Vérifier que l'utilisateur demande ses propres préférences
-        if (userId !== user.id) {
-            return NextResponse.json({ error: 'Non autorisé' }, { status: 403 });
-        }
+        const userId = user.id;
 
         const preferences = await prisma.notificationSettings.findUnique({
             where: { userId }
@@ -60,6 +69,11 @@ export async function GET(request: Request) {
         if (preferences?.dailySummary) notificationTypes.push('DAILY_SUMMARY');
 
         // Mapper les données du schéma vers le format attendu par le frontend
+        const defaultWindows: TimeWindow[] = [
+          { start: '09:00', end: '12:00' },
+          { start: '14:00', end: '18:00' },
+        ];
+
         const mappedPreferences: NotificationPreferences = preferences ? {
             isEnabled: preferences.isEnabled,
             emailEnabled: preferences.emailEnabled,
@@ -71,17 +85,33 @@ export async function GET(request: Request) {
             allowedDays: preferences.allowedDays,
             notificationTypes: notificationTypes,
             morningReminder: preferences.morningReminder,
+            noonReminder: preferences.noonReminder,
+            afternoonReminder: preferences.afternoonReminder,
+            eveningReminder: preferences.eveningReminder,
+            nightReminder: preferences.nightReminder,
+            improvementReminder: preferences.improvementReminder,
+            recapReminder: preferences.recapReminder,
             taskReminder: preferences.taskReminder,
             habitReminder: preferences.habitReminder,
             motivation: preferences.motivation,
             dailySummary: preferences.dailySummary,
             morningTime: preferences.morningTime,
-            improvementReminder: preferences.improvementReminder,
             improvementTime: preferences.improvementTime,
             noonTime: preferences.noonTime,
             afternoonTime: preferences.afternoonTime,
             eveningTime: preferences.eveningTime,
-            nightTime: preferences.nightTime
+            nightTime: preferences.nightTime,
+            recapTime: preferences.recapTime,
+            timezone: preferences.timezone,
+            moodEnabled: preferences.moodEnabled,
+            stressEnabled: preferences.stressEnabled,
+            focusEnabled: preferences.focusEnabled,
+            moodWindows: (preferences.moodWindows as any) || defaultWindows,
+            stressWindows: (preferences.stressWindows as any) || defaultWindows,
+            focusWindows: (preferences.focusWindows as any) || defaultWindows,
+            moodDailyCount: preferences.moodDailyCount,
+            stressDailyCount: preferences.stressDailyCount,
+            focusDailyCount: preferences.focusDailyCount,
         } : {
             isEnabled: true,
             emailEnabled: true,
@@ -93,17 +123,33 @@ export async function GET(request: Request) {
             allowedDays: [1, 2, 3, 4, 5],
             notificationTypes: ['TASK_DUE', 'HABIT_REMINDER', 'DAILY_SUMMARY'],
             morningReminder: true,
+            noonReminder: true,
+            afternoonReminder: true,
+            eveningReminder: true,
+            nightReminder: true,
+            improvementReminder: true,
+            recapReminder: true,
             taskReminder: true,
             habitReminder: true,
             motivation: true,
             dailySummary: true,
-            morningTime: '08:00',
-            improvementReminder: false,
-            improvementTime: '08:30',
+            morningTime: '07:30',
+            improvementTime: '10:00',
             noonTime: '12:00',
-            afternoonTime: '14:00',
-            eveningTime: '18:00',
-            nightTime: '22:00'
+            afternoonTime: '15:00',
+            eveningTime: '18:30',
+            nightTime: '21:30',
+            recapTime: '21:00',
+            timezone: 'Europe/Paris',
+            moodEnabled: true,
+            stressEnabled: true,
+            focusEnabled: true,
+            moodWindows: defaultWindows,
+            stressWindows: defaultWindows,
+            focusWindows: defaultWindows,
+            moodDailyCount: 1,
+            stressDailyCount: 1,
+            focusDailyCount: 1,
         };
 
         return NextResponse.json(mappedPreferences);
@@ -122,16 +168,8 @@ export async function POST(request: Request) {
         }
 
         const body = await request.json();
-        const { userId, ...incomingPreferences } = body as { userId: string } & NotificationPreferences;
-
-        if (!userId) {
-            return NextResponse.json({ error: 'userId requis' }, { status: 400 });
-        }
-
-        // Vérifier que l'utilisateur modifie ses propres préférences
-        if (userId !== user.id) {
-            return NextResponse.json({ error: 'Non autorisé' }, { status: 403 });
-        }
+        const userId = user.id;
+        const incomingPreferences = body as NotificationPreferences;
 
         // Récupérer les anciennes préférences pour comparaison
         const oldPreferences = await prisma.notificationSettings.findUnique({
@@ -159,17 +197,33 @@ export async function POST(request: Request) {
             allowedDays: incomingPreferences.allowedDays,
             notificationTypes: notificationTypes,
             morningReminder: incomingPreferences.morningReminder,
+            noonReminder: incomingPreferences.noonReminder,
+            afternoonReminder: incomingPreferences.afternoonReminder,
+            eveningReminder: incomingPreferences.eveningReminder,
+            nightReminder: incomingPreferences.nightReminder,
+            improvementReminder: incomingPreferences.improvementReminder,
+            recapReminder: incomingPreferences.recapReminder,
             taskReminder: incomingPreferences.taskReminder,
             habitReminder: incomingPreferences.habitReminder,
             motivation: incomingPreferences.motivation,
             dailySummary: incomingPreferences.dailySummary,
             morningTime: incomingPreferences.morningTime,
-            improvementReminder: incomingPreferences.improvementReminder,
             improvementTime: incomingPreferences.improvementTime,
             noonTime: incomingPreferences.noonTime,
             afternoonTime: incomingPreferences.afternoonTime,
             eveningTime: incomingPreferences.eveningTime,
-            nightTime: incomingPreferences.nightTime
+            nightTime: incomingPreferences.nightTime,
+            recapTime: incomingPreferences.recapTime,
+            timezone: incomingPreferences.timezone,
+            moodEnabled: incomingPreferences.moodEnabled,
+            stressEnabled: incomingPreferences.stressEnabled,
+            focusEnabled: incomingPreferences.focusEnabled,
+            moodWindows: incomingPreferences.moodWindows,
+            stressWindows: incomingPreferences.stressWindows,
+            focusWindows: incomingPreferences.focusWindows,
+            moodDailyCount: incomingPreferences.moodDailyCount,
+            stressDailyCount: incomingPreferences.stressDailyCount,
+            focusDailyCount: incomingPreferences.focusDailyCount,
         } as const;
 
         // Mettre à jour ou créer les préférences dans PostgreSQL

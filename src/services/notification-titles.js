@@ -10,7 +10,12 @@ export const getNotificationTitle = (type) => {
         'DAILY_MOTIVATION': '💪 Motivation du jour',
         'TASK_DUE': '⏰ Échéance importante',
         'HABIT_REMINDER': '🎯 Rappel d\'habitude',
-        'DAILY_SUMMARY': '📊 Résumé quotidien'
+        'DAILY_SUMMARY': '📊 Résumé quotidien',
+        'IMPROVEMENT_REMINDER': '🛠️ Amélioration du jour',
+        'RECAP_ANALYSIS': '📊 Récap de ta journée',
+        'MOOD_CHECK': '🙂 Humeur du moment',
+        'STRESS_CHECK': '😌 Stress du moment',
+        'FOCUS_CHECK': '🎯 Focus du moment'
     };
     return titles[type] || type;
 };

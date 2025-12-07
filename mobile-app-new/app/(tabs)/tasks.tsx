@@ -34,6 +34,7 @@ interface Task {
   priority: number | null;
   energyLevel: number | null;
   dueDate?: string;
+  userId?: string;
   project?: {
     id: string;
     name: string;
@@ -191,6 +192,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onToggle, onPress, onDelete, 
 export default function TasksScreen() {
   const router = useRouter();
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -303,7 +305,9 @@ export default function TasksScreen() {
         completed: t.completed
       })));
       
-      setTasks(tasks);
+      // Filtrer sur l'utilisateur courant si l'API renvoie plusieurs users (sécurité)
+      const filtered = currentUserId ? tasks.filter((t: any) => !t.userId || t.userId === currentUserId) : tasks;
+      setTasks(filtered);
     } catch (error) {
       console.error('Erreur lors du chargement des tâches:', error);
       Alert.alert('Erreur', 'Impossible de charger les tâches');
@@ -328,6 +332,9 @@ export default function TasksScreen() {
     try {
       const response = await authService.checkAuth();
       console.log('🔐 Statut d\'authentification:', response);
+      if (response?.user?.id) {
+        setCurrentUserId(response.user.id);
+      }
     } catch (error) {
       console.error('❌ Pas authentifié:', error);
       Alert.alert('Erreur', 'Vous devez vous reconnecter');

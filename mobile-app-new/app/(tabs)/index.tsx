@@ -705,17 +705,17 @@ export default function DashboardScreen() {
         ),
       }));
 
+      // Déclencher immédiatement l'animation de célébration côté UI
+      if (!currentCompleted) {
+        setCelebratingHabit(habitId);
+        setTimeout(() => setCelebratingHabit(null), 1500);
+      }
+
       // Call API to toggle habit (complete or uncomplete)
       await habitsService.complete(habitId, todayStr, currentCompleted);
       
       // Recharger les données pour avoir la streak à jour
       await loadDashboardData();
-
-      if (!currentCompleted) {
-        // Célébrer seulement si on vient de compléter
-        setCelebratingHabit(habitId);
-        setTimeout(() => setCelebratingHabit(null), 1500);
-      }
     } catch (error) {
       console.error('Error toggling habit:', error);
       // Rollback en cas d'erreur
@@ -725,6 +725,8 @@ export default function DashboardScreen() {
           h.id === habitId ? { ...h, completed: currentCompleted } : h
         ),
       }));
+      // Annuler l'animation si l'appel API échoue
+      setCelebratingHabit(null);
     }
   };
 

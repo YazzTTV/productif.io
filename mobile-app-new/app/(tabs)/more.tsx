@@ -436,7 +436,7 @@ export default function SettingsScreen() {
               </View>
             </View>
 
-            {/* Notifications Toggle */}
+            {/* Notifications */}
             <View style={[styles.preferenceSection, styles.preferenceBorder]}>
               <View style={styles.preferenceRow}>
                 <View style={styles.preferenceLeft}>
@@ -450,6 +450,23 @@ export default function SettingsScreen() {
                   thumbColor="#FFFFFF"
                 />
               </View>
+              <TouchableOpacity
+                style={styles.settingButton}
+                onPress={() => router.push('/notifications')}
+              >
+                <View style={styles.settingButtonLeft}>
+                  <Ionicons name="alarm" size={24} color="#00C27A" />
+                  <View style={styles.settingButtonContent}>
+                    <Text style={[styles.settingButtonText, { color: colors.text }]}>
+                      Rappels et horaires
+                    </Text>
+                    <Text style={styles.settingButtonSubtext}>
+                      Matin, midi, soir, questions humeur/stress/focus
+                    </Text>
+                  </View>
+                </View>
+                <Ionicons name="chevron-forward" size={24} color="#9CA3AF" />
+              </TouchableOpacity>
             </View>
 
             {/* Analytics */}

@@ -1169,8 +1169,10 @@ export default function AssistantScreen() {
           <LockedCard onLockedClick={() => setShowUpgradeModal(true)}>
             <ScrollView
               style={styles.messagesContainer}
-              contentContainerStyle={styles.messagesContent}
+              contentContainerStyle={[styles.messagesContent, { paddingBottom: 260 }]}
               showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="on-drag"
             >
               {messages.map((message, index) => (
               <Animated.View
@@ -1288,8 +1290,12 @@ export default function AssistantScreen() {
             </ScrollView>
           </LockedCard>
 
-          {/* Quick Action Chips */}
-          <LockedCard onLockedClick={() => setShowUpgradeModal(true)}>
+        </View>
+
+        {/* Input Area fixed bottom */}
+        <LockedCard onLockedClick={() => setShowUpgradeModal(true)}>
+          <View style={styles.inputBarWrapper}>
+            {/* Quick Action Chips moved near input */}
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -1311,40 +1317,37 @@ export default function AssistantScreen() {
                 </Animated.View>
               ))}
             </ScrollView>
-          </LockedCard>
 
-          {/* Input Area */}
-          <LockedCard onLockedClick={() => setShowUpgradeModal(true)}>
             <View style={styles.inputContainer}>
-            <View style={styles.inputWrapper}>
-              <TextInput
-                style={styles.input}
-                value={inputText}
-                onChangeText={setInputText}
-                placeholder="Ask me anything..."
-                placeholderTextColor="#9CA3AF"
-                multiline
-                maxLength={500}
-              />
-            </View>
+              <View style={styles.inputWrapper}>
+                <TextInput
+                  style={styles.input}
+                  value={inputText}
+                  onChangeText={setInputText}
+                  placeholder="Ask me anything..."
+                  placeholderTextColor="#9CA3AF"
+                  multiline
+                  maxLength={500}
+                />
+              </View>
 
-            <TouchableOpacity style={styles.micButton}>
-              <Ionicons name="mic" size={20} color="#6B7280" />
-            </TouchableOpacity>
+              <TouchableOpacity style={styles.micButton}>
+                <Ionicons name="mic" size={20} color="#6B7280" />
+              </TouchableOpacity>
 
-            <TouchableOpacity onPress={handleSend} style={styles.sendButton}>
-              <LinearGradient
-                colors={['#00C27A', '#00D68F']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.sendButtonGradient}
-              >
-                <Ionicons name="send" size={20} color="#FFFFFF" />
-              </LinearGradient>
-            </TouchableOpacity>
+              <TouchableOpacity onPress={handleSend} style={styles.sendButton}>
+                <LinearGradient
+                  colors={['#00C27A', '#00D68F']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.sendButtonGradient}
+                >
+                  <Ionicons name="send" size={20} color="#FFFFFF" />
+                </LinearGradient>
+              </TouchableOpacity>
             </View>
-          </LockedCard>
-        </View>
+          </View>
+        </LockedCard>
 
         {/* Upgrade Modal */}
         <UpgradeModal
@@ -2549,7 +2552,13 @@ const styles = StyleSheet.create({
   },
   messagesContent: {
     paddingHorizontal: 24,
-    paddingBottom: Platform.OS === 'ios' ? 120 : 110,
+    paddingBottom: 260,
+  },
+  inputBarWrapper: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 16,
+    backgroundColor: '#fff',
   },
   messageContainer: {
     marginBottom: 12,
