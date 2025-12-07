@@ -4,7 +4,7 @@ const prisma = new PrismaClient()
 
 async function expireTrialForUser() {
   try {
-    const email = 'test4654321@free.fr'
+    const email = process.env.EMAIL || 'test4654321@free.fr'
     
     console.log(`🔍 Recherche de l'utilisateur: ${email}`)
     

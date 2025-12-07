@@ -294,11 +294,13 @@ class NotificationScheduler {
             console.log(`      🌤️ Après-midi: ${settings.afternoonTime}`);
             console.log(`      🌆 Soir: ${settings.eveningTime}`);
             console.log(`      🌙 Nuit: ${settings.nightTime}`);
+            console.log(`      🛠️ Amélioration: ${settings.improvementTime}`);
+            console.log(`      📊 Récap: ${settings.recapTime}`);
             
-            const { morningTime, noonTime, afternoonTime, eveningTime, nightTime } = settings;
+            const { morningTime, noonTime, afternoonTime, eveningTime, nightTime, improvementTime, recapTime } = settings;
 
             // Validation des horaires pour éviter les doublons
-            const times = [morningTime, noonTime, afternoonTime, eveningTime, nightTime];
+            const times = [morningTime, noonTime, afternoonTime, eveningTime, nightTime, improvementTime, recapTime];
             const uniqueTimes = [...new Set(times)];
             
             if (times.length !== uniqueTimes.length) {
@@ -321,23 +323,33 @@ class NotificationScheduler {
             }
 
             // Notification du midi
-            if (this.isValidSchedulingTime(noonTime, currentTime)) {
+            if (settings.noonReminder && this.isValidSchedulingTime(noonTime, currentTime)) {
                 timesToSchedule.push({time: noonTime, type: 'midi', callback: async (date) => await this.notificationService.scheduleNoonNotification(userId, date)});
             }
 
             // Notification de l'après-midi
-            if (this.isValidSchedulingTime(afternoonTime, currentTime)) {
+            if (settings.afternoonReminder && this.isValidSchedulingTime(afternoonTime, currentTime)) {
                 timesToSchedule.push({time: afternoonTime, type: 'après-midi', callback: async (date) => await this.notificationService.scheduleAfternoonNotification(userId, date)});
             }
 
             // Notification du soir
-            if (this.isValidSchedulingTime(eveningTime, currentTime)) {
+            if (settings.eveningReminder && this.isValidSchedulingTime(eveningTime, currentTime)) {
                 timesToSchedule.push({time: eveningTime, type: 'soir', callback: async (date) => await this.notificationService.scheduleEveningNotification(userId, date)});
             }
 
             // Notification de nuit
-            if (this.isValidSchedulingTime(nightTime, currentTime)) {
+            if (settings.nightReminder && this.isValidSchedulingTime(nightTime, currentTime)) {
                 timesToSchedule.push({time: nightTime, type: 'nuit', callback: async (date) => await this.notificationService.scheduleNightNotification(userId, date)});
+            }
+
+            // Notification amélioration
+            if (settings.improvementReminder && this.isValidSchedulingTime(improvementTime, currentTime)) {
+                timesToSchedule.push({time: improvementTime, type: 'amelioration', callback: async (date) => await this.notificationService.scheduleImprovementNotification(userId, date)});
+            }
+
+            // Notification récap analyse
+            if (settings.recapReminder && this.isValidSchedulingTime(recapTime, currentTime)) {
+                timesToSchedule.push({time: recapTime, type: 'recap', callback: async (date) => await this.notificationService.scheduleRecapNotification(userId, date)});
             }
 
             // Planifier seulement les horaires valides et uniques
@@ -348,7 +360,40 @@ class NotificationScheduler {
             console.log(`   📅 ${uniqueTimesToSchedule.length} horaires uniques seront planifiés`);
 
             for (const item of uniqueTimesToSchedule) {
-                this.scheduleDailyNotification(userId, item.time, item.callback);
+                this.scheduleDailyNotification(userId, item.time, item.callback, settings.timezone);
+            }
+
+            // Notifications aléatoires (humeur/stress/focus)
+            const randomConfigs = [
+                {
+                    enabled: settings.moodEnabled,
+                    windows: settings.moodWindows || [],
+                    count: settings.moodDailyCount || 0,
+                    label: 'humeur',
+                    callback: async (date) => await this.notificationService.scheduleMoodCheckNotification(userId, date),
+                },
+                {
+                    enabled: settings.stressEnabled,
+                    windows: settings.stressWindows || [],
+                    count: settings.stressDailyCount || 0,
+                    label: 'stress',
+                    callback: async (date) => await this.notificationService.scheduleStressCheckNotification(userId, date),
+                },
+                {
+                    enabled: settings.focusEnabled,
+                    windows: settings.focusWindows || [],
+                    count: settings.focusDailyCount || 0,
+                    label: 'focus',
+                    callback: async (date) => await this.notificationService.scheduleFocusCheckNotification(userId, date),
+                },
+            ];
+
+            for (const config of randomConfigs) {
+                if (!config.enabled || config.count <= 0 || !config.windows?.length) continue;
+                const randomTimes = this.generateRandomTimesFromWindows(config.windows, config.count);
+                for (const time of randomTimes) {
+                    this.scheduleDailyNotification(userId, time, config.callback, settings.timezone);
+                }
             }
 
             console.log(`   ✅ Toutes les notifications planifiées pour l'utilisateur ${userId}`);
@@ -369,7 +414,7 @@ class NotificationScheduler {
         return true;
     }
 
-    scheduleDailyNotification(userId, time, callback) {
+    scheduleDailyNotification(userId, time, callback, timezone = 'UTC') {
         const scheduleId = `SCHEDULE_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         const jobId = `${userId}-${time}`;
         
@@ -416,13 +461,37 @@ class NotificationScheduler {
                 NotificationLogger.logError('Exécution de la tâche planifiée', error);
             }
             console.log(`🔥🔥🔥 FIN CRON_EXECUTION_${execId} 🔥🔥🔥\n`);
-        });
+        }, { timezone });
 
         this.jobs.set(jobId, job);
         console.log(`   ➕ Nouvelle tâche: ${jobId} (${cronExpression})`);
         console.log(`📊 Jobs actuels APRÈS création: ${this.jobs.size}`);
         console.log(`🔍 Job bien créé? ${this.jobs.has(jobId) ? 'OUI ✅' : 'NON ❌'}`);
         console.log(`🚨🚨🚨 FIN SCHEDULE_TASK_${scheduleId} 🚨🚨🚨\n`);
+    }
+
+    /**
+     * Génère des horaires aléatoires dans des fenêtres données (HH:MM)
+     */
+    generateRandomTimesFromWindows(windows, count) {
+        const times = [];
+        const safeCount = Math.max(0, Math.min(count || 0, 5)); // éviter d'inonder
+        for (let i = 0; i < safeCount; i++) {
+            const window = windows[Math.floor(Math.random() * windows.length)];
+            if (!window?.start || !window?.end) continue;
+            const [sh, sm] = window.start.split(':').map(Number);
+            const [eh, em] = window.end.split(':').map(Number);
+            const startMinutes = sh * 60 + (sm || 0);
+            const endMinutes = eh * 60 + (em || 0);
+            if (endMinutes <= startMinutes) continue;
+            const delta = endMinutes - startMinutes;
+            const offset = Math.floor(Math.random() * delta);
+            const total = startMinutes + offset;
+            const hh = Math.floor(total / 60).toString().padStart(2, '0');
+            const mm = (total % 60).toString().padStart(2, '0');
+            times.push(`${hh}:${mm}`);
+        }
+        return times;
     }
 
     scheduleNotificationProcessing() {

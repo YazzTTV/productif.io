@@ -335,10 +335,42 @@ model NotificationSettings {
   id                String   @id @default(cuid())
   userId            String   @unique
   isEnabled         Boolean  @default(true)
+  emailEnabled      Boolean  @default(true)
+  pushEnabled       Boolean  @default(true)
+  whatsappEnabled   Boolean  @default(false)
+  whatsappNumber    String?
   startHour         Int      @default(9)
   endHour           Int      @default(18)
   allowedDays       Int[]    @default([1, 2, 3, 4, 5]) // 1 = Lundi, 7 = Dimanche
   notificationTypes String[] @default(["TASK_DUE", "HABIT_REMINDER", "DAILY_SUMMARY"])
+  morningReminder   Boolean  @default(true)
+  noonReminder      Boolean  @default(true)
+  afternoonReminder Boolean  @default(true)
+  eveningReminder   Boolean  @default(true)
+  nightReminder     Boolean  @default(true)
+  improvementReminder Boolean @default(false)
+  recapReminder     Boolean  @default(true)
+  taskReminder      Boolean  @default(true)
+  habitReminder     Boolean  @default(true)
+  motivation        Boolean  @default(true)
+  dailySummary      Boolean  @default(true)
+  morningTime       String   @default("08:00")
+  noonTime          String   @default("12:00")
+  afternoonTime     String   @default("14:00")
+  eveningTime       String   @default("18:00")
+  nightTime         String   @default("22:00")
+  improvementTime   String   @default("08:30")
+  recapTime         String   @default("21:00")
+  timezone          String   @default("Europe/Paris")
+  moodEnabled       Boolean  @default(true)
+  stressEnabled     Boolean  @default(true)
+  focusEnabled      Boolean  @default(true)
+  moodWindows       Json?
+  stressWindows     Json?
+  focusWindows      Json?
+  moodDailyCount    Int      @default(1)
+  stressDailyCount  Int      @default(1)
+  focusDailyCount   Int      @default(1)
   user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt

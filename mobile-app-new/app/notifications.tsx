@@ -16,17 +16,28 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { apiCall } from '@/lib/api';
 
+type TimeWindow = {
+  start: string;
+  end: string;
+};
+
 interface NotificationPreferences {
   isEnabled: boolean;
   emailEnabled: boolean;
   pushEnabled: boolean;
-  whatsappEnabled: boolean;
-  whatsappNumber?: string;
+  // WhatsApp retiré (plus utilisé)
   startHour: number;
   endHour: number;
   allowedDays: number[];
   notificationTypes: string[];
+  // Rappels fixes
   morningReminder: boolean;
+  noonReminder: boolean;
+  afternoonReminder: boolean;
+  eveningReminder: boolean;
+  nightReminder: boolean;
+  improvementReminder: boolean;
+  recapReminder: boolean;
   taskReminder: boolean;
   habitReminder: boolean;
   motivation: boolean;
@@ -36,7 +47,25 @@ interface NotificationPreferences {
   afternoonTime: string;
   eveningTime: string;
   nightTime: string;
+  improvementTime: string;
+  recapTime: string;
+  timezone: string;
+  // Questions aléatoires
+  moodEnabled: boolean;
+  stressEnabled: boolean;
+  focusEnabled: boolean;
+  moodWindows: TimeWindow[];
+  stressWindows: TimeWindow[];
+  focusWindows: TimeWindow[];
+  moodDailyCount: number;
+  stressDailyCount: number;
+  focusDailyCount: number;
 }
+
+const defaultWindows: TimeWindow[] = [
+  { start: '09:00', end: '12:00' },
+  { start: '14:00', end: '18:00' },
+];
 
 const defaultPreferences: NotificationPreferences = {
   isEnabled: true,
@@ -49,15 +78,33 @@ const defaultPreferences: NotificationPreferences = {
   allowedDays: [1, 2, 3, 4, 5],
   notificationTypes: ['TASK_DUE', 'HABIT_REMINDER', 'DAILY_SUMMARY'],
   morningReminder: true,
+  noonReminder: true,
+  afternoonReminder: true,
+  eveningReminder: true,
+  nightReminder: true,
+  improvementReminder: true,
+  recapReminder: true,
   taskReminder: true,
   habitReminder: true,
   motivation: true,
   dailySummary: true,
-  morningTime: '08:00',
+  morningTime: '07:30',
   noonTime: '12:00',
-  afternoonTime: '14:00',
-  eveningTime: '18:00',
-  nightTime: '22:00'
+  afternoonTime: '15:00',
+  eveningTime: '18:30',
+  nightTime: '21:30',
+  improvementTime: '10:00',
+  recapTime: '21:00',
+  timezone: 'Europe/Paris',
+  moodEnabled: true,
+  stressEnabled: true,
+  focusEnabled: true,
+  moodWindows: defaultWindows,
+  stressWindows: defaultWindows,
+  focusWindows: defaultWindows,
+  moodDailyCount: 1,
+  stressDailyCount: 1,
+  focusDailyCount: 1,
 };
 
 const daysOfWeek = [
@@ -107,11 +154,18 @@ export default function NotificationsPage() {
       
       console.log('✅ Préférences récupérées:', prefs);
       
-      const finalPrefs = {
+      const finalPrefs: NotificationPreferences = {
         ...defaultPreferences,
         ...prefs,
         allowedDays: Array.isArray(prefs.allowedDays) ? prefs.allowedDays : defaultPreferences.allowedDays,
-        notificationTypes: Array.isArray(prefs.notificationTypes) ? prefs.notificationTypes : defaultPreferences.notificationTypes
+        notificationTypes: Array.isArray(prefs.notificationTypes) ? prefs.notificationTypes : defaultPreferences.notificationTypes,
+        moodWindows: Array.isArray(prefs.moodWindows) && prefs.moodWindows.length ? prefs.moodWindows : defaultPreferences.moodWindows,
+        stressWindows: Array.isArray(prefs.stressWindows) && prefs.stressWindows.length ? prefs.stressWindows : defaultPreferences.stressWindows,
+        focusWindows: Array.isArray(prefs.focusWindows) && prefs.focusWindows.length ? prefs.focusWindows : defaultPreferences.focusWindows,
+        timezone: prefs.timezone || defaultPreferences.timezone,
+        moodDailyCount: prefs.moodDailyCount ?? defaultPreferences.moodDailyCount,
+        stressDailyCount: prefs.stressDailyCount ?? defaultPreferences.stressDailyCount,
+        focusDailyCount: prefs.focusDailyCount ?? defaultPreferences.focusDailyCount,
       };
       
       setPreferences(finalPrefs);
@@ -272,6 +326,107 @@ export default function NotificationsPage() {
     </View>
   );
 
+  const renderTimeToggleRow = (
+    label: string,
+    enabled: boolean,
+    onToggle: (value: boolean) => void,
+    timeValue: string,
+    onTimeChange: (value: string) => void,
+    disabled: boolean
+  ) => (
+    <View style={[styles.timeToggleRow, disabled && styles.toggleItemDisabled]}>
+      <View style={styles.timeToggleLeft}>
+        <Text style={[styles.timeToggleLabel, disabled && styles.toggleTitleDisabled]}>{label}</Text>
+        <Switch
+          value={enabled}
+          onValueChange={onToggle}
+          disabled={disabled}
+          trackColor={{ false: '#E5E7EB', true: '#10B981' }}
+          thumbColor={enabled ? '#fff' : '#9CA3AF'}
+        />
+      </View>
+      <TextInput
+        style={[styles.timeInput, styles.timeInputInline, (!enabled || disabled) && styles.timeInputDisabled]}
+        value={timeValue}
+        onChangeText={onTimeChange}
+        placeholder="HH:MM"
+        maxLength={5}
+        editable={enabled && !disabled}
+      />
+    </View>
+  );
+
+  const renderWindowEditor = (
+    label: string,
+    enabled: boolean,
+    onToggle: (value: boolean) => void,
+    windows: TimeWindow[],
+    onWindowsChange: (value: TimeWindow[]) => void,
+    dailyCount: number,
+    onCountChange: (value: number) => void,
+    disabled: boolean
+  ) => (
+    <View style={[styles.card, styles.windowCard, disabled && styles.toggleItemDisabled]}>
+      <View style={styles.windowHeader}>
+        <View style={styles.windowHeaderLeft}>
+          <Text style={[styles.timeToggleLabel, disabled && styles.toggleTitleDisabled]}>{label}</Text>
+          <Switch
+            value={enabled}
+            onValueChange={onToggle}
+            disabled={disabled}
+            trackColor={{ false: '#E5E7EB', true: '#10B981' }}
+            thumbColor={enabled ? '#fff' : '#9CA3AF'}
+          />
+        </View>
+        <View style={styles.countContainer}>
+          <Text style={styles.countLabel}>/jour</Text>
+          <TextInput
+            style={[styles.countInput, (!enabled || disabled) && styles.timeInputDisabled]}
+            value={String(dailyCount)}
+            keyboardType="numeric"
+            onChangeText={(v) => onCountChange(Number(v) || 0)}
+            editable={enabled && !disabled}
+          />
+        </View>
+      </View>
+
+      {windows.slice(0, 2).map((w, idx) => (
+        <View key={`${label}-${idx}`} style={styles.windowRow}>
+          <View style={styles.windowInput}>
+            <Text style={styles.timeLabel}>Début</Text>
+            <TextInput
+              style={[styles.timeInput, styles.timeInputInline, (!enabled || disabled) && styles.timeInputDisabled]}
+              value={w.start}
+              onChangeText={(val) => {
+                const copy = [...windows];
+                copy[idx] = { ...copy[idx], start: val };
+                onWindowsChange(copy);
+              }}
+              placeholder="09:00"
+              maxLength={5}
+              editable={enabled && !disabled}
+            />
+          </View>
+          <View style={styles.windowInput}>
+            <Text style={styles.timeLabel}>Fin</Text>
+            <TextInput
+              style={[styles.timeInput, styles.timeInputInline, (!enabled || disabled) && styles.timeInputDisabled]}
+              value={w.end}
+              onChangeText={(val) => {
+                const copy = [...windows];
+                copy[idx] = { ...copy[idx], end: val };
+                onWindowsChange(copy);
+              }}
+              placeholder="12:00"
+              maxLength={5}
+              editable={enabled && !disabled}
+            />
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+
   if (isLoading) {
     return (
       <SafeAreaView style={styles.container}>
@@ -344,6 +499,17 @@ export default function NotificationsPage() {
               preferences.isEnabled,
               (value) => updatePreference('isEnabled', value)
             )}
+            <View style={styles.timeInputContainer}>
+              <Text style={styles.timeLabel}>Fuseau horaire</Text>
+              <TextInput
+                style={styles.textInput}
+                value={preferences.timezone}
+                onChangeText={(value) => updatePreference('timezone', value)}
+                placeholder="Europe/Paris"
+                autoCapitalize="none"
+                editable={preferences.isEnabled}
+              />
+            </View>
           </View>
         </View>
 
@@ -364,26 +530,6 @@ export default function NotificationsPage() {
               preferences.pushEnabled,
               (value) => updatePreference('pushEnabled', value),
               !preferences.isEnabled
-            )}
-            {renderToggleItem(
-              'Notifications WhatsApp',
-              'Recevoir des notifications via WhatsApp',
-              preferences.whatsappEnabled,
-              (value) => updatePreference('whatsappEnabled', value),
-              !preferences.isEnabled
-            )}
-            
-            {preferences.whatsappEnabled && (
-              <View style={styles.whatsappNumberContainer}>
-                <Text style={styles.inputLabel}>Numéro WhatsApp</Text>
-                <TextInput
-                  style={styles.textInput}
-                  value={preferences.whatsappNumber}
-                  onChangeText={(value) => updatePreference('whatsappNumber', value)}
-                  placeholder="+33 6 XX XX XX XX"
-                  keyboardType="phone-pad"
-                />
-              </View>
             )}
           </View>
         </View>
@@ -479,15 +625,100 @@ export default function NotificationsPage() {
 
         {/* Horaires spécifiques */}
         <View style={styles.section}>
-          {renderSectionHeader('Horaires spécifiques', 'alarm')}
+          {renderSectionHeader('Rappels fixes (horaires)', 'alarm')}
           <View style={styles.card}>
-            <View style={styles.timesGrid}>
-              {renderTimeInput('Matin', preferences.morningTime, (value) => updatePreference('morningTime', value))}
-              {renderTimeInput('Midi', preferences.noonTime, (value) => updatePreference('noonTime', value))}
-              {renderTimeInput('Après-midi', preferences.afternoonTime, (value) => updatePreference('afternoonTime', value))}
-              {renderTimeInput('Soir', preferences.eveningTime, (value) => updatePreference('eveningTime', value))}
-            </View>
+            {renderTimeToggleRow(
+              'Rappel matin',
+              preferences.morningReminder,
+              (v) => updatePreference('morningReminder', v),
+              preferences.morningTime,
+              (value) => updatePreference('morningTime', value),
+              !preferences.isEnabled
+            )}
+            {renderTimeToggleRow(
+              'Rappel midi',
+              preferences.noonReminder,
+              (v) => updatePreference('noonReminder', v),
+              preferences.noonTime,
+              (value) => updatePreference('noonTime', value),
+              !preferences.isEnabled
+            )}
+            {renderTimeToggleRow(
+              'Rappel après-midi',
+              preferences.afternoonReminder,
+              (v) => updatePreference('afternoonReminder', v),
+              preferences.afternoonTime,
+              (value) => updatePreference('afternoonTime', value),
+              !preferences.isEnabled
+            )}
+            {renderTimeToggleRow(
+              'Rappel soir',
+              preferences.eveningReminder,
+              (v) => updatePreference('eveningReminder', v),
+              preferences.eveningTime,
+              (value) => updatePreference('eveningTime', value),
+              !preferences.isEnabled
+            )}
+            {renderTimeToggleRow(
+              'Rappel nuit',
+              preferences.nightReminder,
+              (v) => updatePreference('nightReminder', v),
+              preferences.nightTime,
+              (value) => updatePreference('nightTime', value),
+              !preferences.isEnabled
+            )}
+            {renderTimeToggleRow(
+              'Rappel amélioration',
+              preferences.improvementReminder,
+              (v) => updatePreference('improvementReminder', v),
+              preferences.improvementTime,
+              (value) => updatePreference('improvementTime', value),
+              !preferences.isEnabled
+            )}
+            {renderTimeToggleRow(
+              'Rappel récap analyse',
+              preferences.recapReminder,
+              (v) => updatePreference('recapReminder', v),
+              preferences.recapTime,
+              (value) => updatePreference('recapTime', value),
+              !preferences.isEnabled
+            )}
           </View>
+        </View>
+
+        {/* Questions aléatoires (humeur / stress / focus) */}
+        <View style={styles.section}>
+          {renderSectionHeader('Questions aléatoires', 'help-circle')}
+          {renderWindowEditor(
+            'Humeur',
+            preferences.moodEnabled,
+            (v) => updatePreference('moodEnabled', v),
+            preferences.moodWindows,
+            (w) => updatePreference('moodWindows', w),
+            preferences.moodDailyCount,
+            (n) => updatePreference('moodDailyCount', n),
+            !preferences.isEnabled
+          )}
+          {renderWindowEditor(
+            'Stress',
+            preferences.stressEnabled,
+            (v) => updatePreference('stressEnabled', v),
+            preferences.stressWindows,
+            (w) => updatePreference('stressWindows', w),
+            preferences.stressDailyCount,
+            (n) => updatePreference('stressDailyCount', n),
+            !preferences.isEnabled
+          )}
+          {renderWindowEditor(
+            'Focus',
+            preferences.focusEnabled,
+            (v) => updatePreference('focusEnabled', v),
+            preferences.focusWindows,
+            (w) => updatePreference('focusWindows', w),
+            preferences.focusDailyCount,
+            (n) => updatePreference('focusDailyCount', n),
+            !preferences.isEnabled
+          )}
         </View>
 
         {/* Espacement pour le bouton flottant */}
@@ -755,6 +986,73 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     textAlign: 'center',
     width: 80,
+  },
+  timeInputInline: {
+    flex: 0,
+    width: 90,
+  },
+  timeInputDisabled: {
+    backgroundColor: '#F3F4F6',
+    color: '#9CA3AF',
+  },
+  timeToggleRow: {
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  timeToggleLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  timeToggleLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#111827',
+  },
+  windowCard: {
+    marginBottom: 12,
+  },
+  windowHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  windowHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  countContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  countLabel: {
+    fontSize: 12,
+    color: '#6B7280',
+  },
+  countInput: {
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    width: 60,
+    fontSize: 14,
+    textAlign: 'center',
+    color: '#111827',
+    backgroundColor: '#fff',
+  },
+  windowRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 8,
+  },
+  windowInput: {
+    flex: 1,
   },
   floatingButton: {
     position: 'absolute',

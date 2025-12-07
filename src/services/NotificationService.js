@@ -1,4 +1,4 @@
-npimport { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
 import WhatsAppService from './whatsappService.js';
 import NotificationLogger from './NotificationLogger.js';
 import NotificationContentBuilder from './NotificationContentBuilder.js';
@@ -360,6 +360,51 @@ class NotificationService {
         }
         catch (error) {
             NotificationLogger.logError('Planification de la notification de nuit', error);
+        }
+    }
+
+    async scheduleImprovementNotification(userId, date) {
+        try {
+            const content = "🎯 Aujourd'hui, concentre-toi sur une amélioration clé.\n\n💡 Idées :\n1) Choisis une difficulté et écris une action concrète pour la réduire.\n2) Bloque 25 min en deep work sur une tâche prioritaire.\n3) Supprime une distraction majeure (notifications, onglets...).\n\n🚀 Un pas à la fois !";
+            await this.createNotification(userId, 'IMPROVEMENT_REMINDER', content, date);
+        } catch (error) {
+            NotificationLogger.logError('Planification de la notification amélioration', error);
+        }
+    }
+
+    async scheduleRecapNotification(userId, date) {
+        try {
+            const content = "✨ Bilan de ta journée\n\n✅ Liste tes accomplissements\n⏱ Note ton temps de travail\n💭 Comment s'est passée ta journée ?\n\nPrends 2 minutes pour le récap, puis prépare demain. 💪";
+            await this.createNotification(userId, 'RECAP_ANALYSIS', content, date);
+        } catch (error) {
+            NotificationLogger.logError('Planification de la notification récap', error);
+        }
+    }
+
+    async scheduleMoodCheckNotification(userId, date) {
+        try {
+            const content = "🙂 Comment te sens-tu maintenant ?\n\nRéponds en notant ton humeur sur 1-10 et ajoute un mot-clé (ex: \"8, serein\").";
+            await this.createNotification(userId, 'MOOD_CHECK', content, date);
+        } catch (error) {
+            NotificationLogger.logError('Planification de la question humeur', error);
+        }
+    }
+
+    async scheduleStressCheckNotification(userId, date) {
+        try {
+            const content = "😌 Ton niveau de stress sur 1-10 ?\n\nQu'est-ce qui aide le plus à réduire la pression ? (respiration, pause, priorisation, déconnexion).";
+            await this.createNotification(userId, 'STRESS_CHECK', content, date);
+        } catch (error) {
+            NotificationLogger.logError('Planification de la question stress', error);
+        }
+    }
+
+    async scheduleFocusCheckNotification(userId, date) {
+        try {
+            const content = "🎯 Focus actuel sur 1-10 ?\n\nQuelle est la prochaine tâche à faire en 25 minutes ? (une seule, claire).";
+            await this.createNotification(userId, 'FOCUS_CHECK', content, date);
+        } catch (error) {
+            NotificationLogger.logError('Planification de la question focus', error);
         }
     }
 }
