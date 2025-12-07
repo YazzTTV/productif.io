@@ -1,0 +1,57 @@
+0 verbose cli /Users/noah/.nvm/versions/node/v20.19.4/bin/node /Users/noah/.nvm/versions/node/v20.19.4/lib/node_modules/npm/bin/npm-cli.js
+1 info using npm@10.8.2
+2 info using node@v20.19.4
+3 silly config load:file:/Users/noah/.nvm/versions/node/v20.19.4/lib/node_modules/npm/npmrc
+4 silly config load:file:/Users/noah/Documents/dev/productif.io/.npmrc
+5 silly config load:file:/Users/noah/.npmrc
+6 silly config load:file:/Users/noah/.nvm/versions/node/v20.19.4/etc/npmrc
+7 verbose title npm exec prisma --version
+8 verbose argv "exec" "--" "prisma" "--version"
+9 verbose logfile logs-max:10 dir:/Users/noah/Documents/dev/productif.io/.npm-cache/_logs/2025-12-05T21_24_45_630Z-
+10 verbose logfile /Users/noah/Documents/dev/productif.io/.npm-cache/_logs/2025-12-05T21_24_45_630Z-debug-0.log
+11 silly logfile done cleaning log files
+12 verbose stack Error: EPERM: operation not permitted, open '/Users/noah/.nvm/versions/node/v20.19.4/lib/node_modules/npm/node_modules/@sigstore/verify/dist/key/index.js'
+12 verbose stack     at Object.readFileSync (node:fs:449:20)
+12 verbose stack     at getMaybeCachedSource (node:internal/modules/cjs/loader:1552:18)
+12 verbose stack     at Module._extensions..js (node:internal/modules/cjs/loader:1564:19)
+12 verbose stack     at Module.load (node:internal/modules/cjs/loader:1275:32)
+12 verbose stack     at Module._load (node:internal/modules/cjs/loader:1096:12)
+12 verbose stack     at Module.require (node:internal/modules/cjs/loader:1298:19)
+12 verbose stack     at require (node:internal/modules/helpers:182:18)
+12 verbose stack     at Object.<anonymous> (/Users/noah/.nvm/versions/node/v20.19.4/lib/node_modules/npm/node_modules/@sigstore/verify/dist/verifier.js:21:15)
+12 verbose stack     at Module._compile (node:internal/modules/cjs/loader:1529:14)
+12 verbose stack     at Module._extensions..js (node:internal/modules/cjs/loader:1613:10)
+13 error code EPERM
+14 error syscall open
+15 error path /Users/noah/.nvm/versions/node/v20.19.4/lib/node_modules/npm/node_modules/@sigstore/verify/dist/key/index.js
+16 error errno -1
+17 error Error: EPERM: operation not permitted, open '/Users/noah/.nvm/versions/node/v20.19.4/lib/node_modules/npm/node_modules/@sigstore/verify/dist/key/index.js'
+17 error     at Object.readFileSync (node:fs:449:20)
+17 error     at getMaybeCachedSource (node:internal/modules/cjs/loader:1552:18)
+17 error     at Module._extensions..js (node:internal/modules/cjs/loader:1564:19)
+17 error     at Module.load (node:internal/modules/cjs/loader:1275:32)
+17 error     at Module._load (node:internal/modules/cjs/loader:1096:12)
+17 error     at Module.require (node:internal/modules/cjs/loader:1298:19)
+17 error     at require (node:internal/modules/helpers:182:18)
+17 error     at Object.<anonymous> (/Users/noah/.nvm/versions/node/v20.19.4/lib/node_modules/npm/node_modules/@sigstore/verify/dist/verifier.js:21:15)
+17 error     at Module._compile (node:internal/modules/cjs/loader:1529:14)
+17 error     at Module._extensions..js (node:internal/modules/cjs/loader:1613:10) {
+17 error   errno: -1,
+17 error   code: 'EPERM',
+17 error   syscall: 'open',
+17 error   path: '/Users/noah/.nvm/versions/node/v20.19.4/lib/node_modules/npm/node_modules/@sigstore/verify/dist/key/index.js'
+17 error }
+18 error
+18 error The operation was rejected by your operating system.
+18 error It is likely you do not have the permissions to access this file as the current user
+18 error
+18 error If you believe this might be a permissions issue, please double-check the
+18 error permissions of the file and its containing directories, or try running
+18 error the command again as root/Administrator.
+19 verbose cwd /Users/noah/Documents/dev/productif.io
+20 verbose os Darwin 24.6.0
+21 verbose node v20.19.4
+22 verbose npm  v10.8.2
+23 verbose exit -1
+24 verbose code -1
+25 error A complete log of this run can be found in: /Users/noah/Documents/dev/productif.io/.npm-cache/_logs/2025-12-05T21_24_45_630Z-debug-0.log

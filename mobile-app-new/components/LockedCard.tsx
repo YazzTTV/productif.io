@@ -20,22 +20,19 @@ export function LockedCard({ children, onLockedClick }: LockedCardProps) {
   return (
     <View style={styles.container}>
       {children}
-      {/* Overlay semi-transparent */}
       <TouchableOpacity
         style={[
-          StyleSheet.absoluteFill,
-          styles.overlay,
-          { backgroundColor: colors.background + 'CC' }, // 80% opacity
+          StyleSheet.absoluteFillObject,
+          styles.overlayContainer,
+          { backgroundColor: colors.background + 'CC' },
         ]}
         activeOpacity={0.9}
         onPress={onLockedClick}
-      />
-      {/* Cadenas */}
-      <View style={styles.lockContainer}>
+      >
         <View style={[styles.lockCircle, { backgroundColor: colors.background }]}>
-          <Ionicons name="lock-closed" size={32} color={colors.text} />
+          <Ionicons name="lock-closed" size={18} color={colors.text} />
         </View>
-      </View>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -44,22 +41,16 @@ const styles = StyleSheet.create({
   container: {
     position: 'relative',
   },
-  overlay: {
-    borderRadius: 12,
+  overlayContainer: {
+    borderRadius: 16,
     zIndex: 10,
-  },
-  lockContainer: {
-    position: 'absolute',
-    top: '50%',
-    left: '50%',
-    transform: [{ translateX: -32 }, { translateY: -32 }],
-    zIndex: 20,
-    pointerEvents: 'none',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   lockCircle: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
