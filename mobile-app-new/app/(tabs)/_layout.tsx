@@ -7,9 +7,11 @@ import { HapticTab } from '@/components/HapticTab';
 import TabBarBackground from '@/components/ui/TabBarBackground';
 import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
+import { useTranslation } from '@/hooks/useTranslation';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
+  const t = useTranslation();
 
   return (
     <Tabs
@@ -28,21 +30,21 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Accueil',
+          title: t('dashboard'),
           tabBarIcon: ({ color }) => <Ionicons name="home" size={26} color={color} />,
         }}
       />
       <Tabs.Screen
         name="assistant"
         options={{
-          title: 'Assistant IA',
+          title: t('assistant'),
           tabBarIcon: ({ color }) => <Ionicons name="chatbubble-ellipses" size={26} color={color} />,
         }}
       />
       <Tabs.Screen
         name="more"
         options={{
-          title: 'Réglages',
+          title: t('settings'),
           tabBarIcon: ({ color }) => <Ionicons name="settings" size={26} color={color} />,
         }}
       />

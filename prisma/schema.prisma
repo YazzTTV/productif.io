@@ -336,11 +336,27 @@ model UserGamification {
   lastActivityDate     DateTime?
   points               Int       @default(0)
   level                Int       @default(1)
+  totalXp              Int       @default(0)
+  nextLevelXp          Int       @default(100)
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
   totalHabitsCompleted Int       @default(0)
   totalPoints          Int       @default(0)
   user                 User      @relation(fields: [userId], references: [id])
+  xpEvents             XpEvent[]
+}
+
+model XpEvent {
+  id         String   @id @default(cuid())
+  userId     String
+  type       String
+  xpAwarded  Int
+  metadata   Json?
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([type])
 }
 
 model LeaderboardGroup {
