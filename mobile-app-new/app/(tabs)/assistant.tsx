@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -38,6 +38,9 @@ import { format } from 'date-fns';
 import { LockedCard } from '@/components/LockedCard';
 import { UpgradeModal } from '@/components/UpgradeModal';
 import { useTrialStatus } from '@/hooks/useTrialStatus';
+import { useTheme } from '@/contexts/ThemeContext';
+import { useTranslation } from '@/hooks/useTranslation';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface Message {
   id: string;
@@ -71,13 +74,13 @@ interface Habit {
   }>;
 }
 
-const quickActions = [
-  { icon: 'flash' as const, label: 'Start Deep Work', action: 'deepwork' },
-  { icon: 'book' as const, label: 'Daily Journal', action: 'journal' },
-  { icon: 'bulb' as const, label: 'Learning', action: 'learning' },
-  { icon: 'calendar' as const, label: 'Plan my day', action: 'plan' },
-  { icon: 'flag' as const, label: 'Track habit', action: 'track' },
-  { icon: 'trending-up' as const, label: 'Show stats', action: 'stats' },
+const quickActionsBase = [
+  { icon: 'flash' as const, labelKey: 'qaStartDeepWork', action: 'deepwork' },
+  { icon: 'book' as const, labelKey: 'qaDailyJournal', action: 'journal' },
+  { icon: 'bulb' as const, labelKey: 'qaLearning', action: 'learning' },
+  { icon: 'calendar' as const, labelKey: 'qaPlanDay', action: 'plan' },
+  { icon: 'flag' as const, labelKey: 'qaTrackHabit', action: 'track' },
+  { icon: 'trending-up' as const, labelKey: 'qaShowStats', action: 'stats' },
 ];
 
 const timeOptions = [
@@ -88,19 +91,36 @@ const timeOptions = [
 ];
 
 export default function AssistantScreen() {
+  const t = useTranslation();
+  const { locale } = useLanguage();
+  const { colors } = useTheme();
+  const isFr = locale === 'fr';
+  const quickActions = useMemo(
+    () => quickActionsBase.map((qa) => ({ ...qa, label: t(qa.labelKey) })),
+    [t]
+  );
   const { isLocked } = useTrialStatus();
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
-      text: "Hi! I'm your AI productivity coach. I'm here to help you optimize your day and unlock your full potential. How can I assist you?",
+      text: t('aiWelcome'),
       isAI: true,
       timestamp: new Date(),
     },
   ]);
   const [inputText, setInputText] = useState('');
-  const [xp, setXp] = useState(340);
+  const [xp, setXp] = useState(0); // legacy placeholder (ring now driven by xpStatus)
   const maxXp = 500;
+  const [xpStatus, setXpStatus] = useState<{ totalXp: number; level: number; nextLevelXp: number; progress: number; xpIntoLevel?: number; xpNeeded?: number }>({
+    totalXp: 0,
+    level: 1,
+    nextLevelXp: 100,
+    progress: 0,
+    xpIntoLevel: 0,
+    xpNeeded: 100,
+  });
+  const [deepWorkSessionId, setDeepWorkSessionId] = useState<string | null>(null);
 
   // Deep Work Mode State
   const [isDeepWorkActive, setIsDeepWorkActive] = useState(false);
@@ -142,7 +162,6 @@ export default function AssistantScreen() {
   const [showHabitsModal, setShowHabitsModal] = useState(false);
   const [habits, setHabits] = useState<Habit[]>([]);
   const [isLoadingHabits, setIsLoadingHabits] = useState(false);
-  const [deepWorkSessionId, setDeepWorkSessionId] = useState<string | null>(null);
 
   // Stats Modal State
   const [showStatsModal, setShowStatsModal] = useState(false);
@@ -165,17 +184,12 @@ export default function AssistantScreen() {
       interval = setInterval(() => {
         setDeepWorkTimeLeft((prev) => {
           if (prev <= 1) {
-            setIsDeepWorkActive(false);
-            const completionMessage: Message = {
-              id: Date.now().toString(),
-              text: '🎉 Deep work session complete! Great job staying focused. You earned 50 XP!',
-              isAI: true,
-              timestamp: new Date(),
-            };
-            setMessages((prev) => [...prev, completionMessage]);
-            setXp((prev) => Math.min(prev + 50, maxXp));
+            // Finir la session automatiquement
             setShowSessionCompleteAnimation(true);
-            return 25 * 60;
+            setTimeout(() => {
+              endSession();
+            }, 0);
+            return 0;
           }
           return prev - 1;
         });
@@ -329,8 +343,104 @@ export default function AssistantScreen() {
     }
   };
 
-  const startDeepWork = async (minutes: number) => {
+  const getActiveSessionFromResponse = (active: any) => {
+    if (!active) return null;
+    if (Array.isArray(active) && active.length > 0) return active[0];
+    if (Array.isArray(active?.sessions) && active.sessions.length > 0) return active.sessions[0];
+    if (active?.id) return active;
+    return null;
+  };
+
+  const checkActiveSession = useCallback(async () => {
     try {
+      const active = await assistantService.getActiveDeepWorkSession();
+      const session = getActiveSessionFromResponse(active);
+      if (session) {
+        setIsDeepWorkActive(true);
+        setDeepWorkSessionId(session.id);
+        const planned = session.plannedDuration || selectedDuration || 25;
+        const remaining = session.remainingSeconds || planned * 60;
+        setSelectedDuration(planned);
+        setDeepWorkTimeLeft(remaining);
+        await loadTodayTasks();
+        return session;
+      }
+    } catch (err) {
+      console.warn('Impossible de récupérer la session active de deep work :', err);
+    }
+    return null;
+  }, [selectedDuration]);
+
+  const refreshXpStatus = useCallback(async () => {
+    try {
+      const status = await assistantService.getXpStatus();
+      if (status?.xp) {
+        setXpStatus({
+          totalXp: status.xp.totalXp,
+          level: status.xp.level,
+          nextLevelXp: status.xp.nextLevelXp,
+          progress: status.xp.progress,
+          xpIntoLevel: status.xp.xpIntoLevel ?? 0,
+          xpNeeded: status.xp.xpNeeded ?? status.xp.nextLevelXp,
+        });
+      }
+    } catch (err) {
+      console.warn('Impossible de récupérer le statut XP :', err);
+    }
+  }, []);
+
+
+  useEffect(() => {
+    refreshXpStatus();
+  }, [refreshXpStatus]);
+
+  const endActiveSessionIfAny = useCallback(
+    async (sessionOverride?: any): Promise<boolean> => {
+      const active = sessionOverride || (await checkActiveSession());
+      if (active?.id) {
+        try {
+          await assistantService.endDeepWorkSession(active.id, 'complete');
+        } catch (err) {
+          console.warn('Impossible de clôturer la session active (complete) :', err);
+          // Essayer en cancel si complete échoue
+          try {
+            await assistantService.endDeepWorkSession(active.id, 'cancel');
+          } catch (err2) {
+            console.warn('Impossible de clôturer la session active (cancel) :', err2);
+          }
+        }
+        setIsDeepWorkActive(false);
+        setDeepWorkSessionId(null);
+        setDeepWorkTimeLeft(0);
+        // petite attente pour laisser le backend mettre à jour
+        await new Promise(resolve => setTimeout(resolve, 300));
+        const still = await checkActiveSession();
+        return !still;
+      }
+      return true;
+    },
+    [checkActiveSession]
+  );
+
+  const startDeepWork = async (minutes: number, hasRetried = false) => {
+    try {
+      // Clôturer toute session active côté serveur avant de démarrer
+      await endActiveSessionIfAny();
+      const stillActive = await checkActiveSession();
+      if (stillActive?.id) {
+        if (!hasRetried) {
+          await endActiveSessionIfAny(stillActive);
+          const still = await checkActiveSession();
+          if (still?.id) {
+            Alert.alert('Erreur', 'Une session précédente est encore active. Réessaie dans quelques secondes ou termine-la depuis le web.');
+            return;
+          }
+        } else {
+          Alert.alert('Erreur', 'Une session précédente est encore active. Termine-la depuis le web puis réessaie.');
+          return;
+        }
+      }
+
       setShowTimeSelector(false);
       setCustomDuration('');
       setCustomDurationError('');
@@ -343,27 +453,65 @@ export default function AssistantScreen() {
       );
 
       if (response.error) {
+        // Si le backend indique qu'une session existe déjà, on tente de clôturer et de relancer une fois
+        if (typeof response.error === 'string' && response.error.toLowerCase().includes('déjà en cours')) {
+          if (!hasRetried) {
+            await endActiveSessionIfAny(response.session);
+            const cleared = await endActiveSessionIfAny();
+            if (cleared) {
+              return startDeepWork(minutes, true);
+            }
+          }
+        }
+        // Si le backend renvoie une session dans le payload d'erreur, tenter de la clôturer puis relancer
+        if (!hasRetried && response.session?.id) {
+          const cleared = await endActiveSessionIfAny(response.session);
+          if (cleared) {
+            return startDeepWork(minutes, true);
+          }
+        }
         Alert.alert('Erreur', response.error);
         return;
       }
 
       setIsDeepWorkActive(true);
+      setDeepWorkSessionId(response?.session?.id || response?.id || null);
       setDeepWorkTimeLeft(minutes * 60);
       setSelectedDuration(minutes);
-      setDeepWorkSessionId(response.session?.id || null);
 
       // Charger les tâches d'aujourd'hui
       await loadTodayTasks();
 
       const deepWorkMessage: Message = {
         id: Date.now().toString(),
-        text: `🧠 Deep work session started! I'll be here to keep you focused for the next ${minutes} minutes. Your tasks are ready below. Let's do this!`,
+        text: isFr
+          ? `🧠 Session de deep work lancée ! Je te garde concentré pendant les ${minutes} prochaines minutes. Tes tâches sont prêtes ci-dessous. On y va !`
+          : `🧠 Deep work session started! I'll be here to keep you focused for the next ${minutes} minutes. Your tasks are ready below. Let's do this!`,
         isAI: true,
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, deepWorkMessage]);
+      await refreshXpStatus();
     } catch (error: any) {
       console.error('Erreur lors du démarrage de la session Deep Work:', error);
+      // Si le serveur indique qu'une session existe déjà, tenter de la récupérer puis relancer une fois
+      if (typeof error?.message === 'string' && error.message.toLowerCase().includes('déjà en cours') && !hasRetried) {
+        const cleared = await endActiveSessionIfAny(error?.session);
+        if (cleared) {
+          return startDeepWork(minutes, true);
+        }
+        Alert.alert('Erreur', 'Une session précédente est encore active. Termine-la depuis le web puis réessaie.');
+        return;
+      }
+      // Si l'erreur contient une session active, tenter de la clôturer puis relancer
+      if (!hasRetried && error?.session?.id) {
+        const cleared = await endActiveSessionIfAny(error.session);
+        if (cleared) {
+          return startDeepWork(minutes, true);
+        }
+        Alert.alert('Erreur', 'Une session précédente est encore active. Termine-la depuis le web puis réessaie.');
+        return;
+      }
       Alert.alert('Erreur', error.message || 'Impossible de démarrer la session Deep Work');
     }
   };
@@ -372,22 +520,22 @@ export default function AssistantScreen() {
     const minutes = parseInt(customDuration);
 
     if (!customDuration) {
-      setCustomDurationError('Please enter a duration');
+      setCustomDurationError(t('customDurationRequired'));
       return;
     }
 
     if (isNaN(minutes)) {
-      setCustomDurationError('Please enter a valid number');
+      setCustomDurationError(t('customDurationInvalid'));
       return;
     }
 
     if (minutes < 1) {
-      setCustomDurationError('Minimum 1 minute');
+      setCustomDurationError(t('customDurationMin'));
       return;
     }
 
     if (minutes > 120) {
-      setCustomDurationError('Maximum 120 minutes (2 hours)');
+      setCustomDurationError(t('customDurationMax'));
       return;
     }
 
@@ -882,14 +1030,47 @@ export default function AssistantScreen() {
     }
   };
 
-  const endSession = () => {
+  const endSession = async () => {
     const timeSpent = Math.floor((selectedDuration * 60 - deepWorkTimeLeft) / 60);
     const tasksCompleted = tasks.filter((t) => t.completed).length;
     const xpEarned = tasksCompleted * 15;
 
+    // Tenter de marquer la session comme terminée côté serveur
+    if (deepWorkSessionId) {
+      try {
+        await assistantService.endDeepWorkSession(deepWorkSessionId, 'complete');
+      } catch (err) {
+        console.warn('Impossible de terminer la session sur le serveur :', err);
+        try {
+          await assistantService.endDeepWorkSession(deepWorkSessionId, 'cancel');
+        } catch (err2) {
+          console.warn('Impossible d\'annuler la session sur le serveur :', err2);
+        }
+      }
+    }
+
     setSessionStats({ timeSpent, tasksCompleted, xpEarned });
     setIsDeepWorkActive(false);
+    setDeepWorkSessionId(null);
     setShowSessionSummary(true);
+
+    // Crédite l'XP pour la session de deep work
+    try {
+      const minutes = Math.max(1, selectedDuration - Math.floor(deepWorkTimeLeft / 60));
+      const res = await assistantService.addXpEvent('deepwork_complete', { minutes });
+      if (res?.xpAwarded) {
+        setXpStatus((prev) => ({
+          ...prev,
+          totalXp: res.totalXp ?? prev.totalXp,
+          level: res.level ?? prev.level,
+          nextLevelXp: res.nextLevelXp ?? prev.nextLevelXp,
+        }));
+        Alert.alert('XP', isFr ? `+${res.xpAwarded} XP` : `+${res.xpAwarded} XP`);
+      }
+      await refreshXpStatus();
+    } catch (err) {
+      console.warn('Impossible de créditer XP deepwork :', err);
+    }
 
     if (xpEarned > 0) {
       setXp((prev) => Math.min(prev + xpEarned, maxXp));
@@ -949,14 +1130,17 @@ export default function AssistantScreen() {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const xpPercentage = (xp / maxXp) * 100;
-
   // Charger les tâches d'aujourd'hui
   useEffect(() => {
     if (isDeepWorkActive) {
       loadTodayTasks();
     }
   }, [isDeepWorkActive]);
+
+  // Vérifier s'il existe déjà une session active côté backend
+  useEffect(() => {
+    checkActiveSession();
+  }, [checkActiveSession]);
 
   // Charger les habitudes
   useEffect(() => {
@@ -1130,7 +1314,7 @@ export default function AssistantScreen() {
               <Animated.View style={[styles.logoContainer, logoAnimatedStyle]}>
                 <View style={styles.logoWrapper}>
                   <Image
-                    source={require('../../assets/images/productif-logo.png')}
+                    source={require('../../assets/images/icon.png')}
                     style={styles.logo}
                     resizeMode="contain"
                   />
@@ -1138,8 +1322,8 @@ export default function AssistantScreen() {
                 <Animated.View style={[styles.pulseRing, pulseAnimatedStyle]} />
               </Animated.View>
               <View style={styles.headerText}>
-                <Text style={styles.headerTitle}>AI Productivity Coach</Text>
-                <Text style={styles.headerSubtitle}>Always learning, always improving</Text>
+                <Text style={styles.headerTitle}>{t('assistantHeaderTitle')}</Text>
+                <Text style={styles.headerSubtitle}>{t('assistantHeaderSubtitle')}</Text>
               </View>
             </View>
 
@@ -1148,20 +1332,27 @@ export default function AssistantScreen() {
               <View style={styles.xpHeader}>
                 <View style={styles.xpHeaderLeft}>
                   <Ionicons name="flash" size={16} color="#00C27A" />
-                  <Text style={styles.xpLabel}>Progress to next level</Text>
+                    <Text style={styles.xpLabel}>
+                      {t('progressToNext')}
+                    </Text>
                 </View>
-                <Text style={styles.xpValue}>{xp}/{maxXp} XP</Text>
+                  <Text style={styles.xpSubLabel}>
+                    {`${t('levelShort')} ${xpStatus.level} • ${xpStatus.totalXp} / ${xpStatus.totalXp + (xpStatus.xpNeeded ?? xpStatus.nextLevelXp)} XP`}
+                  </Text>
               </View>
               <View style={styles.progressBar}>
                 <Animated.View
                   style={[
                     styles.progressFill,
                     {
-                      width: `${xpPercentage}%`,
+                      width: `${Math.min(100, (xpStatus.progress || 0) * 100)}%`,
                     },
                   ]}
                 />
               </View>
+              <Text style={{ color: '#6B7280', fontSize: 12, marginTop: 4 }}>
+                {`${xpStatus.xpNeeded ?? xpStatus.nextLevelXp} XP ${t('remainingLabel')}`} • {`${t('levelPrefix')} ${xpStatus.level}`}
+              </Text>
             </View>
           </View>
 
@@ -1175,120 +1366,120 @@ export default function AssistantScreen() {
               keyboardDismissMode="on-drag"
             >
               {messages.map((message, index) => (
-              <Animated.View
-                key={message.id}
-                entering={FadeInDown.delay(index * 100).duration(400)}
-                style={[
-                  styles.messageContainer,
-                  message.isAI ? styles.messageAI : styles.messageUser,
-                ]}
-              >
-                <View
+                <Animated.View
+                  key={message.id}
+                  entering={FadeInDown.delay(index * 100).duration(400)}
                   style={[
-                    styles.messageBubble,
-                    message.isAI ? styles.messageBubbleAI : styles.messageBubbleUser,
+                    styles.messageContainer,
+                    message.isAI ? styles.messageAI : styles.messageUser,
                   ]}
                 >
-                  <Text style={message.isAI ? styles.messageTextAI : styles.messageTextUser}>
-                    {message.text}
-                  </Text>
-                </View>
-              </Animated.View>
-            ))}
-
-            {/* Deep Work Timer & Tasks */}
-            {isDeepWorkActive && (
-              <Animated.View
-                entering={FadeIn.duration(400)}
-                exiting={FadeOut.duration(400)}
-                style={styles.deepWorkContainer}
-              >
-                {/* Focus Bubble with Timer */}
-                <LinearGradient
-                  colors={['#00C27A', '#00D68F']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.focusBubble}
-                >
-                  <View style={styles.focusHeader}>
-                    <View style={styles.focusHeaderLeft}>
-                      <Ionicons name="brain" size={24} color="#FFFFFF" />
-                      <Text style={styles.focusTitle}>Deep Focus Mode</Text>
-                    </View>
-                    <TouchableOpacity onPress={endSession}>
-                      <Text style={styles.endSessionText}>End Session</Text>
-                    </TouchableOpacity>
-                  </View>
-
-                  <View style={styles.timerContainer}>
-                    <Text style={styles.timerText}>{formatTime(deepWorkTimeLeft)}</Text>
-                    <Text style={styles.timerSubtext}>Stay focused! You're doing great 🎯</Text>
-                  </View>
-
-                  <View style={styles.timerProgressBar}>
-                    <View
-                      style={[
-                        styles.timerProgressFill,
-                        {
-                          width: `${((selectedDuration * 60 - deepWorkTimeLeft) / (selectedDuration * 60)) * 100}%`,
-                        },
-                      ]}
-                    />
-                  </View>
-                </LinearGradient>
-
-                {/* Task List */}
-                <View style={styles.tasksCard}>
-                  <View style={styles.tasksHeader}>
-                    <View style={styles.tasksHeaderLeft}>
-                      <Ionicons name="flag" size={20} color="#00C27A" />
-                      <Text style={styles.tasksTitle}>Your Tasks</Text>
-                    </View>
-                    <Text style={styles.tasksCount}>
-                      {tasks.filter((t) => t.completed).length}/{tasks.length}
+                  <View
+                    style={[
+                      styles.messageBubble,
+                      message.isAI ? styles.messageBubbleAI : styles.messageBubbleUser,
+                    ]}
+                  >
+                    <Text style={message.isAI ? styles.messageTextAI : styles.messageTextUser}>
+                      {message.text}
                     </Text>
                   </View>
-
-                  {isLoadingTasks ? (
-                    <View style={styles.loadingContainer}>
-                      <ActivityIndicator size="small" color="#00C27A" />
-                      <Text style={styles.loadingText}>Chargement des tâches...</Text>
-                    </View>
-                  ) : tasks.length === 0 ? (
-                    <Text style={styles.emptyText}>Aucune tâche pour aujourd'hui</Text>
-                  ) : (
-                    tasks.map((task, index) => (
-                      <TouchableOpacity
-                        key={task.id}
-                        onPress={() => toggleTask(task.id)}
-                        style={styles.taskItem}
-                      >
-                        <View
-                          style={[
-                            styles.taskCheckbox,
-                            task.completed && styles.taskCheckboxCompleted,
-                          ]}
-                        >
-                          {task.completed && (
-                            <Ionicons name="checkmark" size={16} color="#FFFFFF" />
-                          )}
-                        </View>
-                        <Text
-                          style={[
-                            styles.taskText,
-                            task.completed && styles.taskTextCompleted,
-                          ]}
-                        >
-                          {task.title}
-                        </Text>
-                      </TouchableOpacity>
-                    ))
-                  )}
-                </View>
-              </Animated.View>
-            )}
+                </Animated.View>
+              ))}
             </ScrollView>
           </LockedCard>
+
+          {/* Deep Work Timer & Tasks - toujours visible pendant la session */}
+          {isDeepWorkActive && (
+            <Animated.View
+              entering={FadeIn.duration(400)}
+              exiting={FadeOut.duration(400)}
+              style={[styles.deepWorkContainer, { paddingHorizontal: 16, marginTop: 12 }]}
+            >
+              {/* Focus Bubble with Timer */}
+              <LinearGradient
+                colors={['#00C27A', '#00D68F']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.focusBubble}
+              >
+                <View style={styles.focusHeader}>
+                  <View style={styles.focusHeaderLeft}>
+                    <Ionicons name="brain" size={24} color="#FFFFFF" />
+                    <Text style={styles.focusTitle}>Deep Focus Mode</Text>
+                  </View>
+                  <TouchableOpacity onPress={endSession}>
+                    <Text style={styles.endSessionText}>End Session</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.timerContainer}>
+                  <Text style={styles.timerText}>{formatTime(deepWorkTimeLeft)}</Text>
+                  <Text style={styles.timerSubtext}>Stay focused! You're doing great 🎯</Text>
+                </View>
+
+                <View style={styles.timerProgressBar}>
+                  <View
+                    style={[
+                      styles.timerProgressFill,
+                      {
+                        width: `${((selectedDuration * 60 - deepWorkTimeLeft) / (selectedDuration * 60)) * 100}%`,
+                      },
+                    ]}
+                  />
+                </View>
+              </LinearGradient>
+
+              {/* Task List */}
+              <View style={styles.tasksCard}>
+                <View style={styles.tasksHeader}>
+                  <View style={styles.tasksHeaderLeft}>
+                    <Ionicons name="flag" size={20} color="#00C27A" />
+                    <Text style={styles.tasksTitle}>{t('tasks')}</Text>
+                  </View>
+                  <Text style={styles.tasksCount}>
+                    {tasks.filter((t) => t.completed).length}/{tasks.length}
+                  </Text>
+                </View>
+
+                {isLoadingTasks ? (
+                  <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="small" color="#00C27A" />
+                    <Text style={styles.loadingText}>Chargement des tâches...</Text>
+                  </View>
+                ) : tasks.length === 0 ? (
+                  <Text style={styles.emptyText}>Aucune tâche pour aujourd'hui</Text>
+                ) : (
+                  tasks.map((task, index) => (
+                    <TouchableOpacity
+                      key={task.id}
+                      onPress={() => toggleTask(task.id)}
+                      style={styles.taskItem}
+                    >
+                      <View
+                        style={[
+                          styles.taskCheckbox,
+                          task.completed && styles.taskCheckboxCompleted,
+                        ]}
+                      >
+                        {task.completed && (
+                          <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+                        )}
+                      </View>
+                      <Text
+                        style={[
+                          styles.taskText,
+                          task.completed && styles.taskTextCompleted,
+                        ]}
+                      >
+                        {task.title}
+                      </Text>
+                    </TouchableOpacity>
+                  ))
+                )}
+              </View>
+            </Animated.View>
+          )}
 
         </View>
 
@@ -1324,7 +1515,7 @@ export default function AssistantScreen() {
                   style={styles.input}
                   value={inputText}
                   onChangeText={setInputText}
-                  placeholder="Ask me anything..."
+                  placeholder={t('askMeAnything')}
                   placeholderTextColor="#9CA3AF"
                   multiline
                   maxLength={500}
@@ -1371,8 +1562,8 @@ export default function AssistantScreen() {
                 <View style={styles.modalIconContainer}>
                   <Ionicons name="timer" size={32} color="#FFFFFF" />
                 </View>
-                <Text style={styles.modalTitle}>Choose Focus Duration</Text>
-                <Text style={styles.modalSubtitle}>How long do you want to focus?</Text>
+                <Text style={styles.modalTitle}>{t('focusDurationTitle')}</Text>
+                <Text style={styles.modalSubtitle}>{t('focusDurationSubtitle')}</Text>
               </View>
 
               <View style={styles.timeOptionsGrid}>
@@ -1389,7 +1580,7 @@ export default function AssistantScreen() {
               </View>
 
               <View style={styles.customDurationContainer}>
-                <Text style={styles.customDurationLabel}>Or enter custom duration</Text>
+                <Text style={styles.customDurationLabel}>{t('customDurationLabel')}</Text>
                 <View style={styles.customDurationInputRow}>
                   <TextInput
                     style={[
@@ -1401,7 +1592,7 @@ export default function AssistantScreen() {
                       setCustomDuration(text);
                       setCustomDurationError('');
                     }}
-                    placeholder="e.g. 30"
+                    placeholder={t('customDurationPlaceholder')}
                     keyboardType="numeric"
                     maxLength={3}
                   />
@@ -1415,21 +1606,21 @@ export default function AssistantScreen() {
                       end={{ x: 1, y: 0 }}
                       style={styles.customDurationButtonGradient}
                     >
-                      <Text style={styles.customDurationButtonText}>Start</Text>
+                      <Text style={styles.customDurationButtonText}>{t('start')}</Text>
                     </LinearGradient>
                   </TouchableOpacity>
                 </View>
                 {customDurationError && (
                   <Text style={styles.customDurationError}>{customDurationError}</Text>
                 )}
-                <Text style={styles.customDurationHint}>Range: 1-120 minutes</Text>
+                <Text style={styles.customDurationHint}>{t('customDurationHint')}</Text>
               </View>
 
               <TouchableOpacity
                 onPress={() => setShowTimeSelector(false)}
                 style={styles.modalCancelButton}
               >
-                <Text style={styles.modalCancelText}>Cancel</Text>
+                <Text style={styles.modalCancelText}>{t('cancel')}</Text>
               </TouchableOpacity>
             </Pressable>
           </Pressable>
@@ -1458,8 +1649,8 @@ export default function AssistantScreen() {
             setJournalText('');
             setShowJournalModal(false);
           }}
-          title="Daily Journal"
-          subtitle={isProcessingJournal ? 'Processing your thoughts...' : isRecording ? "I'm listening..." : 'Tell me about your day'}
+          title={t('journalTitle')}
+          subtitle={isProcessingJournal ? t('processingThoughts') : isRecording ? t('listening') : t('tellDay')}
           emoji="📝"
           isRecording={isRecording}
           recordingTime={recordingTime}
@@ -1468,7 +1659,7 @@ export default function AssistantScreen() {
           onStopRecording={stopRecording}
           journalText={journalText}
           onJournalTextChange={setJournalText}
-          prompt="Share what went well and what needs improvement"
+          prompt={t('journalPrompt')}
         />
 
         {/* Voice Planning Modal */}
@@ -1496,8 +1687,8 @@ export default function AssistantScreen() {
             setPlanningRecordingTime(0);
             setShowPlanningModal(false);
           }}
-          title="Plan Tomorrow"
-          subtitle={isProcessingPlanning ? 'Creating your personalized plan...' : isPlanningRecording ? "I'm listening..." : 'Tell me about your day tomorrow'}
+          title={t('planTitle')}
+          subtitle={isProcessingPlanning ? t('processingPlan') : isPlanningRecording ? t('listening') : t('tellTomorrow')}
           emoji="📅"
           isRecording={isPlanningRecording}
           recordingTime={planningRecordingTime}
@@ -1506,7 +1697,7 @@ export default function AssistantScreen() {
           onStopRecording={stopPlanningRecording}
           journalText={planningText}
           onJournalTextChange={setPlanningText}
-          prompt="Share your tasks, meetings, and priorities for tomorrow"
+          prompt={t('planPrompt')}
         />
 
         {/* Voice Learning Modal */}
@@ -1534,8 +1725,8 @@ export default function AssistantScreen() {
             setLearningRecordingTime(0);
             setShowLearningModal(false);
           }}
-          title="What I Learned Today"
-          subtitle={isProcessingLearning ? 'Processing your insights...' : isLearningRecording ? "I'm listening..." : 'Share what you learned today'}
+          title={t('learningTitle')}
+          subtitle={isProcessingLearning ? t('processingInsights') : isLearningRecording ? t('listening') : t('shareLearned')}
           emoji="💡"
           isRecording={isLearningRecording}
           recordingTime={learningRecordingTime}
@@ -1544,7 +1735,7 @@ export default function AssistantScreen() {
           onStopRecording={stopLearningRecording}
           journalText={learningText}
           onJournalTextChange={setLearningText}
-          prompt="Describe new skills, insights, or knowledge you gained"
+          prompt={t('learningPrompt')}
         />
 
         {/* Habit Tracking Modal */}
@@ -1619,6 +1810,7 @@ function VoiceModal({
   onStopRecording: () => void;
   prompt: string;
 }) {
+  const t = useTranslation();
   const micScale = useSharedValue(1);
   const processingRotation = useSharedValue(0);
   const pulseRings = [useSharedValue(1), useSharedValue(1), useSharedValue(1)];
@@ -1705,7 +1897,11 @@ function VoiceModal({
                   <Ionicons name="flash" size={32} color="#00C27A" />
                 </Animated.View>
                 <Text style={styles.processingText}>
-                  {title.includes('Journal') ? 'Analyzing your reflections...' : title.includes('Plan') ? 'Building your perfect day...' : 'Capturing your knowledge...'}
+                  {title.includes('Journal')
+                    ? t('processingReflections')
+                    : title.includes('Plan')
+                      ? t('processingPlanBuild')
+                      : t('processingKnowledge')}
                 </Text>
               </View>
             ) : (
@@ -1756,7 +1952,7 @@ function VoiceModal({
                 )}
 
                 <Text style={styles.voicePrompt}>
-                  {isRecording ? 'Tap again to stop recording' : 'Tap the microphone to start'}
+                  {isRecording ? t('tapToStop') : t('tapToStart')}
                 </Text>
                 <Text style={styles.voicePromptHint}>{prompt}</Text>
               </>
@@ -1765,7 +1961,7 @@ function VoiceModal({
 
           {!isProcessing && (
             <TouchableOpacity onPress={onClose} style={styles.voiceModalCancel}>
-              <Text style={styles.voiceModalCancelText}>Cancel</Text>
+              <Text style={styles.voiceModalCancelText}>{t('cancel')}</Text>
             </TouchableOpacity>
           )}
         </Pressable>
@@ -1804,6 +2000,7 @@ function JournalModal({
   onJournalTextChange: (text: string) => void;
   prompt: string;
 }) {
+  const t = useTranslation();
   const micScale = useSharedValue(1);
   const processingRotation = useSharedValue(0);
   const pulseRings = [useSharedValue(1), useSharedValue(1), useSharedValue(1)];
@@ -1888,20 +2085,18 @@ function JournalModal({
                 <Animated.View style={[styles.processingIcon, processingRotationStyle]}>
                   <Ionicons name="flash" size={32} color="#00C27A" />
                 </Animated.View>
-                <Text style={styles.processingText}>
-                  Analyzing your reflections...
-                </Text>
+                <Text style={styles.processingText}>{t('processingReflections')}</Text>
               </View>
             ) : (
               <>
                 {/* Champ de texte pour saisie manuelle */}
                 <View style={styles.journalTextContainer}>
-                  <Text style={styles.journalTextLabel}>Écrivez votre note de journée :</Text>
+                  <Text style={styles.journalTextLabel}>{t('journalTextLabel')}</Text>
                   <TextInput
                     style={styles.journalTextInput}
                     value={journalText}
                     onChangeText={onJournalTextChange}
-                    placeholder="Partagez ce qui s'est bien passé aujourd'hui et ce qui peut être amélioré..."
+                    placeholder={t('journalTextPlaceholder')}
                     placeholderTextColor="#9CA3AF"
                     multiline
                     numberOfLines={6}
@@ -1956,7 +2151,11 @@ function JournalModal({
                 )}
 
                 <Text style={styles.voicePrompt}>
-                  {isRecording ? 'Tap again to stop recording' : journalText.trim() ? 'Vous pouvez aussi enregistrer votre voix' : 'Écrivez votre note ou enregistrez votre voix'}
+                  {isRecording
+                    ? t('tapToStop')
+                    : journalText.trim()
+                      ? t('youCanRecord')
+                      : t('writeOrRecord')}
                 </Text>
                 <Text style={styles.voicePromptHint}>{prompt}</Text>
               </>
@@ -1988,6 +2187,7 @@ function HabitsModal({
   onToggleHabit: (id: string) => void;
   isLoadingHabits: boolean;
 }) {
+  const t = useTranslation();
   const safeHabits = habits || [];
   
   return (
@@ -2003,9 +2203,9 @@ function HabitsModal({
             <View style={styles.habitsModalIconContainer}>
               <Ionicons name="flag" size={32} color="#FFFFFF" />
             </View>
-            <Text style={styles.habitsModalTitle}>Today's Habits</Text>
+            <Text style={styles.habitsModalTitle}>{t('todaysHabits')}</Text>
             <Text style={styles.habitsModalSubtitle}>
-              {String(safeHabits.filter((h) => h.completed).length)}/{String(safeHabits.length)} completed
+              {String(safeHabits.filter((h) => h.completed).length)}/{String(safeHabits.length)} {t('completed')}
             </Text>
           </LinearGradient>
 
@@ -2318,6 +2518,7 @@ function StatsModal({
   };
   isLoading: boolean;
 }) {
+  const t = useTranslation();
   const formatTime = (minutes: number): string => {
     if (minutes < 60) {
       return `${minutes} min`;
@@ -2411,14 +2612,14 @@ function StatsModal({
                       <Ionicons name="brain" size={24} color="#FFFFFF" />
                     </View>
                     <View style={styles.statsCardContent}>
-                      <Text style={styles.statsCardLabel}>Deep Work Time</Text>
+                      <Text style={styles.statsCardLabel}>{t('deepWorkTimeLabel')}</Text>
                       <Text style={styles.statsCardValue}>
                         {formatTime(statsData.deepWorkTime)}
                       </Text>
                       <Text style={styles.statsCardSubtext}>
                         {statsData.deepWorkTime > 0
-                          ? 'Great focus session! 🎯'
-                          : 'Start a deep work session to track your focus time'}
+                          ? t('greatFocusSession')
+                          : t('deepWorkEmptyState')}
                       </Text>
                     </View>
                   </View>
@@ -2536,6 +2737,10 @@ const styles = StyleSheet.create({
     color: '#00C27A',
     fontWeight: '600',
   },
+  xpSubLabel: {
+    fontSize: 12,
+    color: '#6B7280',
+  },
   progressBar: {
     height: 8,
     backgroundColor: '#E5E7EB',
@@ -2552,12 +2757,12 @@ const styles = StyleSheet.create({
   },
   messagesContent: {
     paddingHorizontal: 24,
-    paddingBottom: 260,
+    paddingBottom: 200,
   },
   inputBarWrapper: {
     paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 16,
+    paddingTop: 4,
+    paddingBottom: 10,
     backgroundColor: '#fff',
   },
   messageContainer: {
@@ -2720,8 +2925,8 @@ const styles = StyleSheet.create({
   },
   quickActionsContainer: {
     maxHeight: 60,
-    marginBottom: 12,
-    paddingBottom: 8,
+    marginBottom: 8,
+    paddingBottom: 4,
   },
   quickActionsContent: {
     paddingHorizontal: 24,
@@ -2745,9 +2950,9 @@ const styles = StyleSheet.create({
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingTop: 12,
-    paddingBottom: Platform.OS === 'ios' ? 100 : 90,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: Platform.OS === 'ios' ? 60 : 50,
     gap: 12,
     backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
@@ -2766,6 +2971,34 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E5E7EB',
     maxHeight: 100,
+  },
+  challengeBar: {
+    height: 8,
+    backgroundColor: '#E5E7EB',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  challengeFill: {
+    height: '100%',
+    backgroundColor: '#00C27A',
+  },
+  leaderboardRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 6,
+    gap: 8,
+  },
+  leaderboardRank: {
+    width: 20,
+    fontWeight: '700',
+  },
+  leaderboardName: {
+    flex: 1,
+    fontSize: 14,
+  },
+  leaderboardXp: {
+    fontSize: 13,
   },
   micButton: {
     width: 44,

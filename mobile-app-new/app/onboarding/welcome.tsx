@@ -6,7 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { useEffect } from 'react';
 import { authService } from '@/lib/api';
-import productifLogo from '../../assets/images/productif-logo.png';
+import productifLogo from '../../assets/images/icon.png';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function WelcomeScreen() {
