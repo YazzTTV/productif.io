@@ -228,6 +228,10 @@ const HabitItem = ({ habit, index, isCelebrating, onToggle, colors }: {
   };
 }) => {
   const checkmarkScale = useRef(new RNAnimated.Value(habit.completed ? 1 : 0)).current;
+  const pressScale = useSharedValue(1);
+  const pressStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: pressScale.value }],
+  }));
   
   // Animer le checkmark quand l'habitude est complétée
   useEffect(() => {
@@ -246,11 +250,19 @@ const HabitItem = ({ habit, index, isCelebrating, onToggle, colors }: {
       }).start();
     }
   }, [habit.completed]);
+
+  const handlePressIn = () => {
+    pressScale.value = withSpring(0.96, { damping: 12, stiffness: 280 });
+  };
+
+  const handlePressOut = () => {
+    pressScale.value = withSpring(1, { damping: 12, stiffness: 280 });
+  };
   
   return (
     <Animated.View
       entering={FadeInDown.delay(600 + index * 100).duration(400)}
-      style={styles.habitItem}
+      style={[styles.habitItem, pressStyle]}
     >
       {/* Celebration Animation */}
       {isCelebrating && (
@@ -267,7 +279,9 @@ const HabitItem = ({ habit, index, isCelebrating, onToggle, colors }: {
 
       <TouchableOpacity
         onPress={onToggle}
-        activeOpacity={0.8}
+        activeOpacity={0.9}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
         style={[
           styles.habitCheckbox,
           habit.completed && styles.habitCheckboxCompleted,
@@ -450,22 +464,23 @@ export default function DashboardScreen() {
       // Calculate today's tasks
       let todayTasks: any[] = [];
       if (tasksData) {
-        if (Array.isArray(tasksData.tasks)) {
-          todayTasks = tasksData.tasks.filter((task: any) => {
-            const taskDate = task.createdAt ? new Date(task.createdAt).toISOString().split('T')[0] : todayStr;
-            const dueDate = task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : null;
-            return taskDate === todayStr || dueDate === todayStr || task.status === 'PENDING' || task.status === 'IN_PROGRESS';
-          });
-        } else if (Array.isArray(tasksData)) {
-          todayTasks = tasksData.filter((task: any) => {
-            const taskDate = task.createdAt ? new Date(task.createdAt).toISOString().split('T')[0] : todayStr;
-            const dueDate = task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : null;
-            return taskDate === todayStr || dueDate === todayStr || task.status === 'PENDING' || task.status === 'IN_PROGRESS';
-          });
-        }
+        const rawTasks = Array.isArray(tasksData.tasks) ? tasksData.tasks : Array.isArray(tasksData) ? tasksData : [];
+        todayTasks = rawTasks.filter((task: any) => {
+          const taskDate = task.createdAt ? new Date(task.createdAt).toISOString().split('T')[0] : todayStr;
+          const dueDate = task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : null;
+          const completedAt = task.completedAt || task.updatedAt;
+          const completedToday = completedAt ? new Date(completedAt).toISOString().split('T')[0] === todayStr : false;
+          return (
+            taskDate === todayStr ||
+            dueDate === todayStr ||
+            completedToday ||
+            task.status === 'PENDING' ||
+            task.status === 'IN_PROGRESS'
+          );
+        });
       }
 
-      const completedTasks = todayTasks.filter((task: any) => task.status === 'COMPLETED').length;
+      const completedTasks = todayTasks.filter((task: any) => task.status === 'COMPLETED' || task.completed === true).length;
       const totalTasks = todayTasks.length;
 
       // Process habits
@@ -855,7 +870,7 @@ export default function DashboardScreen() {
               <Text style={[styles.statCardValueDark, { color: colors.text }]}>{dashboardData.focusHours}</Text>
               <Text style={[styles.statCardUnit, { color: colors.text }]}>h</Text>
             </View>
-            <Text style={styles.statCardSubtext}>+2.5h vs yesterday 🎯</Text>
+              <Text style={styles.statCardSubtext}>+2,5h vs hier 🎯</Text>
               </View>
             </View>
           </LockedCard>
@@ -867,24 +882,24 @@ export default function DashboardScreen() {
             <View style={styles.statCardHeader}>
               <Ionicons name="checkmark-circle" size={24} color="#00C27A" />
               <TouchableOpacity onPress={() => router.push('/(tabs)/tasks')}>
-                <Text style={styles.viewAllText}>View All</Text>
+              <Text style={styles.viewAllText}>{t('viewAll')}</Text>
               </TouchableOpacity>
             </View>
-            <Text style={[styles.statCardLabelDark, { color: colors.textSecondary }]}>{t('tasksCompleted')}</Text>
+              <Text style={[styles.statCardLabelDark, { color: colors.textSecondary }]}>{t('tasksCompleted')}</Text>
             <View style={styles.statCardValueRow}>
               <Text style={[styles.statCardValueDark, { color: colors.text }]}>{dashboardData.tasksCompleted}</Text>
               <Text style={[styles.statCardUnitDark, { color: colors.textSecondary }]}>/{dashboardData.totalTasks}</Text>
             </View>
             <View style={styles.tasksProgressBar}>
-              {Array.from({ length: Math.max(dashboardData.totalTasks, 1) }).map((_, i) => (
                 <View
-                  key={i}
                   style={[
-                    styles.taskProgressDot,
-                    i < dashboardData.tasksCompleted && styles.taskProgressDotActive,
+                    styles.taskProgressFillDot,
+                    dashboardData.totalTasks > 0 && {
+                      width: `${Math.min(100, (dashboardData.tasksCompleted / dashboardData.totalTasks) * 100)}%`,
+                    },
+                    dashboardData.tasksCompleted === dashboardData.totalTasks && styles.taskProgressDotActive,
                   ]}
                 />
-              ))}
             </View>
               </View>
             </View>
@@ -907,9 +922,9 @@ export default function DashboardScreen() {
               <Text style={styles.statCardLabel}>{t('currentStreak')}</Text>
               <View style={styles.statCardValueRow}>
                 <Text style={styles.statCardValue}>{dashboardData.streakDays}</Text>
-                <Text style={styles.statCardUnitWhite}>days</Text>
+                <Text style={styles.statCardUnitWhite}>jours</Text>
               </View>
-              <Text style={styles.statCardSubtextWhite}>Personal best! 🏆</Text>
+              <Text style={styles.statCardSubtextWhite}>Record personnel ! 🏆</Text>
             </LinearGradient>
               </TouchableOpacity>
             </View>
@@ -938,7 +953,7 @@ export default function DashboardScreen() {
             />
             <View style={styles.productivityMetrics}>
               <View style={styles.metricRow}>
-                <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>Energy ⚡</Text>
+              <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>Energie ⚡</Text>
                 <Text style={[styles.metricValue, { color: colors.text }]}>{dashboardData.energyLevel}%</Text>
               </View>
               <View style={styles.metricBarContainer}>
@@ -969,7 +984,7 @@ export default function DashboardScreen() {
               </View>
 
               <View style={styles.metricRow}>
-                <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>Focus 🧠</Text>
+                <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>Concentration 🧠</Text>
                 <Text style={[styles.metricValue, { color: '#0891B2' }]}>{dashboardData.focusLevel}%</Text>
               </View>
               <View style={styles.metricBarContainer}>
@@ -1072,7 +1087,7 @@ export default function DashboardScreen() {
               style={[styles.viewAllButtonHabits, { backgroundColor: colors.primary }]}
               activeOpacity={0.8}
             >
-              <Text style={styles.viewAllButtonHabitsText}>View all</Text>
+              <Text style={styles.viewAllButtonHabitsText}>{t('viewAll')}</Text>
               <Ionicons name="chevron-forward" size={14} color="#FFFFFF" />
             </TouchableOpacity>
           </View>
@@ -1466,15 +1481,16 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   tasksProgressBar: {
-    flexDirection: 'row',
-    gap: 4,
+    height: 8,
+    backgroundColor: '#E5E7EB',
+    borderRadius: 999,
+    overflow: 'hidden',
     marginTop: 8,
   },
   taskProgressDot: {
-    flex: 1,
-    height: 6,
-    backgroundColor: '#E5E7EB',
-    borderRadius: 3,
+    height: '100%',
+    backgroundColor: '#00C27A',
+    borderRadius: 999,
   },
   taskProgressDotActive: {
     backgroundColor: '#00C27A',

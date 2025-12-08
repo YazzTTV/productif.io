@@ -25,6 +25,7 @@ import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useTranslation } from '@/hooks/useTranslation';
 
 const { width } = Dimensions.get('window');
 
@@ -67,6 +68,7 @@ const ShimmerEffect = () => {
 export default function SettingsScreen() {
   const { theme, setTheme: setThemeContext, actualTheme, colors } = useTheme();
   const { locale, setLocale } = useLanguage();
+  const t = useTranslation();
   const [notifications, setNotifications] = useState(true);
   const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'annual'>('monthly');
   const [user, setUser] = useState<User | null>(null);
@@ -136,7 +138,7 @@ export default function SettingsScreen() {
     return (
       <View style={[styles.container, styles.centerContent, { backgroundColor: colors.background }]}>
         <ActivityIndicator size="large" color="#00C27A" />
-        <Text style={[styles.loadingText, { color: colors.text }]}>Chargement...</Text>
+        <Text style={[styles.loadingText, { color: colors.text }]}>{t('loading')}</Text>
       </View>
     );
   }
@@ -154,12 +156,12 @@ export default function SettingsScreen() {
       >
         {/* Header */}
         <Animated.View entering={FadeInDown.delay(100).duration(400)}>
-          <Text style={[styles.mainTitle, { color: colors.text }]}>Réglages</Text>
+          <Text style={[styles.mainTitle, { color: colors.text }]}>{t('settings')}</Text>
         </Animated.View>
 
         {/* Account Section */}
         <Animated.View entering={FadeInDown.delay(200).duration(400)}>
-          <Text style={styles.sectionTitle}>COMPTE</Text>
+          <Text style={styles.sectionTitle}>{t('accountUpper')}</Text>
           <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <View style={styles.profileSection}>
               <LinearGradient
@@ -180,7 +182,7 @@ export default function SettingsScreen() {
             >
               <View style={styles.settingButtonLeft}>
                 <Ionicons name="person" size={24} color="#00C27A" />
-                <Text style={[styles.settingButtonText, { color: colors.text }]}>Paramètres du profil</Text>
+                <Text style={[styles.settingButtonText, { color: colors.text }]}>{t('profileSettings')}</Text>
               </View>
               <Ionicons name="chevron-forward" size={24} color="#9CA3AF" />
             </TouchableOpacity>
@@ -201,15 +203,15 @@ export default function SettingsScreen() {
               {/* Badge Elite */}
               <View style={styles.eliteBadge}>
                 <Text style={styles.eliteEmoji}>👑</Text>
-                <Text style={styles.eliteBadgeText}>Accès Elite</Text>
+                <Text style={styles.eliteBadgeText}>{t('eliteAccess')}</Text>
               </View>
 
               <View style={styles.premiumContent}>
                 <View style={styles.premiumHeader}>
-                  <Text style={styles.premiumTitle}>Premium Elite</Text>
+                  <Text style={styles.premiumTitle}>{t('premiumElite')}</Text>
                   <Text style={styles.premiumEmoji}>✨</Text>
                 </View>
-                <Text style={styles.premiumSubtitle}>Rejoignez 10 000+ top performers</Text>
+                <Text style={styles.premiumSubtitle}>{t('premiumSubtitle')}</Text>
 
                 {/* Billing Toggle */}
                 <View style={styles.billingToggle}>
@@ -224,7 +226,7 @@ export default function SettingsScreen() {
                       styles.billingButtonText,
                       billingPeriod === 'monthly' && styles.billingButtonTextActive,
                     ]}>
-                      Mensuel
+                      {t('billingMonthly')}
                     </Text>
                   </TouchableOpacity>
                   <TouchableOpacity
@@ -238,7 +240,7 @@ export default function SettingsScreen() {
                       styles.billingButtonText,
                       billingPeriod === 'annual' && styles.billingButtonTextActive,
                     ]}>
-                      Annuel ✨
+                      {t('billingAnnual')}
                     </Text>
                     {billingPeriod !== 'annual' && (
                       <View style={styles.saveBadge}>
@@ -253,18 +255,18 @@ export default function SettingsScreen() {
                   <Animated.View entering={FadeInDown.duration(300)} style={styles.savingsInfo}>
                     <Text style={styles.savingsEmoji}>🎉</Text>
                     <View style={styles.savingsText}>
-                      <Text style={styles.savingsAmount}>Économisez 60€/an</Text>
-                      <Text style={styles.savingsDetail}>C'est 33% de réduction !</Text>
+                      <Text style={styles.savingsAmount}>{t('savePerYearAmount')}</Text>
+                      <Text style={styles.savingsDetail}>{t('savePercentage')}</Text>
                     </View>
                     <View style={styles.bestDealBadge}>
-                      <Text style={styles.bestDealText}>MEILLEURE OFFRE</Text>
+                      <Text style={styles.bestDealText}>{t('bestDeal')}</Text>
                     </View>
                   </Animated.View>
                 )}
 
                 {/* Limited Spots */}
                 <View style={styles.limitedSpots}>
-                  <Text style={styles.limitedSpotsText}>Places limitées restantes</Text>
+                  <Text style={styles.limitedSpotsText}>{t('limitedSpots')}</Text>
                   <Text style={styles.limitedSpotsEmoji}>🔥</Text>
                 </View>
                 <View style={styles.spotsBar}>
@@ -278,11 +280,11 @@ export default function SettingsScreen() {
                     />
                   ))}
                 </View>
-                <Text style={styles.limitedSpotsSubtext}>Seulement 3 places restantes à ce prix</Text>
+                <Text style={styles.limitedSpotsSubtext}>{t('limitedSpotsSubtext')}</Text>
 
                 {/* Features */}
                 <View style={styles.features}>
-                  {['Coaching IA illimité', 'Support prioritaire 24/7', 'Analyses avancées'].map((feature, i) => (
+                  {[t('feature1'), t('feature2'), t('feature3')].map((feature, i) => (
                     <View key={i} style={styles.feature}>
                       <Text style={styles.featureCheck}>✓</Text>
                       <Text style={styles.featureText}>{feature}</Text>
@@ -295,13 +297,13 @@ export default function SettingsScreen() {
                   <Text style={styles.price}>
                     {billingPeriod === 'monthly' ? '14,99€' : '9,99€'}
                   </Text>
-                  <Text style={styles.priceUnit}>/mois</Text>
+                  <Text style={styles.priceUnit}>{t('pricePerMonth')}</Text>
                 </View>
                 {billingPeriod === 'annual' && (
-                  <Text style={styles.pricingDetail}>Facturé annuellement à 119,88€</Text>
+                  <Text style={styles.pricingDetail}>{t('annualBilled')}</Text>
                 )}
                 {billingPeriod === 'monthly' && (
-                  <Text style={styles.pricingDetail}>Facturation flexible</Text>
+                  <Text style={styles.pricingDetail}>{t('monthlyBilling')}</Text>
                 )}
 
                 {/* CTA Button */}
@@ -312,15 +314,15 @@ export default function SettingsScreen() {
                 >
                   <Text style={styles.ctaText}>
                     {billingPeriod === 'monthly' 
-                      ? 'Obtenir l\'accès Elite maintenant' 
-                      : 'Obtenir l\'accès Elite annuel'}
+                      ? t('ctaMonthly')
+                      : t('ctaAnnual')}
                   </Text>
                 </TouchableOpacity>
 
                 <Text style={styles.offerExpires}>
                   ⏰ {billingPeriod === 'monthly' 
-                    ? 'Offre expire dans 24 heures' 
-                    : 'Offre annuelle expire dans 24 heures'}
+                    ? t('offerExpireMonthly')
+                    : t('offerExpireAnnual')}
                 </Text>
               </View>
             </LinearGradient>
@@ -329,13 +331,13 @@ export default function SettingsScreen() {
 
         {/* Preferences Section */}
         <Animated.View entering={FadeInDown.delay(400).duration(400)}>
-          <Text style={styles.sectionTitle}>PRÉFÉRENCES</Text>
+        <Text style={styles.sectionTitle}>{t('preferencesUpper')}</Text>
           <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             {/* Theme Selector */}
             <View style={styles.preferenceSection}>
               <View style={styles.preferenceHeader}>
                 <Ionicons name="color-palette" size={24} color="#00C27A" />
-                <Text style={[styles.preferenceTitle, { color: colors.text }]}>Thème</Text>
+                <Text style={[styles.preferenceTitle, { color: colors.text }]}>{t('theme')}</Text>
               </View>
               <View style={styles.themeButtons}>
                 <TouchableOpacity
@@ -354,7 +356,7 @@ export default function SettingsScreen() {
                     styles.themeButtonText,
                     theme === 'light' && styles.themeButtonTextActive,
                   ]}>
-                    Clair
+                    {t('light')}
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -373,7 +375,7 @@ export default function SettingsScreen() {
                     styles.themeButtonText,
                     theme === 'dark' && styles.themeButtonTextActive,
                   ]}>
-                    Sombre
+                    {t('dark')}
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -392,7 +394,7 @@ export default function SettingsScreen() {
                     styles.themeButtonText,
                     theme === 'system' && styles.themeButtonTextActive,
                   ]}>
-                    Auto
+                    {t('system')}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -402,7 +404,7 @@ export default function SettingsScreen() {
             <View style={[styles.preferenceSection, styles.preferenceBorder]}>
               <View style={styles.preferenceHeader}>
                 <Ionicons name="language" size={24} color="#00C27A" />
-                <Text style={[styles.preferenceTitle, { color: colors.text }]}>Langue</Text>
+                <Text style={[styles.preferenceTitle, { color: colors.text }]}>{t('language')}</Text>
               </View>
               <View style={styles.languageButtons}>
                 <TouchableOpacity
@@ -416,7 +418,7 @@ export default function SettingsScreen() {
                     styles.languageButtonText,
                     locale === 'fr' && styles.languageButtonTextActive,
                   ]}>
-                    🇫🇷 Français
+                    🇫🇷 {t('french')}
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -430,7 +432,7 @@ export default function SettingsScreen() {
                     styles.languageButtonText,
                     locale === 'en' && styles.languageButtonTextActive,
                   ]}>
-                    🇬🇧 English
+                    🇬🇧 {t('english')}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -441,7 +443,7 @@ export default function SettingsScreen() {
               <View style={styles.preferenceRow}>
                 <View style={styles.preferenceLeft}>
                   <Ionicons name="notifications" size={24} color="#00C27A" />
-                  <Text style={[styles.preferenceTitle, { color: colors.text }]}>Notifications</Text>
+                  <Text style={[styles.preferenceTitle, { color: colors.text }]}>{t('notifications')}</Text>
                 </View>
                 <Switch
                   value={notifications}
@@ -458,10 +460,10 @@ export default function SettingsScreen() {
                   <Ionicons name="alarm" size={24} color="#00C27A" />
                   <View style={styles.settingButtonContent}>
                     <Text style={[styles.settingButtonText, { color: colors.text }]}>
-                      Rappels et horaires
+                      {t('remindersAndSchedules')}
                     </Text>
                     <Text style={styles.settingButtonSubtext}>
-                      Matin, midi, soir, questions humeur/stress/focus
+                      {t('remindersSubtitle')}
                     </Text>
                   </View>
                 </View>
@@ -476,7 +478,7 @@ export default function SettingsScreen() {
             >
               <View style={styles.settingButtonLeft}>
                 <Ionicons name="bar-chart" size={24} color="#00C27A" />
-                <Text style={[styles.settingButtonText, { color: colors.text }]}>Statistiques détaillées</Text>
+                <Text style={[styles.settingButtonText, { color: colors.text }]}>{t('detailedStats')}</Text>
               </View>
               <Ionicons name="chevron-forward" size={24} color="#9CA3AF" />
             </TouchableOpacity>
@@ -490,10 +492,10 @@ export default function SettingsScreen() {
                 <Ionicons name="refresh" size={24} color="#F59E0B" />
                 <View style={styles.settingButtonContent}>
                   <Text style={[styles.settingButtonText, { color: colors.text }]}>
-                    Réinitialiser l'onboarding
+                    {t('resetOnboarding')}
                   </Text>
                   <Text style={styles.settingButtonSubtext}>
-                    Revoir le parcours d'introduction
+                    {t('resetOnboardingSubtitle')}
                   </Text>
                 </View>
               </View>
@@ -504,7 +506,7 @@ export default function SettingsScreen() {
 
         {/* Help & Support Section */}
         <Animated.View entering={FadeInDown.delay(500).duration(400)}>
-          <Text style={styles.sectionTitle}>AIDE & SUPPORT</Text>
+          <Text style={styles.sectionTitle}>{t('helpSupportUpper')}</Text>
           <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <TouchableOpacity
               style={[styles.settingButton, styles.settingButtonBorder]}
@@ -512,7 +514,7 @@ export default function SettingsScreen() {
             >
               <View style={styles.settingButtonLeft}>
                 <Ionicons name="help-circle" size={24} color="#00C27A" />
-                <Text style={[styles.settingButtonText, { color: colors.text }]}>Aide & Support</Text>
+                <Text style={[styles.settingButtonText, { color: colors.text }]}>{t('helpSupport')}</Text>
               </View>
               <Ionicons name="chevron-forward" size={24} color="#9CA3AF" />
             </TouchableOpacity>

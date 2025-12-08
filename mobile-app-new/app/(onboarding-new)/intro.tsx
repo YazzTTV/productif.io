@@ -92,11 +92,11 @@ export default function IntroScreen() {
           style={styles.logoContainer}
         >
           <View style={styles.logoBox}>
-            <Image
-              source={require('../../assets/images/productif-logo.png')}
-              style={styles.logoImage}
-              resizeMode="contain"
-            />
+          <Image
+            source={require('../../assets/images/icon.png')}
+            style={styles.logoImage}
+            resizeMode="contain"
+          />
           </View>
         </Animated.View>
 
@@ -169,9 +169,9 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   logoBox: {
-    width: 96,
-    height: 96,
-    borderRadius: 24,
+    width: 120,
+    height: 120,
+    borderRadius: 28,
     backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     alignItems: 'center',
@@ -180,7 +180,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 12,
     elevation: 8,
-    padding: 12,
+    padding: 14,
   },
   logoImage: {
     width: '100%',

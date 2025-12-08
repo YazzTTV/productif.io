@@ -167,7 +167,6 @@ export default function ConnectionScreen() {
             >
               <Ionicons name="mail" size={20} color="#FFFFFF" />
               <Text style={styles.primaryButtonText}>{t('continueWithEmail')}</Text>
-              <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
             </LinearGradient>
           </TouchableOpacity>
 
@@ -212,13 +211,6 @@ export default function ConnectionScreen() {
           >
             <Text style={styles.signInButtonText}>{t('logIn')}</Text>
             <Ionicons name="arrow-forward" size={18} color="#00C27A" />
-          </TouchableOpacity>
-        </Animated.View>
-
-        {/* Bouton Skip */}
-        <Animated.View entering={FadeInDown.delay(1300).duration(600)}>
-          <TouchableOpacity onPress={handleSkip} style={styles.skipButton}>
-            <Text style={styles.skipText}>{t('skipForNow')}</Text>
           </TouchableOpacity>
         </Animated.View>
 
@@ -355,8 +347,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#FFFFFF',
-    flex: 1,
-    textAlign: 'center',
   },
   secondaryButton: {
     flexDirection: 'row',

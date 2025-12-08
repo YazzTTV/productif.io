@@ -183,28 +183,29 @@ export async function apiCall<T>(
     console.log('📊 apiCall - Status Text:', response.statusText);
     
     if (!response.ok) {
-      let errorData;
-      const contentType = response.headers.get('content-type');
-      
-      try {
-        if (contentType && contentType.includes('application/json')) {
+      const contentType = response.headers.get('content-type') || '';
+      let rawText: string | undefined;
+      let errorData: any = undefined;
+
+      if (contentType.includes('application/json')) {
+        try {
           errorData = await response.json();
-        } else {
-          // Si ce n'est pas du JSON, lire comme texte
-          const text = await response.text();
-          console.error('❌ apiCall - Réponse non-JSON:', text.substring(0, 200));
-          throw new Error(`Erreur serveur (${response.status}): ${text.substring(0, 100)}`);
+        } catch (parseError) {
+          // fallback lecture texte une seule fois
+          rawText = await response.text();
+          console.error('❌ apiCall - Erreur de parsing JSON:', parseError);
         }
-      } catch (parseError) {
-        // Si le parsing JSON échoue, lire comme texte
-        const text = await response.text();
-        console.error('❌ apiCall - Erreur de parsing:', parseError);
-        console.error('❌ apiCall - Réponse brute:', text.substring(0, 200));
-        throw new Error(`Erreur serveur (${response.status}): Réponse invalide`);
+      } else {
+        rawText = await response.text();
+        console.error('❌ apiCall - Réponse non-JSON:', rawText.substring(0, 200));
       }
-      
-      console.error('❌ apiCall - Erreur serveur:', errorData);
-      throw new Error(errorData.error || errorData.message || 'Erreur de réseau');
+
+      const message =
+        errorData?.error ||
+        errorData?.message ||
+        (rawText ? `Erreur serveur (${response.status}): ${rawText.substring(0, 100)}` : 'Erreur de réseau');
+
+      throw new Error(message);
     }
 
     // Vérifier que la réponse est bien du JSON
@@ -672,6 +673,11 @@ export const gamificationService = {
 
 // Service pour l'assistant IA
 export const assistantService = {
+  // Récupérer la session Deep Work active (s'il y en a une)
+  async getActiveDeepWorkSession(): Promise<any> {
+    return await apiCall('/deepwork/agent?status=active&limit=1');
+  },
+
   // Démarrer une session Deep Work
   async startDeepWorkSession(plannedDuration: number, type: string = 'deepwork', description?: string): Promise<any> {
     // Note: Cette API nécessite un token API avec les scopes deepwork:write et tasks:write
@@ -685,6 +691,38 @@ export const assistantService = {
         description,
       }),
     });
+  },
+
+  // Terminer/compléter une session Deep Work
+  // actions supportées côté backend: complete, cancel, pause, resume, add_interruption
+  async endDeepWorkSession(sessionId: string, action: 'complete' | 'cancel' = 'complete'): Promise<any> {
+    return await apiCall(`/deepwork/agent/${sessionId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ action }),
+    });
+  },
+
+  // XP - ajouter un événement
+  async addXpEvent(type: string, payload: any = {}): Promise<any> {
+    return await apiCall('/xp/events', {
+      method: 'POST',
+      body: JSON.stringify({ type, payload }),
+    });
+  },
+
+  // XP - statut actuel
+  async getXpStatus(): Promise<any> {
+    return await apiCall('/xp/status');
+  },
+
+  // XP - leaderboard (range: all | weekly)
+  async getXpLeaderboard(range: 'all' | 'weekly' = 'weekly', limit: number = 10): Promise<any> {
+    return await apiCall(`/xp/leaderboard?range=${range}&limit=${limit}`);
+  },
+
+  // XP - défi hebdomadaire (progression personnelle)
+  async getXpWeeklyChallenge(): Promise<any> {
+    return await apiCall('/xp/weekly-challenge');
   },
 
   // Récupérer les tâches d'aujourd'hui
