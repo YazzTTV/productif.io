@@ -14,12 +14,14 @@ import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 import { LineChart } from 'react-native-chart-kit';
 import { dashboardService, habitsService } from '@/lib/api';
 import { format, subDays, startOfDay } from 'date-fns';
+import { useTranslation } from '@/hooks/useTranslation';
 
 const { width } = Dimensions.get('window');
 
 type TimePeriod = 'week' | 'month' | 'trimester' | 'year';
 
 export default function AnalyticsScreen() {
+  const t = useTranslation();
   const [loading, setLoading] = useState(true);
   const [timePeriod, setTimePeriod] = useState<TimePeriod>('week');
   const [weeklyData, setWeeklyData] = useState<any[]>([]);
@@ -98,7 +100,7 @@ export default function AnalyticsScreen() {
     return (
       <View style={styles.centered}>
         <ActivityIndicator size="large" color="#00C27A" />
-        <Text style={styles.loadingText}>Chargement des analytics...</Text>
+        <Text style={styles.loadingText}>{t('loadingAnalytics')}</Text>
       </View>
     );
   }
@@ -133,7 +135,7 @@ export default function AnalyticsScreen() {
         >
           <Ionicons name="arrow-back" size={24} color="#374151" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Analytics</Text>
+        <Text style={styles.headerTitle}>{t('analytics')}</Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -159,7 +161,7 @@ export default function AnalyticsScreen() {
                   timePeriod === period && styles.periodButtonTextActive,
                 ]}
               >
-                {period.charAt(0).toUpperCase() + period.slice(1)}
+                {t(period)}
               </Text>
             </TouchableOpacity>
           ))}
@@ -173,7 +175,7 @@ export default function AnalyticsScreen() {
           >
             <View style={styles.statHeader}>
               <Ionicons name="trending-up" size={18} color="#00C27A" />
-              <Text style={styles.statLabel}>Avg Productivity</Text>
+              <Text style={styles.statLabel}>{t('avgProductivity')}</Text>
             </View>
             <Text style={styles.statValue}>{stats.avgProductivity}%</Text>
           </Animated.View>
@@ -184,7 +186,7 @@ export default function AnalyticsScreen() {
           >
             <View style={styles.statHeader}>
               <Ionicons name="checkmark-circle" size={18} color="#3B82F6" />
-              <Text style={styles.statLabel}>Total Tasks</Text>
+              <Text style={styles.statLabel}>{t('totalTasks')}</Text>
             </View>
             <Text style={styles.statValue}>{stats.totalTasks}</Text>
           </Animated.View>
@@ -195,7 +197,7 @@ export default function AnalyticsScreen() {
           >
             <View style={styles.statHeader}>
               <Ionicons name="flame" size={18} color="#F59E0B" />
-              <Text style={styles.statLabel}>Habits Tracked</Text>
+              <Text style={styles.statLabel}>{t('habitsTracked')}</Text>
             </View>
             <Text style={styles.statValue}>{stats.totalHabits}%</Text>
           </Animated.View>
@@ -206,7 +208,7 @@ export default function AnalyticsScreen() {
           >
             <View style={styles.statHeader}>
               <Ionicons name="time" size={18} color="#8B5CF6" />
-              <Text style={styles.statLabel}>Focus Hours</Text>
+              <Text style={styles.statLabel}>{t('focusHours')}</Text>
             </View>
             <Text style={styles.statValue}>{stats.focusHours}h</Text>
           </Animated.View>
@@ -217,7 +219,7 @@ export default function AnalyticsScreen() {
           entering={FadeInDown.delay(300).duration(400)}
           style={styles.chartCard}
         >
-          <Text style={styles.chartTitle}>Productivity Trend</Text>
+          <Text style={styles.chartTitle}>{t('productivityTrend')}</Text>
           {weeklyData.length > 0 ? (
             <LineChart
               data={chartData}
@@ -251,7 +253,7 @@ export default function AnalyticsScreen() {
             />
           ) : (
             <View style={styles.emptyChart}>
-              <Text style={styles.emptyText}>Aucune donnée disponible</Text>
+              <Text style={styles.emptyText}>{t('noDataAvailable')}</Text>
             </View>
           )}
         </Animated.View>
@@ -261,7 +263,7 @@ export default function AnalyticsScreen() {
           entering={FadeInDown.delay(350).duration(400)}
           style={styles.chartCard}
         >
-          <Text style={styles.chartTitle}>Focus Score vs Tasks Completed</Text>
+          <Text style={styles.chartTitle}>{t('focusScoreVsTasks')}</Text>
           {weeklyData.length > 0 ? (
             <View style={styles.barChartContainer}>
               <View style={styles.barChart}>
@@ -298,17 +300,17 @@ export default function AnalyticsScreen() {
               <View style={styles.barLegend}>
                 <View style={styles.legendItem}>
                   <View style={[styles.legendColor, { backgroundColor: '#00C27A' }]} />
-                  <Text style={styles.legendText}>Habits</Text>
+                  <Text style={styles.legendText}>{t('habits')}</Text>
                 </View>
                 <View style={styles.legendItem}>
                   <View style={[styles.legendColor, { backgroundColor: '#60A5FA' }]} />
-                  <Text style={styles.legendText}>Tasks</Text>
+                  <Text style={styles.legendText}>{t('tasks')}</Text>
                 </View>
               </View>
             </View>
           ) : (
             <View style={styles.emptyChart}>
-              <Text style={styles.emptyText}>Aucune donnée disponible</Text>
+              <Text style={styles.emptyText}>{t('noDataAvailable')}</Text>
             </View>
           )}
         </Animated.View>
@@ -319,7 +321,7 @@ export default function AnalyticsScreen() {
           style={styles.chartCard}
         >
           <View style={styles.habitStreaksHeader}>
-            <Text style={styles.chartTitle}>Habit Streaks</Text>
+            <Text style={styles.chartTitle}>{t('habitStreaks')}</Text>
             <Ionicons name="trophy" size={20} color="#00C27A" />
           </View>
 
@@ -337,7 +339,7 @@ export default function AnalyticsScreen() {
                       <View>
                         <Text style={styles.habitName}>{habit.name}</Text>
                         <Text style={styles.habitCompletion}>
-                          {habit.completed}% completion
+                          {habit.completed}% {t('completion')}
                         </Text>
                       </View>
                     </View>
@@ -346,7 +348,7 @@ export default function AnalyticsScreen() {
                         <Ionicons name="flame" size={16} color="#F59E0B" />
                         <Text style={styles.streakValue}>{habit.streak}</Text>
                       </View>
-                      <Text style={styles.streakLabel}>day streak</Text>
+                      <Text style={styles.streakLabel}>{t('dayStreak')}</Text>
                     </View>
                   </View>
 
@@ -364,7 +366,7 @@ export default function AnalyticsScreen() {
             </View>
           ) : (
             <View style={styles.emptyChart}>
-              <Text style={styles.emptyText}>Aucune habitude trouvée</Text>
+              <Text style={styles.emptyText}>{t('noHabitsFound')}</Text>
             </View>
           )}
         </Animated.View>
@@ -374,7 +376,7 @@ export default function AnalyticsScreen() {
           entering={FadeInDown.delay(600).duration(400)}
           style={styles.chartCard}
         >
-          <Text style={styles.chartTitle}>Weekly Consistency</Text>
+          <Text style={styles.chartTitle}>{t('weeklyConsistency')}</Text>
           <View style={styles.heatmap}>
             {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((day, index) => (
               <View key={index} style={styles.heatmapDay}>
