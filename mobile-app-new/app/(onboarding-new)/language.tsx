@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
+  Pressable,
   ScrollView,
 } from 'react-native';
 import Animated, {
@@ -29,27 +30,40 @@ const languages = [
 export default function LanguageSelectionScreen() {
   const { locale, setLocale } = useLanguage();
   const [selectedLanguage, setSelectedLanguage] = useState<string>(locale);
+  const [isLoading, setIsLoading] = useState(false);
+  const isProcessingRef = useRef(false);
 
   const handleContinue = async () => {
-    await setLocale(selectedLanguage as 'fr' | 'en');
-    await AsyncStorage.setItem('onboarding_language', selectedLanguage);
+    if (isLoading || isProcessingRef.current) return; // Empêcher les doubles clics
     
-    // Sauvegarder la langue dans l'API si l'utilisateur est authentifié
+    isProcessingRef.current = true;
+    setIsLoading(true);
+    
     try {
-      const user = await authService.checkAuth();
-      if (user?.id) {
-        await onboardingService.saveOnboardingData({
-          language: selectedLanguage,
-          currentStep: 2, // Étape de sélection de langue
-        });
-        console.log('✅ Langue sauvegardée dans l\'API');
+      await setLocale(selectedLanguage as 'fr' | 'en');
+      await AsyncStorage.setItem('onboarding_language', selectedLanguage);
+      
+      // Sauvegarder la langue dans l'API si l'utilisateur est authentifié
+      try {
+        const user = await authService.checkAuth();
+        if (user?.id) {
+          await onboardingService.saveOnboardingData({
+            language: selectedLanguage,
+            currentStep: 2, // Étape de sélection de langue
+          });
+          console.log('✅ Langue sauvegardée dans l\'API');
+        }
+      } catch (error) {
+        console.error('❌ Erreur lors de la sauvegarde de la langue:', error);
+        // Ne pas bloquer le flux
       }
+      
+      router.push('/(onboarding-new)/connection');
     } catch (error) {
-      console.error('❌ Erreur lors de la sauvegarde de la langue:', error);
-      // Ne pas bloquer le flux
+      console.error('❌ Erreur lors de la navigation:', error);
+      setIsLoading(false);
+      isProcessingRef.current = false;
     }
-    
-    router.push('/(onboarding-new)/connection');
   };
 
   return (
@@ -138,21 +152,26 @@ export default function LanguageSelectionScreen() {
 
         {/* Continue Button */}
         <Animated.View entering={FadeInDown.delay(800).duration(600)}>
-          <TouchableOpacity
-            activeOpacity={0.9}
+          <Pressable
             onPress={handleContinue}
-            disabled={!selectedLanguage}
+            disabled={!selectedLanguage || isLoading}
+            style={({ pressed }) => [
+              styles.continueButtonWrapper,
+              (pressed || isLoading) && styles.continueButtonPressed,
+            ]}
           >
             <LinearGradient
               colors={['#00C27A', '#00D68F']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
-              style={[styles.continueButton, !selectedLanguage && styles.continueButtonDisabled]}
+              style={[styles.continueButton, (!selectedLanguage || isLoading) && styles.continueButtonDisabled]}
             >
-              <Text style={styles.continueButtonText}>Continue</Text>
-              <Text style={styles.continueButtonArrow}>→</Text>
+              <Text style={styles.continueButtonText}>
+                {isLoading ? 'Loading...' : 'Continue'}
+              </Text>
+              {!isLoading && <Text style={styles.continueButtonArrow}>→</Text>}
             </LinearGradient>
-          </TouchableOpacity>
+          </Pressable>
 
           <Text style={styles.infoText}>You can change this later in Settings</Text>
         </Animated.View>
@@ -271,6 +290,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  continueButtonWrapper: {
+    borderRadius: 24,
+    overflow: 'hidden',
+  },
   continueButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -283,6 +306,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 4,
+  },
+  continueButtonPressed: {
+    opacity: 0.9,
   },
   continueButtonDisabled: {
     opacity: 0.5,
