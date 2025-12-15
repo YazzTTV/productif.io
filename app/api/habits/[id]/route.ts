@@ -35,7 +35,8 @@ export async function PUT(
     const userId = decoded.userId
 
     // Récupérer les données du corps de la requête
-    const { name, description, color, daysOfWeek } = await request.json()
+    const body = await request.json()
+    const { name, description, color, daysOfWeek, userCategoryOverride } = body
 
     // Vérifier que l'habitude appartient à l'utilisateur
     const habit = await prisma.habit.findUnique({
@@ -64,15 +65,21 @@ export async function PUT(
       )
     }
 
-    // Mettre à jour l'habitude
+    const data: any = {
+      ...(name !== undefined ? { name } : {}),
+      ...(description !== undefined ? { description } : {}),
+      ...(color !== undefined ? { color } : {}),
+      ...(daysOfWeek !== undefined ? { daysOfWeek } : {}),
+    }
+
+    // RESET MUST WORK (null is valid)
+    if ("userCategoryOverride" in body) {
+      data.userCategoryOverride = userCategoryOverride
+    }
+
     const updatedHabit = await prisma.habit.update({
       where: { id: params.id },
-      data: {
-        name,
-        description,
-        color,
-        daysOfWeek,
-      },
+      data,
     })
 
     return NextResponse.json(updatedHabit)

@@ -36,6 +36,73 @@ import { useTrialStatus } from '@/hooks/useTrialStatus';
 
 const { width } = Dimensions.get('window');
 
+// --- Helpers Habitudes : catégories & fenêtre temporelle ---
+
+type HabitTimeSlot = 'morning' | 'day' | 'evening' | 'anti';
+type HabitCategory = 'MORNING' | 'DAY' | 'EVENING' | 'ANTI_HABIT';
+
+// Déduction douce de la catégorie à partir de signaux “structurels” (heure de rappel)
+const inferSlotFromSignals = (habit: any): HabitTimeSlot => {
+  // 1) Utiliser l'heure de rappel si disponible
+  const time: string | undefined =
+    habit?.reminderTime ||
+    habit?.notificationSettings?.reminderTime ||
+    undefined;
+
+  if (typeof time === 'string') {
+    const [hStr] = time.split(':');
+    const hour = parseInt(hStr, 10);
+    if (!Number.isNaN(hour)) {
+      if (hour >= 5 && hour < 11) return 'morning';
+      if (hour >= 18 || hour < 5) return 'evening';
+      return 'day';
+    }
+  }
+
+  // 2) Par défaut : journée
+  return 'day';
+};
+
+// Classification finale côté app : userCategoryOverride > inferredCategory > signaux (heure)
+const resolveHabitSlot = (habit: any): HabitTimeSlot => {
+  const raw: string = (
+    habit?.userCategoryOverride ||
+    habit?.inferredCategory ||
+    ''
+  )
+    .toString()
+    .toUpperCase()
+    .trim();
+
+  switch (raw as HabitCategory) {
+    case 'MORNING':
+      return 'morning';
+    case 'EVENING':
+      return 'evening';
+    case 'ANTI_HABIT':
+      return 'anti';
+    case 'DAY':
+      return 'day';
+    default:
+      // Si aucune catégorie explicite n'est définie, on infère à partir des signaux temporels
+      return inferSlotFromSignals(habit);
+  }
+};
+
+const getCurrentTimeSlot = (now: Date = new Date()): HabitTimeSlot => {
+  const hour = now.getHours();
+  if (hour >= 5 && hour < 11) return 'morning';
+  if (hour >= 11 && hour < 18) return 'day';
+  if (hour >= 18 && hour < 23) return 'evening';
+  // Nuit : comportement par défaut = aucune habitude mise en avant
+  return 'day';
+};
+
+const isHabitRelevantNow = (slot: HabitTimeSlot, nowSlot: HabitTimeSlot): boolean => {
+  if (slot === 'anti') return false; // Anti-habitudes gérées séparément
+  return slot === nowSlot;
+};
+
 // Mock data - will be replaced with API calls
 const mockData = {
   user: "Alex",
@@ -509,23 +576,47 @@ export default function DashboardScreen() {
         }
       }
 
-      // Format habits for display - Afficher toutes les habitudes actives
+      // Helper de slot basé sur finalCategory / override / inferredCategory
+      const slot = (habit: any): HabitCategory => {
+        return (
+          (habit.finalCategory as HabitCategory | undefined) ??
+          (habit.userCategoryOverride as HabitCategory | undefined) ??
+          (habit.inferredCategory as HabitCategory | undefined) ??
+          "DAY"
+        );
+      };
+
+      // Format habits for display - Afficher seulement les habitudes pertinentes et non complétées
       const activeHabitsForDisplay = habitsList.filter((h: any) => h.isActive !== false);
-      const formattedHabits = activeHabitsForDisplay.map((habit: any) => {
-        const entries = habit.entries || habit.completions || [];
-        const todayEntry = entries.find((entry: any) => {
-          const entryDate = new Date(entry.date).toISOString().split('T')[0];
-          return entryDate === todayStr && entry.completed === true;
-        });
-        
-        return {
-          id: habit.id,
-          name: habit.name,
-          completed: !!todayEntry,
-          streak: habit.currentStreak || 0,
-          time: habit.reminderTime || '09:00',
-        };
-      });
+      const nowSlot = getCurrentTimeSlot();
+
+      const formattedHabits = activeHabitsForDisplay
+        .map((habit: any) => {
+          const cat = slot(habit);
+          const normalizedSlot =
+            cat === "MORNING" ? "morning" :
+            cat === "EVENING" ? "evening" :
+            cat === "ANTI"    ? "anti"    :
+            "day";
+          const entries = habit.entries || habit.completions || [];
+          const todayEntry = entries.find((entry: any) => {
+            const entryDate = new Date(entry.date).toISOString().split('T')[0];
+            return entryDate === todayStr && entry.completed === true;
+          });
+          
+          return {
+            id: habit.id,
+            name: habit.name,
+            completed: !!todayEntry,
+            streak: habit.currentStreak || 0,
+            time: habit.reminderTime || '09:00',
+            slot: normalizedSlot,
+          };
+        })
+        // Ne garder que les habitudes non complétées et pertinentes maintenant
+        .filter((habit: any) => !habit.completed && isHabitRelevantNow(habit.slot, nowSlot))
+        // Limiter le nombre d’habitudes affichées pour réduire la charge cognitive
+        .slice(0, 5);
 
       // Calculate daily progress (habits + tasks)
       const activeHabits = habitsList.filter((h: any) => h.isActive !== false);
@@ -1101,7 +1192,7 @@ export default function DashboardScreen() {
           </Animated.View>
         </LockedCard>
 
-        {/* Daily Habits */}
+        {/* Habitudes restantes (pertinentes maintenant) */}
         <LockedCard onLockedClick={() => setShowUpgradeModal(true)}>
           <Animated.View
             entering={FadeInDown.delay(500).duration(400)}
@@ -1110,7 +1201,7 @@ export default function DashboardScreen() {
           <View style={styles.habitsSectionHeader}>
             <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('dailyHabits')}</Text>
             <TouchableOpacity
-              onPress={() => router.push('/habits-manager')}
+              onPress={() => router.push('/(tabs)/habits')}
               style={[styles.viewAllButtonHabits, { backgroundColor: colors.primary }]}
               activeOpacity={0.8}
             >
