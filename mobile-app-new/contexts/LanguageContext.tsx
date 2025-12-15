@@ -97,7 +97,7 @@ const translations = {
     'bestTime': 'Meilleur',
     'globalRank': 'Classement',
     'weeklyTrend': 'Tendance hebdomadaire',
-    'dailyHabits': 'Habitudes restantes',
+    'dailyHabits': 'Mes habitudes',
     'achievementsUnlocked': 'Succès débloqués',
     'unlocked': 'Débloqué',
     'leaderboard': 'Classement',

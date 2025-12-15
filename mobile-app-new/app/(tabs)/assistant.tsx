@@ -302,12 +302,27 @@ export default function AssistantScreen() {
     } catch (error: any) {
       console.error('Erreur lors de l\'envoi du message:', error);
       // Remplacer le message de chargement par un message d'erreur
+      let errorMessage = "Désolé, j'ai rencontré une erreur. Pouvez-vous réessayer ?";
+      
+      // Messages d'erreur plus spécifiques
+      if (error?.message) {
+        if (error.message.includes('Endpoint non trouvé') || error.message.includes('404')) {
+          errorMessage = "❌ L'endpoint de l'assistant IA n'est pas accessible. Vérifiez votre connexion ou contactez le support.";
+        } else if (error.message.includes('401') || error.message.includes('non authentifié')) {
+          errorMessage = "❌ Vous devez être connecté pour utiliser l'assistant IA.";
+        } else if (error.message.includes('timeout')) {
+          errorMessage = "⏱️ La requête a pris trop de temps. Réessayez dans quelques instants.";
+        } else {
+          errorMessage = `❌ ${error.message}`;
+        }
+      }
+      
       setMessages((prev) => 
         prev.map((msg) => 
           msg.id === loadingMessageId
             ? {
                 ...msg,
-                text: "Désolé, j'ai rencontré une erreur. Pouvez-vous réessayer ?",
+                text: errorMessage,
               }
             : msg
         )

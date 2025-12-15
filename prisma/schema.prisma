@@ -63,6 +63,7 @@ model User {
   LeaderboardGroupMember LeaderboardGroupMember[]
   agentInteractions      AgentInteraction[]
   onboardingData         OnboardingData?
+  xpEvents               XpEvent[]
 }
 
 model Company {
@@ -345,7 +346,6 @@ model UserGamification {
   totalHabitsCompleted Int       @default(0)
   totalPoints          Int       @default(0)
   user                 User      @relation(fields: [userId], references: [id])
-  xpEvents             XpEvent[]
 }
 
 model XpEvent {

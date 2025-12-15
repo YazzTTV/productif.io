@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { inferHabitCategory, HabitCategory } from "@/lib/habits-utils"
 import { startOfDay } from "date-fns"
 import { getAuthUser, getAuthUserFromRequest } from "@/lib/auth"
 
@@ -72,7 +71,7 @@ export async function GET(req: NextRequest) {
       }
     })
 
-    // Calculer les streaks + finalCategory pour chaque habitude
+    // Calculer les streaks pour chaque habitude
     const habitsWithStreaks = habits.map(habit => {
       let streak = 0
       
@@ -81,21 +80,11 @@ export async function GET(req: NextRequest) {
         .filter(entry => entry.completed) // Seulement les entrées complétées
         .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
       
-      const base: any = {
-        ...habit,
-        currentStreak: 0,
-      }
-
       if (sortedEntries.length === 0) {
         // Aucune entrée complétée, streak = 0
-        const finalCategory: HabitCategory =
-          (habit.userCategoryOverride as HabitCategory) ||
-          (habit.inferredCategory as HabitCategory) ||
-          "DAY"
-
         return {
-          ...base,
-          finalCategory,
+          ...habit,
+          currentStreak: 0,
         }
       }
       
@@ -149,15 +138,9 @@ export async function GET(req: NextRequest) {
       }
       
       // Toujours retourner la streak, même si elle est 0
-      const finalCategory: HabitCategory =
-        (habit.userCategoryOverride as HabitCategory) ||
-        (habit.inferredCategory as HabitCategory) ||
-        "DAY"
-
       return {
-        ...base,
+        ...habit,
         currentStreak: streak,
-        finalCategory,
       }
     })
 
@@ -244,9 +227,6 @@ export async function POST(req: NextRequest) {
 
     const maxOrder = maxOrderHabit ? maxOrderHabit.order + 1 : 2; // +1 pour le placer après, ou 2 si aucune habitude (après les 2 par défaut)
 
-    // Inférer la catégorie à partir du nom + description
-    const inferredCategory = inferHabitCategory(name, description) as HabitCategory
-
     // Créer l'habitude
     const habit = await prisma.habit.create({
       data: {
@@ -257,7 +237,6 @@ export async function POST(req: NextRequest) {
         color,
         order: maxOrder,
         userId: user.id,
-        inferredCategory,
       },
     })
 
