@@ -8,7 +8,7 @@ interface AnalyticsSummaryProps {
     totalTimeTracked: number
     totalProjects: number
     activeProjects?: number
-    totalTasks: number
+    totalTasks: numberr
     completedTasks: number
     completionRate: number
   }

@@ -14,7 +14,6 @@ import {
   TextInput,
   Switch,
 } from 'react-native';
-import { PanGestureHandler, State } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { habitsService } from '@/lib/api';
@@ -27,10 +26,60 @@ import { HabitNoteModal } from '@/components/habits/HabitNoteModal';
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = width - 32; // 16px padding on each side
 
+type HabitTimeSlot = 'morning' | 'day' | 'evening' | 'anti';
+type HabitCategory = 'MORNING' | 'DAY' | 'EVENING' | 'ANTI_HABIT';
+
+const inferSlotFromSignals = (habit: any): HabitTimeSlot => {
+  const time: string | undefined =
+    habit?.reminderTime ||
+    habit?.notificationSettings?.reminderTime ||
+    undefined;
+
+  if (typeof time === 'string') {
+    const [hStr] = time.split(':');
+    const hour = parseInt(hStr, 10);
+    if (!Number.isNaN(hour)) {
+      if (hour >= 5 && hour < 11) return 'morning';
+      if (hour >= 18 || hour < 5) return 'evening';
+      return 'day';
+    }
+  }
+
+  return 'day';
+};
+
+// Classification : userCategory > category > inferredCategory > signaux (heure)
+const resolveHabitSlot = (habit: any): HabitTimeSlot => {
+  const raw: string = (
+    habit?.userCategoryOverride ||
+    habit?.inferredCategory ||
+    ''
+  )
+    .toString()
+    .toUpperCase()
+    .trim();
+
+  switch (raw as HabitCategory) {
+    case 'MORNING':
+      return 'morning';
+    case 'EVENING':
+      return 'evening';
+    case 'ANTI_HABIT':
+      return 'anti';
+    case 'DAY':
+      return 'day';
+    default:
+      return inferSlotFromSignals(habit);
+  }
+};
+
 interface Habit {
   id: string;
   name: string;
   description?: string;
+  category?: HabitCategory | string;
+  inferredCategory?: HabitCategory | string;
+  userCategory?: HabitCategory | string;
   frequency: 'DAILY' | 'WEEKLY';
   targetCount: number;
   createdAt: string;
@@ -348,13 +397,10 @@ export default function HabitsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedDate, setSelectedDate] = useState(() => startOfDay(new Date()));
-  const [currentCardIndex, setCurrentCardIndex] = useState(0);
   const [updatingHabits, setUpdatingHabits] = useState<Set<string>>(new Set());
   const [showCreateModal, setShowCreateModal] = useState(false);
 
-  // Animation pour le swipe
-  const translateX = useRef(new Animated.Value(0)).current;
-  const gestureState = useRef({ isActive: false }).current;
+  // (Swipe horizontal supprimé au profit d'une vue par sections calmes)
 
   const fetchHabits = async () => {
     try {
@@ -481,63 +527,6 @@ export default function HabitsScreen() {
     setCurrentCardIndex(0);
   };
 
-  const handlePreviousCard = () => {
-    const newIndex = Math.max(0, currentCardIndex - 1);
-    setCurrentCardIndex(newIndex);
-    animateToCard(newIndex);
-  };
-
-  const handleNextCard = () => {
-    const newIndex = Math.min(habits.length - 1, currentCardIndex + 1);
-    setCurrentCardIndex(newIndex);
-    animateToCard(newIndex);
-  };
-
-  const animateToCard = (index: number) => {
-    Animated.spring(translateX, {
-      toValue: -index * CARD_WIDTH,
-      useNativeDriver: true,
-      tension: 100,
-      friction: 8,
-    }).start();
-  };
-
-  // Gestionnaire de swipe
-  const onGestureEvent = Animated.event(
-    [{ nativeEvent: { translationX: translateX } }],
-    { useNativeDriver: true }
-  );
-
-  const onHandlerStateChange = (event: any) => {
-    if (event.nativeEvent.state === State.BEGAN) {
-      gestureState.isActive = true;
-    } else if (event.nativeEvent.state === State.END) {
-      gestureState.isActive = false;
-      const { translationX: translation, velocityX } = event.nativeEvent;
-      
-      let newIndex = currentCardIndex;
-      
-      // Déterminer la direction du swipe
-      if (Math.abs(translation) > CARD_WIDTH * 0.3 || Math.abs(velocityX) > 500) {
-        if (translation < 0 && currentCardIndex < habits.length - 1) {
-          // Swipe vers la gauche - carte suivante
-          newIndex = currentCardIndex + 1;
-        } else if (translation > 0 && currentCardIndex > 0) {
-          // Swipe vers la droite - carte précédente
-          newIndex = currentCardIndex - 1;
-        }
-      }
-      
-      setCurrentCardIndex(newIndex);
-      animateToCard(newIndex);
-    }
-  };
-
-  // Réinitialiser l'animation quand on change de date
-  useEffect(() => {
-    animateToCard(currentCardIndex);
-  }, [selectedDate]);
-
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -547,8 +536,22 @@ export default function HabitsScreen() {
     );
   }
 
-  const currentHabit = habits[currentCardIndex];
   const isToday = selectedDate.toDateString() === new Date().toDateString();
+
+  // Helper de slot basé sur finalCategory / override / inferredCategory
+  const slot = (habit: any): HabitCategory => {
+    return (
+      (habit.finalCategory as HabitCategory | undefined) ??
+      (habit.userCategoryOverride as HabitCategory | undefined) ??
+      (habit.inferredCategory as HabitCategory | undefined) ??
+      "DAY"
+    );
+  };
+
+  const morningHabits = habits.filter((h) => slot(h) === "MORNING");
+  const dayHabits = habits.filter((h) => slot(h) === "DAY");
+  const eveningHabits = habits.filter((h) => slot(h) === "EVENING");
+  const antiHabits = habits.filter((h) => slot(h) === "ANTI");
 
   return (
     <View style={styles.container}>
@@ -573,17 +576,11 @@ export default function HabitsScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Indicateurs de progression */}
+        {/* Indicateurs de progression (nombre d'habitudes) */}
         {habits.length > 0 && (
           <View style={styles.progressIndicators}>
             {habits.map((_, index) => (
-              <View
-                key={index}
-                style={[
-                  styles.progressDot,
-                  index === currentCardIndex && styles.progressDotActive
-                ]}
-              />
+              <View key={index} style={styles.progressDot} />
             ))}
           </View>
         )}
@@ -619,21 +616,14 @@ export default function HabitsScreen() {
           </View>
         ) : (
           <View style={styles.cardsContainer}>
-            {/* Container pour les cartes avec swipe */}
-            <PanGestureHandler
-              onGestureEvent={onGestureEvent}
-              onHandlerStateChange={onHandlerStateChange}
-            >
-              <Animated.View 
-                style={[
-                  styles.cardsWrapper,
-                  { 
-                    transform: [{ translateX }],
-                    width: habits.length * CARD_WIDTH,
-                  }
-                ]}
-              >
-                {habits.map((habit, index) => (
+            {/* Section Matin */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Habitudes du matin</Text>
+              <Text style={styles.sectionDescription}>Pour bien commencer la journée</Text>
+              {morningHabits.length === 0 ? (
+                <Text style={styles.sectionEmpty}>Aucune habitude du matin définie.</Text>
+              ) : (
+                morningHabits.map((habit) => (
                   <View key={habit.id} style={styles.cardWrapper}>
                     <HabitCard
                       habit={habit}
@@ -643,48 +633,85 @@ export default function HabitsScreen() {
                       isUpdating={updatingHabits.has(habit.id)}
                     />
                   </View>
-                ))}
-              </Animated.View>
-            </PanGestureHandler>
+                ))
+              )}
+            </View>
 
-            {/* Navigation entre les cartes */}
-            {habits.length > 1 && (
-              <View style={styles.cardNavigation}>
-                <TouchableOpacity 
-                  style={[
-                    styles.cardNavButton,
-                    currentCardIndex === 0 && styles.cardNavButtonDisabled
-                  ]}
-                  onPress={handlePreviousCard}
-                  disabled={currentCardIndex === 0}
-                >
-                  <Ionicons 
-                    name="chevron-back" 
-                    size={20} 
-                    color={currentCardIndex === 0 ? '#9CA3AF' : '#374151'} 
-                  />
-                </TouchableOpacity>
-                
-                <Text style={styles.cardCounter}>
-                  {currentCardIndex + 1} / {habits.length}
-                </Text>
-                
-                <TouchableOpacity 
-                  style={[
-                    styles.cardNavButton,
-                    currentCardIndex === habits.length - 1 && styles.cardNavButtonDisabled
-                  ]}
-                  onPress={handleNextCard}
-                  disabled={currentCardIndex === habits.length - 1}
-                >
-                  <Ionicons 
-                    name="chevron-forward" 
-                    size={20} 
-                    color={currentCardIndex === habits.length - 1 ? '#9CA3AF' : '#374151'} 
-                  />
-                </TouchableOpacity>
-              </View>
-            )}
+            {/* Section Journée */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Habitudes de la journée</Text>
+              <Text style={styles.sectionDescription}>Pour faire avancer l’essentiel</Text>
+              {dayHabits.length === 0 ? (
+                <Text style={styles.sectionEmpty}>Aucune habitude de journée définie.</Text>
+              ) : (
+                dayHabits.map((habit) => (
+                  <View key={habit.id} style={styles.cardWrapper}>
+                    <HabitCard
+                      habit={habit}
+                      selectedDate={selectedDate}
+                      onToggle={handleToggleHabit}
+                      onSaveWithNote={handleSaveWithNote}
+                      isUpdating={updatingHabits.has(habit.id)}
+                    />
+                  </View>
+                ))
+              )}
+            </View>
+
+            {/* Section Soir */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Habitudes du soir</Text>
+              <Text style={styles.sectionDescription}>Pour préparer demain</Text>
+              {eveningHabits.length === 0 ? (
+                <Text style={styles.sectionEmpty}>Aucune habitude du soir définie.</Text>
+              ) : (
+                eveningHabits.map((habit) => (
+                  <View key={habit.id} style={styles.cardWrapper}>
+                    <HabitCard
+                      habit={habit}
+                      selectedDate={selectedDate}
+                      onToggle={handleToggleHabit}
+                      onSaveWithNote={handleSaveWithNote}
+                      isUpdating={updatingHabits.has(habit.id)}
+                    />
+                  </View>
+                ))
+              )}
+            </View>
+
+            {/* Section Anti-habitudes */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Anti-habitudes</Text>
+              <Text style={styles.sectionDescription}>À éviter aujourd’hui</Text>
+              {antiHabits.length === 0 ? (
+                <Text style={styles.sectionEmpty}>Aucune anti-habitude définie.</Text>
+              ) : (
+                antiHabits.map((habit) => {
+                  const allEntries = (habit.completions || habit.entries || []) as any[];
+                  const dateString = format(selectedDate, 'yyyy-MM-dd');
+                  const entry = allEntries.find(
+                    (e) => format(new Date(e.date), 'yyyy-MM-dd') === dateString
+                  );
+                  const isBroken = entry?.completed ?? false;
+
+                  return (
+                    <View key={habit.id} style={styles.antiHabitRow}>
+                      <View>
+                        <Text style={styles.antiHabitName}>{habit.name}</Text>
+                      </View>
+                      <Text
+                        style={[
+                          styles.antiHabitStatus,
+                          isBroken ? styles.antiHabitBroken : styles.antiHabitRespected,
+                        ]}
+                      >
+                        {isBroken ? 'Brisée aujourd’hui' : 'Respectée aujourd’hui'}
+                      </Text>
+                    </View>
+                  );
+                })
+              )}
+            </View>
           </View>
         )}
       </ScrollView>
@@ -774,18 +801,35 @@ const styles = StyleSheet.create({
     backgroundColor: '#10B981',
     width: 24,
   },
+  section: {
+    marginBottom: 24,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 4,
+  },
+  sectionDescription: {
+    fontSize: 13,
+    color: '#6B7280',
+    marginBottom: 12,
+  },
+  sectionEmpty: {
+    fontSize: 13,
+    color: '#9CA3AF',
+  },
   content: {
     flex: 1,
   },
   cardsContainer: {
     padding: 16,
-    height: 600, // Hauteur fixe pour le container de swipe
   },
   cardsWrapper: {
     flexDirection: 'row',
   },
   cardWrapper: {
-    width: CARD_WIDTH,
+    width: '100%',
     paddingRight: 0,
   },
   habitCard: {
@@ -846,6 +890,29 @@ const styles = StyleSheet.create({
   habitDescription: {
     fontSize: 14,
     color: '#6B7280',
+  },
+  antiHabitRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  antiHabitName: {
+    fontSize: 15,
+    color: '#111827',
+    fontWeight: '500',
+  },
+  antiHabitStatus: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  antiHabitRespected: {
+    color: '#10B981',
+  },
+  antiHabitBroken: {
+    color: '#EF4444',
   },
   progressContainer: {
     alignItems: 'center',

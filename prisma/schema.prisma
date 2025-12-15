@@ -211,6 +211,8 @@ model Habit {
   color       String?      @db.VarChar(7)
   frequency   String       @db.VarChar(10)
   daysOfWeek  String[]
+  inferredCategory     String?   @db.VarChar(20)
+  userCategoryOverride String?   @db.VarChar(20)
   userId      String
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
