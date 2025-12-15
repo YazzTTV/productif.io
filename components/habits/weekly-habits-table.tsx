@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { ChevronLeft, ChevronRight, GripVertical, Pencil, Trash2 } from "lucide-react"
+import { ChevronLeft, ChevronRight, GripVertical, MoreHorizontal, Pencil, Trash2 } from "lucide-react"
 import Link from "next/link"
 import {
   AlertDialog,
@@ -31,6 +31,15 @@ import { Habit, HabitEntry } from "@prisma/client"
 import { Checkbox } from "@/components/ui/checkbox"
 import { CustomHabitEntry } from "./custom-habit-entry"
 import { toast } from "sonner"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import type { HabitCategory } from "@/lib/habits-utils"
 import {
   DndContext,
   closestCenter,
@@ -226,6 +235,40 @@ export function WeeklyHabitsTable({
            habitName.toLowerCase().includes("note de sa journée")
   }
 
+  const handleUpdateCategory = async (habitId: string, category: HabitCategory | null) => {
+    try {
+      const response = await fetch(`/api/habits/${habitId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          userCategoryOverride: category,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error("Erreur lors de la mise à jour de la catégorie")
+      }
+
+      toast.success("Catégorie mise à jour")
+      // Mise à jour optimiste locale
+      setSortedHabits(prev =>
+        prev.map(h =>
+          h.id === habitId
+            ? {
+                ...h,
+                userCategoryOverride: category as any,
+              }
+            : h
+        )
+      )
+    } catch (error) {
+      console.error("Error updating habit category:", error)
+      toast.error("Erreur lors de la mise à jour de la catégorie")
+    }
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -272,7 +315,7 @@ export function WeeklyHabitsTable({
                     </div>
                   </TableHead>
                 ))}
-                <TableHead className="w-[100px]"></TableHead>
+                <TableHead className="w-[140px]">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <SortableContext 
@@ -291,6 +334,7 @@ export function WeeklyHabitsTable({
                     handleToggle={handleToggle}
                     handleCustomUpdate={handleCustomUpdateWrapper}
                     handleDeleteHabit={handleDeleteHabit}
+                    handleUpdateCategory={handleUpdateCategory}
                     DAYS_OF_WEEK={DAYS_OF_WEEK}
                   />
                 ))}
@@ -324,6 +368,7 @@ interface SortableTableRowProps {
   ) => Promise<void>
   handleDeleteHabit: (habitId: string) => Promise<void>
   DAYS_OF_WEEK: Record<string, string>
+  handleUpdateCategory: (habitId: string, category: HabitCategory | null) => Promise<void>
 }
 
 function SortableTableRow({
@@ -335,7 +380,8 @@ function SortableTableRow({
   handleToggle,
   handleCustomUpdate,
   handleDeleteHabit,
-  DAYS_OF_WEEK
+  DAYS_OF_WEEK,
+  handleUpdateCategory,
 }: SortableTableRowProps) {
   const {
     attributes,
@@ -362,7 +408,16 @@ function SortableTableRow({
           {...listeners} 
         />
       </TableCell>
-      <TableCell className="font-medium">{habit.name}</TableCell>
+      <TableCell className="font-medium">
+        <div className="flex items-center gap-2">
+          <span>{habit.name}</span>
+          {habit.userCategoryOverride && (
+            <span className="text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200">
+              Manuel
+            </span>
+          )}
+        </div>
+      </TableCell>
       <TableCell>
         <div className="flex gap-1">
           {habit.daysOfWeek.map((day) => (
@@ -407,28 +462,46 @@ function SortableTableRow({
       })}
       <TableCell>
         <div className="flex justify-end gap-2">
-          {!isDefaultHabit(habit.name) && (
-            <>
-              <Link href={`/dashboard/habits/${habit.id}/edit`}>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
                 <Button
                   variant="ghost"
                   size="icon"
                   className="text-gray-500 hover:text-gray-700"
                   disabled={loading === habit.id}
                 >
-                  <Pencil className="h-4 w-4" />
+                <MoreHorizontal className="h-4 w-4" />
                 </Button>
-              </Link>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>Catégorie</DropdownMenuLabel>
+              <DropdownMenuItem onClick={() => handleUpdateCategory(habit.id, "MORNING")}>
+                Déplacer vers le matin
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleUpdateCategory(habit.id, "DAY")}>
+                Déplacer vers la journée
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleUpdateCategory(habit.id, "EVENING")}>
+                Déplacer vers le soir
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleUpdateCategory(habit.id, "ANTI")}>
+                Déplacer vers anti-habitude
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => handleUpdateCategory(habit.id, null)}>
+                Revenir en automatique
+              </DropdownMenuItem>
+              {!isDefaultHabit(habit.name) && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild>
+                    <Link href={`/dashboard/habits/${habit.id}/edit`}>Modifier</Link>
+                  </DropdownMenuItem>
               <AlertDialog>
                 <AlertDialogTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="text-gray-500 hover:text-red-500"
-                    disabled={loading === habit.id}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                      <DropdownMenuItem className="text-red-600 focus:text-red-600">
+                        Supprimer
+                      </DropdownMenuItem>
                 </AlertDialogTrigger>
                 <AlertDialogContent>
                   <AlertDialogHeader>
@@ -450,6 +523,8 @@ function SortableTableRow({
               </AlertDialog>
             </>
           )}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </TableCell>
     </TableRow>

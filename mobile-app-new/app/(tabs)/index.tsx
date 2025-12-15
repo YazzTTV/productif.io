@@ -544,27 +544,26 @@ export default function DashboardScreen() {
       const deepWorkStatsData = deepWorkStats.status === 'fulfilled' ? deepWorkStats.value : null;
       const weeklyProductivityData = weeklyProductivity.status === 'fulfilled' ? weeklyProductivity.value : null;
 
-      // Calculate today's tasks
-      let todayTasks: any[] = [];
+      // Calculate all active tasks (not just today's)
+      let allTasks: any[] = [];
       if (tasksData) {
         const rawTasks = Array.isArray(tasksData.tasks) ? tasksData.tasks : Array.isArray(tasksData) ? tasksData : [];
-        todayTasks = rawTasks.filter((task: any) => {
-          const taskDate = task.createdAt ? new Date(task.createdAt).toISOString().split('T')[0] : todayStr;
-          const dueDate = task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : null;
-          const completedAt = task.completedAt || task.updatedAt;
-          const completedToday = completedAt ? new Date(completedAt).toISOString().split('T')[0] === todayStr : false;
-          return (
-            taskDate === todayStr ||
-            dueDate === todayStr ||
-            completedToday ||
-            task.status === 'PENDING' ||
-            task.status === 'IN_PROGRESS'
-          );
+        // Inclure toutes les tâches actives (non complétées ou complétées récemment)
+        allTasks = rawTasks.filter((task: any) => {
+          const isCompleted = task.status === 'COMPLETED' || task.completed === true;
+          // Inclure toutes les tâches non complétées + celles complétées aujourd'hui
+          if (isCompleted) {
+            const completedAt = task.completedAt || task.updatedAt;
+            const completedToday = completedAt ? new Date(completedAt).toISOString().split('T')[0] === todayStr : false;
+            return completedToday;
+          }
+          // Inclure toutes les tâches non complétées (PENDING, IN_PROGRESS, etc.)
+          return task.status === 'PENDING' || task.status === 'IN_PROGRESS' || !isCompleted;
         });
       }
 
-      const completedTasks = todayTasks.filter((task: any) => task.status === 'COMPLETED' || task.completed === true).length;
-      const totalTasks = todayTasks.length;
+      const completedTasks = allTasks.filter((task: any) => task.status === 'COMPLETED' || task.completed === true).length;
+      const totalTasks = allTasks.length;
 
       // Process habits
       let habitsList: any[] = [];
@@ -586,18 +585,11 @@ export default function DashboardScreen() {
         );
       };
 
-      // Format habits for display - Afficher seulement les habitudes pertinentes et non complétées
+      // Format habits for display - Afficher toutes les habitudes actives (non complétées en priorité)
       const activeHabitsForDisplay = habitsList.filter((h: any) => h.isActive !== false);
-      const nowSlot = getCurrentTimeSlot();
 
       const formattedHabits = activeHabitsForDisplay
         .map((habit: any) => {
-          const cat = slot(habit);
-          const normalizedSlot =
-            cat === "MORNING" ? "morning" :
-            cat === "EVENING" ? "evening" :
-            cat === "ANTI"    ? "anti"    :
-            "day";
           const entries = habit.entries || habit.completions || [];
           const todayEntry = entries.find((entry: any) => {
             const entryDate = new Date(entry.date).toISOString().split('T')[0];
@@ -610,13 +602,13 @@ export default function DashboardScreen() {
             completed: !!todayEntry,
             streak: habit.currentStreak || 0,
             time: habit.reminderTime || '09:00',
-            slot: normalizedSlot,
           };
         })
-        // Ne garder que les habitudes non complétées et pertinentes maintenant
-        .filter((habit: any) => !habit.completed && isHabitRelevantNow(habit.slot, nowSlot))
-        // Limiter le nombre d’habitudes affichées pour réduire la charge cognitive
-        .slice(0, 5);
+        // Trier : non complétées en premier, puis complétées
+        .sort((a, b) => {
+          if (a.completed === b.completed) return 0;
+          return a.completed ? 1 : -1;
+        });
 
       // Calculate daily progress (habits + tasks)
       const activeHabits = habitsList.filter((h: any) => h.isActive !== false);

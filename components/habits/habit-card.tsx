@@ -147,9 +147,16 @@ export function HabitCard({
 
       {/* Nom de l'habitude avec meilleur style */}
       <div className="mb-6">
-        <h3 className="font-bold text-gray-900 text-base leading-tight mb-1">
+        <div className="flex items-center gap-2 mb-1">
+          <h3 className="font-bold text-gray-900 text-base leading-tight">
           {habit.name}
         </h3>
+          {habit.userCategoryOverride && (
+            <span className="text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200">
+              Manuel
+            </span>
+          )}
+        </div>
         {!isScheduledDay ? (
           <p className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full inline-block">
             Non prévu aujourd'hui
