@@ -4,3 +4,7 @@ ADD COLUMN IF NOT EXISTS "inferredCategory" TEXT,
 ADD COLUMN IF NOT EXISTS "userCategoryOverride" TEXT;
 
 
+
+
+
+
