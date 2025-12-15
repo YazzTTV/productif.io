@@ -158,6 +158,8 @@ model Habit {
   color       String?      @db.VarChar(7) // Format hexadécimal: #RRGGBB
   frequency   String       @db.VarChar(10) // 'daily', 'weekly', 'monthly'
   daysOfWeek  String[]     // ["monday", "wednesday", "friday"]
+  inferredCategory     String?   @db.VarChar(20)
+  userCategoryOverride String?   @db.VarChar(20)
   userId      String
   order       Int          @default(0) // Nouvel attribut pour l'ordre d'affichage
   user        User         @relation(fields: [userId], references: [id])

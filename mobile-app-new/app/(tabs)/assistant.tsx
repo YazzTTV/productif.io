@@ -34,6 +34,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { Audio } from 'expo-av';
 import * as FileSystem from 'expo-file-system';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { assistantService, tasksService, habitsService, getAuthToken, dashboardService } from '@/lib/api';
 import { format } from 'date-fns';
 import { LockedCard } from '@/components/LockedCard';
@@ -91,6 +92,8 @@ const timeOptions = [
   { label: '60 min', minutes: 60, emoji: '💪' },
 ];
 
+const DEEPWORK_STORAGE_KEY = 'productif_deepwork_state_v1';
+
 export default function AssistantScreen() {
   const t = useTranslation();
   const insets = useSafeAreaInsets();
@@ -126,6 +129,7 @@ export default function AssistantScreen() {
 
   // Deep Work Mode State
   const [isDeepWorkActive, setIsDeepWorkActive] = useState(false);
+  const [deepWorkStartAt, setDeepWorkStartAt] = useState<number | null>(null);
   const [deepWorkTimeLeft, setDeepWorkTimeLeft] = useState(25 * 60);
   const [selectedDuration, setSelectedDuration] = useState(25);
   const [showTimeSelector, setShowTimeSelector] = useState(false);
@@ -177,31 +181,34 @@ export default function AssistantScreen() {
 
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isLoadingTasks, setIsLoadingTasks] = useState(false);
+  const [isInputFocused, setIsInputFocused] = useState(false);
 
-  // Timer Effect
+  // Timer Effect (basé sur l'horodatage pour survivre aux fermetures/app en arrière-plan)
   useEffect(() => {
     let interval: NodeJS.Timeout;
 
-    if (isDeepWorkActive && deepWorkTimeLeft > 0) {
-      interval = setInterval(() => {
-        setDeepWorkTimeLeft((prev) => {
-          if (prev <= 1) {
-            // Finir la session automatiquement
-            setShowSessionCompleteAnimation(true);
-            setTimeout(() => {
-              endSession();
-            }, 0);
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
+    if (isDeepWorkActive && deepWorkStartAt && selectedDuration) {
+      const tick = () => {
+        const elapsed = Math.floor((Date.now() - deepWorkStartAt) / 1000);
+        const remaining = Math.max(0, selectedDuration * 60 - elapsed);
+        setDeepWorkTimeLeft(remaining);
+
+        if (remaining <= 0) {
+          setShowSessionCompleteAnimation(true);
+          setTimeout(() => {
+            endSession();
+          }, 0);
+        }
+      };
+
+      tick(); // mise à jour immédiate au montage
+      interval = setInterval(tick, 1000);
     }
 
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [isDeepWorkActive, deepWorkTimeLeft]);
+  }, [isDeepWorkActive, deepWorkStartAt, selectedDuration]);
 
   // Recording Timer Effects
   useEffect(() => {
@@ -353,6 +360,50 @@ export default function AssistantScreen() {
     return null;
   };
 
+  const persistDeepWorkState = useCallback(async (payload: { startAt: number; durationSeconds: number; sessionId?: string | null; plannedMinutes?: number }) => {
+    try {
+      await AsyncStorage.setItem(DEEPWORK_STORAGE_KEY, JSON.stringify(payload));
+    } catch (err) {
+      console.warn('Impossible de persister l’état du deep work :', err);
+    }
+  }, []);
+
+  const clearDeepWorkState = useCallback(async () => {
+    try {
+      await AsyncStorage.removeItem(DEEPWORK_STORAGE_KEY);
+    } catch (err) {
+      console.warn('Impossible de nettoyer l’état du deep work :', err);
+    }
+  }, []);
+
+  const restoreDeepWorkState = useCallback(async () => {
+    try {
+      const raw = await AsyncStorage.getItem(DEEPWORK_STORAGE_KEY);
+      if (!raw) return;
+
+      const parsed = JSON.parse(raw);
+      if (!parsed?.startAt || !parsed?.durationSeconds) return;
+
+      const elapsed = Math.floor((Date.now() - parsed.startAt) / 1000);
+      const remaining = Math.max(0, parsed.durationSeconds - elapsed);
+
+      if (remaining <= 0) {
+        await clearDeepWorkState();
+        return;
+      }
+
+      const plannedMinutes = parsed.plannedMinutes || Math.round(parsed.durationSeconds / 60);
+
+      setSelectedDuration(plannedMinutes);
+      setDeepWorkSessionId(parsed.sessionId || null);
+      setIsDeepWorkActive(true);
+      setDeepWorkStartAt(parsed.startAt);
+      setDeepWorkTimeLeft(remaining);
+    } catch (err) {
+      console.warn('Impossible de restaurer l’état du deep work :', err);
+    }
+  }, [clearDeepWorkState]);
+
   const checkActiveSession = useCallback(async () => {
     try {
       const active = await assistantService.getActiveDeepWorkSession();
@@ -362,8 +413,19 @@ export default function AssistantScreen() {
         setDeepWorkSessionId(session.id);
         const planned = session.plannedDuration || selectedDuration || 25;
         const remaining = session.remainingSeconds || planned * 60;
+        const startAt =
+          remaining && planned
+            ? Date.now() - (planned * 60 - remaining) * 1000
+            : Date.now();
         setSelectedDuration(planned);
+        setDeepWorkStartAt(startAt);
         setDeepWorkTimeLeft(remaining);
+        await persistDeepWorkState({
+          startAt,
+          durationSeconds: planned * 60,
+          sessionId: session.id,
+          plannedMinutes: planned,
+        });
         await loadTodayTasks();
         return session;
       }
@@ -371,7 +433,7 @@ export default function AssistantScreen() {
       console.warn('Impossible de récupérer la session active de deep work :', err);
     }
     return null;
-  }, [selectedDuration]);
+  }, [persistDeepWorkState, selectedDuration]);
 
   const refreshXpStatus = useCallback(async () => {
     try {
@@ -395,6 +457,10 @@ export default function AssistantScreen() {
   useEffect(() => {
     refreshXpStatus();
   }, [refreshXpStatus]);
+
+  useEffect(() => {
+    restoreDeepWorkState();
+  }, [restoreDeepWorkState]);
 
   const endActiveSessionIfAny = useCallback(
     async (sessionOverride?: any): Promise<boolean> => {
@@ -478,8 +544,17 @@ export default function AssistantScreen() {
 
       setIsDeepWorkActive(true);
       setDeepWorkSessionId(response?.session?.id || response?.id || null);
-      setDeepWorkTimeLeft(minutes * 60);
+      const startedAt = Date.now();
+      const durationSeconds = minutes * 60;
+      setDeepWorkStartAt(startedAt);
+      setDeepWorkTimeLeft(durationSeconds);
       setSelectedDuration(minutes);
+      await persistDeepWorkState({
+        startAt: startedAt,
+        durationSeconds,
+        sessionId: response?.session?.id || response?.id || null,
+        plannedMinutes: minutes,
+      });
 
       // Charger les tâches d'aujourd'hui
       await loadTodayTasks();
@@ -1141,9 +1216,12 @@ export default function AssistantScreen() {
       }
     }
 
+    await clearDeepWorkState();
+    setDeepWorkStartAt(null);
     setSessionStats({ timeSpent, tasksCompleted, xpEarned });
     setIsDeepWorkActive(false);
     setDeepWorkSessionId(null);
+    setDeepWorkTimeLeft(0);
     // Ne pas afficher automatiquement le résumé - laisser le silence être la récompense
     // setShowSessionSummary(true);
 
@@ -1407,7 +1485,7 @@ export default function AssistantScreen() {
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + 20 : 0}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + 10 : 0}
       >
         <View style={styles.content}>
           {/* Header with AI Avatar */}
@@ -1463,7 +1541,10 @@ export default function AssistantScreen() {
           <LockedCard onLockedClick={() => setShowUpgradeModal(true)}>
             <ScrollView
               style={styles.messagesContainer}
-              contentContainerStyle={[styles.messagesContent, { paddingBottom: 200 }]}
+              contentContainerStyle={[
+                styles.messagesContent,
+                { paddingBottom: isInputFocused ? 260 : 200 },
+              ]}
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
               keyboardDismissMode="on-drag"
@@ -1594,7 +1675,15 @@ export default function AssistantScreen() {
 
         {/* Input Area fixed bottom */}
         <LockedCard onLockedClick={() => setShowUpgradeModal(true)}>
-          <View style={[styles.inputBarWrapper, { backgroundColor: colors.background }]}>
+          <View
+            style={[
+              styles.inputBarWrapper,
+              {
+                backgroundColor: colors.background,
+                paddingBottom: Platform.OS === 'ios' ? (isInputFocused ? insets.bottom : insets.bottom + 4) : 8,
+              },
+            ]}
+          >
             {/* Quick Action Chips moved near input - masqués après complétion pour réduire le bruit UI */}
             {!showSessionSummary && (
             <ScrollView
@@ -1639,6 +1728,8 @@ export default function AssistantScreen() {
                   placeholder={t('askMeAnything')}
                   placeholderTextColor={colors.textSecondary}
                   multiline
+                  onFocus={() => setIsInputFocused(true)}
+                  onBlur={() => setIsInputFocused(false)}
                   maxLength={500}
                 />
               </View>
@@ -2129,6 +2220,7 @@ function JournalModal({
   prompt: string;
 }) {
   const t = useTranslation();
+  const insets = useSafeAreaInsets();
   const micScale = useSharedValue(1);
   const processingRotation = useSharedValue(0);
   const pulseRings = [useSharedValue(1), useSharedValue(1), useSharedValue(1)];
@@ -2194,128 +2286,145 @@ function JournalModal({
 
                         return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <BlurView intensity={20} style={styles.voiceModalBackdrop}>
-        <Pressable style={styles.voiceModalContent} onPress={(e) => e.stopPropagation()}>
-          <LinearGradient
-            colors={['#00C27A', '#00D68F']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.voiceModalHeader}
-          >
-            <Text style={styles.voiceModalEmoji}>{emoji}</Text>
-            <Text style={styles.voiceModalTitle}>{title}</Text>
-            <Text style={styles.voiceModalSubtitle}>{subtitle}</Text>
-          </LinearGradient>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={insets.top + 20}
+        style={{ flex: 1 }}
+      >
+        <BlurView intensity={20} style={styles.voiceModalBackdrop}>
+          <Pressable style={styles.voiceModalContent} onPress={(e) => e.stopPropagation()}>
+            <ScrollView
+              contentContainerStyle={[
+                styles.voiceModalScroll,
+                { paddingBottom: insets.bottom + 180 },
+              ]}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
+              <LinearGradient
+                colors={['#00C27A', '#00D68F']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.voiceModalHeader}
+              >
+                <Text style={styles.voiceModalEmoji}>{emoji}</Text>
+                <Text style={styles.voiceModalTitle}>{title}</Text>
+                <Text style={styles.voiceModalSubtitle}>{subtitle}</Text>
+              </LinearGradient>
 
-          <View style={styles.voiceModalBody}>
-            {isProcessing ? (
-              <View style={styles.processingContainer}>
-                <Animated.View style={[styles.processingIcon, processingRotationStyle]}>
-                  <Ionicons name="flash" size={32} color="#00C27A" />
-                </Animated.View>
-                <Text style={styles.processingText}>{t('processingReflections')}</Text>
+              <View style={styles.voiceModalBody}>
+                {isProcessing ? (
+                  <View style={styles.processingContainer}>
+                    <Animated.View style={[styles.processingIcon, processingRotationStyle]}>
+                      <Ionicons name="flash" size={32} color="#00C27A" />
+                    </Animated.View>
+                    <Text style={styles.processingText}>{t('processingReflections')}</Text>
+                  </View>
+                ) : (
+                  <>
+                    {/* Champ de texte pour saisie manuelle */}
+                    <View style={styles.journalTextContainer}>
+                      <Text style={styles.journalTextLabel}>{t('journalTextLabel')}</Text>
+                      <TextInput
+                        style={styles.journalTextInput}
+                        value={journalText}
+                        onChangeText={onJournalTextChange}
+                        placeholder={t('journalTextPlaceholder')}
+                        placeholderTextColor="#9CA3AF"
+                        multiline
+                        numberOfLines={6}
+                        textAlignVertical="top"
+                        editable={!isRecording}
+                        returnKeyType="done"
+                        blurOnSubmit={true}
+                      />
+                    </View>
+
+                    <View style={styles.micContainer}>
+                      <Animated.View style={micAnimatedStyle}>
+                        <TouchableOpacity
+                          onPress={isRecording ? onStopRecording : onStartRecording}
+                          activeOpacity={0.8}
+                          style={[
+                            styles.micButtonLarge,
+                            isRecording && styles.micButtonRecording,
+                            { zIndex: 10 },
+                          ]}
+                        >
+                          <LinearGradient
+                            colors={isRecording ? ['#EF4444', '#DC2626'] : ['#00C27A', '#00D68F']}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 1 }}
+                            style={styles.micButtonGradient}
+                          >
+                            <Ionicons name="mic" size={48} color="#FFFFFF" />
+                          </LinearGradient>
+                        </TouchableOpacity>
+                      </Animated.View>
+
+                      {isRecording && (
+                        <>
+                          <Animated.View
+                            style={[styles.pulseRing, pulseRingStyle1]}
+                            pointerEvents="none"
+                          />
+                          <Animated.View
+                            style={[styles.pulseRing, pulseRingStyle2]}
+                            pointerEvents="none"
+                          />
+                          <Animated.View
+                            style={[styles.pulseRing, pulseRingStyle3]}
+                            pointerEvents="none"
+                          />
+                          <View style={styles.recordingDot} pointerEvents="none" />
+                        </>
+                      )}
+                    </View>
+
+                    {isRecording && (
+                      <Text style={styles.recordingTime}>{formatTime(recordingTime)}</Text>
+                    )}
+
+                    <Text style={styles.voicePrompt}>
+                      {isRecording
+                        ? t('tapToStop')
+                        : journalText.trim()
+                          ? t('youCanRecord')
+                          : t('writeOrRecord')}
+                    </Text>
+                    <Text style={styles.voicePromptHint}>{prompt}</Text>
+                  </>
+                )}
               </View>
-            ) : (
-              <>
-                {/* Champ de texte pour saisie manuelle */}
-                <View style={styles.journalTextContainer}>
-                  <Text style={styles.journalTextLabel}>{t('journalTextLabel')}</Text>
-                  <TextInput
-                    style={styles.journalTextInput}
-                    value={journalText}
-                    onChangeText={onJournalTextChange}
-                    placeholder={t('journalTextPlaceholder')}
-                    placeholderTextColor="#9CA3AF"
-                    multiline
-                    numberOfLines={6}
-                    textAlignVertical="top"
-                    editable={!isRecording}
-                  />
-                </View>
 
-                <View style={styles.micContainer}>
-                  <Animated.View style={micAnimatedStyle}>
+              {!isProcessing && (
+                <View style={styles.voiceModalActions}>
+                  <TouchableOpacity onPress={onClose} style={styles.voiceModalCancel}>
+                    <Text style={styles.voiceModalCancelText}>{t('cancel')}</Text>
+                  </TouchableOpacity>
+                  {onSubmit && journalText.trim() && (
                     <TouchableOpacity
-                      onPress={isRecording ? onStopRecording : onStartRecording}
-                      activeOpacity={0.8}
-                      style={[
-                        styles.micButtonLarge,
-                        isRecording && styles.micButtonRecording,
-                        { zIndex: 10 },
-                      ]}
+                      onPress={onSubmit}
+                      style={styles.voiceModalSubmit}
+                      disabled={!journalText.trim()}
                     >
                       <LinearGradient
-                        colors={isRecording ? ['#EF4444', '#DC2626'] : ['#00C27A', '#00D68F']}
+                        colors={['#00C27A', '#00D68F']}
                         start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 1 }}
-                        style={styles.micButtonGradient}
+                        end={{ x: 1, y: 0 }}
+                        style={styles.voiceModalSubmitGradient}
                       >
-                        <Ionicons name="mic" size={48} color="#FFFFFF" />
+                        <Ionicons name="send" size={18} color="#FFFFFF" />
+                        <Text style={styles.voiceModalSubmitText}>{t('send')}</Text>
                       </LinearGradient>
                     </TouchableOpacity>
-                  </Animated.View>
-
-                  {isRecording && (
-                    <>
-                          <Animated.View
-                        style={[styles.pulseRing, pulseRingStyle1]}
-                        pointerEvents="none"
-                      />
-                      <Animated.View
-                        style={[styles.pulseRing, pulseRingStyle2]}
-                        pointerEvents="none"
-                      />
-                      <Animated.View
-                        style={[styles.pulseRing, pulseRingStyle3]}
-                        pointerEvents="none"
-                      />
-                      <View style={styles.recordingDot} pointerEvents="none" />
-                    </>
                   )}
                 </View>
-
-                {isRecording && (
-                  <Text style={styles.recordingTime}>{formatTime(recordingTime)}</Text>
-                )}
-
-                <Text style={styles.voicePrompt}>
-                  {isRecording
-                    ? t('tapToStop')
-                    : journalText.trim()
-                      ? t('youCanRecord')
-                      : t('writeOrRecord')}
-                </Text>
-                <Text style={styles.voicePromptHint}>{prompt}</Text>
-              </>
-            )}
-          </View>
-
-          {!isProcessing && (
-            <View style={styles.voiceModalActions}>
-            <TouchableOpacity onPress={onClose} style={styles.voiceModalCancel}>
-                <Text style={styles.voiceModalCancelText}>{t('cancel')}</Text>
-              </TouchableOpacity>
-              {onSubmit && journalText.trim() && (
-                <TouchableOpacity 
-                  onPress={onSubmit} 
-                  style={styles.voiceModalSubmit}
-                  disabled={!journalText.trim()}
-                >
-                  <LinearGradient
-                    colors={['#00C27A', '#00D68F']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={styles.voiceModalSubmitGradient}
-                  >
-                    <Ionicons name="send" size={18} color="#FFFFFF" />
-                    <Text style={styles.voiceModalSubmitText}>{t('send')}</Text>
-                  </LinearGradient>
-            </TouchableOpacity>
               )}
-            </View>
-          )}
-        </Pressable>
-      </BlurView>
+            </ScrollView>
+          </Pressable>
+        </BlurView>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -3455,6 +3564,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#FFFFFF',
+  },
+  voiceModalScroll: {
+    flexGrow: 1,
   },
   // Journal Text Input Styles
   journalTextContainer: {
