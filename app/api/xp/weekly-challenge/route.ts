@@ -1,13 +1,13 @@
-import { NextResponse } from "next/server";
-import { getAuthUser } from "@/lib/auth";
+import { NextRequest, NextResponse } from "next/server";
+import { getAuthUserFromRequest } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 // Simple défi hebdo : atteindre 500 XP sur 7 jours
 const WEEKLY_TARGET_XP = 500;
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const user = await getAuthUser();
+    const user = await getAuthUserFromRequest(req);
     if (!user) {
       return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
     }
