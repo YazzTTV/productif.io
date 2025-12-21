@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAuthUser } from "@/lib/auth";
+import { getAuthUserFromRequest } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { computeXpForEvent, computeLevel } from "@/lib/xp";
 
 export async function POST(req: NextRequest) {
   try {
-    const user = await getAuthUser();
+    const user = await getAuthUserFromRequest(req);
     if (!user) {
       return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
     }

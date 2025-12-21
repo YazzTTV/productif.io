@@ -56,9 +56,16 @@ interface DashboardData {
   }
 }
 
+// Simple cache for dashboard data (5 seconds TTL)
+const dashboardCache: { data: DashboardData | null; timestamp: number } = {
+  data: null,
+  timestamp: 0
+}
+const CACHE_TTL = 5000 // 5 seconds
+
 export function NewDashboard() {
   const router = useRouter()
-  const { t } = useLocale()
+  const { t, locale } = useLocale()
   const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
   const [habitStates, setHabitStates] = useState<Array<{ id: string; name: string; completed: boolean; streak: number }>>([])
@@ -82,26 +89,99 @@ export function NewDashboard() {
 
   const fetchDashboardData = async () => {
     try {
-      // Fetch all dashboard data in parallel
-      const [metricsRes, weeklyRes, habitsRes, leaderboardRes, userRes, todayTasksRes] = await Promise.all([
+      // Check cache first
+      const now = Date.now()
+      if (dashboardCache.data && (now - dashboardCache.timestamp) < CACHE_TTL) {
+        setData(dashboardCache.data)
+        setLoading(false)
+        return
+      }
+
+      // Fetch ALL dashboard data in parallel (including previously sequential calls)
+      const [
+        metricsRes, 
+        weeklyRes, 
+        habitsRes, 
+        leaderboardRes, 
+        userRes, 
+        todayTasksRes,
+        deepWorkRes,
+        gamificationRes,
+        achievementsRes
+      ] = await Promise.all([
         fetch("/api/dashboard/metrics"),
         fetch("/api/dashboard/weekly-productivity?period=week"),
         fetch("/api/habits"),
         fetch("/api/gamification/leaderboard?limit=3"),
         fetch("/api/auth/me"),
-        fetch("/api/tasks/today")
+        fetch("/api/tasks/today"),
+        fetch("/api/dashboard/deepwork-stats"),
+        fetch("/api/gamification/stats"),
+        fetch("/api/gamification/achievements")
       ])
 
-      const metrics = await safeJsonResponse(metricsRes, "dashboard/metrics")
-      const weekly = await safeJsonResponse(weeklyRes, "dashboard/weekly-productivity")
-      const habits = await safeJsonResponse(habitsRes, "habits")
-      const leaderboard = await safeJsonResponse(leaderboardRes, "gamification/leaderboard")
-      const user = await safeJsonResponse(userRes, "auth/me")
-      const todayTasks = await safeJsonResponse(todayTasksRes, "tasks/today")
+      // Parse all JSON responses in parallel for better performance
+      const [
+        metrics,
+        weekly,
+        habits,
+        leaderboard,
+        user,
+        todayTasks,
+        deepWork,
+        gamification,
+        achievementsData
+      ] = await Promise.all([
+        safeJsonResponse(metricsRes, "dashboard/metrics").catch((error: any) => {
+          console.error("Erreur dashboard/metrics:", error)
+          throw new Error(`Erreur lors du chargement des métriques: ${error.message}`)
+        }),
+        safeJsonResponse(weeklyRes, "dashboard/weekly-productivity").catch((error: any) => {
+          console.error("Erreur dashboard/weekly-productivity:", error)
+          throw new Error(`Erreur lors du chargement de la productivité hebdomadaire: ${error.message}`)
+        }),
+        safeJsonResponse(habitsRes, "habits").catch((error: any) => {
+          console.error("Erreur habits:", error)
+          throw new Error(`Erreur lors du chargement des habitudes: ${error.message}`)
+        }),
+        safeJsonResponse(leaderboardRes, "gamification/leaderboard").catch((error: any) => {
+          console.error("Erreur gamification/leaderboard:", error)
+          return { leaderboard: [] } // Non-critique
+        }),
+        safeJsonResponse(userRes, "auth/me").catch((error: any) => {
+          console.error("Erreur auth/me:", error)
+          router.push("/login")
+          throw new Error(`Erreur lors du chargement des informations utilisateur: ${error.message}`)
+        }),
+        safeJsonResponse(todayTasksRes, "tasks/today").catch((error: any) => {
+          console.error("Erreur tasks/today:", error)
+          return [] // Non-critique
+        }),
+        safeJsonResponse(deepWorkRes, "dashboard/deepwork-stats").catch((error: any) => {
+          console.error("Erreur deepwork-stats:", error)
+          return {} // Non-critique
+        }),
+        safeJsonResponse(gamificationRes, "gamification/stats").catch((error: any) => {
+          console.error("Erreur gamification/stats:", error)
+          return {} // Non-critique
+        }),
+        safeJsonResponse(achievementsRes, "gamification/achievements").catch((error: any) => {
+          console.error("Erreur achievements:", error)
+          return { achievements: [] } // Non-critique
+        })
+      ])
 
-      // Calculate today's progress - même logique que l'app mobile
-      const tasksCompleted = metrics.tasks?.completed || 0
-      const totalTasks = metrics.tasks?.today || 0
+      // Calculate today's progress - utiliser directement les tâches d'aujourd'hui
+      // todayTasks contient toutes les tâches d'aujourd'hui
+      const todayTasksArray = Array.isArray(todayTasks) ? todayTasks : []
+      const tasksCompletedToday = todayTasksArray.filter((task: any) => 
+        task.completed || task.status === 'COMPLETED'
+      ).length
+      const totalTasksToday = todayTasksArray.length
+      
+      // Fallback sur metrics si todayTasks est vide
+      const tasksCompleted = totalTasksToday > 0 ? tasksCompletedToday : (metrics?.tasks?.completed || 0)
+      const totalTasks = totalTasksToday > 0 ? totalTasksToday : (metrics?.tasks?.today || 0)
 
       // Préparer la date du jour au format AAAA-MM-JJ (comme sur mobile)
       const todayStr = new Date().toISOString().split("T")[0]
@@ -144,10 +224,7 @@ export function NewDashboard() {
         productivityScore = Math.round(tasksProgress)
       }
 
-      // Get focus hours from deep work stats (même endpoint que sur mobile)
-      const deepWorkRes = await fetch("/api/dashboard/deepwork-stats")
-      const deepWork = await safeJsonResponse(deepWorkRes, "dashboard/deepwork-stats")
-
+      // Get focus hours from deep work stats (already fetched in Promise.all)
       let focusHours = 0
       if (deepWork?.today) {
         if (typeof deepWork.today.seconds === "number") {
@@ -157,19 +234,13 @@ export function NewDashboard() {
         }
       }
 
-      // Get deep work metrics for performance section
+      // Get deep work metrics for performance section (already fetched)
       const totalDeepWorkHours = Math.round(deepWork?.allTime?.hours || 0)
       const weeklyDeepWorkHours = Math.round(deepWork?.week?.hours || 0)
       const bestSession = deepWork?.bestSession || 'N/A'
 
-      // Get streak from gamification
-      const gamificationRes = await fetch("/api/gamification/stats")
-      const gamification = await safeJsonResponse(gamificationRes, "gamification/stats")
+      // Get streak from gamification (already fetched)
       const streakDays = gamification?.currentStreak || gamification?.streak || 0
-
-      // Get achievements
-      const achievementsRes = await fetch("/api/gamification/achievements")
-      const achievementsData = await safeJsonResponse(achievementsRes, "gamification/achievements")
       
       // Get unlocked achievements (most recent first) and locked achievements
       const unlocked = (achievementsData?.achievements || [])
@@ -271,9 +342,31 @@ export function NewDashboard() {
         project: task.project
       })) : []
 
-      setData({
+      // Extraire le prénom (premier mot du nom)
+      // L'API /api/auth/me retourne { user: { name: ... } }
+      // Donc user contient déjà { user: { name: ... } }
+      const userData = user?.user || user
+      const fullName = userData?.name || userData?.userName || user?.name || user?.userName || null
+      
+      console.log("[DASHBOARD] Debug utilisateur:", {
+        userStructure: user,
+        userData: userData,
+        fullName: fullName,
+        hasName: !!fullName
+      })
+      
+      // Si pas de nom, utiliser l'email ou "User"
+      let firstName = "User"
+      if (fullName && fullName !== "User") {
+        firstName = fullName.split(' ')[0] || fullName
+      } else if (userData?.email) {
+        // Utiliser la partie avant @ de l'email comme fallback
+        firstName = userData.email.split('@')[0]
+      }
+      
+      const dashboardData: DashboardData = {
         user: {
-          name: user?.name || user?.userName || "User"
+          name: firstName
         },
         metrics: {
           todayProgress,
@@ -294,9 +387,33 @@ export function NewDashboard() {
           bestSession,
           rank: formattedLeaderboard.findIndex(u => u.isUser) + 1 || 1
         }
-      })
-    } catch (error) {
+      }
+      
+      // Update cache and state
+      dashboardCache.data = dashboardData
+      dashboardCache.timestamp = Date.now()
+      setData(dashboardData)
+    } catch (error: any) {
       console.error("Error fetching dashboard data:", error)
+      
+      // Si l'erreur est liée à l'authentification, rediriger vers la page de connexion
+      if (error.message?.includes("Non authentifié") || 
+          error.message?.includes("authentification") ||
+          error.message?.includes("401") ||
+          error.message?.includes("403")) {
+        if (typeof window !== "undefined") {
+          console.log("Redirection vers /login - utilisateur non authentifié")
+          window.location.href = "/login"
+          return
+        }
+      }
+      
+      // Afficher un message d'erreur plus clair dans la console
+      console.error("Détails de l'erreur:", {
+        message: error.message,
+        name: error.name,
+        stack: error.stack
+      })
     } finally {
       setLoading(false)
     }
@@ -440,7 +557,7 @@ export function NewDashboard() {
             {/* Logo & Brand */}
             <Link href="/dashboard" className="flex items-center gap-3 mr-auto">
               <Image
-                src="/P_tech_letter_logo_TEMPLATE-removebg-preview.png"
+                src="/icon.png"
                 alt="Productif.io"
                 width={64}
                 height={64}
@@ -620,8 +737,8 @@ export function NewDashboard() {
               >
                 <div className="flex items-center justify-between mb-6">
                   <div>
-                    <h3 className="text-gray-800 text-xl mb-1">Performance hebdomadaire</h3>
-                    <p className="text-gray-500 text-sm">Moyenne de productivité sur 7 jours</p>
+                    <h3 className="text-gray-800 text-xl mb-1">{t('weeklyPerformance')}</h3>
+                    <p className="text-gray-500 text-sm">{t('averageProductivity7Days')}</p>
                   </div>
                   <motion.button
                     whileHover={{ scale: 1.05 }}
@@ -755,7 +872,7 @@ export function NewDashboard() {
                               </div>
                               {task.dueDate && (
                                 <div className="text-xs text-gray-400 mt-1">
-                                  Échéance: {new Date(task.dueDate).toLocaleDateString('fr-FR')}
+                                  {t('dueDate')}: {new Date(task.dueDate).toLocaleDateString(locale === 'fr' ? 'fr-FR' : 'en-US')}
                                 </div>
                               )}
                             </div>
@@ -763,8 +880,8 @@ export function NewDashboard() {
                         ))
                       ) : (
                         <div className="text-center py-8">
-                          <p className="text-gray-500 text-sm">Aucune tâche pour aujourd'hui</p>
-                          <p className="text-gray-400 text-xs mt-1">Excellent travail ! 🎉</p>
+                          <p className="text-gray-500 text-sm">{t('noTasksToday')}</p>
+                          <p className="text-gray-400 text-xs mt-1">{t('excellentWork')}</p>
                         </div>
                       )}
                     </div>
@@ -772,7 +889,7 @@ export function NewDashboard() {
                     {/* Summary at bottom */}
                     <div className="mt-6 pt-4 border-t border-gray-200">
                       <div className="flex items-center justify-between text-sm">
-                        <span className="text-gray-600">Terminé</span>
+                        <span className="text-gray-600">{t('completed')}</span>
                         <span className="text-[#00C27A] font-bold">{data.metrics.tasksCompleted}/{data.metrics.totalTasks}</span>
                       </div>
                     </div>

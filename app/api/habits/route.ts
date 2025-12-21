@@ -54,7 +54,7 @@ export async function GET(req: NextRequest) {
     // Obtenir le jour en anglais pour le filtrage
     const currentDayOfWeek = today.toLocaleDateString("en-US", { weekday: "long" }).toLowerCase()
     
-    // Récupérer toutes les habitudes de l'utilisateur avec toutes leurs entrées historiques
+    // Récupérer toutes les habitudes de l'utilisateur avec leurs entrées récentes (optimisation: limiter à 60 dernières pour le calcul des streaks)
     const habits = await prisma.habit.findMany({
       where: {
         userId: user.id,
@@ -63,7 +63,8 @@ export async function GET(req: NextRequest) {
         entries: {
           orderBy: {
             date: 'desc'
-          }
+          },
+          take: 60 // Limiter à 60 dernières entrées pour optimiser les performances
         }
       },
       orderBy: {
@@ -74,6 +75,25 @@ export async function GET(req: NextRequest) {
     // Calculer les streaks pour chaque habitude
     const habitsWithStreaks = habits.map(habit => {
       let streak = 0
+      
+      // Vérifier si l'habitude est prévue aujourd'hui
+      const isScheduledToday = habit.daysOfWeek.includes(currentDayOfWeek)
+      
+      // Vérifier si l'habitude est complétée aujourd'hui
+      const todayEntry = habit.entries.find(entry => {
+        const entryDate = new Date(entry.date)
+        entryDate.setHours(12, 0, 0, 0)
+        return entryDate.getTime() === normalizedDate.getTime()
+      })
+      const isCompletedToday = todayEntry?.completed === true
+      
+      // Si l'habitude est prévue aujourd'hui mais pas complétée, le streak est 0
+      if (isScheduledToday && !isCompletedToday) {
+        return {
+          ...habit,
+          currentStreak: 0,
+        }
+      }
       
       // Trier les entrées complétées par date décroissante (les plus récentes en premier)
       const sortedEntries = [...habit.entries]
@@ -93,8 +113,14 @@ export async function GET(req: NextRequest) {
       const lastCompletedDate = new Date(lastEntry.date)
       lastCompletedDate.setHours(12, 0, 0, 0)
       
-      // Calculer le streak en remontant depuis le dernier jour complété
-      let checkDate = new Date(lastCompletedDate)
+      // Si l'habitude est complétée aujourd'hui, commencer depuis aujourd'hui
+      // Sinon, commencer depuis le dernier jour complété
+      let checkDate: Date
+      if (isCompletedToday) {
+        checkDate = new Date(normalizedDate)
+      } else {
+        checkDate = new Date(lastCompletedDate)
+      }
       checkDate.setHours(12, 0, 0, 0)
       
       // Créer un Set des dates complétées pour une recherche rapide
