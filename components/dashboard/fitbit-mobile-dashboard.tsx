@@ -144,8 +144,16 @@ export function FitbitMobileDashboard() {
         fetch("/api/gamification/stats")
       ])
       
-      if (!metricsResponse.ok) throw new Error("Erreur lors du chargement des métriques")
-      if (!gamificationResponse.ok) throw new Error("Erreur lors du chargement des stats de gamification")
+      // Vérifier les réponses et gérer les erreurs
+      if (!metricsResponse.ok) {
+        const errorData = await metricsResponse.json().catch(() => ({ error: "Erreur inconnue" }))
+        throw new Error(`Erreur lors du chargement des métriques: ${errorData.error || metricsResponse.statusText}`)
+      }
+      
+      if (!gamificationResponse.ok) {
+        const errorData = await gamificationResponse.json().catch(() => ({ error: "Erreur inconnue" }))
+        throw new Error(`Erreur lors du chargement des stats de gamification: ${errorData.error || gamificationResponse.statusText}`)
+      }
       
       const metricsData = await metricsResponse.json()
       const gamificationData = await gamificationResponse.json()

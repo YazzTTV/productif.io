@@ -2,19 +2,21 @@
 
 import { motion } from "framer-motion"
 import { Clock, FolderKanban, ListTodo, CheckCircle } from "lucide-react"
+import { useLocale } from "@/lib/i18n"
 
 interface AnalyticsSummaryProps {
   stats: {
     totalTimeTracked: number
     totalProjects: number
     activeProjects?: number
-    totalTasks: numberr
+    totalTasks: number
     completedTasks: number
     completionRate: number
   }
 }
 
 export function AnalyticsSummary({ stats }: AnalyticsSummaryProps) {
+  const { t } = useLocale()
   // Formater le temps total (format: XXh XXm)
   const formatTotalTime = (hours: number) => {
     // Le temps est déjà en heures, pas en secondes
@@ -40,11 +42,11 @@ export function AnalyticsSummary({ stats }: AnalyticsSummaryProps) {
         />
         <div className="relative z-10">
           <Clock size={28} className="mb-3 opacity-90" />
-          <p className="text-white/80 mb-2 text-sm">Total time tracked</p>
+          <p className="text-white/80 mb-2 text-sm">{t('totalTimeTracked')}</p>
           <div className="flex items-baseline gap-2 mb-1">
             <p className="text-4xl">{formatTotalTime(stats.totalTimeTracked)}</p>
           </div>
-          <p className="text-white/70 text-sm">Total time recorded</p>
+          <p className="text-white/70 text-sm">{t('totalTimeRecorded')}</p>
         </div>
       </motion.div>
 
@@ -56,14 +58,14 @@ export function AnalyticsSummary({ stats }: AnalyticsSummaryProps) {
         className="bg-white rounded-3xl p-6 shadow-lg border border-gray-100"
       >
         <FolderKanban size={28} className="text-[#00C27A] mb-3" />
-        <p className="text-gray-600 mb-2 text-sm">Projects</p>
+        <p className="text-gray-600 mb-2 text-sm">{t('projects')}</p>
         <div className="flex items-baseline gap-2 mb-2">
           <p className="text-gray-800 text-4xl">{stats.totalProjects}</p>
         </div>
         <p className="text-[#00C27A] text-sm">
           {stats.activeProjects !== undefined ? 
-           `${stats.activeProjects} active` : 
-           'Projects created'}
+           `${stats.activeProjects} ${stats.activeProjects > 1 ? t('activePlural') : t('active')}` : 
+           t('projectsCreated')}
         </p>
       </motion.div>
 
@@ -75,11 +77,11 @@ export function AnalyticsSummary({ stats }: AnalyticsSummaryProps) {
         className="bg-gradient-to-br from-orange-400 to-pink-500 rounded-3xl p-6 shadow-xl text-white relative overflow-hidden"
       >
         <ListTodo size={28} className="mb-3 opacity-90" />
-        <p className="text-white/80 mb-2 text-sm">Tasks</p>
+        <p className="text-white/80 mb-2 text-sm">{t('tasks')}</p>
         <div className="flex items-baseline gap-2 mb-1">
           <p className="text-4xl">{stats.totalTasks}</p>
         </div>
-        <p className="text-white/70 text-sm">{stats.completedTasks} completed</p>
+        <p className="text-white/70 text-sm">{stats.completedTasks} {t('completed')}</p>
       </motion.div>
 
       {/* Taux de complétion - Gradient violet/indigo */}
@@ -90,11 +92,11 @@ export function AnalyticsSummary({ stats }: AnalyticsSummaryProps) {
         className="bg-gradient-to-br from-purple-500 to-indigo-600 rounded-3xl p-6 shadow-xl text-white relative overflow-hidden"
       >
         <CheckCircle size={28} className="mb-3 opacity-90" />
-        <p className="text-white/80 mb-2 text-sm">Completion rate</p>
+        <p className="text-white/80 mb-2 text-sm">{t('completionRate')}</p>
         <div className="flex items-baseline gap-2 mb-1">
           <p className="text-4xl">{stats.completionRate}%</p>
         </div>
-        <p className="text-white/70 text-sm">Tasks completed</p>
+        <p className="text-white/70 text-sm">{t('tasksCompleted')}</p>
       </motion.div>
     </div>
   )

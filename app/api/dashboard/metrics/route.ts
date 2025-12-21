@@ -1,19 +1,25 @@
-import { NextResponse } from "next/server"
-import { getAuthUser } from "@/lib/auth"
+import { NextRequest, NextResponse } from "next/server"
+import { getAuthUser, getAuthUserFromRequest } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { format, startOfDay, endOfDay, isSameDay, isAfter, isBefore, startOfTomorrow, isTomorrow } from "date-fns"
 
 // Augmenter le timeout pour les requêtes complexes (60 secondes)
 export const maxDuration = 60
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   const startTime = Date.now()
   const routeName = "[METRICS]"
   
   try {
     console.log(`${routeName} ⏱️  DÉBUT - Route: /api/dashboard/metrics - Timestamp: ${new Date().toISOString()}`)
     
-    const user = await getAuthUser()
+    // Essayer d'abord avec getAuthUserFromRequest (tokens utilisateur dans headers)
+    let user = await getAuthUserFromRequest(request)
+    
+    // Si pas d'utilisateur, essayer avec getAuthUser (cookies pour web)
+    if (!user) {
+      user = await getAuthUser()
+    }
     
     if (!user) {
       console.log(`${routeName} ❌ ERREUR - Non authentifié après ${Date.now() - startTime}ms`)
@@ -51,10 +57,18 @@ export async function GET(request: Request) {
     console.log("[METRICS] Fuseau horaire serveur:", Intl.DateTimeFormat().resolvedOptions().timeZone)
 
     // OPTIMISATION: Vérification rapide si l'utilisateur est nouveau (pas de données)
-    const [taskCount, habitCount] = await Promise.all([
-      prisma.task.count({ where: { userId: user.id } }),
-      prisma.habit.count({ where: { userId: user.id } })
-    ])
+    let taskCount = 0
+    let habitCount = 0
+    
+    try {
+      [taskCount, habitCount] = await Promise.all([
+        prisma.task.count({ where: { userId: user.id } }),
+        prisma.habit.count({ where: { userId: user.id } })
+      ])
+    } catch (error: any) {
+      console.error("[METRICS] Erreur lors du comptage des tâches/habitudes:", error)
+      throw new Error(`Erreur lors de la récupération des données: ${error.message}`)
+    }
 
     // Si pas de tâches ni d'habitudes, retourner une réponse vide rapidement
     if (taskCount === 0 && habitCount === 0) {
@@ -91,11 +105,17 @@ export async function GET(request: Request) {
     }
 
     // Récupérer TOUTES les tâches récentes seulement si nécessaire
-    const recentTasks = await prisma.task.findMany({
-      where: {
-        userId: user.id,
-      }
-    })
+    let recentTasks = []
+    try {
+      recentTasks = await prisma.task.findMany({
+        where: {
+          userId: user.id,
+        }
+      })
+    } catch (error: any) {
+      console.error("[METRICS] Erreur lors de la récupération des tâches:", error)
+      throw new Error(`Erreur lors de la récupération des tâches: ${error.message}`)
+    }
 
     console.log("[METRICS] Nombre total de tâches non filtrées:", recentTasks.length)
 
@@ -180,26 +200,32 @@ export async function GET(request: Request) {
     console.log("[METRICS] Jour de la semaine actuel:", currentDayOfWeek)
     
     // Récupérer toutes les habitudes de l'utilisateur avec leurs entrées pour aujourd'hui
-    const habits = await prisma.habit.findMany({
-      where: {
-        userId: user.id,
-        // Filtrer pour ne garder que les habitudes pour ce jour de la semaine
-        daysOfWeek: {
-          has: currentDayOfWeek
-        }
-      },
-      include: {
-        entries: {
-          where: {
-            // Utiliser la date normalisée pour la cohérence avec l'API habits/today
-            date: normalizedDate
+    let habits = []
+    try {
+      habits = await prisma.habit.findMany({
+        where: {
+          userId: user.id,
+          // Filtrer pour ne garder que les habitudes pour ce jour de la semaine
+          daysOfWeek: {
+            has: currentDayOfWeek
           }
+        },
+        include: {
+          entries: {
+            where: {
+              // Utiliser la date normalisée pour la cohérence avec l'API habits/today
+              date: normalizedDate
+            }
+          }
+        },
+        orderBy: {
+          order: 'asc'
         }
-      },
-      orderBy: {
-        order: 'asc'
-      }
-    })
+      })
+    } catch (error: any) {
+      console.error("[METRICS] Erreur lors de la récupération des habitudes:", error)
+      throw new Error(`Erreur lors de la récupération des habitudes: ${error.message}`)
+    }
 
     console.log("[METRICS] Nombre d'habitudes trouvées pour", currentDayOfWeek, ":", habits.length)
     
@@ -220,13 +246,20 @@ export async function GET(request: Request) {
     const longestStreak = 5
 
     // Récupération des objectifs depuis le modèle Objective
-    const objectives = await prisma.objective.findMany({
-      where: {
-        mission: {
-          userId: user.id
+    let objectives = []
+    try {
+      objectives = await prisma.objective.findMany({
+        where: {
+          mission: {
+            userId: user.id
+          }
         }
-      }
-    })
+      })
+    } catch (error: any) {
+      console.error("[METRICS] Erreur lors de la récupération des objectifs:", error)
+      // Les objectifs ne sont pas critiques, on continue avec un tableau vide
+      objectives = []
+    }
 
     const objectivesProgress = objectives.length > 0
       ? Math.round(objectives.reduce((sum, obj) => sum + (obj.progress || 0), 0) / objectives.length)
@@ -283,12 +316,20 @@ export async function GET(request: Request) {
     console.log("[METRICS] Réponse finale:", JSON.stringify(response, null, 2))
 
     return NextResponse.json(response)
-  } catch (error) {
+  } catch (error: any) {
     const totalTime = Date.now() - startTime
     console.error(`${routeName} ❌ ERREUR - Route échouée après ${totalTime}ms - Timestamp: ${new Date().toISOString()}`)
     console.error("[METRICS_ERROR] Erreur lors de la récupération des métriques:", error)
+    console.error("[METRICS_ERROR] Stack trace:", error?.stack)
+    console.error("[METRICS_ERROR] Message:", error?.message)
+    
+    // Retourner un message d'erreur plus détaillé en développement
+    const errorMessage = process.env.NODE_ENV === 'development' 
+      ? `Erreur interne du serveur: ${error?.message || 'Erreur inconnue'}`
+      : "Erreur interne du serveur"
+    
     return NextResponse.json(
-      { error: "Erreur interne du serveur" },
+      { error: errorMessage },
       { status: 500 }
     )
   }
