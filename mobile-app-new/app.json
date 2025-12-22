@@ -13,8 +13,10 @@
       "infoPlist": {
         "NSCameraUsageDescription": "We need access to your camera to allow you to take photos for your tasks and journal entries.",
         "NSPhotoLibraryUsageDescription": "We need access to your photo library to let you select images for your tasks and journal entries.",
-        "NSPhotoLibraryAddUsageDescription": "We need permission to save images to your photo library."
-      }
+        "NSPhotoLibraryAddUsageDescription": "We need permission to save images to your photo library.",
+        "NSUserNotificationsUsageDescription": "Nous avons besoin de votre permission pour vous envoyer des notifications importantes concernant vos tâches, habitudes et rappels."
+      },
+      "usesAppleSignIn": true
     },
     "android": {
       "versionCode": 8,
@@ -45,6 +47,14 @@
         "expo-av",
         {
           "microphonePermission": "Autoriser l'accès au microphone pour enregistrer votre voix."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.png",
+          "color": "#00C27A",
+          "sounds": []
         }
       ],
       [

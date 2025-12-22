@@ -11,8 +11,12 @@ RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 
 # Copy package files
 COPY package*.json ./
-COPY .npmrc ./
 COPY prisma ./prisma/
+
+# Create .npmrc with defaults for npm installation
+RUN echo "legacy-peer-deps=true" > .npmrc && \
+    echo "strict-peer-dependencies=false" >> .npmrc && \
+    echo "auto-install-peers=true" >> .npmrc
 
 # Install dependencies
 RUN npm ci
@@ -32,4 +36,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
   CMD curl -fsS http://localhost:$PORT/health || exit 1
 
 # Start the scheduler service (run DB migrations first)
-CMD ["sh", "-lc", "npx prisma migrate deploy && npm run start:scheduler"]
+# Utiliser un script shell pour mieux gérer les erreurs
+CMD ["sh", "-c", "set -e && echo '🔄 Application des migrations Prisma...' && npx prisma migrate deploy && echo '✅ Migrations appliquées' && echo '🚀 Démarrage du scheduler...' && npm run start:scheduler"]

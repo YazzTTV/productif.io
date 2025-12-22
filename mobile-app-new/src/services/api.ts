@@ -1,3 +1,5 @@
+import { TokenStorage } from '../../lib/api';
+
 const API_BASE_URL = 'https://www.productif.io/api';
 
 export interface ApiResponse<T> {
@@ -13,8 +15,9 @@ export interface ApiError {
 }
 
 class ApiService {
-  private getAuthHeaders(): HeadersInit {
-    const token = localStorage.getItem('auth_token');
+  private async getAuthHeaders(): Promise<HeadersInit> {
+    const tokenStorage = TokenStorage.getInstance();
+    const token = await tokenStorage.getToken();
     return {
       'Content-Type': 'application/json',
       ...(token && { 'Authorization': `Bearer ${token}` }),
@@ -25,10 +28,11 @@ class ApiService {
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({ message: 'Erreur réseau' }));
       
-      // Si token expiré, rediriger vers login
+      // Si token expiré, nettoyer le token
       if (response.status === 401) {
-        localStorage.removeItem('auth_token');
-        window.location.reload();
+        const tokenStorage = TokenStorage.getInstance();
+        await tokenStorage.clearToken();
+        console.log('🔒 Token expiré, nettoyage effectué');
       }
       
       throw {
@@ -42,41 +46,61 @@ class ApiService {
   }
 
   async get<T>(endpoint: string): Promise<T> {
+    const headers = await this.getAuthHeaders();
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
       method: 'GET',
-      headers: this.getAuthHeaders(),
+      headers,
     });
     return this.handleResponse<T>(response);
   }
 
   async post<T>(endpoint: string, data?: any): Promise<T> {
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    const headers = await this.getAuthHeaders();
+    const url = `${API_BASE_URL}${endpoint}`;
+    const hasAuth = 'Authorization' in headers;
+    console.log(`🌐 [ApiService] POST ${url}`, {
+      hasData: !!data,
+      hasAuth,
+      dataKeys: data ? Object.keys(data) : []
+    });
+    
+    const response = await fetch(url, {
       method: 'POST',
-      headers: this.getAuthHeaders(),
+      headers,
       body: data ? JSON.stringify(data) : undefined,
     });
+    
+    console.log(`📡 [ApiService] Réponse reçue:`, {
+      status: response.status,
+      statusText: response.statusText,
+      ok: response.ok
+    });
+    
     return this.handleResponse<T>(response);
   }
 
   async put<T>(endpoint: string, data?: any): Promise<T> {
+    const headers = await this.getAuthHeaders();
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
       method: 'PUT',
-      headers: this.getAuthHeaders(),
+      headers,
       body: data ? JSON.stringify(data) : undefined,
     });
     return this.handleResponse<T>(response);
   }
 
   async delete<T>(endpoint: string): Promise<T> {
+    const headers = await this.getAuthHeaders();
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
       method: 'DELETE',
-      headers: this.getAuthHeaders(),
+      headers,
     });
     return this.handleResponse<T>(response);
   }
 
   async upload<T>(endpoint: string, formData: FormData): Promise<T> {
-    const token = localStorage.getItem('auth_token');
+    const tokenStorage = TokenStorage.getInstance();
+    const token = await tokenStorage.getToken();
     const headers: HeadersInit = {};
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;

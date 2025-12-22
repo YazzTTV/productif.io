@@ -1,5 +1,5 @@
 import { Intent } from '@/lib/ai/IntentDetectionService';
-import prisma from '@/lib/prisma';
+import { prisma } from '@/lib/prisma';
 import { sendWhatsAppMessage } from '@/lib/whatsapp';
 import { handleTaskPlanningCommand } from './handlers/task-planning.handler';
 import { handleDeepWorkCommand } from './handlers/deepwork.handler';

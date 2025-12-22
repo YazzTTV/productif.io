@@ -11,6 +11,7 @@ import { ThemeProvider, useTheme } from '@/contexts/ThemeContext';
 import { LanguageProvider } from '@/contexts/LanguageContext';
 import Constants from 'expo-constants';
 import '@/utils/suppressWarnings'; // Supprimer les warnings NativeEventEmitter
+import { usePushNotifications } from '@/hooks/usePushNotifications';
 
 // Stripe publishable key - from environment variables or app.json extra config
 const STRIPE_PUBLISHABLE_KEY = 
@@ -23,6 +24,9 @@ function AppContent() {
   const [loaded] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
   });
+  
+  // Initialiser les notifications push au démarrage
+  usePushNotifications();
 
   if (!loaded) {
     return null;

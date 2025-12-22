@@ -1,10 +1,52 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyApiToken, hasRequiredScopes } from '@/lib/api-token'
+import { verifyApiToken, hasRequiredScopes, ApiTokenPayload } from '@/lib/api-token'
 import { TrialService } from '@/lib/trial/TrialService'
 
 export interface ApiAuthOptions {
   requiredScopes?: string[]
   checkTrial?: boolean // Activer la vérification du trial
+}
+
+export interface VerifyApiTokenResult {
+  valid: boolean
+  error?: string
+  payload?: ApiTokenPayload
+}
+
+/**
+ * Helper pour vérifier un token API depuis une requête Next.js
+ * Utilisé par les routes API qui ont besoin d'une vérification simple
+ */
+export async function verifyApiTokenFromRequest(
+  req: NextRequest,
+  requiredScopes?: string[]
+): Promise<VerifyApiTokenResult> {
+  const authHeader = req.headers.get('authorization')
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return { valid: false, error: 'Un token API est requis' }
+  }
+
+  const token = authHeader.substring(7)
+  if (!token) {
+    return { valid: false, error: 'Un token API est requis' }
+  }
+
+  const payload = await verifyApiToken(token)
+  if (!payload) {
+    return { valid: false, error: 'Token API invalide ou expiré' }
+  }
+
+  if (requiredScopes && requiredScopes.length > 0) {
+    if (!hasRequiredScopes(payload.scopes, requiredScopes)) {
+      return { 
+        valid: false, 
+        error: 'Permissions insuffisantes',
+        payload 
+      }
+    }
+  }
+
+  return { valid: true, payload }
 }
 
 /**

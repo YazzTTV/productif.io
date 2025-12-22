@@ -116,6 +116,34 @@ class NotificationService {
             await this.whatsappService.sendMessage(userPhoneNumber, messageContent, notification.id, null);
             console.log(`🔵 [${processingId}] WhatsApp envoyé avec succès pour notification ${notification.id}`);
             
+            // Envoyer aussi une notification push si activée
+            if (settings?.pushEnabled) {
+                try {
+                    const { sendPushNotification } = await import('../../lib/apns.js');
+                    const title = getNotificationTitle(notification.type);
+                    const body = this.extractBodyFromContent(notification.content);
+                    
+                    const pushResult = await sendPushNotification(notification.userId, {
+                        title: title,
+                        body: body,
+                        sound: 'default',
+                        data: {
+                            notificationId: notification.id,
+                            type: notification.type
+                        }
+                    });
+                    
+                    if (pushResult.success && pushResult.sent > 0) {
+                        console.log(`📱 [${processingId}] Notification push envoyée avec succès (${pushResult.sent} appareil(s))`);
+                    } else if (pushResult.failed > 0) {
+                        console.log(`⚠️ [${processingId}] Notification push partiellement échouée (${pushResult.failed} échec(s))`);
+                    }
+                } catch (pushError) {
+                    console.error(`❌ [${processingId}] Erreur lors de l'envoi de la notification push:`, pushError);
+                    // On continue même si la push échoue, WhatsApp est déjà envoyé
+                }
+            }
+            
             // Marquer comme envoyée
             await this.prisma.notificationHistory.update({
                 where: { id: notification.id },
@@ -164,6 +192,16 @@ class NotificationService {
         } else {
             return start === 0; // 0->0 : 24/24
         }
+    }
+    extractBodyFromContent(content) {
+        if (!content) return '';
+        // Retirer les emojis et formater pour notification push
+        let body = content.replace(/\n+/g, ' ').trim();
+        // Limiter à 200 caractères pour les notifications push
+        if (body.length > 200) {
+            body = body.substring(0, 197) + '...';
+        }
+        return body;
     }
     formatWhatsAppMessage(notification) {
         const title = getNotificationTitle(notification.type);

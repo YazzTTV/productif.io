@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyApiToken } from '@/middleware/api-auth'
+import { verifyApiTokenFromRequest } from '@/middleware/api-auth'
 import { analyzeBehaviorPatterns } from '@/lib/ai/behavior-analysis.service'
-import prisma from '@/lib/prisma'
+import { prisma } from '@/lib/prisma'
 
 // GET : récupérer ou générer l'analyse
 export async function GET(req: NextRequest) {
-  const verification = await verifyApiToken(req, ['behavior:read'])
+  const verification = await verifyApiTokenFromRequest(req, ['behavior:read'])
   if (!verification.valid) {
     return NextResponse.json({ error: verification.error }, { status: 401 })
   }
@@ -56,7 +56,7 @@ export async function GET(req: NextRequest) {
 
 // POST : forcer la régénération
 export async function POST(req: NextRequest) {
-  const verification = await verifyApiToken(req, ['behavior:write'])
+  const verification = await verifyApiTokenFromRequest(req, ['behavior:write'])
   if (!verification.valid) {
     return NextResponse.json({ error: verification.error }, { status: 401 })
   }
