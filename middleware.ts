@@ -17,12 +17,12 @@ function decodeJwtPayload(token: string): any | null {
 
 // Définir les routes publiques qui ne nécessitent pas d'authentification
 const publicRoutes = [
-  "/login", 
-  "/register", 
+  "/login",
+  "/register",
   "/onboarding",
-  "/upgrade", 
-  "/api/auth", 
-  "/api/auth/login", 
+  "/upgrade",
+  "/api/auth",
+  "/api/auth/login",
   "/api/auth/register",
   "/api/webhooks/stripe",
   "/merci",
@@ -34,7 +34,9 @@ const publicRoutes = [
   "/legal",
   "/privacy-policy",
   "/terms",
-  "/refund-policy"
+  "/refund-policy",
+  // Landing marketing publique
+  "/landing",
 ]
 
 export async function middleware(request: NextRequest) {
