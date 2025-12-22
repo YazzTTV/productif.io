@@ -63,6 +63,8 @@ model User {
   LeaderboardGroupMember LeaderboardGroupMember[]
   agentInteractions      AgentInteraction[]
   onboardingData         OnboardingData?
+  xpEvents               XpEvent[]
+  pushTokens             PushToken[]
 }
 
 model Company {
@@ -343,7 +345,6 @@ model UserGamification {
   totalHabitsCompleted Int       @default(0)
   totalPoints          Int       @default(0)
   user                 User      @relation(fields: [userId], references: [id])
-  xpEvents             XpEvent[]
 }
 
 model XpEvent {
@@ -747,4 +748,20 @@ model OnboardingData {
   updatedAt DateTime @updatedAt
 
   @@index([userId])
+}
+
+model PushToken {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  platform  String   // 'ios' | 'android' | 'web'
+  deviceId  String?  // Identifiant unique de l'appareil (optionnel)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+  @@index([platform])
+  @@map("push_tokens")
 }

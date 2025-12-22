@@ -1,11 +1,57 @@
 import whatsappService from './whatsappService.js';
 import NotificationScheduler from './NotificationScheduler.js';
 import express from 'express';
+import { PrismaClient } from '@prisma/client';
 
 const app = express();
 
 // Variable globale pour le planificateur
 let scheduler = null;
+
+// Fonction pour attendre que la base de données soit prête et que les migrations soient appliquées
+async function waitForDatabase(maxRetries = 30, delay = 2000) {
+    const prisma = new PrismaClient();
+    
+    for (let i = 0; i < maxRetries; i++) {
+        try {
+            // Tester la connexion en faisant une requête simple
+            await prisma.$queryRaw`SELECT 1`;
+            
+            // Vérifier que les tables principales existent (test sur la table User)
+            try {
+                await prisma.user.findFirst({ take: 1 });
+                console.log('✅ Base de données prête et migrations appliquées');
+                await prisma.$disconnect();
+                return true;
+            } catch (tableError) {
+                // Si la table n'existe pas, c'est que les migrations ne sont pas appliquées
+                if (tableError.code === 'P2021' || tableError.code === 'P0002') {
+                    console.log(`⏳ Tentative ${i + 1}/${maxRetries} - Les migrations ne sont pas encore appliquées...`);
+                    if (i < maxRetries - 1) {
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                        continue;
+                    } else {
+                        console.error('❌ Les migrations ne sont pas appliquées après', maxRetries, 'tentatives');
+                        await prisma.$disconnect();
+                        throw new Error('Migrations non appliquées: ' + tableError.message);
+                    }
+                }
+                throw tableError;
+            }
+        } catch (error) {
+            console.log(`⏳ Tentative ${i + 1}/${maxRetries} - Attente de la base de données...`);
+            console.log(`   Erreur: ${error.code || error.message}`);
+            if (i < maxRetries - 1) {
+                await new Promise(resolve => setTimeout(resolve, delay));
+            } else {
+                console.error('❌ Impossible de se connecter à la base de données après', maxRetries, 'tentatives');
+                console.error('   Dernière erreur:', error.message);
+                await prisma.$disconnect();
+                throw error;
+            }
+        }
+    }
+}
 
 async function startSchedulerService() {
     try {
@@ -169,19 +215,37 @@ async function startSchedulerService() {
             }
         });
 
-        // 2. Démarrer le planificateur
-        console.log('⚙️ Initialisation du planificateur...');
-        scheduler = new NotificationScheduler(whatsappService);
-        await scheduler.start();
-        console.log('✅ Planificateur démarré');
-
-        // 3. Démarrer le serveur pour le healthcheck
+        // 3. Démarrer le serveur pour le healthcheck AVANT le scheduler
         // Railway fournit PORT; local on peut utiliser SCHEDULER_PORT ou 3002
         const port = Number(process.env.PORT || process.env.SCHEDULER_PORT) || 3002;
-        app.listen(port, () => {
+        app.listen(port, '0.0.0.0', () => {
             console.log(`🌐 Serveur de monitoring démarré sur le port ${port}`);
-            console.log(`📊 Status disponible sur http://localhost:${port}/status`);
+            console.log(`📊 Status disponible sur http://0.0.0.0:${port}/status`);
         });
+
+        // 2. Attendre que la base de données soit prête (migrations terminées)
+        console.log('⏳ Attente que la base de données soit prête...');
+        try {
+            await waitForDatabase();
+        } catch (error) {
+            console.error('❌ Erreur lors de la connexion à la base de données:', error);
+            console.error('⚠️ Le serveur continue de fonctionner pour le healthcheck');
+            // Ne pas faire échouer le service, mais le scheduler ne démarrera pas
+            return;
+        }
+
+        // 3. Démarrer le planificateur (après le serveur pour que le healthcheck réponde rapidement)
+        console.log('⚙️ Initialisation du planificateur...');
+        try {
+            scheduler = new NotificationScheduler(whatsappService);
+            await scheduler.start();
+            console.log('✅ Planificateur démarré');
+        } catch (error) {
+            console.error('⚠️ Erreur lors du démarrage du planificateur:', error);
+            console.error('Stack:', error.stack);
+            console.error('⚠️ Le serveur continue de fonctionner pour le healthcheck');
+            // Ne pas faire échouer le service si le scheduler ne démarre pas
+        }
 
         // 4. Gérer l'arrêt gracieux
         process.on('SIGTERM', async () => {
