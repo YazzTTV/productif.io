@@ -9,13 +9,11 @@ import {
   Brain,
   Zap,
   TrendingDown,
-  ArrowRight,
   CheckCircle2,
   Timer,
   Award,
   Flame,
   BarChart3,
-  Sparkles,
   Users,
   BookOpen,
   Focus,
@@ -25,7 +23,8 @@ import {
   Mic,
   Play,
   Lightbulb,
-  User
+  User,
+  Star
 } from "lucide-react"
 
 // Animation variants
@@ -61,7 +60,7 @@ function RevealOnScroll({ children, delay = 0 }: { children: React.ReactNode; de
       ref={ref}
       initial={{ opacity: 0, y: 30 }}
       animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 30 }}
-      transition={{ duration: 0.8, delay, ease: "easeOut" }}
+      transition={{ duration: 0.8, delay }}
     >
       {children}
     </motion.div>
@@ -77,7 +76,7 @@ function AppInHero() {
         {/* iPhone Outer Frame */}
         <div className="bg-black rounded-[3rem] p-2 shadow-2xl">
           {/* iPhone Screen */}
-          <div className="bg-[#FBFBFB] rounded-[2.5rem] overflow-hidden">
+          <div className="bg-white rounded-[2.5rem] overflow-hidden">
             {/* Notch */}
             <div className="h-6 bg-black rounded-b-3xl mx-auto w-32"></div>
             
@@ -191,10 +190,10 @@ function AppInHero() {
             {/* Input Area */}
             <div className="px-4 py-4 border-t border-black/[0.03] bg-white">
               <div className="flex items-center gap-2">
-                <button className="w-10 h-10 bg-[#FBFBFB] border border-black/[0.03] rounded-full flex items-center justify-center">
+                <button className="w-10 h-10 bg-white border border-black/[0.03] rounded-full flex items-center justify-center">
                   <Mic size={18} strokeWidth={1.5} className="text-gray-600" />
                 </button>
-                <div className="flex-1 bg-[#FBFBFB] border border-black/[0.03] rounded-3xl px-4 py-3">
+                <div className="flex-1 bg-white border border-black/[0.03] rounded-3xl px-4 py-3">
                   <span className="text-sm text-gray-400">Ask your coach...</span>
                 </div>
                 <button className="w-10 h-10 bg-[#16a34a] rounded-full flex items-center justify-center hover:bg-[#15803d] transition-colors">
@@ -226,7 +225,7 @@ export default function LandingPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#FBFBFB]">
+    <main className="min-h-screen bg-white">
       {/* Hero Section */}
       <section className="relative min-h-screen flex items-center justify-center px-6 py-20">
         <div className="max-w-6xl mx-auto w-full">
@@ -257,7 +256,7 @@ export default function LandingPage() {
           >
             <motion.div variants={itemVariants}>
               <span className="inline-flex items-center px-4 py-1.5 rounded-full border border-[#16a34a]/20 bg-[#16a34a]/5 text-sm font-medium text-[#16a34a] tracking-tight">
-                For students who want discipline
+                For students who want control
               </span>
             </motion.div>
 
@@ -400,7 +399,7 @@ export default function LandingPage() {
                 }
               ].map((step, index) => (
                 <RevealOnScroll key={step.step} delay={index * 0.15}>
-                  <div className="relative bg-[#FBFBFB] border border-[#16a34a]/10 rounded-3xl p-8 shadow-sm hover:border-[#16a34a]/20 transition-colors">
+                  <div className="relative bg-white border border-[#16a34a]/10 rounded-3xl p-8 shadow-sm hover:border-[#16a34a]/20 transition-colors">
                     <div className="flex items-start gap-4 mb-4">
                       <span className="text-2xl font-light text-[#16a34a]/40 tracking-tight">
                         {step.step}
@@ -425,129 +424,61 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Features - Minimal Design */}
+      {/* Features Section */}
       <section className="py-32 px-6 bg-white">
-        <div className="max-w-4xl mx-auto">
+        <div className="max-w-6xl mx-auto">
           <RevealOnScroll>
-            <h2 className="text-4xl md:text-5xl font-light text-gray-900 tracking-[-0.04em] text-center mb-4">
-              Built for Focus
+            <h2 className="text-4xl md:text-5xl font-light text-gray-900 tracking-[-0.04em] text-center mb-20">
+              Core Features
             </h2>
-            <p className="text-center text-gray-600 mb-16 text-lg">
-              Four core systems that work together
-            </p>
           </RevealOnScroll>
 
-          <div className="space-y-16">
-            {/* AI Coach */}
-            <RevealOnScroll>
-              <div className="border-l-2 border-[#16a34a] pl-8">
-                <div className="flex items-center gap-3 mb-3">
-                  <Brain size={24} strokeWidth={1.5} className="text-[#16a34a]" />
-                  <h3 className="text-2xl font-medium text-gray-900 tracking-tight">
-                    AI Coach Agent
-                  </h3>
-                </div>
-                <p className="text-gray-600 leading-relaxed mb-4">
-                  Structures your deep work sessions, starts focus timers, and closes loops.
-                  Understands your energy levels and schedules tasks accordingly.
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <RevealOnScroll delay={0}>
+              <div className="bg-white border border-black/[0.03] rounded-3xl p-8 shadow-sm hover:border-[#16a34a]/20 transition-colors">
+                <Brain size={32} strokeWidth={1.5} className="text-[#16a34a] mb-4" />
+                <h3 className="text-xl font-medium text-gray-900 mb-3 tracking-tight">
+                  AI Coach Agent
+                </h3>
+                <p className="text-gray-600 text-sm leading-relaxed">
+                  Structures your deep work sessions, starts focus timers, and closes loops automatically.
                 </p>
-                <div className="flex flex-wrap gap-2">
-                  <span className="text-xs px-3 py-1 bg-[#16a34a]/10 text-[#16a34a] rounded-full border border-[#16a34a]/20">
-                    Session Structuring
-                  </span>
-                  <span className="text-xs px-3 py-1 bg-[#16a34a]/10 text-[#16a34a] rounded-full border border-[#16a34a]/20">
-                    Focus Initiation
-                  </span>
-                  <span className="text-xs px-3 py-1 bg-[#16a34a]/10 text-[#16a34a] rounded-full border border-[#16a34a]/20">
-                    Loop Closure
-                  </span>
-                </div>
               </div>
             </RevealOnScroll>
 
-            {/* Energy-Based Tasking */}
             <RevealOnScroll delay={0.1}>
-              <div className="border-l-2 border-[#16a34a] pl-8">
-                <div className="flex items-center gap-3 mb-3">
-                  <Zap size={24} strokeWidth={1.5} className="text-[#16a34a]" />
-                  <h3 className="text-2xl font-medium text-gray-900 tracking-tight">
-                    Energy-Based Tasking
-                  </h3>
-                </div>
-                <p className="text-gray-600 leading-relaxed mb-4">
-                  Prioritize by mental battery, not time. Tasks are scheduled based on your energy levels
-                  throughout the day.
+              <div className="bg-white border border-black/[0.03] rounded-3xl p-8 shadow-sm hover:border-[#16a34a]/20 transition-colors">
+                <Zap size={32} strokeWidth={1.5} className="text-[#16a34a] mb-4" />
+                <h3 className="text-xl font-medium text-gray-900 mb-3 tracking-tight">
+                  Energy-Based Tasking
+                </h3>
+                <p className="text-gray-600 text-sm leading-relaxed">
+                  Prioritize by mental battery, not time. Tasks scheduled based on your energy levels.
                 </p>
-                <div className="grid grid-cols-3 gap-4 mt-6">
-                  <div className="text-center">
-                    <div className="text-sm font-medium text-gray-900 mb-1">Morning</div>
-                    <div className="text-xs text-[#16a34a]">High energy</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-sm font-medium text-gray-900 mb-1">Afternoon</div>
-                    <div className="text-xs text-gray-500">Medium</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-sm font-medium text-gray-900 mb-1">Evening</div>
-                    <div className="text-xs text-gray-500">Low energy</div>
-                  </div>
-                </div>
               </div>
             </RevealOnScroll>
 
-            {/* Habit Tracking */}
             <RevealOnScroll delay={0.2}>
-              <div className="border-l-2 border-[#16a34a] pl-8">
-                <div className="flex items-center gap-3 mb-3">
-                  <Flame size={24} strokeWidth={1.5} className="text-[#16a34a]" />
-                  <h3 className="text-2xl font-medium text-gray-900 tracking-tight">
-                    Habit Tracking
-                  </h3>
-                </div>
-                <p className="text-gray-600 leading-relaxed mb-4">
-                  Visualize streaks and daily presence. Build consistency through daily check-ins
-                  and streak bonuses.
+              <div className="bg-white border border-black/[0.03] rounded-3xl p-8 shadow-sm hover:border-[#16a34a]/20 transition-colors">
+                <Flame size={32} strokeWidth={1.5} className="text-[#16a34a] mb-4" />
+                <h3 className="text-xl font-medium text-gray-900 mb-3 tracking-tight">
+                  Habit Tracking
+                </h3>
+                <p className="text-gray-600 text-sm leading-relaxed">
+                  Visualize streaks and daily presence. Build consistency through daily check-ins.
                 </p>
-                <div className="flex items-center gap-6 mt-6">
-                  <div>
-                    <div className="text-3xl font-light text-[#16a34a] mb-1">12</div>
-                    <div className="text-xs text-gray-500">day streak</div>
-                  </div>
-                  <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
-                    <div className="h-full bg-[#16a34a]" style={{ width: '80%' }} />
-                  </div>
-                  <div className="text-xs text-gray-500">+5 XP/day</div>
-                </div>
               </div>
             </RevealOnScroll>
 
-            {/* XP System */}
             <RevealOnScroll delay={0.3}>
-              <div className="border-l-2 border-[#16a34a] pl-8">
-                <div className="flex items-center gap-3 mb-3">
-                  <Award size={24} strokeWidth={1.5} className="text-[#16a34a]" />
-                  <h3 className="text-2xl font-medium text-gray-900 tracking-tight">
-                    XP System
-                  </h3>
-                </div>
-                <p className="text-gray-600 leading-relaxed mb-4">
+              <div className="bg-white border border-black/[0.03] rounded-3xl p-8 shadow-sm hover:border-[#16a34a]/20 transition-colors">
+                <Award size={32} strokeWidth={1.5} className="text-[#16a34a] mb-4" />
+                <h3 className="text-xl font-medium text-gray-900 mb-3 tracking-tight">
+                  XP System
+                </h3>
+                <p className="text-gray-600 text-sm leading-relaxed">
                   Track progress through XP events. Every action contributes to your level.
-                  Build discipline through gamified consistency.
                 </p>
-                <div className="space-y-3 mt-6">
-                  <div className="flex items-center justify-between py-2 border-b border-black/[0.03]">
-                    <span className="text-sm font-mono text-gray-700">task_complete</span>
-                    <span className="text-sm text-[#16a34a] font-medium">10-20 XP</span>
-                  </div>
-                  <div className="flex items-center justify-between py-2 border-b border-black/[0.03]">
-                    <span className="text-sm font-mono text-gray-700">deepwork_complete</span>
-                    <span className="text-sm text-[#16a34a] font-medium">1 XP/min</span>
-                  </div>
-                  <div className="flex items-center justify-between py-2">
-                    <span className="text-sm font-mono text-gray-700">habit_streak_bonus</span>
-                    <span className="text-sm text-[#16a34a] font-medium">+5 XP/day</span>
-                  </div>
-                </div>
               </div>
             </RevealOnScroll>
           </div>
@@ -567,54 +498,96 @@ export default function LandingPage() {
           </RevealOnScroll>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {/* Gaetan Silgado */}
             <RevealOnScroll delay={0}>
-              <div className="bg-[#FBFBFB] border border-black/[0.03] rounded-3xl p-6 shadow-sm hover:border-[#16a34a]/20 transition-colors">
+              <div className="bg-white border border-black/[0.03] rounded-3xl p-6 shadow-sm hover:border-[#16a34a]/20 transition-colors">
                 <div className="flex items-center gap-1 mb-4">
                   {[...Array(5)].map((_, i) => (
-                    <div key={i} className="w-4 h-4 bg-[#16a34a] rounded-full"></div>
+                    <Star key={i} size={14} strokeWidth={1.5} className="text-[#16a34a] fill-[#16a34a]" />
                   ))}
                   <CheckCircle2 size={16} strokeWidth={1.5} className="text-[#16a34a] ml-2" />
                 </div>
                 <p className="text-gray-700 leading-relaxed mb-6 text-sm">
-                  "As an infopreneur, Productif.io helped me organize and work without distractions. As a result, I generated much more revenue by staying focused on what matters."
+                  &ldquo;As an infopreneur, Productif.io helped me organize and work without distractions. As a result, I generated much more revenue by staying focused on what matters.&rdquo;
                 </p>
-                <div className="border-t border-black/[0.03] pt-4">
-                  <div className="text-sm font-medium text-gray-900">Gaetan Silgado</div>
-                  <div className="text-xs text-gray-500 mt-1">Infopreneur</div>
+                <div className="border-t border-black/[0.03] pt-4 flex items-center gap-3">
+                  <Image
+                    src="/testimonials/gaetan-silgado.jpg"
+                    alt="Gaetan Silgado"
+                    width={48}
+                    height={48}
+                    className="rounded-full object-cover"
+                  />
+                  <div>
+                    <div className="text-sm font-medium text-gray-900">Gaetan Silgado</div>
+                    <div className="text-xs text-gray-500 mt-1">Infopreneur</div>
+                  </div>
                 </div>
               </div>
             </RevealOnScroll>
 
+            {/* Benjamin Courdrais - Video */}
             <RevealOnScroll delay={0.1}>
-              <div className="bg-[#FBFBFB] border border-black/[0.03] rounded-3xl p-6 shadow-sm hover:border-[#16a34a]/20 transition-colors">
-                <div className="flex items-center gap-1 mb-4">
-                  {[...Array(5)].map((_, i) => (
-                    <div key={i} className="w-4 h-4 bg-[#16a34a] rounded-full"></div>
-                  ))}
+              <div className="bg-white border border-black/[0.03] rounded-3xl overflow-hidden shadow-sm hover:border-[#16a34a]/20 transition-colors">
+                <div className="relative aspect-video bg-gray-900">
+                  <video
+                    className="w-full h-full object-cover"
+                    controls
+                    poster="/testimonials/benjamin-courdrais.jpg"
+                  >
+                    <source src="/videos/benjamin-temoignage.mp4" type="video/mp4" />
+                    Your browser does not support the video tag.
+                  </video>
                 </div>
-                <p className="text-gray-700 leading-relaxed mb-6 text-sm">
-                  "En tant que fondateur de startup, je travaille sur plusieurs projets en parallèle. Productif.io m'a fait gagner un temps précieux en centralisant toutes mes tâches et objectifs."
-                </p>
-                <div className="border-t border-black/[0.03] pt-4">
-                  <div className="text-sm font-medium text-gray-900">Benjamin Courdrais</div>
-                  <div className="text-xs text-gray-500 mt-1">Entrepreneur</div>
+                <div className="p-6">
+                  <div className="flex items-center gap-1 mb-4">
+                    {[...Array(5)].map((_, i) => (
+                      <Star key={i} size={14} strokeWidth={1.5} className="text-[#16a34a] fill-[#16a34a]" />
+                    ))}
+                  </div>
+                  <p className="text-gray-700 leading-relaxed mb-6 text-sm">
+                    &ldquo;En tant que fondateur de startup, je travaille sur plusieurs projets en parallèle. Productif.io m'a fait gagner un temps précieux en centralisant toutes mes tâches et objectifs.&rdquo;
+                  </p>
+                  <div className="border-t border-black/[0.03] pt-4 flex items-center gap-3">
+                    <Image
+                      src="/testimonials/benjamin-courdrais.jpg"
+                      alt="Benjamin Courdrais"
+                      width={48}
+                      height={48}
+                      className="rounded-full object-cover"
+                    />
+                    <div>
+                      <div className="text-sm font-medium text-gray-900">Benjamin Courdrais</div>
+                      <div className="text-xs text-gray-500 mt-1">Entrepreneur</div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </RevealOnScroll>
 
+            {/* Sabrina */}
             <RevealOnScroll delay={0.2}>
-              <div className="bg-[#FBFBFB] border border-black/[0.03] rounded-3xl p-6 shadow-sm hover:border-[#16a34a]/20 transition-colors">
+              <div className="bg-white border border-black/[0.03] rounded-3xl p-6 shadow-sm hover:border-[#16a34a]/20 transition-colors">
                 <div className="flex items-center gap-1 mb-4">
                   {[...Array(5)].map((_, i) => (
-                    <div key={i} className="w-4 h-4 bg-[#16a34a] rounded-full"></div>
+                    <Star key={i} size={14} strokeWidth={1.5} className="text-[#16a34a] fill-[#16a34a]" />
                   ))}
                 </div>
                 <p className="text-gray-700 leading-relaxed mb-6 text-sm">
-                  "I just tried it and it's perfect. I LOVE how the app organizes my tasks and helps me track my habits. It's truly intuitive!"
+                  &ldquo;I just tried it and it's perfect. I LOVE how the app organizes my tasks and helps me track my habits. It's truly intuitive!&rdquo;
                 </p>
-                <div className="border-t border-black/[0.03] pt-4">
-                  <div className="text-sm font-medium text-gray-900">Sabrina</div>
-                  <div className="text-xs text-gray-500 mt-1">Freelance Media Buyer</div>
+                <div className="border-t border-black/[0.03] pt-4 flex items-center gap-3">
+                  <Image
+                    src="/testimonials/sabrina.jpg"
+                    alt="Sabrina"
+                    width={48}
+                    height={48}
+                    className="rounded-full object-cover"
+                  />
+                  <div>
+                    <div className="text-sm font-medium text-gray-900">Sabrina</div>
+                    <div className="text-xs text-gray-500 mt-1">Freelance Media Buyer</div>
+                  </div>
                 </div>
               </div>
             </RevealOnScroll>
@@ -623,7 +596,7 @@ export default function LandingPage() {
       </section>
 
       {/* Pricing Section */}
-      <section className="py-32 px-6 bg-[#FBFBFB]">
+      <section className="py-32 px-6 bg-white">
         <div className="max-w-4xl mx-auto">
           <RevealOnScroll>
             <h2 className="text-4xl md:text-5xl font-light text-gray-900 tracking-[-0.04em] text-center mb-4">
@@ -636,7 +609,7 @@ export default function LandingPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <RevealOnScroll>
-              <div className="bg-[#FBFBFB] border border-black/[0.03] rounded-3xl p-8 shadow-sm">
+              <div className="bg-white border border-black/[0.03] rounded-3xl p-8 shadow-sm">
                 <h3 className="text-2xl font-medium text-gray-900 mb-2 tracking-tight">Free</h3>
                 <p className="text-gray-600 text-sm mb-6">Limited access to core features</p>
                 <ul className="space-y-3 mb-8">
@@ -700,22 +673,116 @@ export default function LandingPage() {
       </section>
 
       {/* Footer */}
-      <footer className="py-16 px-6 border-t border-black/[0.03]">
+      <footer className="py-16 px-6 border-t border-black/[0.03] bg-white">
         <div className="max-w-6xl mx-auto">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-            <div className="flex flex-wrap items-center justify-center gap-6 text-sm text-gray-600">
-              <a href="/dashboard" className="hover:text-gray-900 transition-colors">Dashboard</a>
-              <a href="/dashboard/habits" className="hover:text-gray-900 transition-colors">Habits</a>
-              <a href="/dashboard/tasks" className="hover:text-gray-900 transition-colors">Tasks</a>
-              <a href="/dashboard/analytics" className="hover:text-gray-900 transition-colors">Analytics</a>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 mb-12">
+            {/* Brand */}
+            <div>
+              <div className="flex items-center gap-3 mb-4">
+                <Image
+                  src="/icon.png"
+                  alt="Productif.io"
+                  width={32}
+                  height={32}
+                  className="w-8 h-8"
+                />
+                <h3 className="text-lg font-medium text-gray-900">Productif.io</h3>
+              </div>
+              <p className="text-sm text-gray-600 leading-relaxed">
+                The AI coach that helps students stay focused, build consistency, and perform better.
+              </p>
             </div>
-            <p className="text-sm text-gray-500 text-center">
-              Built for the next generation of high-performers.
-            </p>
+
+            {/* Product */}
+            <div>
+              <h4 className="text-sm font-medium text-gray-900 mb-4">Product</h4>
+              <ul className="space-y-3">
+                <li>
+                  <a href="/dashboard" className="text-sm text-gray-600 hover:text-gray-900 transition-colors">
+                    Dashboard
+                  </a>
+                </li>
+                <li>
+                  <a href="/dashboard/habits" className="text-sm text-gray-600 hover:text-gray-900 transition-colors">
+                    Habits
+                  </a>
+                </li>
+                <li>
+                  <a href="/dashboard/tasks" className="text-sm text-gray-600 hover:text-gray-900 transition-colors">
+                    Tasks
+                  </a>
+                </li>
+                <li>
+                  <a href="/dashboard/analytics" className="text-sm text-gray-600 hover:text-gray-900 transition-colors">
+                    Analytics
+                  </a>
+                </li>
+                <li>
+                  <a href="/dashboard/assistant-ia" className="text-sm text-gray-600 hover:text-gray-900 transition-colors">
+                    AI Coach
+                  </a>
+                </li>
+              </ul>
+            </div>
+
+            {/* Resources */}
+            <div>
+              <h4 className="text-sm font-medium text-gray-900 mb-4">Resources</h4>
+              <ul className="space-y-3">
+                <li>
+                  <a href="/pricing" className="text-sm text-gray-600 hover:text-gray-900 transition-colors">
+                    Pricing
+                  </a>
+                </li>
+                <li>
+                  <a href="/onboarding/welcome" className="text-sm text-gray-600 hover:text-gray-900 transition-colors">
+                    Get Started
+                  </a>
+                </li>
+                <li>
+                  <a href="/landing" className="text-sm text-gray-600 hover:text-gray-900 transition-colors">
+                    Features
+                  </a>
+                </li>
+              </ul>
+            </div>
+
+            {/* Legal */}
+            <div>
+              <h4 className="text-sm font-medium text-gray-900 mb-4">Legal</h4>
+              <ul className="space-y-3">
+                <li>
+                  <a href="/privacy-policy" className="text-sm text-gray-600 hover:text-gray-900 transition-colors">
+                    Privacy Policy
+                  </a>
+                </li>
+                <li>
+                  <a href="/terms" className="text-sm text-gray-600 hover:text-gray-900 transition-colors">
+                    Terms of Service
+                  </a>
+                </li>
+                <li>
+                  <a href="/cgv" className="text-sm text-gray-600 hover:text-gray-900 transition-colors">
+                    CGV
+                  </a>
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          {/* Bottom Bar */}
+          <div className="pt-8 border-t border-black/[0.03]">
+            <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+              <p className="text-sm text-gray-500 text-center md:text-left">
+                © {new Date().getFullYear()} Productif.io. All rights reserved.
+              </p>
+              <p className="text-sm text-gray-500 text-center md:text-right">
+                Built for the next generation of high-performers.
+              </p>
+            </div>
           </div>
         </div>
       </footer>
     </main>
   )
 }
-
