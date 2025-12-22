@@ -14,6 +14,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { authService } from '@/lib/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -33,6 +34,8 @@ export default function LoginScreen() {
       const response = await authService.login({ email, password });
       
       if (response.success) {
+        // Marquer la session comme persistante pour éviter une déconnexion à la fermeture
+        await AsyncStorage.setItem('onboarding_completed', 'true');
         // Connexion réussie, redirection vers le dashboard
         router.replace('/(tabs)');
       } else {

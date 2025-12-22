@@ -200,6 +200,12 @@ export async function apiCall<T>(
         console.error('❌ apiCall - Réponse non-JSON:', rawText.substring(0, 200));
       }
 
+      // Si c'est une 404 avec du HTML, c'est probablement que l'endpoint n'existe pas
+      if (response.status === 404 && rawText && rawText.includes('<!DOCTYPE')) {
+        console.error('❌ apiCall - Endpoint non trouvé (404 HTML):', `${API_BASE_URL}${endpoint}`);
+        throw new Error(`Endpoint non trouvé: ${endpoint}. Vérifiez que l'endpoint existe sur le serveur.`);
+      }
+
       const message =
         errorData?.error ||
         errorData?.message ||

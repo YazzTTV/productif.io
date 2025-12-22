@@ -1,5 +1,61 @@
 import { prisma } from "@/lib/prisma"
 
+export type HabitCategory = "MORNING" | "DAY" | "EVENING" | "ANTI"
+
+// Inférence simple mais fonctionnelle basée sur l'intention
+export function inferHabitCategory(name: string, description?: string | null): HabitCategory {
+  const text = `${name || ""} ${description || ""}`.toLowerCase()
+
+  // 1) Anti-habitudes : éviter un comportement
+  if (
+    /\b(no|ne pas|sans|stop|arrêter|éviter)\b/.test(text) ||
+    text.includes("réseaux sociaux") ||
+    text.includes("junk food") ||
+    text.includes("alcool") ||
+    text.includes("porn") ||
+    text.includes("scrolling")
+  ) {
+    return "ANTI"
+  }
+
+  // 2) Soir / récupération / sommeil
+  if (
+    text.includes("sommeil") ||
+    text.includes("dormir") ||
+    text.includes("coucher") ||
+    text.includes("écran") ||
+    text.includes("écrans") ||
+    text.includes("déconnexion") ||
+    text.includes("routine du soir") ||
+    text.includes("préparer demain") ||
+    text.includes("journal du soir") ||
+    text.includes("éteindre") ||
+    text.includes("screens off")
+  ) {
+    return "EVENING"
+  }
+
+  // 3) Matin / démarrage / clarté
+  if (
+    text.includes("réveil") ||
+    text.includes("lever") ||
+    text.includes("routine du matin") ||
+    text.includes("planifier la journée") ||
+    text.includes("plan my day") ||
+    text.includes("clarifier") ||
+    text.includes("intention") ||
+    text.includes("gratitude matin") ||
+    text.includes("hydratation") ||
+    text.includes("eau au réveil") ||
+    text.includes("méditation")
+  ) {
+    return "MORNING"
+  }
+
+  // 4) Par défaut : exécution / journée
+  return "DAY"
+}
+
 /**
  * Crée des habitudes par défaut pour un nouvel utilisateur
  */
@@ -26,10 +82,12 @@ export async function createDefaultHabits(userId: string) {
 
     // Créer les habitudes par défaut
     for (const habit of defaultHabits) {
+      const inferredCategory = inferHabitCategory(habit.name, habit.description)
       await prisma.habit.create({
         data: {
           ...habit,
           userId,
+          inferredCategory,
         },
       })
     }
