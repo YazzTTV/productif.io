@@ -13,6 +13,7 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
+  Animated as RNAnimated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
@@ -23,6 +24,13 @@ import { useRouter } from 'expo-router';
 import { Select } from '@/components/ui/Select';
 import { DatePicker } from '@/components/ui/DatePicker';
 import { dashboardEvents, DASHBOARD_DATA_CHANGED } from '@/lib/events';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  FadeInDown,
+  FadeIn,
+} from 'react-native-reanimated';
 
 const { width } = Dimensions.get('window');
 
@@ -60,7 +68,45 @@ interface TaskCardProps {
   onStartTimer: (task: Task) => void;
 }
 
-const TaskCard: React.FC<TaskCardProps> = ({ task, onToggle, onPress, onDelete, onStartTimer }) => {
+const TaskCard: React.FC<TaskCardProps & { index?: number }> = ({ task, onToggle, onPress, onDelete, onStartTimer, index = 0 }) => {
+  const checkmarkScale = useSharedValue(0);
+  const pressScale = useSharedValue(1);
+  const [isCelebrating, setIsCelebrating] = useState(false);
+
+  useEffect(() => {
+    if (task.completed) {
+      checkmarkScale.value = withSpring(1, { damping: 8, stiffness: 200 });
+    } else {
+      checkmarkScale.value = withSpring(0, { damping: 8, stiffness: 200 });
+    }
+  }, [task.completed]);
+
+  const handleToggle = () => {
+    const newCompleted = !task.completed;
+    onToggle(task.id, newCompleted);
+    
+    if (newCompleted) {
+      setIsCelebrating(true);
+      setTimeout(() => setIsCelebrating(false), 1000);
+    }
+  };
+
+  const pressStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: pressScale.value }],
+  }));
+
+  const checkmarkStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: checkmarkScale.value }],
+  }));
+
+  const handlePressIn = () => {
+    pressScale.value = withSpring(0.96, { damping: 12, stiffness: 280 });
+  };
+
+  const handlePressOut = () => {
+    pressScale.value = withSpring(1, { damping: 12, stiffness: 280 });
+  };
+
   const getPriorityLabel = (priority: number | null) => {
     if (priority === null) return null;
     switch (priority) {
@@ -73,119 +119,99 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onToggle, onPress, onDelete, 
     }
   };
 
-  const getEnergyLabel = (energyLevel: number | null) => {
-    if (energyLevel === null) return null;
-    switch (energyLevel) {
-      case 0: return { label: 'Faible', color: '#10b981' };
-      case 1: return { label: 'Moyen', color: '#f59e0b' };
-      case 2: return { label: 'Élevé', color: '#f97316' };
-      case 3: return { label: 'Extrême', color: '#ef4444' };
-      default: return null;
-    }
-  };
-
   const formatDueDate = (dateString?: string) => {
     if (!dateString) return null;
     try {
-      // Essayer de parser la date - elle peut être en format ISO ou Date object
       const date = typeof dateString === 'string' ? parseISO(dateString) : new Date(dateString);
-      
-      if (isNaN(date.getTime())) return null; // Date invalide
-      
+      if (isNaN(date.getTime())) return null;
       if (isToday(date)) return "Aujourd'hui";
       if (isTomorrow(date)) return "Demain";
       return format(date, 'dd/MM', { locale: fr });
     } catch (error) {
-      console.warn('Erreur parsing date:', dateString, error);
       return null;
     }
   };
 
   const priorityInfo = getPriorityLabel(task.priority);
-  const energyInfo = getEnergyLabel(task.energyLevel);
+  const dueDateText = formatDueDate(task.dueDate);
 
   return (
-    <View style={[
-      styles.taskCard,
-      task.completed && styles.taskCardCompleted
-    ]}>
-      <View style={styles.taskContent}>
-        <TouchableOpacity
-          style={[
-            styles.checkbox,
-            task.completed && styles.checkboxCompleted
-          ]}
-          onPress={() => onToggle(task.id, !task.completed)}
+    <Animated.View
+      entering={FadeInDown.delay(index * 50).duration(400)}
+      style={[styles.taskItem, pressStyle]}
+    >
+      {/* Celebration Animation */}
+      {isCelebrating && (
+        <Animated.View
+          entering={FadeIn.duration(200)}
+          exiting={FadeIn.duration(200)}
+          style={StyleSheet.absoluteFillObject}
+          pointerEvents="none"
         >
-          {task.completed && (
-            <Ionicons name="checkmark" size={14} color="#fff" />
-          )}
-        </TouchableOpacity>
-        
-        <View style={styles.taskInfo}>
-          <TouchableOpacity onPress={onPress} style={styles.taskTextContainer}>
-            <Text style={[
-              styles.taskTitle,
-              task.completed && styles.taskTitleCompleted
-            ]}>
+          <View style={styles.celebrationOverlay} />
+          <Text style={styles.celebrationEmoji}>✨</Text>
+        </Animated.View>
+      )}
+
+      <TouchableOpacity
+        onPress={handleToggle}
+        activeOpacity={0.9}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        style={[
+          styles.taskCheckbox,
+          task.completed && styles.taskCheckboxCompleted,
+        ]}
+      >
+        {task.completed && (
+          <RNAnimated.View style={checkmarkStyle}>
+            <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+          </RNAnimated.View>
+        )}
+      </TouchableOpacity>
+
+      <View style={styles.taskContent}>
+        <View style={styles.taskHeader}>
+          <TouchableOpacity onPress={onPress} style={{ flex: 1 }}>
+            <Text
+              style={[
+                styles.taskName,
+                task.completed && styles.taskNameCompleted,
+              ]}
+            >
               {task.title}
             </Text>
-            
-            {task.description && (
-              <Text style={[
-                styles.taskDescription,
-                task.completed && styles.taskDescriptionCompleted
-              ]} numberOfLines={2}>
-                {task.description}
-              </Text>
-            )}
           </TouchableOpacity>
-          
-          <View style={styles.taskMeta}>
-            {priorityInfo && (
-              <View style={[styles.badge, { borderColor: priorityInfo.color }]}>
-                <Text style={[styles.badgeText, { color: priorityInfo.color }]}>
-                  {priorityInfo.label}
-                </Text>
-              </View>
-            )}
-            
-            {energyInfo && (
-              <View style={[styles.badge, { borderColor: energyInfo.color }]}>
-                <Text style={[styles.badgeText, { color: energyInfo.color }]}>
-                  Énergie {energyInfo.label}
-                </Text>
-              </View>
-            )}
-            
-            {task.project && (
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>{task.project.name}</Text>
-              </View>
-            )}
-            
-            {task.dueDate && (
-              <View style={styles.dueDateContainer}>
-                <Ionicons name="calendar-outline" size={12} color="#6b7280" />
-                <Text style={styles.dueDateText}>{formatDueDate(task.dueDate)}</Text>
-              </View>
-            )}
+          {dueDateText && (
+            <Text style={styles.taskDate}>{dueDateText}</Text>
+          )}
+        </View>
+        <View style={styles.taskProgressRow}>
+          <View style={styles.taskProgressBar}>
+            <Animated.View
+              style={[
+                styles.taskProgressFill,
+                { width: task.completed ? '100%' : '0%' },
+              ]}
+            />
           </View>
+          {priorityInfo && (
+            <View style={styles.taskPriority}>
+              <View style={[styles.priorityDot, { backgroundColor: priorityInfo.color }]} />
+              <Text style={[styles.priorityText, { color: priorityInfo.color }]}>
+                {priorityInfo.label}
+              </Text>
+            </View>
+          )}
         </View>
-        
-        <View style={styles.taskActions}>
-          <TouchableOpacity style={styles.actionButton} onPress={() => onStartTimer(task)}>
-            <Ionicons name="play-circle-outline" size={20} color="#10b981" />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.actionButton} onPress={onPress}>
-            <Ionicons name="create-outline" size={20} color="#6b7280" />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.actionButton} onPress={() => onDelete(task.id)}>
-            <Ionicons name="trash-outline" size={20} color="#ef4444" />
-          </TouchableOpacity>
-        </View>
+        {task.project && (
+          <View style={styles.taskProject}>
+            <Ionicons name="folder-outline" size={12} color="#6b7280" />
+            <Text style={styles.taskProjectText}>{task.project.name}</Text>
+          </View>
+        )}
       </View>
-    </View>
+    </Animated.View>
   );
 };
 
@@ -582,10 +608,11 @@ export default function TasksScreen() {
       <View style={styles.taskGroup} key={title}>
         <Text style={styles.groupTitle}>{title}</Text>
         <View style={styles.groupTasks}>
-          {tasks.map((task) => (
+          {tasks.map((task, index) => (
             <TaskCard
               key={task.id}
               task={task}
+              index={index}
               onToggle={handleToggleTask}
               onPress={() => handleTaskPress(task)}
               onDelete={handleDeleteTask}
@@ -973,94 +1000,110 @@ const styles = StyleSheet.create({
   groupTasks: {
     gap: 12,
   },
-  taskCard: {
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    padding: 12,
-  },
-  taskCardCompleted: {
-    backgroundColor: '#f9fafb',
-  },
-  taskContent: {
+  taskItem: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
     gap: 12,
+    position: 'relative',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
-  checkbox: {
-    width: 20,
-    height: 20,
-    borderRadius: 4,
+  celebrationOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 194, 122, 0.2)',
+    borderRadius: 16,
+  },
+  celebrationEmoji: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    transform: [{ translateX: -12 }, { translateY: -12 }],
+    fontSize: 24,
+  },
+  taskCheckbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     borderWidth: 2,
-    borderColor: '#d1d5db',
+    borderColor: '#D1D5DB',
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 2,
   },
-  checkboxCompleted: {
-    backgroundColor: '#22c55e',
-    borderColor: '#22c55e',
+  taskCheckboxCompleted: {
+    backgroundColor: '#00C27A',
+    borderColor: '#00C27A',
   },
-  taskInfo: {
+  taskContent: {
     flex: 1,
   },
-  taskTextContainer: {
-    marginBottom: 8,
-  },
-  taskTitle: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#111827',
+  taskHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 4,
   },
-  taskTitleCompleted: {
-    textDecorationLine: 'line-through',
-    color: '#6b7280',
-  },
-  taskDescription: {
+  taskName: {
     fontSize: 14,
-    color: '#6b7280',
-    lineHeight: 20,
+    fontWeight: '400',
+    color: '#111827',
+    flex: 1,
   },
-  taskDescriptionCompleted: {
-    color: '#9ca3af',
+  taskNameCompleted: {
+    color: '#6B7280',
+    textDecorationLine: 'line-through',
   },
-  taskMeta: {
+  taskDate: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    marginLeft: 8,
+  },
+  taskProgressRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    flexWrap: 'wrap',
   },
-  badge: {
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
+  taskProgressBar: {
+    flex: 1,
+    height: 6,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 3,
+    overflow: 'hidden',
   },
-  badgeText: {
-    fontSize: 12,
-    color: '#6b7280',
+  taskProgressFill: {
+    height: '100%',
+    backgroundColor: '#00C27A',
+    borderRadius: 3,
   },
-  dueDateContainer: {
+  taskPriority: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
   },
-  dueDateText: {
-    fontSize: 12,
-    color: '#6b7280',
+  priorityDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
   },
-  taskActions: {
+  priorityText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  taskProject: {
     flexDirection: 'row',
-    gap: 4,
-  },
-  actionButton: {
-    width: 32,
-    height: 32,
-    justifyContent: 'center',
     alignItems: 'center',
+    gap: 4,
+    marginTop: 6,
+  },
+  taskProjectText: {
+    fontSize: 11,
+    color: '#6B7280',
   },
   emptyState: {
     alignItems: 'center',

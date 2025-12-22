@@ -36,6 +36,73 @@ import { useTrialStatus } from '@/hooks/useTrialStatus';
 
 const { width } = Dimensions.get('window');
 
+// --- Helpers Habitudes : catégories & fenêtre temporelle ---
+
+type HabitTimeSlot = 'morning' | 'day' | 'evening' | 'anti';
+type HabitCategory = 'MORNING' | 'DAY' | 'EVENING' | 'ANTI_HABIT';
+
+// Déduction douce de la catégorie à partir de signaux “structurels” (heure de rappel)
+const inferSlotFromSignals = (habit: any): HabitTimeSlot => {
+  // 1) Utiliser l'heure de rappel si disponible
+  const time: string | undefined =
+    habit?.reminderTime ||
+    habit?.notificationSettings?.reminderTime ||
+    undefined;
+
+  if (typeof time === 'string') {
+    const [hStr] = time.split(':');
+    const hour = parseInt(hStr, 10);
+    if (!Number.isNaN(hour)) {
+      if (hour >= 5 && hour < 11) return 'morning';
+      if (hour >= 18 || hour < 5) return 'evening';
+      return 'day';
+    }
+  }
+
+  // 2) Par défaut : journée
+  return 'day';
+};
+
+// Classification finale côté app : userCategoryOverride > inferredCategory > signaux (heure)
+const resolveHabitSlot = (habit: any): HabitTimeSlot => {
+  const raw: string = (
+    habit?.userCategoryOverride ||
+    habit?.inferredCategory ||
+    ''
+  )
+    .toString()
+    .toUpperCase()
+    .trim();
+
+  switch (raw as HabitCategory) {
+    case 'MORNING':
+      return 'morning';
+    case 'EVENING':
+      return 'evening';
+    case 'ANTI_HABIT':
+      return 'anti';
+    case 'DAY':
+      return 'day';
+    default:
+      // Si aucune catégorie explicite n'est définie, on infère à partir des signaux temporels
+      return inferSlotFromSignals(habit);
+  }
+};
+
+const getCurrentTimeSlot = (now: Date = new Date()): HabitTimeSlot => {
+  const hour = now.getHours();
+  if (hour >= 5 && hour < 11) return 'morning';
+  if (hour >= 11 && hour < 18) return 'day';
+  if (hour >= 18 && hour < 23) return 'evening';
+  // Nuit : comportement par défaut = aucune habitude mise en avant
+  return 'day';
+};
+
+const isHabitRelevantNow = (slot: HabitTimeSlot, nowSlot: HabitTimeSlot): boolean => {
+  if (slot === 'anti') return false; // Anti-habitudes gérées séparément
+  return slot === nowSlot;
+};
+
 // Mock data - will be replaced with API calls
 const mockData = {
   user: "Alex",
@@ -365,8 +432,24 @@ export default function DashboardScreen() {
     try {
       setLoading(true);
       
-      // Load user name
-      const userName = await AsyncStorage.getItem('user_name') || 'User';
+      // Load user name from API or fallback to AsyncStorage
+      let userName = 'User';
+      try {
+        const user = await authService.checkAuth();
+        if (user?.name) {
+          // Extraire le prénom (premier mot du nom complet)
+          userName = user.name.split(' ')[0];
+          // Sauvegarder dans AsyncStorage pour usage offline
+          await AsyncStorage.setItem('user_name', userName);
+        } else {
+          // Fallback sur AsyncStorage si l'API ne retourne pas de nom
+          userName = await AsyncStorage.getItem('user_name') || 'User';
+        }
+      } catch (error) {
+        console.error('Error fetching user name:', error);
+        // Fallback sur AsyncStorage en cas d'erreur API
+        userName = await AsyncStorage.getItem('user_name') || 'User';
+      }
 
       // Fetch trial status from API
       try {
@@ -461,27 +544,26 @@ export default function DashboardScreen() {
       const deepWorkStatsData = deepWorkStats.status === 'fulfilled' ? deepWorkStats.value : null;
       const weeklyProductivityData = weeklyProductivity.status === 'fulfilled' ? weeklyProductivity.value : null;
 
-      // Calculate today's tasks
-      let todayTasks: any[] = [];
+      // Calculate all active tasks (not just today's)
+      let allTasks: any[] = [];
       if (tasksData) {
         const rawTasks = Array.isArray(tasksData.tasks) ? tasksData.tasks : Array.isArray(tasksData) ? tasksData : [];
-        todayTasks = rawTasks.filter((task: any) => {
-          const taskDate = task.createdAt ? new Date(task.createdAt).toISOString().split('T')[0] : todayStr;
-          const dueDate = task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : null;
-          const completedAt = task.completedAt || task.updatedAt;
-          const completedToday = completedAt ? new Date(completedAt).toISOString().split('T')[0] === todayStr : false;
-          return (
-            taskDate === todayStr ||
-            dueDate === todayStr ||
-            completedToday ||
-            task.status === 'PENDING' ||
-            task.status === 'IN_PROGRESS'
-          );
+        // Inclure toutes les tâches actives (non complétées ou complétées récemment)
+        allTasks = rawTasks.filter((task: any) => {
+          const isCompleted = task.status === 'COMPLETED' || task.completed === true;
+          // Inclure toutes les tâches non complétées + celles complétées aujourd'hui
+          if (isCompleted) {
+            const completedAt = task.completedAt || task.updatedAt;
+            const completedToday = completedAt ? new Date(completedAt).toISOString().split('T')[0] === todayStr : false;
+            return completedToday;
+          }
+          // Inclure toutes les tâches non complétées (PENDING, IN_PROGRESS, etc.)
+          return task.status === 'PENDING' || task.status === 'IN_PROGRESS' || !isCompleted;
         });
       }
 
-      const completedTasks = todayTasks.filter((task: any) => task.status === 'COMPLETED' || task.completed === true).length;
-      const totalTasks = todayTasks.length;
+      const completedTasks = allTasks.filter((task: any) => task.status === 'COMPLETED' || task.completed === true).length;
+      const totalTasks = allTasks.length;
 
       // Process habits
       let habitsList: any[] = [];
@@ -493,23 +575,40 @@ export default function DashboardScreen() {
         }
       }
 
-      // Format habits for display - Afficher toutes les habitudes actives
+      // Helper de slot basé sur finalCategory / override / inferredCategory
+      const slot = (habit: any): HabitCategory => {
+        return (
+          (habit.finalCategory as HabitCategory | undefined) ??
+          (habit.userCategoryOverride as HabitCategory | undefined) ??
+          (habit.inferredCategory as HabitCategory | undefined) ??
+          "DAY"
+        );
+      };
+
+      // Format habits for display - Afficher toutes les habitudes actives (non complétées en priorité)
       const activeHabitsForDisplay = habitsList.filter((h: any) => h.isActive !== false);
-      const formattedHabits = activeHabitsForDisplay.map((habit: any) => {
-        const entries = habit.entries || habit.completions || [];
-        const todayEntry = entries.find((entry: any) => {
-          const entryDate = new Date(entry.date).toISOString().split('T')[0];
-          return entryDate === todayStr && entry.completed === true;
+
+      const formattedHabits = activeHabitsForDisplay
+        .map((habit: any) => {
+          const entries = habit.entries || habit.completions || [];
+          const todayEntry = entries.find((entry: any) => {
+            const entryDate = new Date(entry.date).toISOString().split('T')[0];
+            return entryDate === todayStr && entry.completed === true;
+          });
+          
+          return {
+            id: habit.id,
+            name: habit.name,
+            completed: !!todayEntry,
+            streak: habit.currentStreak || 0,
+            time: habit.reminderTime || '09:00',
+          };
+        })
+        // Trier : non complétées en premier, puis complétées
+        .sort((a, b) => {
+          if (a.completed === b.completed) return 0;
+          return a.completed ? 1 : -1;
         });
-        
-        return {
-          id: habit.id,
-          name: habit.name,
-          completed: !!todayEntry,
-          streak: habit.currentStreak || 0,
-          time: habit.reminderTime || '09:00',
-        };
-      });
 
       // Calculate daily progress (habits + tasks)
       const activeHabits = habitsList.filter((h: any) => h.isActive !== false);
@@ -791,10 +890,13 @@ export default function DashboardScreen() {
                     <Ionicons name="flash" size={20} color="#FFFFFF" />
                     <Text style={styles.trialSparkle}>✨</Text>
                   </View>
-                  <View>
-                    <Text style={styles.trialLabel}>Free Trial</Text>
+                  <View style={styles.trialTextContainer}>
+                    <Text style={styles.trialLabel}>{t('freeTrialLabel')}</Text>
                     <Text style={styles.trialText}>
-                      ⚡ {trialDaysLeft} {trialDaysLeft === 1 ? t('day') : t('days')} {t('left')} to unlock full potential ⚡
+                      ⚡ {t('freeTrialDaysLeft')
+                        .replace('{days}', trialDaysLeft.toString())
+                        .replace('{daysText}', trialDaysLeft === 1 ? t('day') : t('days'))
+                        .replace('{restant}', trialDaysLeft === 1 ? 'restant' : 'restants')} ⚡
                     </Text>
                   </View>
                 </View>
@@ -882,7 +984,7 @@ export default function DashboardScreen() {
             <View style={styles.statCardHeader}>
               <Ionicons name="checkmark-circle" size={24} color="#00C27A" />
               <TouchableOpacity onPress={() => router.push('/(tabs)/tasks')}>
-              <Text style={styles.viewAllText}>{t('viewAll')}</Text>
+              <Text style={[styles.viewAllText, { color: colors.primary }]}>{t('viewAll')}</Text>
               </TouchableOpacity>
             </View>
               <Text style={[styles.statCardLabelDark, { color: colors.textSecondary }]}>{t('tasksCompleted')}</Text>
@@ -939,9 +1041,9 @@ export default function DashboardScreen() {
           >
           <View style={styles.productivityHeader}>
             <Text style={[styles.productivityTitle, { color: colors.text }]}>{t('productivityScore')}</Text>
-            <View style={styles.trendBadge}>
-              <Ionicons name="trending-up" size={12} color="#059669" />
-              <Text style={styles.trendText}>+12%</Text>
+            <View style={[styles.trendBadge, { backgroundColor: colors.surface }]}>
+              <Ionicons name="trending-up" size={12} color={colors.primary} />
+              <Text style={[styles.trendText, { color: colors.primary }]}>+12%</Text>
             </View>
           </View>
 
@@ -956,11 +1058,11 @@ export default function DashboardScreen() {
               <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>Energie ⚡</Text>
                 <Text style={[styles.metricValue, { color: colors.text }]}>{dashboardData.energyLevel}%</Text>
               </View>
-              <View style={styles.metricBarContainer}>
+              <View style={[styles.metricBarContainer, { backgroundColor: colors.border }]}>
                 <Animated.View
                   style={[
                     styles.metricBar,
-                    { width: `${dashboardData.energyLevel}%` },
+                    { width: `${dashboardData.energyLevel}%`, backgroundColor: colors.primary },
                   ]}
                 />
               </View>
@@ -971,13 +1073,13 @@ export default function DashboardScreen() {
                   {dashboardData.stressLevel}%
                 </Text>
               </View>
-              <View style={styles.metricBarContainer}>
+              <View style={[styles.metricBarContainer, { backgroundColor: colors.border }]}>
                 <Animated.View
                   style={[
                     styles.metricBar,
                     { 
                       width: `${dashboardData.stressLevel}%`,
-                      backgroundColor: dashboardData.stressLevel > 70 ? '#DC2626' : dashboardData.stressLevel > 40 ? '#F59E0B' : '#00C27A'
+                      backgroundColor: dashboardData.stressLevel > 70 ? '#DC2626' : dashboardData.stressLevel > 40 ? '#F59E0B' : colors.primary
                     },
                   ]}
                 />
@@ -987,7 +1089,7 @@ export default function DashboardScreen() {
                 <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>Concentration 🧠</Text>
                 <Text style={[styles.metricValue, { color: '#0891B2' }]}>{dashboardData.focusLevel}%</Text>
               </View>
-              <View style={styles.metricBarContainer}>
+              <View style={[styles.metricBarContainer, { backgroundColor: colors.border }]}>
                 <Animated.View
                   style={[
                     styles.metricBar,
@@ -1050,8 +1152,16 @@ export default function DashboardScreen() {
               decimalPlaces: 0,
               color: (opacity = 1) => `rgba(0, 194, 122, ${opacity})`,
               labelColor: (opacity = 1) => {
-                const rgb = colors.textSecondary === '#6b7280' ? '107, 114, 128' : '156, 163, 175';
-                return `rgba(${rgb}, ${opacity})`;
+                // Utiliser la couleur du thème pour les labels
+                const hex = colors.textSecondary.replace('#', '');
+                if (hex.length === 6) {
+                  const r = parseInt(hex.substr(0, 2), 16);
+                  const g = parseInt(hex.substr(2, 2), 16);
+                  const b = parseInt(hex.substr(4, 2), 16);
+                  return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+                }
+                // Fallback si le format n'est pas hex
+                return `rgba(107, 114, 128, ${opacity})`;
               },
               style: {
                 borderRadius: 16,
@@ -1074,7 +1184,7 @@ export default function DashboardScreen() {
           </Animated.View>
         </LockedCard>
 
-        {/* Daily Habits */}
+        {/* Habitudes restantes (pertinentes maintenant) */}
         <LockedCard onLockedClick={() => setShowUpgradeModal(true)}>
           <Animated.View
             entering={FadeInDown.delay(500).duration(400)}
@@ -1083,7 +1193,7 @@ export default function DashboardScreen() {
           <View style={styles.habitsSectionHeader}>
             <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('dailyHabits')}</Text>
             <TouchableOpacity
-              onPress={() => router.push('/habits-manager')}
+              onPress={() => router.push('/(tabs)/habits')}
               style={[styles.viewAllButtonHabits, { backgroundColor: colors.primary }]}
               activeOpacity={0.8}
             >
@@ -1295,6 +1405,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
     flex: 1,
+    minWidth: 0, // Permet au flex de fonctionner correctement
   },
   trialIconContainer: {
     width: 40,
@@ -1311,15 +1422,23 @@ const styles = StyleSheet.create({
     right: -4,
     fontSize: 12,
   },
+  trialTextContainer: {
+    flex: 1,
+    marginRight: 8,
+    minWidth: 0, // Permet au flex de fonctionner correctement
+  },
   trialLabel: {
     fontSize: 14,
     color: 'rgba(255, 255, 255, 0.9)',
     marginBottom: 4,
+    fontWeight: '500',
   },
   trialText: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#FFFFFF',
     fontWeight: '600',
+    lineHeight: 18,
+    flexWrap: 'wrap',
   },
   upgradeButton: {
     backgroundColor: '#FFFFFF',
@@ -1432,8 +1551,8 @@ const styles = StyleSheet.create({
   },
   viewAllText: {
     fontSize: 12,
-    color: '#00C27A',
     fontWeight: '600',
+    // La couleur sera définie dynamiquement via colors.primary
   },
   statCardLabelDark: {
     fontSize: 14,
@@ -1498,11 +1617,11 @@ const styles = StyleSheet.create({
   productivityCard: {
     marginHorizontal: 24,
     marginBottom: 16,
-    backgroundColor: 'rgba(0, 194, 122, 0.05)',
+    // backgroundColor sera défini dynamiquement via colors.surface
     borderRadius: 24,
     padding: 16,
     borderWidth: 1,
-    borderColor: 'rgba(0, 194, 122, 0.2)',
+    // borderColor sera défini dynamiquement via colors.border
   },
   productivityHeader: {
     flexDirection: 'row',
@@ -1513,13 +1632,13 @@ const styles = StyleSheet.create({
   productivityTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#1F2937',
+    // color sera défini dynamiquement via colors.text
   },
   trendBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#D1FAE5',
+    // backgroundColor sera défini dynamiquement via colors.surface
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
@@ -1527,7 +1646,7 @@ const styles = StyleSheet.create({
   trendText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#059669',
+    // color sera défini dynamiquement via colors.primary
   },
   productivityContent: {
     flexDirection: 'row',
@@ -1547,22 +1666,22 @@ const styles = StyleSheet.create({
   },
   metricLabel: {
     fontSize: 12,
-    color: '#6B7280',
+    // color sera défini dynamiquement via colors.textSecondary
   },
   metricValue: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#00C27A',
+    // color sera défini dynamiquement (peut être colors.text ou colors.primary selon le contexte)
   },
   metricBarContainer: {
     height: 6,
-    backgroundColor: '#F3F4F6',
+    // backgroundColor sera défini dynamiquement via colors.border
     borderRadius: 3,
     overflow: 'hidden',
   },
   metricBar: {
     height: '100%',
-    backgroundColor: '#00C27A',
+    // backgroundColor sera défini dynamiquement via colors.primary
     borderRadius: 3,
   },
   compactStatsGrid: {
@@ -1570,29 +1689,29 @@ const styles = StyleSheet.create({
     justifyContent: 'space-around',
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
+    // borderTopColor sera défini dynamiquement via colors.border
   },
   compactStat: {
     alignItems: 'center',
   },
   compactStatLabel: {
     fontSize: 10,
-    color: '#6B7280',
+    // color sera défini dynamiquement via colors.textSecondary
     marginBottom: 4,
   },
   compactStatValue: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#00C27A',
+    // color sera défini dynamiquement via colors.text
   },
   chartCard: {
     marginHorizontal: 24,
     marginBottom: 16,
-    backgroundColor: '#FFFFFF',
+    // backgroundColor sera défini dynamiquement via colors.surface
     borderRadius: 24,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#F3F4F6',
+    // borderColor sera défini dynamiquement via colors.border
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
@@ -1608,7 +1727,7 @@ const styles = StyleSheet.create({
   chartTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#1F2937',
+    // color sera défini dynamiquement via colors.text
   },
   viewDataButton: {
     flexDirection: 'row',

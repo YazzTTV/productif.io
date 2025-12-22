@@ -36,12 +36,12 @@ export default function HabitsPage() {
   const fetchHabits = async () => {
     try {
       const response = await fetch("/api/habits")
-      if (!response.ok) throw new Error("Erreur lors du chargement des habitudes")
+      if (!response.ok) throw new Error(t('errorLoadingHabits'))
       const data = await response.json()
       setHabits(data)
     } catch (error) {
       console.error("Error fetching habits:", error)
-      toast.error("Erreur lors du chargement des habitudes")
+      toast.error(t('errorLoadingHabits'))
     } finally {
       setLoading(false)
     }
