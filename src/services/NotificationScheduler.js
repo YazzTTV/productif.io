@@ -513,16 +513,17 @@ class NotificationScheduler {
         
         try {
             const now = new Date();
-            const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000);
+            // Élargir la fenêtre : 10 minutes dans le passé (pour rattraper les notifications manquées) et 2 minutes dans le futur
+            const tenMinutesAgo = new Date(now.getTime() - 10 * 60 * 1000);
             const twoMinutesInFuture = new Date(now.getTime() + 2 * 60 * 1000);
 
             // Récupérer les notifications en attente qui doivent être envoyées
-            console.log(`🟢 [${batchId}] Récupération des notifications entre ${fiveMinutesAgo.toISOString()} et ${twoMinutesInFuture.toISOString()}`);
+            console.log(`🟢 [${batchId}] Récupération des notifications entre ${tenMinutesAgo.toISOString()} et ${twoMinutesInFuture.toISOString()}`);
             const pendingNotifications = await this.prisma.notificationHistory.findMany({
                 where: {
                     status: 'pending',
                     scheduledFor: {
-                        gte: fiveMinutesAgo,
+                        gte: tenMinutesAgo,
                         lte: twoMinutesInFuture
                     }
                 },

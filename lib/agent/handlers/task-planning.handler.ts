@@ -1,5 +1,5 @@
 import { whatsappService } from '@/lib/whatsapp'
-import prisma from '@/lib/prisma'
+import { prisma } from '@/lib/prisma'
 import { FlexibleMatcher } from '@/lib/utils/FlexibleMatcher'
 
 // Helpers pour l'état conversationnel

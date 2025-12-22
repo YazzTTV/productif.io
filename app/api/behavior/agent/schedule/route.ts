@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyApiToken } from '@/middleware/api-auth'
-import prisma from '@/lib/prisma'
+import { verifyApiTokenFromRequest } from '@/middleware/api-auth'
+import { prisma } from '@/lib/prisma'
 
 // GET : récupérer la config de planning
 export async function GET(req: NextRequest) {
-  const verification = await verifyApiToken(req, ['behavior:read'])
+  const verification = await verifyApiTokenFromRequest(req, ['behavior:read'])
   if (!verification.valid) {
     return NextResponse.json({ error: verification.error }, { status: 401 })
   }
@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
 
 // PATCH : mettre à jour la config
 export async function PATCH(req: NextRequest) {
-  const verification = await verifyApiToken(req, ['behavior:write'])
+  const verification = await verifyApiTokenFromRequest(req, ['behavior:write'])
   if (!verification.valid) {
     return NextResponse.json({ error: verification.error }, { status: 401 })
   }

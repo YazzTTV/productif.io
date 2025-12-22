@@ -15,6 +15,8 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { apiCall } from '@/lib/api';
+import { usePushNotifications } from '@/hooks/usePushNotifications';
+import { Platform, Linking } from 'react-native';
 
 type TimeWindow = {
   start: string;
@@ -127,12 +129,14 @@ const notificationTypeLabels: Record<string, string> = {
 
 export default function NotificationsPage() {
   const router = useRouter();
+  const { permissionStatus, requestPermissions, expoPushToken } = usePushNotifications();
   const [preferences, setPreferences] = useState<NotificationPreferences>(defaultPreferences);
   const [originalPreferences, setOriginalPreferences] = useState<NotificationPreferences>(defaultPreferences);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [userId, setUserId] = useState<string>('');
   const [hasChanges, setHasChanges] = useState(false);
+  const [isRequestingPermissions, setIsRequestingPermissions] = useState(false);
 
   useEffect(() => {
     loadPreferences();
@@ -194,6 +198,24 @@ export default function NotificationsPage() {
       return;
     }
 
+    // Vérifier si les notifications push sont activées mais que les permissions ne sont pas accordées
+    if (preferences.pushEnabled && permissionStatus !== 'granted') {
+      console.log('📱 Notifications push activées mais permissions non accordées, demande des permissions...');
+      const granted = await handleRequestPermissions();
+      
+      // Si les permissions n'ont pas été accordées, désactiver pushEnabled ou annuler la sauvegarde
+      if (!granted) {
+        Alert.alert(
+          'Permissions requises',
+          'Les notifications push nécessitent des permissions. Les notifications push ont été désactivées.',
+          [{ text: 'OK' }]
+        );
+        // Désactiver pushEnabled si les permissions ne sont pas accordées
+        setPreferences(prev => ({ ...prev, pushEnabled: false }));
+        return;
+      }
+    }
+
     try {
       setIsSaving(true);
       
@@ -228,6 +250,64 @@ export default function NotificationsPage() {
       );
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleRequestPermissions = async (): Promise<boolean> => {
+    if (Platform.OS !== 'ios' && Platform.OS !== 'android') {
+      Alert.alert('Information', 'Les notifications push ne sont disponibles que sur iOS et Android.');
+      return false;
+    }
+
+    setIsRequestingPermissions(true);
+    try {
+      const granted = await requestPermissions();
+      
+      if (granted) {
+        Alert.alert(
+          'Succès',
+          'Les permissions de notification ont été accordées ! Vous recevrez maintenant les notifications push.',
+          [{ text: 'OK' }]
+        );
+        return true;
+      } else {
+        if (permissionStatus === 'denied') {
+          Alert.alert(
+            'Permissions refusées',
+            'Les permissions de notification ont été refusées. Pour les activer, allez dans Réglages > Productif.io > Notifications.',
+            [
+              { text: 'Annuler', style: 'cancel' },
+              {
+                text: 'Ouvrir les réglages',
+                onPress: () => {
+                  if (Platform.OS === 'ios') {
+                    Linking.openURL('app-settings:');
+                  } else {
+                    Linking.openSettings();
+                  }
+                }
+              }
+            ]
+          );
+        } else {
+          Alert.alert(
+            'Permissions requises',
+            'Les permissions de notification sont nécessaires pour recevoir des notifications push.',
+            [{ text: 'OK' }]
+          );
+        }
+        return false;
+      }
+    } catch (error) {
+      console.error('❌ Erreur lors de la demande de permissions:', error);
+      Alert.alert(
+        'Erreur',
+        'Une erreur est survenue lors de la demande de permissions.',
+        [{ text: 'OK' }]
+      );
+      return false;
+    } finally {
+      setIsRequestingPermissions(false);
     }
   };
 
@@ -497,7 +577,25 @@ export default function NotificationsPage() {
               'Notifications activées',
               'Activer ou désactiver toutes les notifications',
               preferences.isEnabled,
-              (value) => updatePreference('isEnabled', value)
+              async (value) => {
+                // Si on active les notifications et que les permissions push ne sont pas accordées, les demander
+                if (value && permissionStatus !== 'granted') {
+                  console.log('📱 Activation des notifications, demande des permissions push...');
+                  const granted = await handleRequestPermissions();
+                  
+                  if (granted) {
+                    // Si les permissions sont accordées, activer les notifications
+                    updatePreference('isEnabled', true);
+                  } else {
+                    // Si les permissions sont refusées, ne pas activer les notifications
+                    // Le toggle reste désactivé
+                    console.log('⚠️ Permissions refusées, notifications non activées');
+                  }
+                } else {
+                  // Si on désactive ou si les permissions sont déjà accordées, mettre à jour normalement
+                  updatePreference('isEnabled', value);
+                }
+              }
             )}
             <View style={styles.timeInputContainer}>
               <Text style={styles.timeLabel}>Fuseau horaire</Text>
@@ -524,13 +622,104 @@ export default function NotificationsPage() {
               (value) => updatePreference('emailEnabled', value),
               !preferences.isEnabled
             )}
-            {renderToggleItem(
-              'Notifications push',
-              'Recevoir des notifications sur l\'appareil',
-              preferences.pushEnabled,
-              (value) => updatePreference('pushEnabled', value),
-              !preferences.isEnabled
-            )}
+            <View style={styles.pushNotificationRow}>
+              <View style={styles.pushNotificationInfo}>
+                <Text style={styles.pushNotificationTitle}>Notifications push</Text>
+                <Text style={styles.pushNotificationDescription}>
+                  Recevoir des notifications sur l'appareil
+                </Text>
+                {permissionStatus && (
+                  <View style={styles.permissionStatus}>
+                    <Ionicons
+                      name={
+                        permissionStatus === 'granted'
+                          ? 'checkmark-circle'
+                          : permissionStatus === 'denied'
+                          ? 'close-circle'
+                          : 'alert-circle'
+                      }
+                      size={16}
+                      color={
+                        permissionStatus === 'granted'
+                          ? '#00C27A'
+                          : permissionStatus === 'denied'
+                          ? '#FF3B30'
+                          : '#FF9500'
+                      }
+                    />
+                    <Text
+                      style={[
+                        styles.permissionStatusText,
+                        {
+                          color:
+                            permissionStatus === 'granted'
+                              ? '#00C27A'
+                              : permissionStatus === 'denied'
+                              ? '#FF3B30'
+                              : '#FF9500',
+                        },
+                      ]}
+                    >
+                      {permissionStatus === 'granted'
+                        ? 'Permissions accordées'
+                        : permissionStatus === 'denied'
+                        ? 'Permissions refusées'
+                        : 'Permissions non demandées'}
+                    </Text>
+                    {expoPushToken && (
+                      <Text style={styles.tokenInfo}>
+                        Token: {expoPushToken.substring(0, 20)}...
+                      </Text>
+                    )}
+                  </View>
+                )}
+              </View>
+              <View style={styles.pushNotificationActions}>
+                <Switch
+                  value={preferences.pushEnabled}
+                  onValueChange={async (value) => {
+                    if (value && permissionStatus !== 'granted') {
+                      // Demander automatiquement les permissions sans alerte
+                      console.log('📱 Activation des notifications push, demande des permissions...');
+                      const granted = await handleRequestPermissions();
+                      
+                      if (granted) {
+                        // Si les permissions sont accordées, activer le toggle
+                        updatePreference('pushEnabled', true);
+                      } else {
+                        // Si les permissions sont refusées, ne pas activer le toggle
+                        // L'alerte est déjà affichée dans handleRequestPermissions
+                        console.log('⚠️ Permissions refusées, notifications push non activées');
+                      }
+                    } else {
+                      updatePreference('pushEnabled', value);
+                    }
+                  }}
+                  disabled={!preferences.isEnabled}
+                />
+                {permissionStatus !== 'granted' && (
+                  <TouchableOpacity
+                    style={[
+                      styles.requestPermissionButton,
+                      isRequestingPermissions && styles.requestPermissionButtonDisabled,
+                    ]}
+                    onPress={handleRequestPermissions}
+                    disabled={isRequestingPermissions}
+                  >
+                    {isRequestingPermissions ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <>
+                        <Ionicons name="notifications-outline" size={16} color="#fff" />
+                        <Text style={styles.requestPermissionButtonText}>
+                          {permissionStatus === 'denied' ? 'Ouvrir les réglages' : 'Demander les permissions'}
+                        </Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
           </View>
         </View>
 
@@ -1081,5 +1270,63 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     marginLeft: 8,
+  },
+  pushNotificationRow: {
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  pushNotificationInfo: {
+    flex: 1,
+    marginBottom: 8,
+  },
+  pushNotificationTitle: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#374151',
+    marginBottom: 4,
+  },
+  pushNotificationDescription: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 8,
+  },
+  permissionStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  permissionStatusText: {
+    fontSize: 12,
+    marginLeft: 6,
+    fontWeight: '500',
+  },
+  tokenInfo: {
+    fontSize: 10,
+    color: '#9CA3AF',
+    marginTop: 4,
+    fontFamily: 'monospace',
+  },
+  pushNotificationActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  requestPermissionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#00C27A',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    gap: 6,
+  },
+  requestPermissionButtonDisabled: {
+    opacity: 0.6,
+  },
+  requestPermissionButtonText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
   },
 });
