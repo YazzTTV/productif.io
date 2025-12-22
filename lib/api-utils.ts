@@ -45,7 +45,20 @@ export async function safeJsonResponse<T = any>(
     
     // Si la réponse n'est pas OK, lever une erreur avec les données JSON
     if (!response.ok) {
-      throw new Error(data.error || data.message || `Erreur ${response.status}`)
+      const errorMessage = data.error || data.message || `Erreur ${response.status}`
+      
+      // Messages d'erreur plus spécifiques selon le code de statut
+      if (response.status === 401) {
+        throw new Error("Non authentifié")
+      } else if (response.status === 403) {
+        throw new Error("Accès refusé")
+      } else if (response.status === 404) {
+        throw new Error(`Endpoint non trouvé: ${endpointName}`)
+      } else if (response.status >= 500) {
+        throw new Error(`Erreur serveur (${response.status}): ${errorMessage}`)
+      } else {
+        throw new Error(errorMessage)
+      }
     }
     
     return data

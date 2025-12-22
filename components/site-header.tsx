@@ -16,7 +16,7 @@ export default function SiteHeader() {
           {/* Logo & Brand */}
           <Link href="/" className="flex items-center gap-3">
             <Image
-              src="/P_tech_letter_logo_TEMPLATE-removebg-preview.png"
+              src="/icon.png"
               alt="Productif.io"
               width={40}
               height={40}
