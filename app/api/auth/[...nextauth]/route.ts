@@ -2,6 +2,7 @@ import NextAuth from "next-auth";
 import { NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import { prisma } from "@/lib/prisma";
+import { createToken, createSession } from "@/lib/auth";
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID!;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET!;
@@ -29,13 +30,13 @@ const authOptions: NextAuthOptions = {
 
       try {
         // Vérifier si l'utilisateur existe déjà
-        const existingUser = await prisma.user.findUnique({
+        let dbUser = await prisma.user.findUnique({
           where: { email: user.email },
         });
 
         // Si l'utilisateur n'existe pas, le créer
-        if (!existingUser) {
-          await prisma.user.create({
+        if (!dbUser) {
+          dbUser = await prisma.user.create({
             data: {
               email: user.email,
               name: user.name || "Utilisateur Google",
@@ -44,16 +45,13 @@ const authOptions: NextAuthOptions = {
           });
         }
 
-        // Stocker les tokens de Google
-        if (existingUser && account.access_token) {
-          await prisma.session.create({
-            data: {
-              userId: existingUser.id,
-              token: account.access_token,
-              expiresAt: new Date(Date.now() + 3600 * 1000), // 1 heure
-            },
-          });
-        }
+        // Créer un token JWT et une session avec le système d'auth personnalisé
+        const token = await createToken({
+          userId: dbUser.id,
+          email: dbUser.email,
+        });
+
+        await createSession(dbUser.id, token);
 
         return true;
       } catch (error) {
@@ -74,6 +72,21 @@ const authOptions: NextAuthOptions = {
       session.accessToken = token.accessToken;
       return session;
     },
+    async redirect({ url, baseUrl }) {
+      // Rediriger vers la page de callback qui créera les cookies personnalisés
+      // Passer l'URL de destination dans les paramètres
+      let callbackUrl = "/dashboard"
+      
+      // Si une URL est fournie, l'utiliser comme destination finale
+      if (url.startsWith("/") && url !== "/") {
+        callbackUrl = url
+      } else if (url.startsWith(baseUrl)) {
+        callbackUrl = url.replace(baseUrl, "")
+      }
+      
+      // Encoder l'URL de callback pour la passer en paramètre
+      return `/auth/callback?callbackUrl=${encodeURIComponent(callbackUrl)}`
+    },
   },
   pages: {
     signIn: "/login",
@@ -85,4 +98,4 @@ const authOptions: NextAuthOptions = {
 
 const handler = NextAuth(authOptions);
 
-export { handler as GET, handler as POST }; 
+export { handler as GET, handler as POST, authOptions }; 

@@ -791,10 +791,17 @@ export function LanguageProvider({ children, initialLocale = 'fr' }: { children:
   );
 }
 
-export function useLanguage() {
+export function useLanguage(): LanguageContextType {
   const context = useContext(LanguageContext);
   if (context === undefined) {
-    throw new Error('useLanguage must be used within a LanguageProvider');
+    // Retourner des valeurs par défaut au lieu de lancer une erreur
+    // Cela permet au composant de fonctionner même si le provider n'est pas encore monté
+    console.warn('useLanguage called outside LanguageProvider, using defaults');
+    return {
+      locale: 'fr',
+      setLocale: () => {},
+      t: (key: string) => key,
+    };
   }
   return context;
 }

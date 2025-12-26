@@ -29,6 +29,7 @@ import Animated, {
   withSpring,
   interpolate,
   Extrapolate,
+  cancelAnimation,
 } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
@@ -43,6 +44,7 @@ import { useTrialStatus } from '@/hooks/useTrialStatus';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useLocalSearchParams } from 'expo-router';
 
 interface Message {
   id: string;
@@ -96,6 +98,7 @@ const DEEPWORK_STORAGE_KEY = 'productif_deepwork_state_v1';
 
 export default function AssistantScreen() {
   const t = useTranslation();
+  const params = useLocalSearchParams<{ preset?: string }>();
   const insets = useSafeAreaInsets();
   const { locale } = useLanguage();
   const { colors } = useTheme();
@@ -246,6 +249,24 @@ export default function AssistantScreen() {
       if (interval) clearInterval(interval);
     };
   }, [isLearningRecording]);
+
+  // Pré-remplir la conversation quand on arrive depuis une notification push
+  useEffect(() => {
+    const preset = params?.preset;
+    if (!preset || typeof preset !== 'string') return;
+
+    const text = preset;
+
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: `preset-${Date.now()}`,
+        text,
+        isAI: false,
+        timestamp: new Date(),
+      },
+    ]);
+  }, [params?.preset]);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -1480,6 +1501,13 @@ export default function AssistantScreen() {
       -1,
       true
     );
+    
+    // Cleanup: annuler les animations au démontage pour éviter les crashs Hermes GC
+    return () => {
+      cancelAnimation(logoScale);
+      cancelAnimation(logoY);
+      cancelAnimation(pulseScale);
+    };
   }, []);
 
   const logoAnimatedStyle = useAnimatedStyle(() => ({
@@ -2058,11 +2086,19 @@ function VoiceModal({
         );
       });
     } else {
+      cancelAnimation(micScale);
       micScale.value = 1;
       pulseRings.forEach((ring) => {
+        cancelAnimation(ring);
         ring.value = 1;
       });
     }
+    
+    // Cleanup au démontage
+    return () => {
+      cancelAnimation(micScale);
+      pulseRings.forEach((ring) => cancelAnimation(ring));
+    };
   }, [isRecording]);
 
   useEffect(() => {
@@ -2073,8 +2109,14 @@ function VoiceModal({
         false
       );
     } else {
+      cancelAnimation(processingRotation);
       processingRotation.value = 0;
     }
+    
+    // Cleanup au démontage
+    return () => {
+      cancelAnimation(processingRotation);
+    };
   }, [isProcessing]);
 
   const micAnimatedStyle = useAnimatedStyle(() => ({
@@ -2251,11 +2293,19 @@ function JournalModal({
         );
       });
     } else {
+      cancelAnimation(micScale);
       micScale.value = 1;
       pulseRings.forEach((ring) => {
+        cancelAnimation(ring);
         ring.value = 1;
       });
     }
+    
+    // Cleanup au démontage
+    return () => {
+      cancelAnimation(micScale);
+      pulseRings.forEach((ring) => cancelAnimation(ring));
+    };
   }, [isRecording]);
 
   useEffect(() => {
@@ -2266,8 +2316,14 @@ function JournalModal({
         false
       );
     } else {
+      cancelAnimation(processingRotation);
       processingRotation.value = 0;
     }
+    
+    // Cleanup au démontage
+    return () => {
+      cancelAnimation(processingRotation);
+    };
   }, [isProcessing]);
 
   const micAnimatedStyle = useAnimatedStyle(() => ({

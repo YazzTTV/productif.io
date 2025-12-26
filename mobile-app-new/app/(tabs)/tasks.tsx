@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -226,6 +226,14 @@ export default function TasksScreen() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [updating, setUpdating] = useState(false);
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
   
   // États du formulaire
   const [newTask, setNewTask] = useState({
@@ -356,14 +364,20 @@ export default function TasksScreen() {
 
   const checkAuthStatus = async () => {
     try {
-      const response = await authService.checkAuth();
-      console.log('🔐 Statut d\'authentification:', response);
-      if (response?.user?.id) {
-        setCurrentUserId(response.user.id);
+      const user = await authService.checkAuth();
+      if (!isMountedRef.current) return;
+      
+      console.log('🔐 Statut d\'authentification:', user);
+      // checkAuth retourne User | null, pas { user: { id } }
+      if (user?.id) {
+        setCurrentUserId(user.id);
       }
     } catch (error) {
       console.error('❌ Pas authentifié:', error);
-      Alert.alert('Erreur', 'Vous devez vous reconnecter');
+      // Ne pas afficher d'Alert si le composant est démonté ou si c'est juste une 401 normale
+      if (isMountedRef.current && error instanceof Error && error.message !== 'Non authentifié') {
+        Alert.alert('Erreur', 'Vous devez vous reconnecter');
+      }
     }
   };
 

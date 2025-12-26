@@ -2,6 +2,7 @@
 
 import { motion } from 'framer-motion'
 import { useRouter } from 'next/navigation'
+import { signIn } from 'next-auth/react'
 import { Apple, Mail, ArrowRight } from 'lucide-react'
 import { useLocale } from '@/lib/i18n'
 
@@ -10,7 +11,6 @@ export default function ConnectionPage() {
   const { t } = useLocale()
 
   const handleConnect = (provider: string) => {
-    // In a real app, this would handle OAuth
     console.log(`Connecting with ${provider}`)
     
     // If it's the Login button, go to login page
@@ -26,8 +26,18 @@ export default function ConnectionPage() {
       return
     }
 
-    // Sinon (Apple / Google), on le laisse passer sur le flux onboarding classique
-    router.push('/onboarding')
+    // Google OAuth - Créer un compte et rediriger vers l'onboarding
+    if (provider === 'Google') {
+      signIn('google', { callbackUrl: '/onboarding' })
+      return
+    }
+
+    // Apple OAuth - TODO: implémenter si nécessaire
+    if (provider === 'Apple') {
+      // Pour l'instant, rediriger vers l'onboarding
+      router.push('/onboarding')
+      return
+    }
   }
 
   return (

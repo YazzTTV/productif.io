@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -18,6 +18,7 @@ import Animated, {
   withRepeat,
   withTiming,
   withSequence,
+  cancelAnimation,
 } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { authService, User } from '@/lib/api';
@@ -29,7 +30,7 @@ import { useTranslation } from '@/hooks/useTranslation';
 
 const { width } = Dimensions.get('window');
 
-// Composant de shimmer animé
+// Composant de shimmer animé avec cleanup approprié
 const ShimmerEffect = () => {
   const translateX = useSharedValue(-width);
 
@@ -42,6 +43,11 @@ const ShimmerEffect = () => {
       -1,
       false
     );
+    
+    // Cleanup: annuler l'animation au démontage
+    return () => {
+      cancelAnimation(translateX);
+    };
   }, []);
 
   const animatedStyle = useAnimatedStyle(() => ({
@@ -73,23 +79,35 @@ export default function SettingsScreen() {
   const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'annual'>('monthly');
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const isMountedRef = useRef(true);
 
   useEffect(() => {
+    isMountedRef.current = true;
     loadUserData();
+    
+    return () => {
+      isMountedRef.current = false;
+    };
   }, []);
 
   const loadUserData = async () => {
     try {
       const userData = await authService.checkAuth();
+      if (!isMountedRef.current) return;
       setUser(userData);
     } catch (error) {
       console.error('Erreur lors du chargement des données utilisateur:', error);
     } finally {
-      setLoading(false);
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
     }
   };
 
   const handleLogout = async () => {
+    if (isLoggingOut) return; // Éviter les doubles appels
+    
     Alert.alert(
       'Déconnexion',
       'Êtes-vous sûr de vouloir vous déconnecter ?',
@@ -100,10 +118,18 @@ export default function SettingsScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              await authService.logout();
+              setIsLoggingOut(true);
+              // Naviguer d'abord avant de nettoyer pour éviter les crashs
               router.replace('/login');
+              // Attendre un court délai pour que la navigation soit initiée
+              await new Promise(resolve => setTimeout(resolve, 100));
+              // Ensuite nettoyer la session
+              await authService.logout();
             } catch (error) {
               console.error('Erreur lors de la déconnexion:', error);
+              if (isMountedRef.current) {
+                setIsLoggingOut(false);
+              }
             }
           },
         },

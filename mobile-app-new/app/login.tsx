@@ -14,12 +14,14 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { authService } from '@/lib/api';
+import { signInWithGoogle } from '@/lib/googleAuth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingGoogle, setIsLoadingGoogle] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
   const handleLogin = async () => {
@@ -47,6 +49,42 @@ export default function LoginScreen() {
       Alert.alert('Erreur', error instanceof Error ? error.message : 'Une erreur est survenue lors de la connexion');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    setIsLoadingGoogle(true);
+    
+    try {
+      // Lancer le flux OAuth Google
+      const googleResult = await signInWithGoogle();
+      
+      // Envoyer les tokens au backend pour créer la session
+      const response = await authService.loginWithGoogle(
+        googleResult.accessToken,
+        googleResult.idToken,
+        googleResult.user.email,
+        googleResult.user.name
+      );
+      
+      if (response.success) {
+        // Marquer la session comme persistante
+        await AsyncStorage.setItem('onboarding_completed', 'true');
+        // Connexion réussie, redirection vers le dashboard
+        router.replace('/(tabs)');
+      } else {
+        Alert.alert('Erreur', 'Échec de la connexion avec Google');
+      }
+      
+    } catch (error) {
+      console.error('Erreur de connexion Google:', error);
+      if (error instanceof Error && error.message.includes('annulée')) {
+        // Ne pas afficher d'alerte si l'utilisateur a annulé
+        return;
+      }
+      Alert.alert('Erreur', error instanceof Error ? error.message : 'Une erreur est survenue lors de la connexion avec Google');
+    } finally {
+      setIsLoadingGoogle(false);
     }
   };
 
@@ -112,6 +150,30 @@ export default function LoginScreen() {
                 />
               </TouchableOpacity>
             </View>
+          </View>
+
+          {/* Bouton Google - même design que l'onboarding */}
+          <TouchableOpacity
+            style={[styles.googleButton, isLoadingGoogle && styles.googleButtonDisabled]}
+            onPress={handleGoogleLogin}
+            disabled={isLoadingGoogle}
+            activeOpacity={0.9}
+          >
+            {isLoadingGoogle ? (
+              <ActivityIndicator color="#4285F4" />
+            ) : (
+              <>
+                <Ionicons name="logo-google" size={20} color="#4285F4" />
+                <Text style={styles.googleButtonText}>Continuer avec Google</Text>
+              </>
+            )}
+          </TouchableOpacity>
+
+          {/* Séparateur */}
+          <View style={styles.separatorContainer}>
+            <View style={styles.separatorLine} />
+            <Text style={styles.separatorText}>OU</Text>
+            <View style={styles.separatorLine} />
           </View>
 
           <TouchableOpacity
@@ -267,5 +329,41 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#9CA3AF',
     textAlign: 'center',
+  },
+  googleButton: {
+    backgroundColor: '#FFFFFF',
+    paddingVertical: 14,
+    borderRadius: 16,
+    alignItems: 'center',
+    marginBottom: 16,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  googleButtonDisabled: {
+    opacity: 0.6,
+  },
+  googleButtonText: {
+    color: '#374151',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  separatorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 16,
+  },
+  separatorLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#E5E7EB',
+  },
+  separatorText: {
+    marginHorizontal: 12,
+    fontSize: 12,
+    color: '#6B7280',
+    fontWeight: '500',
   },
 }); 

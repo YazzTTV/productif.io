@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { useEffect } from 'react';
 import { authService } from '@/lib/api';
+import { signInWithGoogle } from '@/lib/googleAuth';
 import productifLogo from '../../assets/images/icon.png';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -22,6 +23,7 @@ export default function WelcomeScreen() {
   const [signupEmail, setSignupEmail] = useState('');
   const [signupPassword, setSignupPassword] = useState('');
   const [loadingSignup, setLoadingSignup] = useState(false);
+  const [loadingGoogle, setLoadingGoogle] = useState(false);
 
   const handleApple = async () => {
     try {
@@ -50,6 +52,38 @@ export default function WelcomeScreen() {
     } catch (e: any) {
       if (e?.code === 'ERR_CANCELED') return;
       Alert.alert('Erreur Apple', e?.message || 'Une erreur est survenue');
+    }
+  };
+
+  const handleGoogle = async (isLogin: boolean = false) => {
+    setLoadingGoogle(true);
+    try {
+      const googleResult = await signInWithGoogle();
+      
+      const response = await authService.loginWithGoogle(
+        googleResult.accessToken,
+        googleResult.idToken,
+        googleResult.user.email,
+        googleResult.user.name
+      );
+      
+      if (response.success) {
+        if (isLogin) {
+          // Connexion: aller au dashboard
+          await AsyncStorage.setItem('onboarding_completed', 'true');
+          router.replace('/(tabs)');
+        } else {
+          // Inscription: continuer l'onboarding
+          router.replace('/onboarding/value');
+        }
+      } else {
+        Alert.alert('Erreur', 'Échec de la connexion avec Google');
+      }
+    } catch (e: any) {
+      if (e?.message?.includes('annulée')) return;
+      Alert.alert('Erreur Google', e?.message || 'Une erreur est survenue');
+    } finally {
+      setLoadingGoogle(false);
     }
   };
 
@@ -186,6 +220,17 @@ export default function WelcomeScreen() {
                     <Text style={styles.oauthText}>Continuer avec Apple</Text>
                   </TouchableOpacity>
 
+                  <TouchableOpacity style={styles.oauthBtn} onPress={() => handleGoogle(true)} disabled={loadingGoogle}>
+                    {loadingGoogle ? (
+                      <ActivityIndicator color="#4285F4" />
+                    ) : (
+                      <>
+                        <Ionicons name="logo-google" size={18} color="#4285F4" />
+                        <Text style={styles.oauthText}>Continuer avec Google</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+
                   <TouchableOpacity onPress={() => setStep(3)}>
                     <Text style={styles.link}>Pas de compte ? Inscription</Text>
                   </TouchableOpacity>
@@ -226,6 +271,17 @@ export default function WelcomeScreen() {
                     <Text style={styles.oauthText}>Continuer avec Apple</Text>
                   </TouchableOpacity>
 
+                  <TouchableOpacity style={styles.oauthBtn} onPress={() => handleGoogle(false)} disabled={loadingGoogle}>
+                    {loadingGoogle ? (
+                      <ActivityIndicator color="#4285F4" />
+                    ) : (
+                      <>
+                        <Ionicons name="logo-google" size={18} color="#4285F4" />
+                        <Text style={styles.oauthText}>Continuer avec Google</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+
                   <TouchableOpacity onPress={() => setStep(2)}>
                     <Text style={styles.link}>Déjà un compte ? Connexion</Text>
                   </TouchableOpacity>
@@ -249,7 +305,17 @@ export default function WelcomeScreen() {
                   <Ionicons name="logo-apple" size={18} color="#111827" />
                   <Text style={styles.oauthText}>Continuer avec Apple</Text>
                 </TouchableOpacity>
-                {/* Google désactivé pour l'instant */}
+
+                <TouchableOpacity style={styles.oauthBtn} onPress={() => handleGoogle(false)} disabled={loadingGoogle}>
+                  {loadingGoogle ? (
+                    <ActivityIndicator color="#4285F4" />
+                  ) : (
+                    <>
+                      <Ionicons name="logo-google" size={18} color="#4285F4" />
+                      <Text style={styles.oauthText}>Continuer avec Google</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
               </View>
             )}
           </View>

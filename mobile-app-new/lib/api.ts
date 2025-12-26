@@ -200,6 +200,16 @@ export async function apiCall<T>(
         console.error('❌ apiCall - Réponse non-JSON:', rawText.substring(0, 200));
       }
 
+      // Gérer les erreurs 401 (Non authentifié) - nettoyer le token invalide
+      if (response.status === 401) {
+        // Nettoyer le token invalide pour éviter les appels répétés
+        await TokenStorage.getInstance().clearToken();
+        const message = errorData?.error || errorData?.message || 'Non authentifié';
+        // Ne pas logger comme erreur critique - c'est normal si l'utilisateur n'est pas connecté
+        console.log('ℹ️ apiCall - Non authentifié (401), token nettoyé');
+        throw new Error(message);
+      }
+
       // Si c'est une 404 avec du HTML, c'est probablement que l'endpoint n'existe pas
       if (response.status === 404 && rawText && rawText.includes('<!DOCTYPE')) {
         console.error('❌ apiCall - Endpoint non trouvé (404 HTML):', `${API_BASE_URL}${endpoint}`);
@@ -226,7 +236,13 @@ export async function apiCall<T>(
     console.log('✅ apiCall - Succès:', result);
     return result;
   } catch (error) {
-    console.error('💥 API Error:', error);
+    // Ne pas logger les erreurs 401 comme des erreurs critiques - c'est normal si l'utilisateur n'est pas connecté
+    if (error instanceof Error && error.message === 'Non authentifié') {
+      // Log silencieux pour les erreurs d'authentification
+      // L'erreur sera gérée par le code appelant (checkAuth retourne null)
+    } else {
+      console.error('💥 API Error:', error);
+    }
     throw error;
   }
 }
@@ -284,6 +300,26 @@ export const authService = {
     } finally {
       await TokenStorage.getInstance().clearToken();
     }
+  },
+
+  // Connexion avec Google
+  async loginWithGoogle(accessToken: string, idToken: string, email: string, name: string): Promise<AuthResponse> {
+    const response = await apiCall<AuthResponse>('/auth/google/mobile', {
+      method: 'POST',
+      body: JSON.stringify({
+        accessToken,
+        idToken,
+        email,
+        name,
+      }),
+    });
+
+    // Stocker le token si présent dans la réponse
+    if (response.success && response.token) {
+      await TokenStorage.getInstance().setToken(response.token);
+    }
+
+    return response;
   },
 
   // Vérifier l'état de connexion
