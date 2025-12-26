@@ -120,17 +120,33 @@ class NotificationService {
             if (settings?.pushEnabled) {
                 try {
                     const { sendPushNotification } = await import('../../lib/apns.js');
-                    const title = getNotificationTitle(notification.type);
-                    const body = this.extractBodyFromContent(notification.content);
+                    // Utiliser les titres/corps courts si disponibles pour le push,
+                    // sinon fallback sur le titre générique + extrait du contenu
+                    const title = notification.pushTitle || getNotificationTitle(notification.type);
+                    const body = notification.pushBody || this.extractBodyFromContent(notification.content);
+                    
+                    const pushData = {
+                        notificationId: notification.id,
+                        type: notification.type,
+                        action: 'open_assistant',
+                        // Message complet destiné à préremplir l'assistant IA mobile
+                        message: notification.assistantMessage || notification.content
+                    };
+                    
+                    console.log(`📤 [${processingId}] Payload push APNs envoyé:`, {
+                        userId: notification.userId,
+                        title,
+                        body,
+                        data: pushData,
+                        hasAssistantMessage: !!notification.assistantMessage,
+                        messageLength: pushData.message?.length || 0
+                    });
                     
                     const pushResult = await sendPushNotification(notification.userId, {
                         title: title,
                         body: body,
                         sound: 'default',
-                        data: {
-                            notificationId: notification.id,
-                            type: notification.type
-                        }
+                        data: pushData
                     });
                     
                     if (pushResult.success && pushResult.sent > 0) {
@@ -218,7 +234,8 @@ class NotificationService {
         message += '\n\n_Envoyé via Productif.io_';
         return message;
     }
-    async createNotification(userId, type, content, scheduledFor) {
+    async createNotification(userId, type, content, scheduledFor, options = {}) {
+        const { pushTitle = null, pushBody = null, assistantMessage = null } = options || {};
         const notificationId = uuidv4();
         
         NotificationLogger.logNotificationCreation({
@@ -234,6 +251,9 @@ class NotificationService {
                     userId,
                     type,
                     content,
+                    pushTitle,
+                    pushBody,
+                    assistantMessage,
                     scheduledFor,
                     status: 'pending'
                 }
@@ -257,7 +277,7 @@ class NotificationService {
             throw error;
         }
     }
-    async scheduleNotification(userId, type, content, scheduledFor) {
+    async scheduleNotification(userId, type, content, scheduledFor, options = {}) {
         try {
             // Récupérer les préférences de l'utilisateur
             const user = await this.prisma.user.findUnique({
@@ -275,11 +295,15 @@ class NotificationService {
                 console.log(`⚠️ La notification ne peut pas être envoyée à cette heure`);
                 return null;
             }
+            const { pushTitle = null, pushBody = null, assistantMessage = null } = options || {};
             const notification = await this.prisma.notificationHistory.create({
                 data: {
                     userId,
                     type,
                     content,
+                    pushTitle,
+                    pushBody,
+                    assistantMessage,
                     scheduledFor,
                     status: 'pending'
                 }
@@ -357,8 +381,24 @@ class NotificationService {
     }
     async scheduleMorningNotification(userId, date) {
         try {
+            // Message complet utilisé pour WhatsApp + assistant IA
             const content = await NotificationContentBuilder.buildMorningContent(userId);
-            await this.createNotification(userId, 'MORNING_REMINDER', content, date);
+
+            // Version courte pour la push
+            const shortTitle = '☀️ Nouvelle journée';
+            const shortBody = "Quelle est la seule chose importante aujourd'hui ?";
+
+            await this.createNotification(
+              userId,
+              'MORNING_REMINDER',
+              content,
+              date,
+              {
+                pushTitle: shortTitle,
+                pushBody: shortBody,
+                assistantMessage: content,
+              }
+            );
         }
         catch (error) {
             NotificationLogger.logError('Planification de la notification du matin', error);
@@ -366,8 +406,24 @@ class NotificationService {
     }
     async scheduleNoonNotification(userId, date) {
         try {
+            // Message complet utilisé pour WhatsApp + assistant IA
             const content = await NotificationContentBuilder.buildNoonContent(userId);
-            await this.createNotification(userId, 'NOON_CHECK', content, date);
+
+            // Version courte pour la push
+            const shortTitle = '🍽️ Pause méritée';
+            const shortBody = 'Prends le temps de manger. Le repos fait partie de la performance.';
+
+            await this.createNotification(
+              userId,
+              'NOON_CHECK',
+              content,
+              date,
+              {
+                pushTitle: shortTitle,
+                pushBody: shortBody,
+                assistantMessage: content,
+              }
+            );
         }
         catch (error) {
             NotificationLogger.logError('Planification de la notification du midi', error);
@@ -375,8 +431,25 @@ class NotificationService {
     }
     async scheduleAfternoonNotification(userId, date) {
         try {
+            // Message complet utilisé pour WhatsApp + assistant IA
             const content = await NotificationContentBuilder.buildAfternoonContent(userId);
-            await this.createNotification(userId, 'AFTERNOON_REMINDER', content, date);
+
+            // Version courte pour la push (titre + préview)
+            const shortTitle = '🌤️ L’après-midi commence';
+            const shortBody = 'Reviens calmement à l’essentiel.';
+
+            await this.createNotification(
+              userId,
+              'AFTERNOON_REMINDER',
+              content,
+              date,
+              {
+                pushTitle: shortTitle,
+                pushBody: shortBody,
+                // Message complet qui sera envoyé au mobile pour préremplir l’assistant
+                assistantMessage: content,
+              }
+            );
         }
         catch (error) {
             NotificationLogger.logError('Planification de la notification de l\'après-midi', error);
@@ -384,8 +457,24 @@ class NotificationService {
     }
     async scheduleEveningNotification(userId, date) {
         try {
+            // Message complet utilisé pour WhatsApp + assistant IA
             const content = await NotificationContentBuilder.buildEveningContent(userId);
-            await this.createNotification(userId, 'EVENING_PLANNING', content, date);
+
+            // Version courte pour la push
+            const shortTitle = '🌙 Préparer demain';
+            const shortBody = 'Une intention suffit pour bien démarrer.';
+
+            await this.createNotification(
+              userId,
+              'EVENING_PLANNING',
+              content,
+              date,
+              {
+                pushTitle: shortTitle,
+                pushBody: shortBody,
+                assistantMessage: content,
+              }
+            );
         }
         catch (error) {
             NotificationLogger.logError('Planification de la notification du soir', error);
@@ -393,8 +482,24 @@ class NotificationService {
     }
     async scheduleNightNotification(userId, date) {
         try {
+            // Message complet utilisé pour WhatsApp + assistant IA
             const content = await NotificationContentBuilder.buildNightContent(userId);
-            await this.createNotification(userId, 'NIGHT_HABITS_CHECK', content, date);
+
+            // Version courte pour la push
+            const shortTitle = '🌃 Bilan du soir';
+            const shortBody = "Comment s'est passée ta journée ?";
+
+            await this.createNotification(
+              userId,
+              'NIGHT_HABITS_CHECK',
+              content,
+              date,
+              {
+                pushTitle: shortTitle,
+                pushBody: shortBody,
+                assistantMessage: content,
+              }
+            );
         }
         catch (error) {
             NotificationLogger.logError('Planification de la notification de nuit', error);
@@ -403,8 +508,24 @@ class NotificationService {
 
     async scheduleImprovementNotification(userId, date) {
         try {
+            // Message complet utilisé pour WhatsApp + assistant IA
             const content = "🎯 Aujourd'hui, concentre-toi sur une amélioration clé.\n\n💡 Idées :\n1) Choisis une difficulté et écris une action concrète pour la réduire.\n2) Bloque 25 min en deep work sur une tâche prioritaire.\n3) Supprime une distraction majeure (notifications, onglets...).\n\n🚀 Un pas à la fois !";
-            await this.createNotification(userId, 'IMPROVEMENT_REMINDER', content, date);
+
+            // Version courte pour la push
+            const shortTitle = '📈 Amélioration';
+            const shortBody = "Quelle est la petite victoire d'aujourd'hui, même minime ?";
+
+            await this.createNotification(
+              userId,
+              'IMPROVEMENT_REMINDER',
+              content,
+              date,
+              {
+                pushTitle: shortTitle,
+                pushBody: shortBody,
+                assistantMessage: content,
+              }
+            );
         } catch (error) {
             NotificationLogger.logError('Planification de la notification amélioration', error);
         }
@@ -412,8 +533,24 @@ class NotificationService {
 
     async scheduleRecapNotification(userId, date) {
         try {
+            // Message complet utilisé pour WhatsApp + assistant IA
             const content = "✨ Bilan de ta journée\n\n✅ Liste tes accomplissements\n⏱ Note ton temps de travail\n💭 Comment s'est passée ta journée ?\n\nPrends 2 minutes pour le récap, puis prépare demain. 💪";
-            await this.createNotification(userId, 'RECAP_ANALYSIS', content, date);
+
+            // Version courte pour la push
+            const shortTitle = '📊 Récap';
+            const shortBody = "Regarde le chemin parcouru aujourd'hui. Es-tu fier de toi ?";
+
+            await this.createNotification(
+              userId,
+              'RECAP_ANALYSIS',
+              content,
+              date,
+              {
+                pushTitle: shortTitle,
+                pushBody: shortBody,
+                assistantMessage: content,
+              }
+            );
         } catch (error) {
             NotificationLogger.logError('Planification de la notification récap', error);
         }
@@ -421,8 +558,24 @@ class NotificationService {
 
     async scheduleMoodCheckNotification(userId, date) {
         try {
+            // Message complet utilisé pour WhatsApp + assistant IA
             const content = "🙂 Comment te sens-tu maintenant ?\n\nRéponds en notant ton humeur sur 1-10 et ajoute un mot-clé (ex: \"8, serein\").";
-            await this.createNotification(userId, 'MOOD_CHECK', content, date);
+
+            // Version courte pour la push
+            const shortTitle = '🙂 Humeur du moment';
+            const shortBody = 'Note ton humeur (1–10) et ajoute un mot-clé.';
+
+            await this.createNotification(
+              userId,
+              'MOOD_CHECK',
+              content,
+              date,
+              {
+                pushTitle: shortTitle,
+                pushBody: shortBody,
+                assistantMessage: content,
+              }
+            );
         } catch (error) {
             NotificationLogger.logError('Planification de la question humeur', error);
         }
@@ -430,8 +583,24 @@ class NotificationService {
 
     async scheduleStressCheckNotification(userId, date) {
         try {
+            // Message complet utilisé pour WhatsApp + assistant IA
             const content = "😌 Ton niveau de stress sur 1-10 ?\n\nQu'est-ce qui aide le plus à réduire la pression ? (respiration, pause, priorisation, déconnexion).";
-            await this.createNotification(userId, 'STRESS_CHECK', content, date);
+
+            // Version courte pour la push
+            const shortTitle = '😌 Stress du moment';
+            const shortBody = 'Sur une échelle de 1 à 10, comment te sens-tu ?';
+
+            await this.createNotification(
+              userId,
+              'STRESS_CHECK',
+              content,
+              date,
+              {
+                pushTitle: shortTitle,
+                pushBody: shortBody,
+                assistantMessage: content,
+              }
+            );
         } catch (error) {
             NotificationLogger.logError('Planification de la question stress', error);
         }
@@ -439,8 +608,24 @@ class NotificationService {
 
     async scheduleFocusCheckNotification(userId, date) {
         try {
+            // Message complet utilisé pour WhatsApp + assistant IA
             const content = "🎯 Focus actuel sur 1-10 ?\n\nQuelle est la prochaine tâche à faire en 25 minutes ? (une seule, claire).";
-            await this.createNotification(userId, 'FOCUS_CHECK', content, date);
+
+            // Version courte pour la push
+            const shortTitle = '🎯 Check Focus';
+            const shortBody = 'Es-tu sur ta tâche prioritaire ou es-tu en train de procrastiner ?';
+
+            await this.createNotification(
+              userId,
+              'FOCUS_CHECK',
+              content,
+              date,
+              {
+                pushTitle: shortTitle,
+                pushBody: shortBody,
+                assistantMessage: content,
+              }
+            );
         } catch (error) {
             NotificationLogger.logError('Planification de la question focus', error);
         }

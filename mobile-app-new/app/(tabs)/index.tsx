@@ -21,6 +21,7 @@ import Animated, {
   FadeInDown,
   FadeIn,
   interpolate,
+  cancelAnimation,
 } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { LineChart } from 'react-native-chart-kit';
@@ -161,6 +162,12 @@ const ShimmerParticle = ({ delay = 0 }: { delay?: number }) => {
       -1,
       false
     );
+    
+    // Cleanup: annuler les animations au démontage pour éviter les crashs Hermes GC
+    return () => {
+      cancelAnimation(translateX);
+      cancelAnimation(opacity);
+    };
   }, []);
 
   const animatedStyle = useAnimatedStyle(() => ({

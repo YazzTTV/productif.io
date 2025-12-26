@@ -1,10 +1,12 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   ScrollView,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
@@ -14,21 +16,25 @@ import Animated, {
   withRepeat,
   withTiming,
   withSequence,
+  cancelAnimation,
 } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { signInWithGoogle } from '@/lib/googleAuth';
+import { authService } from '@/lib/api';
 
-// Particule animée
+// Particule animée avec cleanup approprié
 const AnimatedParticle = ({ index }: { index: number }) => {
   const translateY = useSharedValue(0);
   const opacity = useSharedValue(0.2);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const randomDelay = Math.random() * 2000;
     const randomDuration = 3000 + Math.random() * 2000;
 
-    setTimeout(() => {
+    timeoutRef.current = setTimeout(() => {
       translateY.value = withRepeat(
         withSequence(
           withTiming(-30, { duration: randomDuration }),
@@ -47,6 +53,15 @@ const AnimatedParticle = ({ index }: { index: number }) => {
         false
       );
     }, randomDelay);
+
+    // Cleanup: annuler le timeout et les animations
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+      cancelAnimation(translateY);
+      cancelAnimation(opacity);
+    };
   }, []);
 
   const animatedStyle = useAnimatedStyle(() => ({
@@ -73,6 +88,15 @@ const AnimatedParticle = ({ index }: { index: number }) => {
 
 export default function ConnectionScreen() {
   const { t } = useLanguage();
+  const [isLoadingGoogle, setIsLoadingGoogle] = useState(false);
+  const isMountedRef = useRef(true);
+  
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
   
   const benefits = [
     { icon: '🤖', text: t('aiAssistantBenefit') },
@@ -81,11 +105,57 @@ export default function ConnectionScreen() {
     { icon: '🏆', text: t('competeFriendsBenefit') },
     { icon: '☁️', text: t('syncDevicesBenefit') },
   ];
+
+  const handleGoogleSignup = async () => {
+    if (!isMountedRef.current) return;
+    setIsLoadingGoogle(true);
+    
+    try {
+      // Lancer le flux OAuth Google
+      const googleResult = await signInWithGoogle();
+      
+      if (!isMountedRef.current) return;
+      
+      // Envoyer les tokens au backend pour créer le compte
+      const response = await authService.loginWithGoogle(
+        googleResult.accessToken,
+        googleResult.idToken,
+        googleResult.user.email,
+        googleResult.user.name
+      );
+      
+      if (!isMountedRef.current) return;
+      
+      if (response.success) {
+        // Compte créé/connecté, continuer l'onboarding
+        router.replace('/(onboarding-new)/building-plan');
+      } else {
+        Alert.alert('Erreur', 'Échec de la création du compte avec Google');
+      }
+      
+    } catch (error) {
+      console.error('Erreur Google signup:', error);
+      if (error instanceof Error && error.message.includes('annulée')) {
+        // Ne pas afficher d'alerte si l'utilisateur a annulé
+        return;
+      }
+      if (isMountedRef.current) {
+        Alert.alert('Erreur', error instanceof Error ? error.message : 'Une erreur est survenue');
+      }
+    } finally {
+      if (isMountedRef.current) {
+        setIsLoadingGoogle(false);
+      }
+    }
+  };
+
   const handleConnect = (provider: string) => {
     if (provider === 'Login') {
       router.push('/login');
+    } else if (provider === 'Google') {
+      handleGoogleSignup();
     } else {
-      // Email, Apple, Google -> Inscription
+      // Email, Apple -> Inscription
       router.push('/signup');
     }
   };
@@ -185,9 +255,16 @@ export default function ConnectionScreen() {
             activeOpacity={0.9}
             onPress={() => handleConnect('Google')}
             style={[styles.secondaryButton, styles.googleButton]}
+            disabled={isLoadingGoogle}
           >
-            <Ionicons name="logo-google" size={20} color="#4285F4" />
-            <Text style={styles.googleButtonText}>{t('continueWithGoogle')}</Text>
+            {isLoadingGoogle ? (
+              <ActivityIndicator color="#4285F4" />
+            ) : (
+              <>
+                <Ionicons name="logo-google" size={20} color="#4285F4" />
+                <Text style={styles.googleButtonText}>{t('continueWithGoogle')}</Text>
+              </>
+            )}
           </TouchableOpacity>
         </Animated.View>
 

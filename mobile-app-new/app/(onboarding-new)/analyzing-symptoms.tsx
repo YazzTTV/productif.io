@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -12,6 +12,7 @@ import Animated, {
   withTiming,
   withRepeat,
   withSequence,
+  cancelAnimation,
 } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -33,11 +34,16 @@ export default function AnalyzingSymptomsScreen() {
   ];
   const [progress, setProgress] = useState(0);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
+  const isMountedRef = useRef(true);
+  const isNavigatingRef = useRef(false);
 
   const rotation = useSharedValue(0);
   const scale = useSharedValue(1);
 
   useEffect(() => {
+    isMountedRef.current = true;
+    isNavigatingRef.current = false;
+    
     // Animation de rotation continue
     rotation.value = withRepeat(
       withTiming(360, { duration: 2000 }),
@@ -54,11 +60,19 @@ export default function AnalyzingSymptomsScreen() {
       -1,
       false
     );
+    
+    // Cleanup des animations
+    return () => {
+      isMountedRef.current = false;
+      cancelAnimation(rotation);
+      cancelAnimation(scale);
+    };
   }, []);
 
   useEffect(() => {
     // Progression smooth
     const progressInterval = setInterval(() => {
+      if (!isMountedRef.current) return;
       setProgress((prev) => {
         if (prev >= 100) {
           clearInterval(progressInterval);
@@ -70,6 +84,7 @@ export default function AnalyzingSymptomsScreen() {
 
     // Update loading text
     const stepInterval = setInterval(() => {
+      if (!isMountedRef.current) return;
       setProgress((current) => {
         if (current >= 20 && current < 40) setCurrentStepIndex(1);
         else if (current >= 40 && current < 60) setCurrentStepIndex(2);
@@ -81,7 +96,10 @@ export default function AnalyzingSymptomsScreen() {
 
     // Navigate après completion
     const completeTimer = setTimeout(() => {
-      router.push('/(onboarding-new)/social-proof');
+      if (isMountedRef.current && !isNavigatingRef.current) {
+        isNavigatingRef.current = true;
+        router.push('/(onboarding-new)/social-proof');
+      }
     }, 6500);
 
     return () => {

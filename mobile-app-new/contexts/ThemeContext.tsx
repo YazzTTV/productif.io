@@ -92,10 +92,32 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   );
 }
 
-export function useTheme() {
+// Couleurs par défaut pour le fallback
+const defaultColors = {
+  background: '#111827',
+  surface: '#1F2937',
+  text: '#FFFFFF',
+  textSecondary: '#9CA3AF',
+  border: '#374151',
+  primary: '#00C27A',
+  tint: '#00C27A',
+  icon: '#9CA3AF',
+  tabIconDefault: '#9CA3AF',
+  tabIconSelected: '#00C27A',
+};
+
+export function useTheme(): ThemeContextType {
   const context = useContext(ThemeContext);
   if (context === undefined) {
-    throw new Error('useTheme must be used within a ThemeProvider');
+    // Retourner des valeurs par défaut au lieu de lancer une erreur
+    // Cela permet au composant de fonctionner même si le provider n'est pas encore monté
+    console.warn('useTheme called outside ThemeProvider, using defaults');
+    return {
+      theme: 'dark',
+      actualTheme: 'dark',
+      setTheme: () => {},
+      colors: defaultColors,
+    };
   }
   return context;
 }

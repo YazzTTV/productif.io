@@ -1,7 +1,7 @@
 module.exports = function (api) {
   api.cache(true);
   return {
-    presets: ['babel-preset-expo'],
+    presets: ['babel-preset-expo'], // babel-preset-expo inclut déjà expo-router
     plugins: [
       [
         'module-resolver',
@@ -21,7 +21,7 @@ module.exports = function (api) {
           ],
         },
       ],
-      require.resolve('expo-router/babel'),
+      // expo-router/babel est déprécié et inclus dans babel-preset-expo depuis SDK 50
       // Reanimated plugin must be listed last
       'react-native-reanimated/plugin',
     ],

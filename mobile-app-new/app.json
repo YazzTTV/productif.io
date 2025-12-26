@@ -5,7 +5,10 @@
     "version": "1.0.7",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "productifio",
+    "scheme": [
+      "productifio",
+      "com.googleusercontent.apps.738789952398-m6risp9hae6ao11n7s4178nig64largu"
+    ],
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
@@ -14,7 +17,14 @@
         "NSCameraUsageDescription": "We need access to your camera to allow you to take photos for your tasks and journal entries.",
         "NSPhotoLibraryUsageDescription": "We need access to your photo library to let you select images for your tasks and journal entries.",
         "NSPhotoLibraryAddUsageDescription": "We need permission to save images to your photo library.",
-        "NSUserNotificationsUsageDescription": "Nous avons besoin de votre permission pour vous envoyer des notifications importantes concernant vos tâches, habitudes et rappels."
+        "NSUserNotificationsUsageDescription": "Nous avons besoin de votre permission pour vous envoyer des notifications importantes concernant vos tâches, habitudes et rappels.",
+        "CFBundleURLTypes": [
+          {
+            "CFBundleURLSchemes": [
+              "com.googleusercontent.apps.738789952398-m6risp9hae6ao11n7s4178nig64largu"
+            ]
+          }
+        ]
       },
       "usesAppleSignIn": true
     },
@@ -71,6 +81,10 @@
     ],
     "experiments": {
       "typedRoutes": false
+    },
+    "extra": {
+      "googleClientId": "738789952398-m6risp9hae6ao11n7s4178nig64largu.apps.googleusercontent.com",
+      "apiUrl": "https://www.productif.io"
     }
   }
 }

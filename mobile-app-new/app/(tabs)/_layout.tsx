@@ -7,11 +7,12 @@ import { HapticTab } from '@/components/HapticTab';
 import TabBarBackground from '@/components/ui/TabBarBackground';
 import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
-import { useTranslation } from '@/hooks/useTranslation';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
-  const t = useTranslation();
+  // useLanguage retourne maintenant des valeurs par défaut si le provider n'est pas disponible
+  const { t } = useLanguage();
 
   return (
     <Tabs
