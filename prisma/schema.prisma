@@ -65,6 +65,7 @@ model User {
   onboardingData         OnboardingData?
   xpEvents               XpEvent[]
   pushTokens             PushToken[]
+  googleCalendarToken    GoogleCalendarToken?
 }
 
 model Company {
@@ -450,6 +451,9 @@ model NotificationHistory {
   userId       String
   type         String
   content      String
+  pushTitle    String?
+  pushBody     String?
+  assistantMessage String?           @db.Text
   scheduledFor DateTime
   sentAt       DateTime?
   status       String                @default("pending")
@@ -766,4 +770,19 @@ model PushToken {
   @@index([token])
   @@index([platform])
   @@map("push_tokens")
+}
+
+model GoogleCalendarToken {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  accessToken   String   @db.Text
+  refreshToken  String?  @db.Text
+  expiresAt     DateTime
+  scope         String   // Les scopes accordés (ex: "openid email profile https://www.googleapis.com/auth/calendar")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("google_calendar_tokens")
 }

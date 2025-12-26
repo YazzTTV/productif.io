@@ -1,5 +1,5 @@
 import { Stack } from 'expo-router';
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router, useSegments } from 'expo-router';
 import { View, ActivityIndicator } from 'react-native';
@@ -8,11 +8,20 @@ import { useFocusEffect } from '@react-navigation/native';
 export default function OnboardingNewLayout() {
   const [isChecking, setIsChecking] = useState(true);
   const segments = useSegments();
+  const isMountedRef = useRef(true);
+  const isNavigatingRef = useRef(false);
 
-  const checkOnboardingStatus = async () => {
+  const checkOnboardingStatus = useCallback(async () => {
+    // Éviter les navigations concurrentes
+    if (isNavigatingRef.current || !isMountedRef.current) {
+      return false;
+    }
+    
     try {
       const flag = await AsyncStorage.getItem('onboarding_completed');
-      if (flag === 'true') {
+      if (flag === 'true' && isMountedRef.current && !isNavigatingRef.current) {
+        // Marquer qu'on navigue pour éviter les doubles navigations
+        isNavigatingRef.current = true;
         // Rediriger vers l'app si l'onboarding est déjà complété
         // Utiliser replace pour empêcher le retour en arrière
         router.replace('/(tabs)');
@@ -23,20 +32,31 @@ export default function OnboardingNewLayout() {
       console.error('Error checking onboarding status:', error);
       return false;
     }
-  };
-
-  useEffect(() => {
-    // Vérifier au montage
-    checkOnboardingStatus().then((completed) => {
-      setIsChecking(false);
-    });
   }, []);
 
-  // Vérifier à chaque fois que l'écran est focus
+  useEffect(() => {
+    isMountedRef.current = true;
+    isNavigatingRef.current = false;
+    
+    // Vérifier au montage
+    checkOnboardingStatus().then((completed) => {
+      if (isMountedRef.current) {
+        setIsChecking(false);
+      }
+    });
+    
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, [checkOnboardingStatus]);
+
+  // Vérifier à chaque fois que l'écran est focus (mais pas si on est déjà en train de naviguer)
   useFocusEffect(
     useCallback(() => {
+      // Réinitialiser le flag de navigation quand on revient sur cet écran
+      isNavigatingRef.current = false;
       checkOnboardingStatus();
-    }, [])
+    }, [checkOnboardingStatus])
   );
 
   // Afficher un loader pendant la vérification

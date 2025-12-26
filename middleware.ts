@@ -20,6 +20,7 @@ const publicRoutes = [
   "/login",
   "/register",
   "/onboarding",
+  "/auth/callback", // Callback pour synchroniser NextAuth avec le système d'auth personnalisé
   "/upgrade",
   "/api/auth",
   "/api/auth/login",

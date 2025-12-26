@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -15,6 +15,7 @@ import Animated, {
   withRepeat,
   withTiming,
   withSequence,
+  cancelAnimation,
 } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -40,9 +41,18 @@ export default function SymptomsAnalysisScreen() {
   ];
   const [selectedSymptoms, setSelectedSymptoms] = useState<string[]>([]);
   const [showAnalyzing, setShowAnalyzing] = useState(false);
+  const isMountedRef = useRef(true);
+  const isNavigatingRef = useRef(false);
 
   const rotation = useSharedValue(0);
   const scale = useSharedValue(1);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (showAnalyzing) {
@@ -62,10 +72,17 @@ export default function SymptomsAnalysisScreen() {
       );
 
       const timer = setTimeout(() => {
-        router.push('/(onboarding-new)/analyzing-symptoms');
+        if (isMountedRef.current && !isNavigatingRef.current) {
+          isNavigatingRef.current = true;
+          router.push('/(onboarding-new)/analyzing-symptoms');
+        }
       }, 2000);
 
-      return () => clearTimeout(timer);
+      return () => {
+        clearTimeout(timer);
+        cancelAnimation(rotation);
+        cancelAnimation(scale);
+      };
     }
   }, [showAnalyzing]);
 
@@ -85,6 +102,8 @@ export default function SymptomsAnalysisScreen() {
   };
 
   const handleContinue = async () => {
+    if (!isMountedRef.current) return;
+    
     // Sauvegarder les symptômes sélectionnés dans l'API
     try {
       await onboardingService.saveOnboardingData({
@@ -97,7 +116,9 @@ export default function SymptomsAnalysisScreen() {
       // Ne pas bloquer le flux
     }
     
-    setShowAnalyzing(true);
+    if (isMountedRef.current) {
+      setShowAnalyzing(true);
+    }
   };
 
   if (showAnalyzing) {

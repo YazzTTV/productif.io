@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -15,21 +15,23 @@ import Animated, {
   withRepeat,
   withTiming,
   withSequence,
+  cancelAnimation,
 } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useLanguage } from '@/contexts/LanguageContext';
 
-// Particule animée
+// Particule animée avec cleanup approprié
 const AnimatedParticle = ({ index }: { index: number }) => {
   const translateY = useSharedValue(0);
   const opacity = useSharedValue(0.2);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const randomDelay = Math.random() * 2000;
     const randomDuration = 3000 + Math.random() * 2000;
 
-    setTimeout(() => {
+    timeoutRef.current = setTimeout(() => {
       translateY.value = withRepeat(
         withSequence(
           withTiming(-30, { duration: randomDuration }),
@@ -48,6 +50,15 @@ const AnimatedParticle = ({ index }: { index: number }) => {
         false
       );
     }, randomDelay);
+
+    // Cleanup: annuler le timeout et les animations
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+      cancelAnimation(translateY);
+      cancelAnimation(opacity);
+    };
   }, []);
 
   const animatedStyle = useAnimatedStyle(() => ({
