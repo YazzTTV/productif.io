@@ -73,6 +73,12 @@ const authOptions: NextAuthOptions = {
       return session;
     },
     async redirect({ url, baseUrl }) {
+      // Forcer l'utilisation du domaine personnalisé en production
+      const productionBaseUrl = 'https://www.productif.io';
+      const effectiveBaseUrl = process.env.NODE_ENV === 'production' 
+        ? productionBaseUrl 
+        : baseUrl;
+      
       // Rediriger vers la page de callback qui créera les cookies personnalisés
       // Passer l'URL de destination dans les paramètres
       let callbackUrl = "/dashboard"
@@ -82,10 +88,18 @@ const authOptions: NextAuthOptions = {
         callbackUrl = url
       } else if (url.startsWith(baseUrl)) {
         callbackUrl = url.replace(baseUrl, "")
+      } else if (url.startsWith(productionBaseUrl)) {
+        callbackUrl = url.replace(productionBaseUrl, "")
       }
       
-      // Encoder l'URL de callback pour la passer en paramètre
-      return `/auth/callback?callbackUrl=${encodeURIComponent(callbackUrl)}`
+      // Construire l'URL de callback avec le domaine personnalisé en production
+      const callbackPath = `/auth/callback?callbackUrl=${encodeURIComponent(callbackUrl)}`;
+      
+      if (process.env.NODE_ENV === 'production') {
+        return `${productionBaseUrl}${callbackPath}`;
+      }
+      
+      return callbackPath;
     },
   },
   pages: {
