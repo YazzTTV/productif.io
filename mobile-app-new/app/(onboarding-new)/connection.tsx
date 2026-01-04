@@ -22,6 +22,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { signInWithGoogle } from '@/lib/googleAuth';
+import { signInWithApple, isAppleSignInAvailable } from '@/lib/appleAuth';
 import { authService } from '@/lib/api';
 
 // Particule animée avec cleanup approprié
@@ -89,10 +90,14 @@ const AnimatedParticle = ({ index }: { index: number }) => {
 export default function ConnectionScreen() {
   const { t } = useLanguage();
   const [isLoadingGoogle, setIsLoadingGoogle] = useState(false);
+  const [isLoadingApple, setIsLoadingApple] = useState(false);
+  const [appleAvailable, setAppleAvailable] = useState(false);
   const isMountedRef = useRef(true);
   
   useEffect(() => {
     isMountedRef.current = true;
+    // Vérifier si Apple Sign-In est disponible
+    isAppleSignInAvailable().then(setAppleAvailable);
     return () => {
       isMountedRef.current = false;
     };
@@ -116,19 +121,14 @@ export default function ConnectionScreen() {
       
       if (!isMountedRef.current) return;
       
-      // Envoyer les tokens au backend pour créer le compte
-      const response = await authService.loginWithGoogle(
-        googleResult.accessToken,
-        googleResult.idToken,
-        googleResult.user.email,
-        googleResult.user.name
-      );
+      // Envoyer l'idToken au backend dans le header Authorization
+      const response = await authService.loginWithGoogle(googleResult.idToken);
       
       if (!isMountedRef.current) return;
       
       if (response.success) {
-        // Compte créé/connecté, continuer l'onboarding
-        router.replace('/(onboarding-new)/building-plan');
+        // Compte créé/connecté, continuer l'onboarding vers le questionnaire
+        router.replace('/(onboarding-new)/question');
       } else {
         Alert.alert('Erreur', 'Échec de la création du compte avec Google');
       }
@@ -149,13 +149,57 @@ export default function ConnectionScreen() {
     }
   };
 
+  const handleAppleSignup = async () => {
+    if (!isMountedRef.current) return;
+    setIsLoadingApple(true);
+    
+    try {
+      // Lancer le flux OAuth Apple
+      const appleResult = await signInWithApple();
+      
+      if (!isMountedRef.current) return;
+      
+      // Envoyer l'identityToken au backend dans le header Authorization
+      const response = await authService.loginWithApple(
+        appleResult.identityToken,
+        appleResult.user.email,
+        appleResult.user.name
+      );
+      
+      if (!isMountedRef.current) return;
+      
+      if (response.success) {
+        // Compte créé/connecté, continuer l'onboarding vers le questionnaire
+        router.replace('/(onboarding-new)/question');
+      } else {
+        Alert.alert('Erreur', 'Échec de la création du compte avec Apple');
+      }
+      
+    } catch (error) {
+      console.error('Erreur Apple signup:', error);
+      if (error instanceof Error && error.message.includes('annulée')) {
+        // Ne pas afficher d'alerte si l'utilisateur a annulé
+        return;
+      }
+      if (isMountedRef.current) {
+        Alert.alert('Erreur', error instanceof Error ? error.message : 'Une erreur est survenue');
+      }
+    } finally {
+      if (isMountedRef.current) {
+        setIsLoadingApple(false);
+      }
+    }
+  };
+
   const handleConnect = (provider: string) => {
     if (provider === 'Login') {
       router.push('/login');
     } else if (provider === 'Google') {
       handleGoogleSignup();
+    } else if (provider === 'Apple') {
+      handleAppleSignup();
     } else {
-      // Email, Apple -> Inscription
+      // Email -> Inscription
       router.push('/signup');
     }
   };
@@ -240,15 +284,24 @@ export default function ConnectionScreen() {
             </LinearGradient>
           </TouchableOpacity>
 
-          {/* Bouton Apple */}
-          <TouchableOpacity
-            activeOpacity={0.9}
-            onPress={() => handleConnect('Apple')}
-            style={[styles.secondaryButton, styles.appleButton, styles.buttonSpacing]}
-          >
-            <Ionicons name="logo-apple" size={20} color="#FFFFFF" />
-            <Text style={styles.appleButtonText}>{t('continueWithApple')}</Text>
-          </TouchableOpacity>
+          {/* Bouton Apple - seulement si disponible */}
+          {appleAvailable && (
+            <TouchableOpacity
+              activeOpacity={0.9}
+              onPress={() => handleConnect('Apple')}
+              style={[styles.secondaryButton, styles.appleButton, styles.buttonSpacing]}
+              disabled={isLoadingApple}
+            >
+              {isLoadingApple ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <>
+                  <Ionicons name="logo-apple" size={20} color="#FFFFFF" />
+                  <Text style={styles.appleButtonText}>{t('continueWithApple')}</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          )}
 
           {/* Bouton Google */}
           <TouchableOpacity

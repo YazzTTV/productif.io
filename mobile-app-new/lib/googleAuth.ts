@@ -1,60 +1,67 @@
 import Constants from 'expo-constants';
 import { Alert, Platform } from 'react-native';
+import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 
-// Import dynamique pour éviter les crashs en Expo Go
-// Ces modules nécessitent un build natif (expo-crypto)
-let AuthSession: typeof import('expo-auth-session') | null = null;
-let WebBrowser: typeof import('expo-web-browser') | null = null;
-
-// Fonction pour charger les modules de manière sécurisée
-function loadAuthModules() {
-  if (AuthSession && WebBrowser) {
-    return true; // Déjà chargés
-  }
-
-  try {
-    // Vérifier d'abord si on est en Expo Go en testant expo-crypto
-    // Si expo-crypto n'est pas disponible, on est en Expo Go
-    require('expo-crypto');
-    
-    // Si on arrive ici, expo-crypto est disponible, on peut charger les autres modules
-    AuthSession = require('expo-auth-session');
-    WebBrowser = require('expo-web-browser');
-    
-    // Compléter l'authentification dans le navigateur
-    WebBrowser?.maybeCompleteAuthSession();
-    return true;
-  } catch (error) {
-    // En Expo Go, expo-crypto n'est pas disponible
-    console.warn('⚠️ [GoogleAuth] Modules natifs non disponibles (Expo Go détecté)');
-    return false;
-  }
-}
-
-// Configuration Google OAuth - Utiliser le Client ID iOS
-const GOOGLE_CLIENT_ID_IOS = Constants.expoConfig?.extra?.googleClientId || 
+// Configuration Google OAuth
+// iOS Client ID (OAuth client pour iOS)
+const IOS_CLIENT_ID = Constants.expoConfig?.extra?.googleClientId || 
   process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID || 
   '738789952398-m6risp9hae6ao11n7s4178nig64largu.apps.googleusercontent.com';
 
-// Le Reversed Client ID pour le schéma de redirection iOS
-const REVERSED_CLIENT_ID = `com.googleusercontent.apps.${GOOGLE_CLIENT_ID_IOS.split('.')[0]}`;
+// Web Client ID (celui du backend - utilisé pour vérifier l'idToken)
+// IMPORTANT: Doit être dans le même projet Google Cloud que l'iOS Client ID (738789952398)
+// C'est le même que GOOGLE_CLIENT_ID dans les variables d'environnement du backend
+const WEB_CLIENT_ID = Constants.expoConfig?.extra?.googleWebClientId ||
+  process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || 
+  null; // Doit être défini dans app.json ou variables d'environnement
 
-const discovery = {
-  authorizationEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
-  tokenEndpoint: 'https://oauth2.googleapis.com/token',
-  revocationEndpoint: 'https://oauth2.googleapis.com/revoke',
-};
+// Configurer Google Sign-In une seule fois au démarrage
+let isConfigured = false;
 
-// Scopes pour l'authentification et Google Calendar
-const scopes = [
-  'openid',
-  'email',
-  'profile',
-  'https://www.googleapis.com/auth/calendar',
-];
+function configureGoogleSignIn() {
+  if (isConfigured) {
+    return;
+  }
+
+  try {
+    // Vérifier que WEB_CLIENT_ID est défini
+    if (!WEB_CLIENT_ID) {
+      throw new Error('WEB_CLIENT_ID non défini. Configurez googleWebClientId dans app.json ou EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID');
+    }
+    
+    // Configuration Google Sign-In
+    // iosClientId: Client ID iOS (pour l'authentification native)
+    // webClientId: Client ID Web (pour générer l'idToken avec la bonne audience)
+    // IMPORTANT: Les deux doivent être dans le même projet Google Cloud
+    GoogleSignin.configure({
+      iosClientId: IOS_CLIENT_ID,
+      webClientId: WEB_CLIENT_ID, // Doit être dans le même projet que iosClientId
+      offlineAccess: true, // Activer pour obtenir un idToken
+      forceCodeForRefreshToken: false,
+    });
+    isConfigured = true;
+    console.log('✅ [GoogleAuth] Google Sign-In configuré avec succès');
+    console.log('📱 [GoogleAuth] iOS Client ID:', IOS_CLIENT_ID);
+    console.log('🌐 [GoogleAuth] Web Client ID:', WEB_CLIENT_ID);
+    
+    // Vérifier que les deux IDs sont dans le même projet
+    const iosProjectId = IOS_CLIENT_ID.split('-')[0];
+    const webProjectId = WEB_CLIENT_ID.split('-')[0];
+    if (iosProjectId !== webProjectId) {
+      console.error('❌ [GoogleAuth] ERREUR: Les Client IDs ne sont pas dans le même projet!');
+      console.error('❌ [GoogleAuth] iOS Project ID:', iosProjectId);
+      console.error('❌ [GoogleAuth] Web Project ID:', webProjectId);
+      console.error('❌ [GoogleAuth] Créez un Web Client ID dans le projet iOS (738789952398)');
+    } else {
+      console.log('✅ [GoogleAuth] Les deux Client IDs sont dans le même projet:', iosProjectId);
+    }
+  } catch (error) {
+    console.error('❌ [GoogleAuth] Erreur lors de la configuration:', error);
+    throw error;
+  }
+}
 
 export interface GoogleAuthResult {
-  accessToken: string;
   idToken: string;
   user: {
     email: string;
@@ -64,111 +71,166 @@ export interface GoogleAuthResult {
 }
 
 /**
- * Lance le flux d'authentification Google
+ * Lance le flux d'authentification Google avec la lib native
+ * Méthode recommandée par Google pour React Native
  */
 export async function signInWithGoogle(): Promise<GoogleAuthResult> {
-  // Charger les modules de manière sécurisée
-  if (!loadAuthModules()) {
-    const errorMsg = 'Google Auth nécessite un build natif (npx expo run:ios). Non disponible en Expo Go.';
-    console.error('❌ [GoogleAuth]', errorMsg);
-    Alert.alert(
-      'Build natif requis',
-      'La connexion Google nécessite un build natif. Veuillez utiliser:\n\nnpx expo run:ios\n\nou\n\nnpx expo run:android',
-      [{ text: 'OK' }]
-    );
-    throw new Error(errorMsg);
-  }
-
-  // Vérifier que les modules sont bien chargés
-  if (!AuthSession || !WebBrowser) {
-    throw new Error('Impossible de charger les modules d\'authentification');
-  }
-
   try {
-    // Pour iOS natif, utiliser le Reversed Client ID comme schéma de redirection
-    const redirectUri = AuthSession.makeRedirectUri({
-      scheme: REVERSED_CLIENT_ID,
-      path: 'oauth2redirect/google',
-    });
+    // Configurer Google Sign-In si pas déjà fait
+    configureGoogleSignIn();
 
-    console.log('🔐 [GoogleAuth] Redirect URI:', redirectUri);
-    console.log('🔐 [GoogleAuth] Client ID:', GOOGLE_CLIENT_ID_IOS);
-
-    // Créer la requête d'authentification avec Authorization Code flow (plus sûr pour mobile)
-    const request = new AuthSession.AuthRequest({
-      clientId: GOOGLE_CLIENT_ID_IOS,
-      scopes,
-      responseType: AuthSession.ResponseType.Code,
-      redirectUri,
-      additionalParameters: {},
-      usePKCE: true, // Utiliser PKCE pour la sécurité
-    });
-
-    // Lancer le navigateur pour l'authentification
-    const result = await request.promptAsync(discovery, {
-      showInRecents: true,
-    });
-
-    console.log('🔐 [GoogleAuth] Résultat:', result.type);
-
-    if (result.type === 'success') {
-      const { code } = result.params;
-
-      if (!code) {
-        throw new Error('Code d\'autorisation manquant dans la réponse');
-      }
-
-      // Échanger le code contre un access token via notre backend
-      const tokenResponse = await fetch('https://www.productif.io/api/auth/google/exchange', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          code,
-          redirectUri,
-        }),
-      });
-
-      if (!tokenResponse.ok) {
-        const errorData = await tokenResponse.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Échec de l\'échange du code');
-      }
-
-      const tokenData = await tokenResponse.json();
-
-      if (!tokenData.accessToken) {
-        throw new Error('Access token manquant dans la réponse du serveur');
-      }
-
-      // Récupérer les informations utilisateur depuis Google
-      const userInfoResponse = await fetch(
-        `https://www.googleapis.com/oauth2/v2/userinfo?access_token=${tokenData.accessToken}`
-      );
-
-      if (!userInfoResponse.ok) {
-        throw new Error('Impossible de récupérer les informations utilisateur');
-      }
-
-      const userInfo = await userInfoResponse.json();
-
-      return {
-        accessToken: tokenData.accessToken,
-        idToken: tokenData.idToken || '',
-        user: {
-          email: userInfo.email,
-          name: userInfo.name || userInfo.email,
-          picture: userInfo.picture,
-        },
-      };
-    } else if (result.type === 'cancel') {
-      throw new Error('Authentification annulée par l\'utilisateur');
-    } else {
-      throw new Error(`Erreur d'authentification: ${result.type}`);
+    // Vérifier si Google Play Services est disponible (Android uniquement)
+    if (Platform.OS === 'android') {
+      await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
     }
-  } catch (error) {
+
+    // Lancer la connexion
+    console.log('🔐 [GoogleAuth] Lancement de la connexion Google...');
+    const response = await GoogleSignin.signIn();
+
+    // Logs de débogage
+    console.log('🔍 [GoogleAuth] Réponse complète:', JSON.stringify(response, null, 2));
+    
+    // La nouvelle version de la lib retourne { type: 'success', data: { idToken, user, ... } }
+    // L'ancienne version retournait directement { idToken, user, ... }
+    const userInfo = (response as any).data || response;
+    
+    console.log('🔍 [GoogleAuth] idToken présent:', !!userInfo.idToken);
+    console.log('🔍 [GoogleAuth] serverAuthCode présent:', !!userInfo.serverAuthCode);
+    console.log('🔍 [GoogleAuth] user:', userInfo.user);
+
+    let idToken = userInfo.idToken;
+    
+    if (!idToken) {
+      // Essayer de récupérer l'idToken depuis getTokens si disponible
+      try {
+        const tokens = await GoogleSignin.getTokens();
+        console.log('🔍 [GoogleAuth] Tokens récupérés:', !!tokens.idToken);
+        if (tokens.idToken) {
+          idToken = tokens.idToken;
+        }
+      } catch (tokenError) {
+        console.error('❌ [GoogleAuth] Erreur lors de la récupération des tokens:', tokenError);
+      }
+    }
+
+    if (!idToken) {
+      throw new Error('idToken manquant dans la réponse de Google Sign-In. Vérifiez que webClientId est correctement configuré.');
+    }
+
+    // Vérifier l'audience du token (débogage)
+    try {
+      const tokenParts = idToken.split('.');
+      if (tokenParts.length === 3) {
+        // Décoder le payload base64 (React Native compatible)
+        const base64Url = tokenParts[1];
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const jsonPayload = decodeURIComponent(
+          atob(base64)
+            .split('')
+            .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+            .join('')
+        );
+        const payload = JSON.parse(jsonPayload);
+        
+        console.log('🔍 [GoogleAuth] Token payload (audience):', payload.aud);
+        console.log('🔍 [GoogleAuth] Token issuer:', payload.iss);
+        console.log('🔍 [GoogleAuth] Token email:', payload.email);
+        
+        // Vérifier que l'audience correspond au WEB_CLIENT_ID
+        if (payload.aud !== WEB_CLIENT_ID) {
+          console.warn('⚠️ [GoogleAuth] Audience mismatch!');
+          console.warn('⚠️ [GoogleAuth] Token aud:', payload.aud);
+          console.warn('⚠️ [GoogleAuth] Expected WEB_CLIENT_ID:', WEB_CLIENT_ID);
+        } else {
+          console.log('✅ [GoogleAuth] Audience vérifiée:', payload.aud);
+        }
+      }
+    } catch (decodeError) {
+      console.warn('⚠️ [GoogleAuth] Impossible de décoder le token pour vérification:', decodeError);
+    }
+
+    console.log('✅ [GoogleAuth] Connexion Google réussie');
+    console.log('📧 [GoogleAuth] Email:', userInfo.user?.email);
+
+    if (!userInfo.user || !userInfo.user.email) {
+      throw new Error('Informations utilisateur manquantes dans la réponse de Google Sign-In');
+    }
+
+    return {
+      idToken: idToken,
+      user: {
+        email: userInfo.user.email,
+        name: userInfo.user.name || userInfo.user.givenName || userInfo.user.email,
+        picture: userInfo.user.photo || undefined,
+      },
+    };
+  } catch (error: any) {
     console.error('❌ [GoogleAuth] Erreur:', error);
+
+    // Gérer les erreurs spécifiques de Google Sign-In
+    if (error.code === statusCodes.SIGN_IN_CANCELLED) {
+      throw new Error('Authentification annulée par l\'utilisateur');
+    } else if (error.code === statusCodes.IN_PROGRESS) {
+      throw new Error('Une authentification est déjà en cours');
+    } else if (error.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
+      throw new Error('Google Play Services non disponible. Veuillez installer ou mettre à jour Google Play Services.');
+    } else {
+      throw new Error(error.message || 'Une erreur est survenue lors de la connexion avec Google');
+    }
+  }
+}
+
+/**
+ * Déconnecter l'utilisateur Google
+ */
+export async function signOutGoogle(): Promise<void> {
+  try {
+    await GoogleSignin.signOut();
+    console.log('✅ [GoogleAuth] Déconnexion Google réussie');
+  } catch (error) {
+    console.error('❌ [GoogleAuth] Erreur lors de la déconnexion:', error);
     throw error;
   }
 }
 
+/**
+ * Vérifier si l'utilisateur est déjà connecté à Google
+ */
+export async function isSignedInGoogle(): Promise<boolean> {
+  try {
+    return await GoogleSignin.isSignedIn();
+  } catch (error) {
+    console.error('❌ [GoogleAuth] Erreur lors de la vérification:', error);
+    return false;
+  }
+}
+
+/**
+ * Récupérer l'utilisateur Google actuellement connecté
+ */
+export async function getCurrentGoogleUser(): Promise<GoogleAuthResult | null> {
+  try {
+    const isSignedIn = await GoogleSignin.isSignedIn();
+    if (!isSignedIn) {
+      return null;
+    }
+
+    const userInfo = await GoogleSignin.getCurrentUser();
+    if (!userInfo || !userInfo.idToken) {
+      return null;
+    }
+
+    return {
+      idToken: userInfo.idToken,
+      user: {
+        email: userInfo.user.email,
+        name: userInfo.user.name || userInfo.user.email,
+        picture: userInfo.user.photo || undefined,
+      },
+    };
+  } catch (error) {
+    console.error('❌ [GoogleAuth] Erreur lors de la récupération de l\'utilisateur:', error);
+    return null;
+  }
+}

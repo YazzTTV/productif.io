@@ -20,7 +20,7 @@ export default function LoginPage() {
         <LoginForm />
         <p className="text-center text-sm text-muted-foreground">
           <Link 
-            href="/signup"
+            href="/onboarding"
             className="hover:text-brand-green underline underline-offset-4"
           >
             Pas encore de compte ? Inscrivez-vous

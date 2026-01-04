@@ -77,13 +77,21 @@
             "minSdkVersion": 26
           }
         }
-      ]
+      ],
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          "iosUrlScheme": "com.googleusercontent.apps.738789952398-m6risp9hae6ao11n7s4178nig64largu"
+        }
+      ],
+      "expo-apple-authentication"
     ],
     "experiments": {
       "typedRoutes": false
     },
     "extra": {
       "googleClientId": "738789952398-m6risp9hae6ao11n7s4178nig64largu.apps.googleusercontent.com",
+      "googleWebClientId": "738789952398-ikv20t6hf8jp82197ol5ifoiokqlbl3d.apps.googleusercontent.com",
       "apiUrl": "https://www.productif.io"
     }
   }

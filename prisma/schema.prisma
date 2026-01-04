@@ -159,14 +159,25 @@ model Task {
   processId    String?
   priority     Int?
   energyLevel  Int?
-  process      Process?    @relation("TaskProcess", fields: [processId], references: [id])
-  project      Project?    @relation(fields: [projectId], references: [id])
-  user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  timeEntries  TimeEntry[]
+  
+  // Champs pour Google Calendar scheduling
+  estimatedMinutes      Int?                    // Durée estimée en minutes
+  subject               String?                 // Matière/Catégorie
+  googleCalendarEventId String?                 // ID de l'événement Google Calendar
+  schedulingStatus      String?     @default("draft") // draft | proposed | scheduled | done | not_done | snoozed
+  proposedSlotStart     DateTime?               // Créneau proposé (début)
+  proposedSlotEnd       DateTime?               // Créneau proposé (fin)
+  
+  process               Process?    @relation("TaskProcess", fields: [processId], references: [id])
+  project               Project?    @relation(fields: [projectId], references: [id])
+  user                  User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  timeEntries           TimeEntry[]
+  scheduledEvents       ScheduledTaskEvent[]
 
   @@index([userId])
   @@index([projectId])
   @@index([processId])
+  @@index([schedulingStatus])
 }
 
 model TimeEntry {
@@ -785,4 +796,27 @@ model GoogleCalendarToken {
 
   @@index([userId])
   @@map("google_calendar_tokens")
+}
+
+/// Événements de tâches planifiés dans Google Calendar
+model ScheduledTaskEvent {
+  id               String    @id @default(cuid())
+  taskId           String
+  task             Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  userId           String
+  googleEventId    String    @unique
+  startTime        DateTime
+  endTime          DateTime
+  reminderSentAt   DateTime? // Quand le rappel de début a été envoyé
+  postCheckSentAt  DateTime? // Quand le prompt "fait/pas fait" a été envoyé
+  userResponse     String?   // done | not_done | snoozed
+  rescheduledCount Int       @default(0)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([startTime])
+  @@index([endTime])
+  @@index([googleEventId])
+  @@map("scheduled_task_events")
 }

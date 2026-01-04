@@ -302,16 +302,33 @@ export const authService = {
     }
   },
 
-  // Connexion avec Google
-  async loginWithGoogle(accessToken: string, idToken: string, email: string, name: string): Promise<AuthResponse> {
+  // Connexion avec Google (nouvelle méthode avec idToken dans le header)
+  async loginWithGoogle(idToken: string): Promise<AuthResponse> {
+    // Envoyer l'idToken dans le header Authorization comme recommandé par Google
     const response = await apiCall<AuthResponse>('/auth/google/mobile', {
       method: 'POST',
-      body: JSON.stringify({
-        accessToken,
-        idToken,
-        email,
-        name,
-      }),
+      headers: {
+        'Authorization': `Bearer ${idToken}`,
+      },
+    });
+
+    // Stocker le token si présent dans la réponse
+    if (response.success && response.token) {
+      await TokenStorage.getInstance().setToken(response.token);
+    }
+
+    return response;
+  },
+
+  // Connexion avec Apple (avec identityToken dans le header)
+  async loginWithApple(identityToken: string, email?: string | null, name?: string | null): Promise<AuthResponse> {
+    // Envoyer l'identityToken dans le header Authorization comme recommandé par Apple
+    const response = await apiCall<AuthResponse>('/auth/oauth/apple', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${identityToken}`,
+      },
+      body: email || name ? JSON.stringify({ email, name }) : undefined,
     });
 
     // Stocker le token si présent dans la réponse
