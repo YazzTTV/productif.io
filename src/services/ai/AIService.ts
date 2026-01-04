@@ -5,6 +5,7 @@ import { randomBytes } from 'crypto';
 import OpenAI from 'openai';
 import { jwtVerify } from 'jose';
 import { TextEncoder } from 'util';
+import { handleScheduleConfirmation, proposeSlotForTask } from '@/lib/agent/handlers/calendar.handler';
 
 // Utiliser la même clé que celle utilisée pour générer le token
 const JWT_SECRET = (process.env.NEXTAUTH_SECRET || "productif_io_secret_key_for_nextauth") as string;
@@ -518,7 +519,8 @@ export class AIService {
                 }
 
                 // 🎯 DÉTECTION : "je vais commencer la tâche X" ou "je vais commencer [nom tâche]"
-                const taskStartPattern = /(?:je\s+vais\s+)?(?:commencer|démarre?r?|faire|travailler?\s+sur)\s+(?:la\s+)?(?:tâche|tache)\s*(\d+)|(?:je\s+vais\s+)?(?:commencer|démarre?r?|faire|travailler?\s+sur)\s+(.+)/i;
+                // Note: On ajoute ^ au début pour éviter de matcher "faire" au milieu d'un message comme "créer la tâche faire les maths"
+                const taskStartPattern = /^(?:je\s+vais\s+)?(?:commencer|démarre?r?|faire|travailler?\s+sur)\s+(?:la\s+)?(?:tâche|tache)\s*(\d+)|^(?:je\s+vais\s+)?(?:commencer|démarre?r?|faire|travailler?\s+sur)\s+(.+)/i;
                 const taskStartMatch = message.match(taskStartPattern);
                 
                 if (taskStartMatch) {
@@ -596,7 +598,8 @@ export class AIService {
                 }
 
                 // 🎯 DÉTECTION : "j'ai fini la tâche" (termine la session Deep Work associée)
-                const taskFinishPattern = /(?:j'?ai\s+)?(?:fini|terminé|complété)\s+(?:la\s+)?(?:tâche|tache)(?:\s+(\d+))?/i;
+                // Note: On ajoute ^ au début pour éviter les faux positifs
+                const taskFinishPattern = /^(?:j'?ai\s+)?(?:fini|terminé|complété)\s+(?:la\s+)?(?:tâche|tache)(?:\s+(\d+))?/i;
                 const taskFinishMatch = message.match(taskFinishPattern);
                 
                 if (taskFinishMatch) {
@@ -930,12 +933,39 @@ export class AIService {
                                 completed: false,
                                 priority: p,
                                 energyLevel: e,
-                                dueDate: pending.dueDate ?? null
+                                dueDate: pending.dueDate ?? null,
+                                estimatedMinutes: 30, // Durée par défaut
+                                schedulingStatus: 'draft'
                             }
                         });
                         this.taskCreationStates.delete(key);
+                        
+                        // 🗓️ Proposer un créneau si Google Calendar est connecté
+                        let reply: string;
+                        try {
+                            const slotProposal = await proposeSlotForTask(
+                                user.id,
+                                task.id,
+                                task.title,
+                                task.estimatedMinutes || 30,
+                                task.priority || 2,
+                                task.energyLevel || 1,
+                                pending.dueDate || undefined
+                            );
+
+                            if (slotProposal.success) {
+                                reply = slotProposal.message;
+                            } else {
+                                // Si Google Calendar non connecté ou pas de créneaux
+                                reply = slotProposal.message;
+                            }
+                        } catch (calendarError) {
+                            console.warn('Erreur proposition créneau:', calendarError);
+                            // Fallback: message classique sans proposition
+                            reply = `✅ J'ai créé la tâche "${task.title}". Vous pouvez la marquer comme complétée en disant "Marquer tâche ${task.title} comme complétée"`;
+                        }
+                        
                         // Enregistrer la réponse IA
-                        const reply = `✅ J'ai créé la tâche "${task.title}". Vous pouvez la marquer comme complétée en disant "Marquer tâche ${task.title} comme complétée"`;
                         await this.prisma.whatsAppMessage.create({
                             data: {
                                 conversationId: existingConversation.id,
@@ -973,6 +1003,170 @@ export class AIService {
                     }
                     // Sinon, laisser passer au moteur GPT
                 }
+            }
+
+            // 🗓️ GESTION CALENDRIER (confirmations de créneaux, réponses fait/pas fait)
+            {
+                const calendarResult = await handleScheduleConfirmation(message, user.id);
+                if (calendarResult.handled) {
+                    // Enregistrer la réponse IA
+                    await this.prisma.whatsAppMessage.create({
+                        data: {
+                            conversationId: existingConversation.id,
+                            content: calendarResult.response,
+                            isFromUser: false
+                        }
+                    });
+                    return { response: calendarResult.response, contextual: true };
+                }
+            }
+
+            // 🎯 DÉTECTION DIRECTE - CRÉATION DE TÂCHE
+            // Détecter directement les messages de création de tâche avant GPT
+            // Patterns supportés:
+            // - "créer une tâche : [nom]"
+            // - "créer un tâche pour demain : [nom]"  
+            // - "j'aimerais créer une tâche qui est [nom]"
+            // - "je voudrais créer une tâche [nom] pour demain"
+            
+            // Pattern 1: Format classique "créer une tâche : nom" ou "créer une tâche nom"
+            const createTaskPattern1 = /(?:j'?aimerais|je\s+(?:veux|voudrais|souhaite)|)?\s*(?:créer|creer|crée)\s+(?:une?|la)\s+(?:tâche|tache)\s*:?\s*(.+)$/i;
+            
+            // Pattern 2: Format "créer une tâche pour [date] qui est [nom]"
+            const createTaskPattern2 = /(?:j'?aimerais|je\s+(?:veux|voudrais|souhaite)|)?\s*(?:créer|creer|crée)\s+(?:une?|la)\s+(?:tâche|tache)\s+(?:pour\s+)?(demain|aujourd'?hui|aujoud'?hui|ce\s+soir)?\s*(?:qui\s+(?:est|serait)|:)\s*(.+)$/i;
+            
+            let createTaskMatch = message.match(createTaskPattern2);
+            let taskTitle: string | null = null;
+            let dateStr: string | null = null;
+            
+            if (createTaskMatch) {
+                // Pattern 2 matched: "créer une tâche pour [date] qui est [nom]"
+                dateStr = createTaskMatch[1]?.trim() || null;
+                taskTitle = createTaskMatch[2]?.trim() || null;
+                console.log('🎯 Pattern 2 matched:', { taskTitle, dateStr });
+            } else {
+                createTaskMatch = message.match(createTaskPattern1);
+                if (createTaskMatch) {
+                    let fullContent = createTaskMatch[1]?.trim() || '';
+                    
+                    // Extraire la date du contenu (plusieurs formats possibles)
+                    // Format 1: "pour le 6 janvier" ou "6 janvier" ou "le 6 janvier"
+                    let dateMatch = fullContent.match(/\s*(?:pour\s+)?(?:le\s+)?(\d{1,2}\s+(?:janvier|février|fevrier|mars|avril|mai|juin|juillet|aout|août|septembre|octobre|novembre|décembre|decembre|jan|fev|fév|avr|juil|sept|oct|nov|dec|déc)(?:\s+\d{4})?)\s*:?\s*/i);
+                    let extractedDate: string | null = null;
+                    
+                    if (dateMatch) {
+                        extractedDate = dateMatch[1]?.trim() || null;
+                        // Retirer la date du titre
+                        taskTitle = fullContent.replace(dateMatch[0], '').trim();
+                        // Nettoyer le titre (enlever les deux-points en début si présent)
+                        taskTitle = taskTitle.replace(/^:\s*/, '').trim();
+                    } else {
+                        // Format 2: dates relatives (demain, aujourd'hui, etc.)
+                        const datePattern = /\s*(?:pour\s+)?(demain|aujourd'?hui|aujoud'?hui|ce\s+soir|cette\s+semaine|la\s+semaine\s+prochaine)\s*$/i;
+                        dateMatch = fullContent.match(datePattern);
+                        extractedDate = dateMatch ? dateMatch[1]?.trim() : null;
+                        taskTitle = fullContent;
+                        if (extractedDate) {
+                            taskTitle = fullContent.replace(datePattern, '').trim();
+                        }
+                    }
+                    
+                    dateStr = extractedDate;
+                    console.log('🎯 Pattern 1 matched:', { taskTitle, dateStr, original: fullContent });
+                }
+            }
+            
+            if (createTaskMatch && taskTitle && taskTitle.length > 2) {
+                console.log('🎯 Détection directe création tâche:', { taskTitle, dateStr });
+                    
+                    // Préparer l'échéance
+                    let pendingDue: Date | null = null;
+                    let echeanceText = '';
+                    
+                    if (dateStr) {
+                        // Essayer de parser avec parseFrenchDate d'abord (pour "6 janvier", etc.)
+                        const parsedDate = this.parseFrenchDate(dateStr);
+                        if (parsedDate) {
+                            pendingDue = parsedDate;
+                            echeanceText = parsedDate.toLocaleDateString('fr-FR');
+                            console.log('✅ Date française parsée:', parsedDate.toISOString());
+                        } else {
+                            // Sinon, dates relatives
+                            const today = new Date();
+                            const tomorrow = new Date(today);
+                            tomorrow.setDate(today.getDate() + 1);
+                            
+                            switch (dateStr.toLowerCase()) {
+                                case 'demain':
+                                    pendingDue = tomorrow;
+                                    echeanceText = `demain (${tomorrow.toLocaleDateString('fr-FR')})`;
+                                    break;
+                                case 'aujourd\'hui':
+                                case 'aujourdhui':
+                                case 'ce soir':
+                                    pendingDue = today;
+                                    echeanceText = `aujourd'hui (${today.toLocaleDateString('fr-FR')})`;
+                                    break;
+                            }
+                        }
+                    }
+                    
+                    // Enregistrer l'état pour la création interactive
+                    const key = `${user.id}_${phoneNumber}`;
+                    this.taskCreationStates.set(key, { 
+                        title: taskTitle, 
+                        dueDate: pendingDue, 
+                        startedAt: new Date() 
+                    });
+                    
+                    // Construire la réponse
+                    let taskInfo = `\n📝 Tâche : "${taskTitle}"`;
+                    if (echeanceText) {
+                        taskInfo += `\n📅 Échéance : ${echeanceText}`;
+                    }
+                    
+                    const reply = `Pour créer votre tâche, j'ai besoin de quelques informations :${taskInfo}\n\n` +
+                        "1️⃣ Quelle est la priorité (0-4, où 4 est la plus urgente) ?\n" +
+                        "   • 4 = Urgent (à faire immédiatement)\n" +
+                        "   • 3 = Important (priorité élevée)\n" +
+                        "   • 2 = Normal (priorité moyenne)\n" +
+                        "   • 1 = Faible (peut attendre)\n" +
+                        "   • 0 = Someday (un jour peut-être)\n\n" +
+                        "2️⃣ Quel est le niveau d'énergie requis (0-3) ?\n" +
+                        "   • 3 = Extrême (tâche très difficile)\n" +
+                        "   • 2 = Élevé (tâche moyennement difficile)\n" +
+                        "   • 1 = Moyen (tâche facile)\n" +
+                        "   • 0 = Faible (tâche très facile)\n\n" +
+                        "💡 Répondez avec ces 2 chiffres, un par ligne.\n" +
+                        "Exemple :\n3\n2";
+                    
+                    // Enregistrer la réponse (créer conversation si nécessaire)
+                    if (!existingConversation) {
+                        existingConversation = await this.prisma.whatsAppConversation.create({
+                            data: {
+                                userId: user.id,
+                                phoneNumber: phoneNumber,
+                                messages: {
+                                    create: {
+                                        content: message,
+                                        isFromUser: true
+                                    }
+                                }
+                            }
+                        });
+                    }
+                    
+                    if (existingConversation) {
+                        await this.prisma.whatsAppMessage.create({
+                            data: {
+                                conversationId: existingConversation.id,
+                                content: reply,
+                                isFromUser: false
+                            }
+                        });
+                    }
+                    
+                    return { response: reply, contextual: true };
             }
 
             // 🎯 DÉTECTION DIRECTE DES HABITUDES SPÉCIALES
@@ -1158,10 +1352,16 @@ export class AIService {
                - IMPORTANT : Ne confonds PAS une demande d'aide avec une création de tâche. Si l'utilisateur demande COMMENT faire quelque chose, c'est une demande d'aide, pas une création de tâche.
             
             1. CRÉATION DE TÂCHES - Quand utiliser creer_tache_interactive :
+               - Si le message commence par "créer une tâche", "créer une tache", "créer tâche", "créer tache" → utilise TOUJOURS 'creer_tache_interactive'
+               - Si le message contient ":" après "créer une tâche", extrait le nom après les ":"
                - Si le message mentionne seulement le nom de la tâche SANS demander comment faire → utilise 'creer_tache_interactive'
                - Si le message contient priorité ET niveau d'énergie → utilise 'creer_tache'
-               - Si le message a des dates relatives (demain, aujourd'hui) → extrait l'échéance
+               - Si le message a des dates relatives (demain, aujourd'hui, ce soir) → extrait l'échéance dans details.echeance
                - ATTENTION : Si le message contient "comment faire" ou "aide-moi à faire", c'est une demande d'aide, PAS une création de tâche !
+               - EXEMPLES DE DÉTECTION :
+                 * "créer une tache : faire mes devoirs" → creer_tache_interactive, nom="faire mes devoirs"
+                 * "créer une tache : faire mes devoirs aujourd'hui" → creer_tache_interactive, nom="faire mes devoirs", echeance="aujourd'hui"
+                 * "créer une tâche pour demain : réviser" → creer_tache_interactive, nom="réviser", echeance="demain"
             
             2. DATES RELATIVES pour les tâches :
                - "demain" → echeance: "demain"
@@ -1766,6 +1966,27 @@ export class AIService {
                 }]
             }
 
+            Message: "créer une tache : faire mes devoirs aujourd'hui"
+            {
+                "actions": [{
+                    "action": "creer_tache_interactive",
+                    "details": {
+                        "nom": "faire mes devoirs",
+                        "echeance": "aujourd'hui"
+                    }
+                }]
+            }
+
+            Message: "créer une tache faire mes devoirs"
+            {
+                "actions": [{
+                    "action": "creer_tache_interactive",
+                    "details": {
+                        "nom": "faire mes devoirs"
+                    }
+                }]
+            }
+
             Message: "je veux créer une tâche"
             {
                 "actions": [{
@@ -1943,7 +2164,7 @@ export class AIService {
             let responses: AIResponse[] = [];
             let hasHandledHabitCompletion = false;
             for (const item of result.actions) {
-                let response: AIResponse;
+                let response: AIResponse | undefined = undefined;
                 
                 switch (item.action) {
                     case 'voir_taches':
@@ -3474,14 +3695,44 @@ ${confirmations.map(c => `• ${c}`).join('\n')}`,
                 completed: false,
                 priority: priorityNum ?? 2,
                 energyLevel: energyLevelNum ?? 2,
-                dueDate: parsedDueDate ?? null
+                dueDate: parsedDueDate ?? null,
+                estimatedMinutes: 30, // Durée par défaut, peut être ajustée
+                schedulingStatus: 'draft'
             }
         });
 
-        return {
-            response: `✅ J'ai créé la tâche "${task.title}". Vous pouvez la marquer comme complétée en disant "Marquer tâche ${task.title} comme complétée"`,
-            contextual: true
-        };
+        // 🗓️ Proposer un créneau si l'utilisateur a connecté Google Calendar
+        try {
+            const slotProposal = await proposeSlotForTask(
+                userId,
+                task.id,
+                task.title,
+                task.estimatedMinutes || 30,
+                task.priority || 2,
+                task.energyLevel || 1,
+                parsedDueDate || undefined
+            );
+
+            if (slotProposal.success) {
+                return {
+                    response: slotProposal.message,
+                    contextual: true
+                };
+            }
+            
+            // Si Google Calendar non connecté ou pas de créneaux, retourner le message normal
+            return {
+                response: slotProposal.message,
+                contextual: true
+            };
+        } catch (calendarError) {
+            console.warn('Erreur proposition créneau:', calendarError);
+            // Fallback: message classique sans proposition de créneau
+            return {
+                response: `✅ J'ai créé la tâche "${task.title}". Vous pouvez la marquer comme complétée en disant "Marquer tâche ${task.title} comme complétée"`,
+                contextual: true
+            };
+        }
     }
 
     private async completeTask(userId: string, message: string): Promise<AIResponse> {

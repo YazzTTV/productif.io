@@ -60,12 +60,7 @@ export default function WelcomeScreen() {
     try {
       const googleResult = await signInWithGoogle();
       
-      const response = await authService.loginWithGoogle(
-        googleResult.accessToken,
-        googleResult.idToken,
-        googleResult.user.email,
-        googleResult.user.name
-      );
+      const response = await authService.loginWithGoogle(googleResult.idToken);
       
       if (response.success) {
         if (isLogin) {

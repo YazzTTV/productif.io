@@ -175,35 +175,134 @@ export default function AssistantIAPage() {
       setIsVoiceSupported(true)
       const recognition = new SpeechRecognition()
       recognition.lang = 'fr-FR'
-      recognition.interimResults = false
+      recognition.interimResults = true // Afficher les résultats intermédiaires pour feedback visuel
       recognition.maxAlternatives = 1
-      recognition.continuous = false
+      recognition.continuous = true // Mode continu pour capturer plusieurs phrases
+      
+      console.log('✅ SpeechRecognition initialisé avec:', {
+        lang: recognition.lang,
+        interimResults: recognition.interimResults,
+        continuous: recognition.continuous
+      })
 
       recognition.onstart = () => {
         console.log('🎤 Reconnaissance vocale démarrée')
+        console.log('🎤 Mode au démarrage:', voiceModeRef.current)
         setIsVoiceRecording(true)
+      }
+      
+      recognition.onspeechstart = () => {
+        console.log('🎤 Parole détectée - début')
+      }
+      
+      recognition.onspeechend = () => {
+        console.log('🎤 Parole détectée - fin')
+      }
+      
+      recognition.onsoundstart = () => {
+        console.log('🎤 Son détecté - début')
+      }
+      
+      recognition.onsoundend = () => {
+        console.log('🎤 Son détecté - fin')
+      }
+      
+      recognition.onaudiostart = () => {
+        console.log('🎤 Audio capturé - début')
+      }
+      
+      recognition.onaudioend = () => {
+        console.log('🎤 Audio capturé - fin')
       }
 
       recognition.onresult = (event: any) => {
+        console.log('🎤 ===== onresult appelé =====')
         console.log('🎤 Résultat reçu:', event.results)
-        const transcript = event.results[0][0].transcript as string
-        console.log('🎤 Transcription:', transcript)
+        console.log('🎤 Nombre de résultats:', event.results?.length || 0)
+        console.log('🎤 Mode actuel dans onresult:', voiceModeRef.current)
+        
+        if (!event.results || event.results.length === 0) {
+          console.warn('⚠️ Aucun résultat dans event.results')
+          return
+        }
+        
         const mode = voiceModeRef.current
-        console.log('🎤 Mode actuel:', mode)
+        console.log('🎤 Mode utilisé:', mode)
+        
+        // Récupérer tous les transcripts (finaux ET intermédiaires pour le feedback)
+        let finalTranscript = ''
+        let interimTranscript = ''
+        
+        for (let i = 0; i < event.results.length; i++) {
+          if (event.results[i] && event.results[i][0]) {
+            const transcript = event.results[i][0].transcript
+            const isFinal = event.results[i].isFinal
+            
+            if (isFinal) {
+              finalTranscript += transcript + ' '
+              console.log(`🎤 Résultat final ${i}:`, transcript)
+            } else {
+              interimTranscript += transcript + ' '
+              console.log(`🎤 Résultat intermédiaire ${i}:`, transcript)
+            }
+          }
+        }
+        
+        // Utiliser les résultats finaux en priorité, sinon les intermédiaires
+        const transcript = finalTranscript.trim() || interimTranscript.trim()
+        console.log('🎤 Transcription finale:', finalTranscript.trim())
+        console.log('🎤 Transcription intermédiaire:', interimTranscript.trim())
+        console.log('🎤 Transcription à utiliser:', transcript)
+        
+        if (!transcript) {
+          console.log('ℹ️ Pas de transcription disponible')
+          return
+        }
         
         if (mode === 'learning') {
-          setLearningText(prev => (prev ? `${prev} ${transcript}` : transcript))
+          console.log('✅ Ajout au champ learning:', transcript)
+          setLearningText(prev => {
+            const newText = prev ? `${prev} ${transcript}` : transcript
+            console.log('✅ Nouveau texte learning:', newText)
+            return newText
+          })
         } else if (mode === 'planning') {
-          setPlanningText(prev => (prev ? `${prev} ${transcript}` : transcript))
+          console.log('✅ Ajout au champ planning:', transcript)
+          setPlanningText(prev => {
+            const newText = prev ? `${prev} ${transcript}` : transcript
+            console.log('✅ Nouveau texte planning:', newText)
+            return newText
+          })
         } else if (mode === 'journaling') {
-          setJournalingText(prev => (prev ? `${prev} ${transcript}` : transcript))
+          console.log('✅ Ajout au champ journaling:', transcript)
+          setJournalingText(prev => {
+            const newText = prev ? `${prev} ${transcript}` : transcript
+            console.log('✅ Nouveau texte journaling:', newText)
+            return newText
+          })
+        } else {
+          console.error('❌ Mode inconnu ou null dans onresult:', mode, 'Text:', transcript)
+          console.error('❌ Impossible d\'ajouter le texte car le mode est:', mode)
         }
+        
+        console.log('🎤 ===== Fin onresult =====')
       }
 
       recognition.onend = () => {
         console.log('🎤 Reconnaissance vocale terminée')
-        setIsVoiceRecording(false)
-        voiceModeRef.current = null
+        console.log('🎤 Mode final:', voiceModeRef.current)
+        
+        // Si le mode est toujours défini, c'est qu'onresult n'a peut-être pas été appelé
+        // On attend un peu plus longtemps pour être sûr
+        const currentMode = voiceModeRef.current
+        setTimeout(() => {
+          if (currentMode && currentMode === voiceModeRef.current) {
+            console.warn('⚠️ onresult n\'a peut-être pas été appelé, mode toujours:', voiceModeRef.current)
+          }
+          setIsVoiceRecording(false)
+          voiceModeRef.current = null
+          console.log('🎤 Mode réinitialisé')
+        }, 500) // Augmenter à 500ms pour laisser plus de temps
       }
 
       recognition.onerror = (event: any) => {
@@ -223,10 +322,31 @@ export default function AssistantIAPage() {
             errorMessage += "Problème d'accès au micro. Vérifie que ton micro fonctionne."
             break
           case 'network':
-            errorMessage += "Problème de connexion réseau."
+            const isHttps = window.location.protocol === 'https:'
+            const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+            
+            console.error('❌ Erreur réseau Speech Recognition:', {
+              protocol: window.location.protocol,
+              hostname: window.location.hostname,
+              isHttps,
+              isLocalhost,
+              userAgent: navigator.userAgent
+            })
+            
+            if (!isHttps && !isLocalhost) {
+              errorMessage += "La reconnaissance vocale nécessite HTTPS. Utilise https:// ou écris directement dans le champ texte."
+            } else {
+              errorMessage += "Problème de connexion avec le service de reconnaissance vocale. Vérifie ta connexion Internet ou écris directement dans le champ texte ci-dessous."
+            }
+            break
+          case 'aborted':
+            errorMessage += "Reconnaissance vocale interrompue."
+            break
+          case 'service-not-allowed':
+            errorMessage += "Service de reconnaissance vocale non autorisé. Vérifie les paramètres de ton navigateur."
             break
           default:
-            errorMessage += "Tu peux écrire ton message à la place."
+            errorMessage += `Erreur: ${event.error}. Tu peux écrire ton message directement dans le champ texte.`
         }
         appendSystemMessage(errorMessage)
       }
@@ -243,7 +363,17 @@ export default function AssistantIAPage() {
     const loadActiveSession = async () => {
       try {
         const res = await fetch('/api/deepwork/agent?status=active&limit=1')
-        if (!res.ok) return
+        if (!res.ok) {
+          // Si 401, l'utilisateur n'est pas authentifié - ignorer silencieusement
+          if (res.status === 401) return
+          // Pour les autres erreurs, vérifier si c'est du JSON
+          const contentType = res.headers.get('content-type')
+          if (contentType?.includes('application/json')) {
+            const error = await res.json().catch(() => null)
+            if (error) console.error('Error loading active deep work session:', error)
+          }
+          return
+        }
         const data = await res.json()
         const session = data.sessions?.[0]
         if (session) {
@@ -262,26 +392,50 @@ export default function AssistantIAPage() {
           setDeepWorkTimeLeft(remainingSeconds)
         }
       } catch (e) {
-        console.error('Error loading active deep work session', e)
+        // Ignorer les erreurs de parsing JSON (peut être du HTML en cas de redirection)
+        if (e instanceof SyntaxError) {
+          console.warn('Error parsing JSON response (likely HTML redirect):', e.message)
+        } else {
+          console.error('Error loading active deep work session', e)
+        }
       }
     }
 
     const checkPendingQuestion = async () => {
       try {
         const res = await fetch('/api/behavior/agent/pending-question')
-        if (res.ok) {
-          const data = await res.json()
-          if (data.question && data.type) {
-            // Il y a une question en attente côté backend (scheduler / WhatsApp),
-            // on l'affiche UNE SEULE fois et on synchronise l'état local
-            appendSystemMessage(data.question)
-            setPendingCheckInType(data.type)
-            setCheckInsAskedToday(prev => prev + 1)
-            lastCheckInAtRef.current = new Date()
+        if (!res.ok) {
+          // Si 401, l'utilisateur n'est pas authentifié - ignorer silencieusement
+          if (res.status === 401) return
+          // Pour les autres erreurs, vérifier si c'est du JSON
+          const contentType = res.headers.get('content-type')
+          if (contentType?.includes('application/json')) {
+            const error = await res.json().catch(() => null)
+            if (error) console.error('Error checking pending question:', error)
           }
+          return
+        }
+        const contentType = res.headers.get('content-type')
+        if (!contentType?.includes('application/json')) {
+          console.warn('Expected JSON but got:', contentType)
+          return
+        }
+        const data = await res.json()
+        if (data.question && data.type) {
+          // Il y a une question en attente côté backend (scheduler / WhatsApp),
+          // on l'affiche UNE SEULE fois et on synchronise l'état local
+          appendSystemMessage(data.question)
+          setPendingCheckInType(data.type)
+          setCheckInsAskedToday(prev => prev + 1)
+          lastCheckInAtRef.current = new Date()
         }
       } catch (e) {
-        console.error('Error checking pending question', e)
+        // Ignorer les erreurs de parsing JSON (peut être du HTML en cas de redirection)
+        if (e instanceof SyntaxError) {
+          console.warn('Error parsing JSON response (likely HTML redirect):', e.message)
+        } else {
+          console.error('Error checking pending question', e)
+        }
       }
     }
 
@@ -369,6 +523,11 @@ export default function AssistantIAPage() {
       try {
         const pendingRes = await fetch('/api/behavior/agent/pending-question')
         if (pendingRes.ok) {
+          const contentType = pendingRes.headers.get('content-type')
+          if (!contentType?.includes('application/json')) {
+            console.warn('Expected JSON but got:', contentType)
+            return
+          }
           const pendingData = await pendingRes.json()
           if (pendingData.question && pendingData.type) {
             currentCheckInType = pendingData.type
@@ -376,7 +535,12 @@ export default function AssistantIAPage() {
           }
         }
       } catch (e) {
-        console.error('Erreur lors de la vérification de question en attente', e)
+        // Ignorer les erreurs de parsing JSON (peut être du HTML en cas de redirection)
+        if (e instanceof SyntaxError) {
+          console.warn('Error parsing JSON response (likely HTML redirect):', e.message)
+        } else {
+          console.error('Erreur lors de la vérification de question en attente', e)
+        }
       }
     }
     
@@ -1600,49 +1764,90 @@ export default function AssistantIAPage() {
                     Planification intelligente
                   </h3>
                   <p className="text-sm text-gray-500">
-                    Décris tout ce que tu dois faire (aujourd’hui ou demain). Je vais créer des tâches et organiser ta journée
-                    automatiquement, comme sur l’assistant WhatsApp.
+                    Décris tout ce que tu dois faire (aujourd'hui ou demain). Je vais créer des tâches et organiser ta journée
+                    automatiquement, comme sur l'assistant WhatsApp.
                   </p>
                 </div>
-                {isVoiceSupported && (
+                {isVoiceSupported ? (
                   <button
                     type="button"
-                    onClick={async () => {
+                    onClick={async (e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      
+                      console.log('🎤 Clic sur bouton micro planning', {
+                        recognitionRef: !!recognitionRef.current,
+                        isVoiceRecording,
+                        voiceModeRef: voiceModeRef.current,
+                        isPlanningModalOpen
+                      })
+                      
                       if (!recognitionRef.current) {
+                        console.error('❌ recognitionRef.current est null')
                         appendSystemMessage("❌ Reconnaissance vocale non initialisée.")
                         return
                       }
+                      
                       if (isVoiceRecording) {
-                        recognitionRef.current.stop()
+                        console.log('🛑 Arrêt de l\'enregistrement')
+                        try {
+                          recognitionRef.current.stop()
+                        } catch (err) {
+                          console.error('Erreur lors de l\'arrêt:', err)
+                        }
                         return
                       }
                       
                       try {
+                        console.log('🎤 Demande de permission micro...')
                         await navigator.mediaDevices.getUserMedia({ audio: true })
+                        console.log('✅ Permission micro accordée')
+                        
+                        // Définir le mode AVANT de démarrer
                         voiceModeRef.current = 'planning'
-                        console.log('🎤 Démarrage reconnaissance vocale pour planning')
+                        console.log('🎤 Mode défini à:', voiceModeRef.current)
+                        console.log('🎤 Vérification mode avant start:', voiceModeRef.current)
+                        
+                        // Vérifier que le mode est bien défini
+                        if (voiceModeRef.current !== 'planning') {
+                          console.error('❌ Mode non défini correctement avant start!')
+                          appendSystemMessage("❌ Erreur: mode non défini. Réessaie.")
+                          return
+                        }
+                        
                         recognitionRef.current.start()
+                        console.log('✅ recognition.start() appelé, mode:', voiceModeRef.current)
                       } catch (error: any) {
-                        console.error('🎤 Erreur permissions micro:', error)
+                        console.error('❌ Erreur permissions micro:', error)
                         if (error.name === 'NotAllowedError') {
                           appendSystemMessage("❌ Permissions micro refusées. Autorise l'accès au micro dans ton navigateur.")
                         } else {
-                          appendSystemMessage("❌ Impossible d'accéder au micro. Vérifie que ton micro fonctionne.")
+                          appendSystemMessage(`❌ Impossible d'accéder au micro: ${error.message || error.name}`)
                         }
                       }
                     }}
-                    className={`p-2 rounded-full border ${
+                    className={`p-2 rounded-full border transition-all cursor-pointer ${
                       isVoiceRecording
-                        ? 'bg-red-500 border-red-500 text-white'
-                        : 'border-gray-200 text-gray-500 hover:bg-gray-100'
+                        ? 'bg-red-500 border-red-500 text-white animate-pulse'
+                        : 'border-gray-200 text-gray-500 hover:bg-gray-100 hover:border-gray-300'
                     }`}
+                    title={isVoiceRecording ? "Arrêter l'enregistrement" : "Démarrer l'enregistrement vocal"}
                   >
                     <MicIcon size={16} />
                   </button>
+                ) : (
+                  <div className="text-xs text-gray-400" title="Reconnaissance vocale non supportée dans ce navigateur">
+                    <MicIcon size={16} className="opacity-50" />
+                  </div>
                 )}
               </div>
               <p className="text-xs text-gray-400 mb-2">
-                Tu peux écrire ou dicter ta liste de tâches, je m’occupe de la transformer en planning.
+                Tu peux écrire ou dicter ta liste de tâches, je m'occupe de la transformer en planning.
+                {isVoiceSupported && (
+                  <span className="block mt-1 text-gray-300">
+                    💡 La reconnaissance vocale nécessite une connexion Internet stable.
+                  </span>
+                )}
               </p>
               <textarea
                 value={planningText}

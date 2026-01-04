@@ -98,6 +98,13 @@ export default function OnboardingNewLayout() {
         }}
       />
       <Stack.Screen 
+        name="question" 
+        options={{
+          gestureEnabled: false,
+          animation: 'none',
+        }}
+      />
+      <Stack.Screen 
         name="building-plan" 
         options={{
           gestureEnabled: false,
