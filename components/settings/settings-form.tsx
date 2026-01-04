@@ -16,7 +16,9 @@ import {
   Shield, 
   LogOut, 
   Home,
-  Globe
+  Globe,
+  Calendar,
+  CheckCircle2
 } from "lucide-react"
 
 interface User {
@@ -39,11 +41,101 @@ export function SettingsForm({ user }: SettingsFormProps) {
   const { theme, setTheme } = useTheme()
   const { locale, setLocale, t } = useLocale()
   const [mounted, setMounted] = useState(false)
+  const [isGoogleCalendarConnected, setIsGoogleCalendarConnected] = useState(false)
+  const [isLoadingCalendar, setIsLoadingCalendar] = useState(false)
 
   // Éviter le flash de contenu non stylé
   useEffect(() => {
     setMounted(true)
   }, [])
+
+  // Vérifier si Google Calendar est connecté
+  useEffect(() => {
+    const checkGoogleCalendarConnection = async () => {
+      try {
+        const response = await fetch('/api/google-calendar/status')
+        if (response.ok) {
+          const data = await response.json()
+          setIsGoogleCalendarConnected(data.connected)
+        }
+      } catch (error) {
+        console.error('Erreur lors de la vérification de la connexion Google Calendar:', error)
+      }
+    }
+    checkGoogleCalendarConnection()
+
+    // Vérifier les paramètres d'URL pour les messages de succès/erreur
+    const urlParams = new URLSearchParams(window.location.search)
+    const success = urlParams.get('success')
+    const error = urlParams.get('error')
+
+    if (success === 'google_calendar_connected') {
+      setIsGoogleCalendarConnected(true)
+      toast({
+        title: t('success'),
+        description: 'Google Calendar connecté avec succès !',
+      })
+      // Nettoyer l'URL
+      window.history.replaceState({}, '', window.location.pathname)
+    }
+
+    if (error) {
+      toast({
+        title: t('error'),
+        description: 'Erreur lors de la connexion à Google Calendar',
+        variant: 'destructive',
+      })
+      // Nettoyer l'URL
+      window.history.replaceState({}, '', window.location.pathname)
+    }
+  }, [toast, t])
+
+  const handleConnectGoogleCalendar = async () => {
+    setIsLoadingCalendar(true)
+    try {
+      const response = await fetch('/api/google-calendar/connect', {
+        method: 'POST',
+      })
+      const data = await response.json()
+      if (response.ok && data.authUrl) {
+        // Rediriger vers l'URL d'authentification Google
+        window.location.href = data.authUrl
+      } else {
+        throw new Error(data.error || 'Erreur lors de la connexion')
+      }
+    } catch (error) {
+      toast({
+        title: t('error'),
+        description: error instanceof Error ? error.message : 'Une erreur est survenue',
+        variant: 'destructive',
+      })
+    } finally {
+      setIsLoadingCalendar(false)
+    }
+  }
+
+  const handleDisconnectGoogleCalendar = async () => {
+    try {
+      const response = await fetch('/api/google-calendar/disconnect', {
+        method: 'POST',
+      })
+      if (response.ok) {
+        setIsGoogleCalendarConnected(false)
+        toast({
+          title: t('success'),
+          description: 'Google Calendar déconnecté avec succès',
+        })
+      } else {
+        throw new Error('Erreur lors de la déconnexion')
+      }
+    } catch (error) {
+      toast({
+        title: t('error'),
+        description: error instanceof Error ? error.message : 'Une erreur est survenue',
+        variant: 'destructive',
+      })
+    }
+  }
 
   const handleNameUpdate = async () => {
     try {
@@ -429,6 +521,67 @@ export function SettingsForm({ user }: SettingsFormProps) {
                   transition={{ type: "spring", stiffness: 500, damping: 30 }}
                 />
               </button>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Integrations */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.25 }}
+          className="mb-10"
+        >
+          <h3 className="text-gray-700 mb-4 text-lg font-semibold">INTÉGRATIONS</h3>
+          <div className="bg-white rounded-3xl shadow-lg border border-gray-200 overflow-hidden">
+            <div className="p-7 flex items-center justify-between">
+              <div className="flex items-center gap-4 flex-1">
+                <Calendar className="text-[#00C27A]" size={24} />
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-gray-900 text-lg">Google Calendar</span>
+                    {isGoogleCalendarConnected && (
+                      <CheckCircle2 className="text-green-500" size={18} />
+                    )}
+                  </div>
+                  <p className="text-gray-500 text-sm">
+                    {isGoogleCalendarConnected 
+                      ? 'Connecté - L\'agent IA peut créer des événements dans votre calendrier'
+                      : 'Connectez votre Google Calendar pour permettre à l\'agent IA de créer des événements'}
+                  </p>
+                </div>
+              </div>
+              {isGoogleCalendarConnected ? (
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={handleDisconnectGoogleCalendar}
+                  className="px-6 py-3 bg-red-50 text-red-600 rounded-full hover:bg-red-100 transition-colors text-sm font-medium"
+                >
+                  Déconnecter
+                </motion.button>
+              ) : (
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={handleConnectGoogleCalendar}
+                  disabled={isLoadingCalendar}
+                  className="px-6 py-3 bg-[#00C27A] text-white rounded-full hover:bg-[#00D68F] transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  {isLoadingCalendar ? (
+                    <>
+                      <motion.div
+                        className="w-4 h-4 border-2 border-white border-t-transparent rounded-full"
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                      />
+                      Connexion...
+                    </>
+                  ) : (
+                    'Connecter'
+                  )}
+                </motion.button>
+              )}
             </div>
           </div>
         </motion.div>

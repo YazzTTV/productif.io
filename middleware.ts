@@ -47,12 +47,10 @@ export async function middleware(request: NextRequest) {
       return NextResponse.next()
     }
 
-    // Autoriser les requêtes API munies d'un header Authorization Bearer (flows machine-to-machine)
+    // Laisser passer toutes les routes API - elles gèrent l'authentification elles-mêmes
+    // (retournent 401 en JSON au lieu de rediriger vers /login)
     if (request.nextUrl.pathname.startsWith("/api/")) {
-      const authHeader = request.headers.get("authorization") || ""
-      if (authHeader.toLowerCase().startsWith("bearer ")) {
-        return NextResponse.next()
-      }
+      return NextResponse.next()
     }
 
     // Laisser passer les ressources statiques (fichiers du dossier public: /file.ext)

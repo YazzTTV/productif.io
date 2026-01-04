@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { authService } from '@/lib/api';
 import { signInWithGoogle } from '@/lib/googleAuth';
+import { signInWithApple, isAppleSignInAvailable } from '@/lib/appleAuth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function LoginScreen() {
@@ -22,7 +23,49 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingGoogle, setIsLoadingGoogle] = useState(false);
+  const [isLoadingApple, setIsLoadingApple] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [appleAvailable, setAppleAvailable] = useState(false);
+
+  useEffect(() => {
+    // Vérifier si Apple Sign-In est disponible
+    isAppleSignInAvailable().then(setAppleAvailable);
+  }, []);
+
+  const handleAppleLogin = async () => {
+    setIsLoadingApple(true);
+    
+    try {
+      // Lancer le flux OAuth Apple avec la lib native
+      const appleResult = await signInWithApple();
+      
+      // Envoyer l'identityToken au backend dans le header Authorization
+      const response = await authService.loginWithApple(
+        appleResult.identityToken,
+        appleResult.user.email,
+        appleResult.user.name
+      );
+      
+      if (response.success) {
+        // Marquer la session comme persistante
+        await AsyncStorage.setItem('onboarding_completed', 'true');
+        // Connexion réussie, redirection vers le dashboard
+        router.replace('/(tabs)');
+      } else {
+        Alert.alert('Erreur', 'Échec de la connexion avec Apple');
+      }
+      
+    } catch (error) {
+      console.error('Erreur de connexion Apple:', error);
+      if (error instanceof Error && error.message.includes('annulée')) {
+        // Ne pas afficher d'alerte si l'utilisateur a annulé
+        return;
+      }
+      Alert.alert('Erreur', error instanceof Error ? error.message : 'Une erreur est survenue lors de la connexion avec Apple');
+    } finally {
+      setIsLoadingApple(false);
+    }
+  };
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -56,16 +99,11 @@ export default function LoginScreen() {
     setIsLoadingGoogle(true);
     
     try {
-      // Lancer le flux OAuth Google
+      // Lancer le flux OAuth Google avec la lib native
       const googleResult = await signInWithGoogle();
       
-      // Envoyer les tokens au backend pour créer la session
-      const response = await authService.loginWithGoogle(
-        googleResult.accessToken,
-        googleResult.idToken,
-        googleResult.user.email,
-        googleResult.user.name
-      );
+      // Envoyer l'idToken au backend dans le header Authorization
+      const response = await authService.loginWithGoogle(googleResult.idToken);
       
       if (response.success) {
         // Marquer la session comme persistante
@@ -152,9 +190,28 @@ export default function LoginScreen() {
             </View>
           </View>
 
+          {/* Bouton Apple - seulement si disponible */}
+          {appleAvailable && (
+            <TouchableOpacity
+              style={[styles.appleButton, isLoadingApple && styles.appleButtonDisabled]}
+              onPress={handleAppleLogin}
+              disabled={isLoadingApple}
+              activeOpacity={0.9}
+            >
+              {isLoadingApple ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <>
+                  <Ionicons name="logo-apple" size={20} color="#FFFFFF" />
+                  <Text style={styles.appleButtonText}>Continuer avec Apple</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          )}
+
           {/* Bouton Google - même design que l'onboarding */}
           <TouchableOpacity
-            style={[styles.googleButton, isLoadingGoogle && styles.googleButtonDisabled]}
+            style={[styles.googleButton, isLoadingGoogle && styles.googleButtonDisabled, appleAvailable && styles.buttonSpacing]}
             onPress={handleGoogleLogin}
             disabled={isLoadingGoogle}
             activeOpacity={0.9}
@@ -349,6 +406,27 @@ const styles = StyleSheet.create({
     color: '#374151',
     fontSize: 14,
     fontWeight: '600',
+  },
+  appleButton: {
+    backgroundColor: '#000000',
+    paddingVertical: 14,
+    borderRadius: 16,
+    alignItems: 'center',
+    marginBottom: 16,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  appleButtonDisabled: {
+    opacity: 0.6,
+  },
+  appleButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  buttonSpacing: {
+    marginTop: 0,
   },
   separatorContainer: {
     flexDirection: 'row',

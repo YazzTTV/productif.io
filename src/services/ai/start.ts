@@ -22,6 +22,7 @@ import { VoiceTranscriptionService } from './VoiceTranscriptionService';
 import { SpecialHabitsHandler } from './SpecialHabitsHandler';
 import express, { Request, Response } from 'express';
 import { generateApiToken } from '../../../lib/api-token.ts';
+import { calendarEventScheduler } from '../../../lib/calendar/CalendarEventScheduler';
 
 const app = express();
 // En prod (Railway), utiliser PORT. En local, AI_PORT (ou 3001)
@@ -1094,6 +1095,10 @@ async function startAIService() {
             }
         });
 
+        // Démarrer le CalendarEventScheduler pour les rappels et post-checks
+        calendarEventScheduler.start();
+        console.log('🗓️ CalendarEventScheduler démarré');
+
         // Démarrer le serveur
         app.listen(port, () => {
             console.log(`✨ Service IA démarré sur le port ${port}`);
@@ -1102,12 +1107,14 @@ async function startAIService() {
         // Gérer l'arrêt gracieux
         process.on('SIGTERM', async () => {
             console.log('\n📴 Signal d\'arrêt reçu...');
+            calendarEventScheduler.stop();
             await prisma.$disconnect();
             process.exit(0);
         });
 
         process.on('SIGINT', async () => {
             console.log('\n📴 Signal d\'interruption reçu...');
+            calendarEventScheduler.stop();
             await prisma.$disconnect();
             process.exit(0);
         });
