@@ -15,6 +15,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { onboardingService } from '@/lib/api';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface Option {
   id: string;
@@ -23,6 +24,7 @@ interface Option {
 
 export default function QuestionScreen() {
   const { t } = useLanguage();
+  const insets = useSafeAreaInsets();
   
   const questions = [
     {
@@ -190,7 +192,17 @@ export default function QuestionScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+      {/* Progress Bar - Fixed at top */}
+      <View style={styles.progressBarContainer}>
+        <View style={styles.progressBar}>
+          <Animated.View 
+            style={[styles.progressFill, { width: `${progress}%` }]}
+            entering={FadeIn.duration(500)}
+          />
+        </View>
+      </View>
+
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
@@ -204,24 +216,8 @@ export default function QuestionScreen() {
               onPress={handleBack}
               style={styles.backButton}
             >
-              <Ionicons name="arrow-back" size={24} color="#6B7280" />
+              <Ionicons name="arrow-back" size={24} color="rgba(0, 0, 0, 0.6)" />
             </TouchableOpacity>
-          </Animated.View>
-
-          {/* Progress Bar */}
-          <Animated.View entering={FadeInDown.delay(100).duration(400)} style={styles.progressContainer}>
-            <View style={styles.progressHeader}>
-              <Text style={styles.progressText}>
-                {t('question')} {questionIndex + 1} {t('of')} {totalQuestions}
-              </Text>
-              <Text style={styles.progressPercent}>{Math.round(progress)}%</Text>
-            </View>
-            <View style={styles.progressBar}>
-              <Animated.View 
-                style={[styles.progressFill, { width: `${progress}%` }]}
-                entering={FadeIn.duration(500)}
-              />
-            </View>
           </Animated.View>
 
           {/* Question */}
@@ -247,22 +243,17 @@ export default function QuestionScreen() {
                 ]}
                 activeOpacity={0.7}
               >
-                <View style={styles.optionContent}>
-                  <View style={[
-                    styles.optionRadio,
-                    selectedOption === option.id && styles.optionRadioSelected,
-                  ]}>
-                    {selectedOption === option.id && (
-                      <Ionicons name="checkmark" size={18} color="#FFFFFF" />
-                    )}
+                <Text style={[
+                  styles.optionText,
+                  selectedOption === option.id && styles.optionTextSelected,
+                ]}>
+                  {t(option.textKey)}
+                </Text>
+                {selectedOption === option.id && (
+                  <View style={styles.checkIcon}>
+                    <Ionicons name="checkmark" size={20} color="#16A34A" />
                   </View>
-                  <Text style={[
-                    styles.optionText,
-                    selectedOption === option.id && styles.optionTextSelected,
-                  ]}>
-                    {t(option.textKey)}
-                  </Text>
-                </View>
+                )}
               </TouchableOpacity>
             </Animated.View>
           ))}
@@ -291,12 +282,27 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FFFFFF',
   },
+  progressBarContainer: {
+    paddingHorizontal: 24,
+    paddingTop: 8,
+    paddingBottom: 16,
+  },
+  progressBar: {
+    height: 4,
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: '#16A34A',
+    borderRadius: 2,
+  },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
     paddingHorizontal: 24,
-    paddingTop: 60,
   },
   header: {
     marginBottom: 32,
@@ -305,94 +311,58 @@ const styles = StyleSheet.create({
     padding: 8,
     marginLeft: -8,
     marginBottom: 24,
-  },
-  progressContainer: {
-    marginBottom: 16,
-  },
-  progressHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  progressText: {
-    fontSize: 12,
-    color: '#6B7280',
-  },
-  progressPercent: {
-    fontSize: 12,
-    color: '#00C27A',
-    fontWeight: '600',
-  },
-  progressBar: {
-    height: 8,
-    backgroundColor: '#F3F4F6',
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: '#00C27A',
-    borderRadius: 4,
+    width: 44,
   },
   question: {
     fontSize: 24,
-    fontWeight: '800',
-    color: '#374151',
+    fontWeight: '600',
+    color: '#000000',
     lineHeight: 32,
+    letterSpacing: -0.03 * 24,
   },
   optionsContainer: {
-    gap: 16,
+    gap: 12,
   },
   optionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     backgroundColor: '#FFFFFF',
-    borderWidth: 2,
-    borderColor: '#E5E7EB',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.1)',
     borderRadius: 16,
     padding: 20,
   },
   optionButtonSelected: {
-    borderColor: '#00C27A',
-    backgroundColor: 'rgba(0, 194, 122, 0.05)',
+    borderColor: '#16A34A',
+    backgroundColor: 'rgba(22, 163, 74, 0.05)',
   },
   optionButtonDisabled: {
     opacity: 0.5,
-    backgroundColor: '#F9FAFB',
-  },
-  optionContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-  },
-  optionRadio: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#D1D5DB',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  optionRadioSelected: {
-    backgroundColor: '#00C27A',
-    borderColor: '#00C27A',
   },
   optionText: {
     flex: 1,
     fontSize: 16,
-    color: '#4B5563',
+    color: '#000000',
     lineHeight: 24,
   },
   optionTextSelected: {
-    color: '#374151',
-    fontWeight: '600',
+    fontWeight: '500',
+  },
+  checkIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(22, 163, 74, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 12,
   },
   socialProof: {
     marginTop: 24,
     padding: 16,
-    backgroundColor: 'rgba(0, 194, 122, 0.1)',
+    backgroundColor: 'rgba(22, 163, 74, 0.05)',
     borderRadius: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(0, 194, 122, 0.3)',
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
@@ -403,8 +373,7 @@ const styles = StyleSheet.create({
   socialProofText: {
     flex: 1,
     fontSize: 14,
-    color: '#374151',
+    color: '#000000',
     lineHeight: 20,
   },
 });
-

@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Switch, TextInput } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Switch, TextInput, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { authService } from '@/lib/api';
 
 type SettingsView = 'main' | 'editProfile' | 'dailyStructure' | 'notifications';
@@ -54,6 +55,29 @@ export function SettingsNew() {
   const showSavedFeedback = () => {
     setSavedFeedback(true);
     setTimeout(() => setSavedFeedback(false), 2000);
+  };
+
+  const resetOnboarding = async () => {
+    Alert.alert(
+      'Réinitialiser l\'onboarding',
+      'Voulez-vous vraiment réinitialiser l\'onboarding ? Vous serez redirigé vers l\'écran d\'accueil.',
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Réinitialiser',
+          style: 'default',
+          onPress: async () => {
+            try {
+              await AsyncStorage.removeItem('onboarding_completed');
+              router.replace('/(onboarding-new)/intro');
+            } catch (error) {
+              console.error('Erreur lors de la réinitialisation de l\'onboarding:', error);
+              Alert.alert('Erreur', 'Impossible de réinitialiser l\'onboarding');
+            }
+          },
+        },
+      ]
+    );
   };
 
   if (view === 'editProfile') {
@@ -632,11 +656,43 @@ export function SettingsNew() {
           </View>
         </Animated.View>
 
-        {/* SECTION 7 — LOGOUT */}
+        {/* SECTION 7 — DEVELOPMENT */}
+        <Animated.View entering={FadeInDown.delay(750).duration(400)} style={styles.section}>
+          <Text style={styles.sectionLabel}>Development</Text>
+          <TouchableOpacity 
+            style={styles.settingCard} 
+            activeOpacity={0.7}
+            onPress={resetOnboarding}
+          >
+            <View style={styles.settingCardRow}>
+              <View style={styles.settingCardContent}>
+                <Text style={styles.settingCardTitle}>Reset onboarding</Text>
+                <Text style={styles.settingCardSubtitle}>Test the onboarding flow again</Text>
+              </View>
+              <Ionicons name="refresh-outline" size={20} color="#16A34A" />
+            </View>
+          </TouchableOpacity>
+        </Animated.View>
+
+        {/* SECTION 8 — LOGOUT */}
         <Animated.View entering={FadeInDown.delay(800).duration(400)} style={styles.section}>
           <TouchableOpacity
             style={styles.logoutCard}
-            onPress={() => router.push('/login')}
+            onPress={async () => {
+              try {
+                // Nettoyer la session
+                await authService.logout();
+                // Supprimer le flag d'onboarding pour forcer la redirection vers l'intro
+                await AsyncStorage.removeItem('onboarding_completed');
+                // Rediriger vers la page de connexion
+                router.replace('/(onboarding-new)/connection');
+              } catch (error) {
+                console.error('Erreur lors de la déconnexion:', error);
+                // Même en cas d'erreur, nettoyer et rediriger
+                await AsyncStorage.removeItem('onboarding_completed');
+                router.replace('/(onboarding-new)/connection');
+              }
+            }}
             activeOpacity={0.7}
           >
             <Ionicons name="log-out-outline" size={20} color="#EF4444" />

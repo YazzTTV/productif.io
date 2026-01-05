@@ -362,7 +362,7 @@ const styles = StyleSheet.create({
   startFocusButton: {
     backgroundColor: '#16A34A',
     paddingVertical: 16,
-    borderRadius: 16,
+    borderRadius: 24,
     alignItems: 'center',
   },
   startFocusText: {
