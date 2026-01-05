@@ -11,179 +11,77 @@ import Animated, {
   FadeIn,
 } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useLanguage } from '@/contexts/LanguageContext';
-
-// Case studies will be built dynamically with translations
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function SocialProofScreen() {
   const { t } = useLanguage();
+  const insets = useSafeAreaInsets();
   
-  const caseStudies = [
-    {
-      name: t('benjaminName'),
-      role: t('benjaminRole'),
-      image: "👨‍💼",
-      before: t('benjaminBefore'),
-      after: t('benjaminAfter'),
-      quote: t('benjaminQuote'),
-      timeframe: t('benjaminTimeframe'),
-      metrics: [
-        { label: t('benjaminMetric1'), value: "+180%" },
-        { label: t('benjaminMetric2'), value: "+65%" }
-      ]
-    },
-    {
-      name: t('sabrinaName'),
-      role: t('sabrinaRole'),
-      image: "👩‍💼",
-      before: t('sabrinaBefore'),
-      after: t('sabrinaAfter'),
-      quote: t('sabrinaQuote'),
-      timeframe: t('sabrinaTimeframe'),
-      metrics: [
-        { label: t('sabrinaMetric1'), value: "+250%" },
-        { label: t('sabrinaMetric2'), value: "+195%" }
-      ]
-    },
-    {
-      name: t('gaetanName'),
-      role: t('gaetanRole'),
-      image: "👨‍💻",
-      before: t('gaetanBefore'),
-      after: t('gaetanAfter'),
-      quote: t('gaetanQuote'),
-      timeframe: t('gaetanTimeframe'),
-      metrics: [
-        { label: t('gaetanMetric1'), value: "+320%" },
-        { label: t('gaetanMetric2'), value: "+145%" }
-      ]
-    }
+  const stats = [
+    { value: "87%", label: t('reportMajorImprovements') || 'report improvements', icon: "trending-up" },
+    { value: "1500+", label: t('earlyAdopters') || 'early adopters', icon: "people" },
+    { value: "4.9★", label: t('averageRating') || 'average rating', icon: "star" },
+    { value: "2.5hrs", label: t('savedDailyPerUser') || 'saved daily', icon: "time" }
   ];
 
   const testimonials = [
-    { text: t('fabioTestimonial'), author: t('fabioName'), verified: true },
-    { text: t('noahTestimonial'), author: t('noahName'), verified: true },
-    { text: t('arthurTestimonial'), author: t('arthurName'), verified: true },
+    { text: t('fabioTestimonial') || "This app changed how I study.", author: t('fabioName') || "Fabio, Student" },
+    { text: t('noahTestimonial') || "Finally a system that works for me.", author: t('noahName') || "Noah, Student" },
+    { text: t('arthurTestimonial') || "My productivity has doubled.", author: t('arthurName') || "Arthur, Student" },
   ];
-  
-  const stats = [
-    { value: "87%", label: t('reportMajorImprovements'), icon: "trending-up" },
-    { value: "1500+", label: t('earlyAdopters'), icon: "people" },
-    { value: "4.9★", label: t('averageRating'), icon: "star" },
-    { value: "2.5hrs", label: t('savedDailyPerUser'), icon: "trophy" }
-  ];
+
   const handleContinue = async () => {
     router.push('/(onboarding-new)/profile-reveal');
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+      {/* Progress Bar */}
+      <View style={styles.progressBarContainer}>
+        <View style={styles.progressBar}>
+          <View style={[styles.progressFill, { width: '90%' }]} />
+        </View>
+      </View>
+
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header with Gradient */}
-        <Animated.View entering={FadeIn.duration(600)}>
-          <LinearGradient
-            colors={['#00C27A', '#00D68F']}
-            style={styles.headerGradient}
-          >
-            <Animated.View entering={FadeIn.delay(200).springify()} style={styles.headerIcon}>
-              <View style={styles.headerIconCircle}>
-                <Ionicons name="trophy" size={40} color="#FFFFFF" />
-              </View>
-            </Animated.View>
-
-            <Text style={styles.headerTitle}>{t('trustedByThousands')}</Text>
-            <Text style={styles.headerSubtitle}>{t('seeWhatUsersSay')}</Text>
-          </LinearGradient>
+        {/* Header */}
+        <Animated.View entering={FadeIn.duration(400)} style={styles.header}>
+          <Text style={styles.title}>
+            {t('trustedByThousands') || 'Trusted by students everywhere'}
+          </Text>
+          <Text style={styles.subtitle}>
+            {t('seeWhatUsersSay') || 'See what others are saying'}
+          </Text>
         </Animated.View>
 
-        {/* Trust Bar */}
-        <Animated.View entering={FadeInDown.delay(300).duration(600)} style={styles.trustBar}>
-          <View style={styles.statsGrid}>
-            {stats.map((stat, index) => (
-              <Animated.View
-                key={index}
-                entering={FadeIn.delay(400 + index * 100).duration(400)}
-                style={styles.statItem}
-              >
-                <Ionicons name={stat.icon as any} size={18} color="#00C27A" />
-                <Text style={styles.statValue}>{stat.value}</Text>
-                <Text style={styles.statLabel}>{stat.label}</Text>
-              </Animated.View>
-            ))}
-          </View>
-        </Animated.View>
-
-        {/* Case Studies */}
-        <View style={styles.section}>
-          <Animated.View entering={FadeInDown.delay(500).duration(600)}>
-            <Text style={styles.sectionTitle}>{t('successStories')}</Text>
-          </Animated.View>
-
-          {caseStudies.map((study, index) => (
-            <Animated.View
-              key={index}
-              entering={FadeInDown.delay(600 + index * 150).duration(600)}
-            >
-              <View style={styles.caseStudyCard}>
-                {/* Header */}
-                <View style={styles.caseStudyHeader}>
-                  <Text style={styles.caseStudyImage}>{study.image}</Text>
-                  <View style={styles.caseStudyInfo}>
-                    <View style={styles.caseStudyNameRow}>
-                      <Text style={styles.caseStudyName}>{study.name}</Text>
-                      <Ionicons name="checkmark-circle" size={16} color="#00C27A" />
-                    </View>
-                    <Text style={styles.caseStudyRole}>{study.role}</Text>
-                  </View>
-                  <View style={styles.timeframeBadge}>
-                    <Text style={styles.timeframeText}>{study.timeframe}</Text>
-                  </View>
-                </View>
-
-                {/* Transformation */}
-                <View style={styles.transformation}>
-                  <View style={styles.transformationSide}>
-                    <Text style={styles.transformationLabel}>{t('before')}</Text>
-                    <Text style={styles.transformationBefore}>{study.before}</Text>
-                  </View>
-                  <Ionicons name="arrow-forward" size={20} color="#9CA3AF" />
-                  <View style={styles.transformationSide}>
-                    <Text style={styles.transformationLabel}>{t('after')}</Text>
-                    <Text style={styles.transformationAfter}>{study.after}</Text>
-                  </View>
-                </View>
-
-                {/* Quote */}
-                <Text style={styles.quote}>"{study.quote}"</Text>
-
-                {/* Metrics */}
-                <View style={styles.metricsRow}>
-                  {study.metrics.map((metric, i) => (
-                    <View key={i} style={styles.metricBox}>
-                      <Text style={styles.metricValue}>{metric.value}</Text>
-                      <Text style={styles.metricLabel}>{metric.label}</Text>
-                    </View>
-                  ))}
-                </View>
+        {/* Stats Grid */}
+        <Animated.View entering={FadeInDown.delay(200).duration(400)} style={styles.statsGrid}>
+          {stats.map((stat, index) => (
+            <View key={index} style={styles.statItem}>
+              <View style={styles.statIconContainer}>
+                <Ionicons name={stat.icon as any} size={20} color="#16A34A" />
               </View>
-            </Animated.View>
+              <Text style={styles.statValue}>{stat.value}</Text>
+              <Text style={styles.statLabel}>{stat.label}</Text>
+            </View>
           ))}
-        </View>
+        </Animated.View>
 
-        {/* Quick Testimonials */}
-        <Animated.View entering={FadeInDown.delay(1200).duration(600)}>
-          <Text style={styles.sectionTitle}>{t('whatUsersSay')}</Text>
+        {/* Testimonials */}
+        <Animated.View entering={FadeInDown.delay(400).duration(400)} style={styles.testimonials}>
+          <Text style={styles.sectionTitle}>
+            {t('whatUsersSay') || 'What users say'}
+          </Text>
           {testimonials.map((testimonial, index) => (
             <Animated.View
               key={index}
-              entering={FadeInDown.delay(1300 + index * 100).duration(600)}
+              entering={FadeInDown.delay(500 + index * 100).duration(400)}
             >
               <View style={styles.testimonialCard}>
                 <View style={styles.stars}>
@@ -194,71 +92,45 @@ export default function SocialProofScreen() {
                 <Text style={styles.testimonialText}>"{testimonial.text}"</Text>
                 <View style={styles.testimonialAuthor}>
                   <Text style={styles.authorName}>{testimonial.author}</Text>
-                  {testimonial.verified && (
-                    <View style={styles.verifiedBadge}>
-                      <Ionicons name="checkmark-circle" size={12} color="#00C27A" />
-                      <Text style={styles.verifiedText}>{t('verified')}</Text>
-                    </View>
-                  )}
+                  <View style={styles.verifiedBadge}>
+                    <Ionicons name="checkmark-circle" size={14} color="#16A34A" />
+                  </View>
                 </View>
               </View>
             </Animated.View>
           ))}
         </Animated.View>
 
-        {/* Social Proof Banner */}
-        <Animated.View entering={FadeInDown.delay(1600).duration(600)}>
-          <LinearGradient
-            colors={['#00C27A', '#00D68F']}
-            style={styles.socialBanner}
-          >
-            <Text style={styles.bannerStars}>⭐⭐⭐⭐⭐</Text>
-            <Text style={styles.bannerRating}>
-              {t('ratingFromReviews')}
-            </Text>
-            <Text style={styles.bannerCompanies}>
-              {t('trustedByProfessionals')}
-            </Text>
-          </LinearGradient>
-        </Animated.View>
-
-        {/* Trust Indicators */}
-        <Animated.View entering={FadeInDown.delay(1800).duration(600)}>
+        {/* Trust Box */}
+        <Animated.View entering={FadeInDown.delay(800).duration(400)}>
           <View style={styles.trustBox}>
-            {[
-              t('freeTrialCancelAnytime'),
-              t('moneyBackGuarantee')
-            ].map((text, i) => (
-              <View key={i} style={styles.trustItem}>
-                <View style={styles.trustIconCircle}>
-                  <Ionicons name="checkmark-circle" size={16} color="#00C27A" />
-                </View>
-                <Text style={styles.trustText}>{text}</Text>
-              </View>
-            ))}
+            <View style={styles.trustItem}>
+              <Ionicons name="shield-checkmark" size={20} color="#16A34A" />
+              <Text style={styles.trustText}>
+                {t('freeTrialCancelAnytime') || 'Free trial, cancel anytime'}
+              </Text>
+            </View>
+            <View style={styles.trustItem}>
+              <Ionicons name="lock-closed" size={20} color="#16A34A" />
+              <Text style={styles.trustText}>
+                {t('moneyBackGuarantee') || 'Money-back guarantee'}
+              </Text>
+            </View>
           </View>
         </Animated.View>
 
         {/* CTA Button */}
-        <Animated.View entering={FadeInDown.delay(2000).duration(600)}>
+        <Animated.View entering={FadeInDown.delay(1000).duration(400)} style={styles.ctaContainer}>
           <TouchableOpacity
-            activeOpacity={0.9}
+            activeOpacity={0.8}
             onPress={handleContinue}
+            style={styles.ctaButton}
           >
-            <LinearGradient
-              colors={['#00C27A', '#00D68F']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.ctaButton}
-            >
-              <Text style={styles.ctaText}>{t('seeMyResults')}</Text>
-              <Ionicons name="arrow-forward" size={20} color="#FFFFFF" />
-            </LinearGradient>
+            <Text style={styles.ctaText}>
+              {t('seeMyResults') || 'See my results'}
+            </Text>
           </TouchableOpacity>
         </Animated.View>
-
-        {/* Bottom Padding */}
-        <View style={{ height: 60 }} />
       </ScrollView>
     </View>
   );
@@ -269,208 +141,105 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FFFFFF',
   },
+  progressBarContainer: {
+    paddingHorizontal: 24,
+    paddingTop: 8,
+    paddingBottom: 16,
+  },
+  progressBar: {
+    height: 4,
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: '#16A34A',
+    borderRadius: 2,
+  },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 20,
-  },
-  headerGradient: {
     paddingHorizontal: 24,
-    paddingVertical: 32,
-    paddingTop: 64,
-    position: 'relative',
-    overflow: 'hidden',
+    paddingBottom: 40,
   },
-  headerIcon: {
-    alignItems: 'center',
-    marginBottom: 24,
+  header: {
+    marginBottom: 32,
   },
-  headerIconCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    textAlign: 'center',
+  title: {
+    fontSize: 24,
+    fontWeight: '600',
+    color: '#000000',
     marginBottom: 12,
+    letterSpacing: -0.03 * 24,
   },
-  headerSubtitle: {
+  subtitle: {
     fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.95)',
-    textAlign: 'center',
-  },
-  trustBar: {
-    backgroundColor: '#F9FAFB',
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: '#F3F4F6',
-    paddingVertical: 16,
-    paddingHorizontal: 24,
+    color: 'rgba(0, 0, 0, 0.6)',
+    lineHeight: 24,
   },
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
+    gap: 12,
+    marginBottom: 32,
   },
   statItem: {
-    width: '48%',
+    width: '47%',
+    backgroundColor: 'rgba(22, 163, 74, 0.05)',
+    borderRadius: 16,
+    padding: 16,
     alignItems: 'center',
-    paddingVertical: 8,
+  },
+  statIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(22, 163, 74, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
   },
   statValue: {
-    fontSize: 14,
+    fontSize: 20,
     fontWeight: '700',
-    color: '#374151',
-    marginTop: 4,
-    marginBottom: 2,
+    color: '#000000',
+    marginBottom: 4,
   },
   statLabel: {
-    fontSize: 9,
-    color: '#6B7280',
+    fontSize: 12,
+    color: 'rgba(0, 0, 0, 0.6)',
     textAlign: 'center',
-    lineHeight: 12,
   },
-  section: {
-    paddingHorizontal: 24,
-    paddingTop: 24,
+  testimonials: {
+    marginBottom: 24,
   },
   sectionTitle: {
     fontSize: 20,
-    fontWeight: '700',
-    color: '#374151',
-    marginBottom: 16,
-  },
-  caseStudyCard: {
-    backgroundColor: '#FAFAFA',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#F3F4F6',
-  },
-  caseStudyHeader: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 12,
-    marginBottom: 12,
-  },
-  caseStudyImage: {
-    fontSize: 36,
-  },
-  caseStudyInfo: {
-    flex: 1,
-  },
-  caseStudyNameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 4,
-  },
-  caseStudyName: {
-    fontSize: 16,
     fontWeight: '600',
-    color: '#374151',
-  },
-  caseStudyRole: {
-    fontSize: 12,
-    color: '#6B7280',
-  },
-  timeframeBadge: {
-    backgroundColor: 'rgba(0, 194, 122, 0.1)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  timeframeText: {
-    fontSize: 10,
-    color: '#00C27A',
-    fontWeight: '600',
-  },
-  transformation: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 12,
-  },
-  transformationSide: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  transformationLabel: {
-    fontSize: 10,
-    color: '#6B7280',
-    marginBottom: 4,
-  },
-  transformationBefore: {
-    fontSize: 11,
-    color: '#EF4444',
-    fontWeight: '500',
-    textAlign: 'center',
-  },
-  transformationAfter: {
-    fontSize: 11,
-    color: '#00C27A',
-    fontWeight: '500',
-    textAlign: 'center',
-  },
-  quote: {
-    fontSize: 13,
-    color: '#4B5563',
-    fontStyle: 'italic',
-    lineHeight: 20,
-    marginBottom: 12,
-  },
-  metricsRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  metricBox: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 8,
-    padding: 8,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#F3F4F6',
-  },
-  metricValue: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#00C27A',
-    marginBottom: 2,
-  },
-  metricLabel: {
-    fontSize: 9,
-    color: '#6B7280',
+    color: '#000000',
+    marginBottom: 16,
+    letterSpacing: -0.03 * 20,
   },
   testimonialCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: 'rgba(0, 0, 0, 0.1)',
   },
   stars: {
     flexDirection: 'row',
     gap: 4,
-    marginBottom: 8,
+    marginBottom: 12,
   },
   testimonialText: {
-    fontSize: 12,
-    color: '#4B5563',
-    lineHeight: 18,
-    marginBottom: 8,
+    fontSize: 14,
+    color: '#000000',
+    lineHeight: 22,
+    marginBottom: 12,
   },
   testimonialAuthor: {
     flexDirection: 'row',
@@ -478,83 +247,39 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   authorName: {
-    fontSize: 11,
-    color: '#6B7280',
+    fontSize: 13,
+    color: 'rgba(0, 0, 0, 0.6)',
+    fontWeight: '500',
   },
   verifiedBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-  },
-  verifiedText: {
-    fontSize: 10,
-    color: '#00C27A',
-    fontWeight: '500',
-  },
-  socialBanner: {
-    marginHorizontal: 24,
-    marginTop: 24,
-    borderRadius: 16,
-    padding: 20,
-    alignItems: 'center',
-  },
-  bannerStars: {
-    fontSize: 24,
-    marginBottom: 8,
-  },
-  bannerRating: {
-    fontSize: 13,
-    color: '#FFFFFF',
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  bannerCompanies: {
-    fontSize: 10,
-    color: 'rgba(255, 255, 255, 0.8)',
-    textAlign: 'center',
   },
   trustBox: {
-    marginHorizontal: 24,
-    marginTop: 24,
-    backgroundColor: '#F9FAFB',
-    borderRadius: 12,
+    backgroundColor: 'rgba(22, 163, 74, 0.05)',
+    borderRadius: 16,
     padding: 16,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    gap: 8,
+    marginBottom: 24,
+    gap: 12,
   },
   trustItem: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
   },
-  trustIconCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(0, 194, 122, 0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
   trustText: {
-    flex: 1,
-    fontSize: 12,
-    color: '#4B5563',
+    fontSize: 14,
+    color: '#000000',
+  },
+  ctaContainer: {
+    marginTop: 'auto',
   },
   ctaButton: {
-    flexDirection: 'row',
+    backgroundColor: '#16A34A',
+    height: 56,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    marginHorizontal: 24,
-    marginTop: 24,
-    paddingVertical: 16,
-    borderRadius: 16,
-    shadowColor: '#00C27A',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
   },
   ctaText: {
     fontSize: 16,
@@ -562,4 +287,3 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
 });
-

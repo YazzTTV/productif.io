@@ -7,16 +7,11 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
+  TextInput,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
   FadeInDown,
-  useSharedValue,
-  useAnimatedStyle,
-  withRepeat,
-  withTiming,
-  withSequence,
-  cancelAnimation,
+  FadeIn,
 } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -24,119 +19,50 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { signInWithGoogle } from '@/lib/googleAuth';
 import { signInWithApple, isAppleSignInAvailable } from '@/lib/appleAuth';
 import { authService } from '@/lib/api';
-
-// Particule animée avec cleanup approprié
-const AnimatedParticle = ({ index }: { index: number }) => {
-  const translateY = useSharedValue(0);
-  const opacity = useSharedValue(0.2);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    const randomDelay = Math.random() * 2000;
-    const randomDuration = 3000 + Math.random() * 2000;
-
-    timeoutRef.current = setTimeout(() => {
-      translateY.value = withRepeat(
-        withSequence(
-          withTiming(-30, { duration: randomDuration }),
-          withTiming(0, { duration: randomDuration })
-        ),
-        -1,
-        false
-      );
-
-      opacity.value = withRepeat(
-        withSequence(
-          withTiming(0.5, { duration: randomDuration }),
-          withTiming(0.2, { duration: randomDuration })
-        ),
-        -1,
-        false
-      );
-    }, randomDelay);
-
-    // Cleanup: annuler le timeout et les animations
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-      cancelAnimation(translateY);
-      cancelAnimation(opacity);
-    };
-  }, []);
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: translateY.value }],
-    opacity: opacity.value,
-  }));
-
-  const randomLeft = `${Math.random() * 100}%`;
-  const randomTop = `${Math.random() * 100}%`;
-
-  return (
-    <Animated.View
-      style={[
-        styles.particle,
-        animatedStyle,
-        {
-          left: randomLeft,
-          top: randomTop,
-        },
-      ]}
-    />
-  );
-};
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function ConnectionScreen() {
   const { t } = useLanguage();
+  const insets = useSafeAreaInsets();
   const [isLoadingGoogle, setIsLoadingGoogle] = useState(false);
   const [isLoadingApple, setIsLoadingApple] = useState(false);
+  const [isLoadingEmail, setIsLoadingEmail] = useState(false);
   const [appleAvailable, setAppleAvailable] = useState(false);
+  const [isLogin, setIsLogin] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const isMountedRef = useRef(true);
   
   useEffect(() => {
     isMountedRef.current = true;
-    // Vérifier si Apple Sign-In est disponible
     isAppleSignInAvailable().then(setAppleAvailable);
     return () => {
       isMountedRef.current = false;
     };
   }, []);
-  
-  const benefits = [
-    { icon: '🤖', text: t('aiAssistantBenefit') },
-    { icon: '🔥', text: t('trackHabitsBenefit') },
-    { icon: '📊', text: t('advancedAnalyticsBenefit') },
-    { icon: '🏆', text: t('competeFriendsBenefit') },
-    { icon: '☁️', text: t('syncDevicesBenefit') },
-  ];
 
   const handleGoogleSignup = async () => {
     if (!isMountedRef.current) return;
     setIsLoadingGoogle(true);
     
     try {
-      // Lancer le flux OAuth Google
       const googleResult = await signInWithGoogle();
       
       if (!isMountedRef.current) return;
       
-      // Envoyer l'idToken au backend dans le header Authorization
       const response = await authService.loginWithGoogle(googleResult.idToken);
       
       if (!isMountedRef.current) return;
       
       if (response.success) {
-        // Compte créé/connecté, continuer l'onboarding vers le questionnaire
         router.replace('/(onboarding-new)/question');
       } else {
-        Alert.alert('Erreur', 'Échec de la création du compte avec Google');
+        Alert.alert('Erreur', 'Échec de la connexion avec Google');
       }
       
     } catch (error) {
       console.error('Erreur Google signup:', error);
       if (error instanceof Error && error.message.includes('annulée')) {
-        // Ne pas afficher d'alerte si l'utilisateur a annulé
         return;
       }
       if (isMountedRef.current) {
@@ -154,12 +80,10 @@ export default function ConnectionScreen() {
     setIsLoadingApple(true);
     
     try {
-      // Lancer le flux OAuth Apple
       const appleResult = await signInWithApple();
       
       if (!isMountedRef.current) return;
       
-      // Envoyer l'identityToken au backend dans le header Authorization
       const response = await authService.loginWithApple(
         appleResult.identityToken,
         appleResult.user.email,
@@ -169,16 +93,14 @@ export default function ConnectionScreen() {
       if (!isMountedRef.current) return;
       
       if (response.success) {
-        // Compte créé/connecté, continuer l'onboarding vers le questionnaire
         router.replace('/(onboarding-new)/question');
       } else {
-        Alert.alert('Erreur', 'Échec de la création du compte avec Apple');
+        Alert.alert('Erreur', 'Échec de la connexion avec Apple');
       }
       
     } catch (error) {
       console.error('Erreur Apple signup:', error);
       if (error instanceof Error && error.message.includes('annulée')) {
-        // Ne pas afficher d'alerte si l'utilisateur a annulé
         return;
       }
       if (isMountedRef.current) {
@@ -191,161 +113,177 @@ export default function ConnectionScreen() {
     }
   };
 
-  const handleConnect = (provider: string) => {
-    if (provider === 'Login') {
-      router.push('/login');
-    } else if (provider === 'Google') {
-      handleGoogleSignup();
-    } else if (provider === 'Apple') {
-      handleAppleSignup();
-    } else {
-      // Email -> Inscription
-      router.push('/signup');
+  const handleEmailAuth = async () => {
+    if (!email || !password) {
+      Alert.alert('Erreur', 'Veuillez remplir tous les champs');
+      return;
+    }
+    
+    setIsLoadingEmail(true);
+    
+    try {
+      if (isLogin) {
+        const response = await authService.login({ email, password });
+        if (response.success) {
+          router.replace('/(tabs)');
+        } else {
+          Alert.alert('Erreur', response.message || 'Email ou mot de passe incorrect');
+        }
+      } else {
+        // Pour l'inscription, on utilise l'email comme nom par défaut
+        const name = email.split('@')[0] || 'User';
+        const response = await authService.signup({ name, email, password });
+        if (response.success) {
+          router.replace('/(onboarding-new)/question');
+        } else {
+          Alert.alert('Erreur', response.message || 'Échec de la création du compte');
+        }
+      }
+    } catch (error) {
+      console.error('Erreur lors de l\'authentification:', error);
+      Alert.alert('Erreur', error instanceof Error ? error.message : 'Une erreur est survenue');
+    } finally {
+      setIsLoadingEmail(false);
     }
   };
 
-  const handleSkip = () => {
-    // Skip to building plan (for testing)
-    router.push('/(onboarding-new)/building-plan');
-  };
-
   return (
-    <View style={styles.container}>
-      {/* Particules animées en arrière-plan */}
-      <View style={styles.particlesContainer}>
-        {[...Array(15)].map((_, i) => (
-          <AnimatedParticle key={i} index={i} />
-        ))}
-      </View>
-
+    <View style={[styles.container, { paddingTop: insets.top }]}>
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
-        {/* Header avec logo et titre */}
-        <Animated.View entering={FadeInDown.delay(200).duration(600)} style={styles.header}>
-          <LinearGradient
-            colors={['#00C27A', '#00D68F']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.gradientTitle}
-          >
-            <Text style={styles.titleGradient}>Productif.io</Text>
-          </LinearGradient>
-          
-          {/* Sparkles */}
-          <Text style={[styles.sparkle, styles.sparkle1]}>✨</Text>
-          <Text style={[styles.sparkle, styles.sparkle2]}>✨</Text>
-        </Animated.View>
+        <View style={styles.content}>
+          {/* Header */}
+          <Animated.View entering={FadeIn.delay(100).duration(400)} style={styles.header}>
+            <Text style={styles.title}>
+              {isLogin 
+                ? (t('welcomeBack') || 'Welcome back')
+                : (t('createAccount') || 'Create your account')
+              }
+            </Text>
+            <Text style={styles.subtitle}>
+              {t('chooseFastest') || 'Choose the fastest way to continue.'}
+            </Text>
+          </Animated.View>
 
-        <Animated.View entering={FadeInDown.delay(300).duration(600)}>
-          <Text style={styles.subtitle}>{t('connectionTitle')}</Text>
-          <Text style={styles.description}>{t('connectionSubtitle')}</Text>
-        </Animated.View>
-
-        {/* Benefits */}
-        <View style={styles.benefitsContainer}>
-          {benefits.map((benefit, index) => (
-            <Animated.View
-              key={benefit.text}
-              entering={FadeInDown.delay(400 + index * 100).duration(600)}
-            >
-              <View style={styles.benefitCard}>
-                <Text style={styles.benefitIcon}>{benefit.icon}</Text>
-                <Text style={styles.benefitText}>{benefit.text}</Text>
-              </View>
-            </Animated.View>
-          ))}
-        </View>
-
-        {/* Section Création de compte */}
-        <Animated.View
-          entering={FadeInDown.delay(900).duration(600)}
-          style={styles.createAccountSection}
-        >
-          <Text style={styles.sectionTitle}>{t('joinElite')}</Text>
-          <Text style={styles.sectionSubtitle}>{t('freeTrialNoCC')}</Text>
-
-          {/* Bouton Email - CTA principal */}
-          <TouchableOpacity
-            activeOpacity={0.9}
-            onPress={() => handleConnect('Email')}
-            style={styles.buttonSpacing}
-          >
-            <LinearGradient
-              colors={['#00C27A', '#00D68F']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.primaryButton}
-            >
-              <Ionicons name="mail" size={20} color="#FFFFFF" />
-              <Text style={styles.primaryButtonText}>{t('continueWithEmail')}</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-
-          {/* Bouton Apple - seulement si disponible */}
-          {appleAvailable && (
+          {/* Social Auth Buttons */}
+          <Animated.View entering={FadeInDown.delay(200).duration(400)} style={styles.socialButtons}>
+            {/* Google Button */}
             <TouchableOpacity
-              activeOpacity={0.9}
-              onPress={() => handleConnect('Apple')}
-              style={[styles.secondaryButton, styles.appleButton, styles.buttonSpacing]}
-              disabled={isLoadingApple}
+              onPress={handleGoogleSignup}
+              style={styles.socialButton}
+              activeOpacity={0.7}
+              disabled={isLoadingGoogle}
             >
-              {isLoadingApple ? (
-                <ActivityIndicator color="#FFFFFF" />
+              {isLoadingGoogle ? (
+                <ActivityIndicator color="#000" />
               ) : (
                 <>
-                  <Ionicons name="logo-apple" size={20} color="#FFFFFF" />
-                  <Text style={styles.appleButtonText}>{t('continueWithApple')}</Text>
+                  <Ionicons name="logo-google" size={20} color="#000" />
+                  <Text style={styles.socialButtonText}>
+                    {t('continueWithGoogle') || 'Continue with Google'}
+                  </Text>
                 </>
               )}
             </TouchableOpacity>
-          )}
 
-          {/* Bouton Google */}
-          <TouchableOpacity
-            activeOpacity={0.9}
-            onPress={() => handleConnect('Google')}
-            style={[styles.secondaryButton, styles.googleButton]}
-            disabled={isLoadingGoogle}
-          >
-            {isLoadingGoogle ? (
-              <ActivityIndicator color="#4285F4" />
-            ) : (
-              <>
-                <Ionicons name="logo-google" size={20} color="#4285F4" />
-                <Text style={styles.googleButtonText}>{t('continueWithGoogle')}</Text>
-              </>
+            {/* Apple Button */}
+            {appleAvailable && (
+              <TouchableOpacity
+                onPress={handleAppleSignup}
+                style={styles.socialButton}
+                activeOpacity={0.7}
+                disabled={isLoadingApple}
+              >
+                {isLoadingApple ? (
+                  <ActivityIndicator color="#000" />
+                ) : (
+                  <>
+                    <Ionicons name="logo-apple" size={20} color="#000" />
+                    <Text style={styles.socialButtonText}>
+                      {t('continueWithApple') || 'Continue with Apple'}
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
             )}
-          </TouchableOpacity>
-        </Animated.View>
+          </Animated.View>
 
-        {/* Divider */}
-        <Animated.View entering={FadeInDown.delay(1100).duration(600)} style={styles.divider}>
-          <View style={styles.dividerLine} />
-          <Text style={styles.dividerText}>{t('or')}</Text>
-          <View style={styles.dividerLine} />
-        </Animated.View>
+          {/* Divider */}
+          <Animated.View entering={FadeInDown.delay(300).duration(400)} style={styles.divider}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>{t('or') || 'or'}</Text>
+            <View style={styles.dividerLine} />
+          </Animated.View>
 
-        {/* Section Connexion */}
-        <Animated.View
-          entering={FadeInDown.delay(1200).duration(600)}
-          style={styles.signInSection}
-        >
-          <Text style={styles.signInText}>{t('alreadyHaveAccount')}</Text>
-          <TouchableOpacity
-            activeOpacity={0.9}
-            onPress={() => handleConnect('Login')}
-            style={styles.signInButton}
-          >
-            <Text style={styles.signInButtonText}>{t('logIn')}</Text>
-            <Ionicons name="arrow-forward" size={18} color="#00C27A" />
-          </TouchableOpacity>
-        </Animated.View>
+          {/* Email & Password */}
+          <Animated.View entering={FadeInDown.delay(400).duration(400)} style={styles.form}>
+            <TextInput
+              style={styles.input}
+              placeholder={t('emailPlaceholder') || 'Your email'}
+              placeholderTextColor="rgba(0, 0, 0, 0.4)"
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoComplete="email"
+            />
 
-        {/* Padding bottom */}
-        <View style={{ height: 60 }} />
+            <TextInput
+              style={styles.input}
+              placeholder={t('passwordPlaceholder') || 'Password'}
+              placeholderTextColor="rgba(0, 0, 0, 0.4)"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+              autoComplete="password"
+            />
+
+            <TouchableOpacity
+              onPress={handleEmailAuth}
+              style={[
+                styles.primaryButton,
+                (!email || !password) && styles.primaryButtonDisabled
+              ]}
+              activeOpacity={0.8}
+              disabled={!email || !password || isLoadingEmail}
+            >
+              {isLoadingEmail ? (
+                <ActivityIndicator color="#FFF" />
+              ) : (
+                <Text style={styles.primaryButtonText}>
+                  {isLogin 
+                    ? (t('loginButton') || 'Log in')
+                    : (t('signUpButton') || 'Sign up')
+                  }
+                </Text>
+              )}
+            </TouchableOpacity>
+          </Animated.View>
+
+          {/* Toggle Login/Signup */}
+          <Animated.View entering={FadeInDown.delay(500).duration(400)}>
+            <TouchableOpacity
+              onPress={() => setIsLogin(!isLogin)}
+              style={styles.toggleButton}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.toggleButtonText}>
+                {isLogin 
+                  ? (t('createAccountLink') || 'Create an account')
+                  : (t('alreadyHaveAccount') || 'I already have an account')
+                }
+              </Text>
+            </TouchableOpacity>
+
+            <Text style={styles.noSpamText}>
+              {t('noSpam') || "We don't spam. Ever."}
+            </Text>
+          </Animated.View>
+        </View>
       </ScrollView>
     </View>
   );
@@ -356,202 +294,109 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FFFFFF',
   },
-  particlesContainer: {
-    ...StyleSheet.absoluteFillObject,
-    overflow: 'hidden',
-  },
-  particle: {
-    position: 'absolute',
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: 'rgba(0, 194, 122, 0.2)',
-  },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 32,
-    paddingTop: 60,
-    zIndex: 10,
+    flexGrow: 1,
+    justifyContent: 'center',
+  },
+  content: {
+    paddingHorizontal: 24,
+    paddingVertical: 48,
   },
   header: {
     alignItems: 'center',
-    marginBottom: 24,
-    position: 'relative',
+    marginBottom: 32,
   },
-  gradientTitle: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 16,
-  },
-  titleGradient: {
-    fontSize: 40,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    textAlign: 'center',
-    letterSpacing: -1,
-  },
-  sparkle: {
-    position: 'absolute',
+  title: {
     fontSize: 24,
-  },
-  sparkle1: {
-    top: -8,
-    right: -16,
-  },
-  sparkle2: {
-    bottom: -8,
-    left: -16,
+    fontWeight: '600',
+    color: '#000000',
+    textAlign: 'center',
+    marginBottom: 12,
+    letterSpacing: -0.03 * 24,
   },
   subtitle: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: '#374151',
+    fontSize: 16,
+    color: 'rgba(0, 0, 0, 0.6)',
     textAlign: 'center',
-    marginBottom: 8,
-    lineHeight: 32,
   },
-  description: {
-    fontSize: 14,
-    color: '#6B7280',
-    textAlign: 'center',
+  socialButtons: {
+    gap: 12,
     marginBottom: 24,
   },
-  benefitsContainer: {
-    marginBottom: 24,
-  },
-  benefitCard: {
+  socialButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.5)',
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 8,
+    padding: 16,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#F3F4F6',
-  },
-  benefitIcon: {
-    fontSize: 20,
-  },
-  benefitText: {
-    fontSize: 13,
-    color: '#4B5563',
-    fontWeight: '500',
-  },
-  createAccountSection: {
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
-    textAlign: 'center',
-    marginBottom: 4,
-  },
-  sectionSubtitle: {
-    fontSize: 12,
-    color: '#6B7280',
-    textAlign: 'center',
-    marginBottom: 16,
-  },
-  buttonSpacing: {
-    marginBottom: 12,
-  },
-  primaryButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 14,
-    borderRadius: 16,
-    shadowColor: '#00C27A',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  primaryButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-  secondaryButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 14,
-    borderRadius: 16,
-  },
-  appleButton: {
-    backgroundColor: '#000000',
-  },
-  appleButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-  googleButton: {
+    borderColor: 'rgba(0, 0, 0, 0.1)',
     backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
   },
-  googleButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#374151',
+  socialButtonText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#000000',
   },
   divider: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 24,
-    gap: 12,
+    gap: 16,
   },
   dividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: '#E5E7EB',
+    backgroundColor: 'rgba(0, 0, 0, 0.1)',
   },
   dividerText: {
-    fontSize: 12,
-    color: '#9CA3AF',
+    fontSize: 14,
+    color: 'rgba(0, 0, 0, 0.4)',
   },
-  signInSection: {
-    marginBottom: 16,
-    alignItems: 'center',
+  form: {
+    gap: 12,
+    marginBottom: 24,
   },
-  signInText: {
-    fontSize: 12,
-    color: '#6B7280',
-    marginBottom: 12,
+  input: {
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.1)',
+    backgroundColor: '#FFFFFF',
+    fontSize: 16,
+    color: '#000000',
   },
-  signInButton: {
-    flexDirection: 'row',
+  primaryButton: {
+    backgroundColor: '#16A34A',
+    height: 56,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    width: '100%',
-    backgroundColor: '#FFFFFF',
-    paddingVertical: 14,
-    borderRadius: 16,
-    borderWidth: 2,
-    borderColor: '#00C27A',
   },
-  signInButtonText: {
-    fontSize: 14,
+  primaryButtonDisabled: {
+    opacity: 0.4,
+  },
+  primaryButtonText: {
+    fontSize: 16,
     fontWeight: '600',
-    color: '#00C27A',
+    color: '#FFFFFF',
   },
-  skipButton: {
-    paddingVertical: 12,
+  toggleButton: {
     alignItems: 'center',
+    paddingVertical: 12,
   },
-  skipText: {
+  toggleButtonText: {
+    fontSize: 14,
+    color: 'rgba(0, 0, 0, 0.6)',
+  },
+  noSpamText: {
     fontSize: 12,
-    color: '#9CA3AF',
+    color: 'rgba(0, 0, 0, 0.3)',
+    textAlign: 'center',
+    marginTop: 16,
   },
 });
-

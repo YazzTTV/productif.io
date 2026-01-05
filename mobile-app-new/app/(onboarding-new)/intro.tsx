@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React from 'react';
 import {
   View,
   Text,
@@ -6,147 +6,69 @@ import {
   TouchableOpacity,
   Image,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
   FadeInDown,
   FadeIn,
-  useSharedValue,
-  useAnimatedStyle,
-  withRepeat,
-  withTiming,
-  withSequence,
-  cancelAnimation,
 } from 'react-native-reanimated';
-import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useLanguage } from '@/contexts/LanguageContext';
-
-// Particule animée avec cleanup approprié
-const AnimatedParticle = ({ index }: { index: number }) => {
-  const translateY = useSharedValue(0);
-  const opacity = useSharedValue(0.2);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    const randomDelay = Math.random() * 2000;
-    const randomDuration = 3000 + Math.random() * 2000;
-
-    timeoutRef.current = setTimeout(() => {
-      translateY.value = withRepeat(
-        withSequence(
-          withTiming(-30, { duration: randomDuration }),
-          withTiming(0, { duration: randomDuration })
-        ),
-        -1,
-        false
-      );
-
-      opacity.value = withRepeat(
-        withSequence(
-          withTiming(0.5, { duration: randomDuration }),
-          withTiming(0.2, { duration: randomDuration })
-        ),
-        -1,
-        false
-      );
-    }, randomDelay);
-
-    // Cleanup: annuler le timeout et les animations
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-      cancelAnimation(translateY);
-      cancelAnimation(opacity);
-    };
-  }, []);
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: translateY.value }],
-    opacity: opacity.value,
-  }));
-
-  const randomLeft = `${Math.random() * 100}%`;
-  const randomTop = `${Math.random() * 100}%`;
-
-  return (
-    <Animated.View
-      style={[
-        styles.particle,
-        animatedStyle,
-        {
-          left: randomLeft,
-          top: randomTop,
-        },
-      ]}
-    />
-  );
-};
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function IntroScreen() {
   const { t } = useLanguage();
+  const insets = useSafeAreaInsets();
   
   return (
-    <View style={styles.container}>
-      {/* Particules animées en arrière-plan */}
-      <View style={styles.particlesContainer}>
-        {[...Array(20)].map((_, i) => (
-          <AnimatedParticle key={i} index={i} />
-        ))}
-      </View>
-
-      {/* Contenu principal */}
+    <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.content}>
-        {/* Logo / Icône */}
+        {/* Logo */}
         <Animated.View
-          entering={FadeIn.delay(200).duration(600).springify()}
+          entering={FadeIn.delay(200).duration(600)}
           style={styles.logoContainer}
         >
-          <View style={styles.logoBox}>
           <Image
             source={require('../../assets/images/icon.png')}
             style={styles.logoImage}
             resizeMode="contain"
           />
-          </View>
         </Animated.View>
 
-        {/* Titre */}
-        <Animated.View entering={FadeInDown.delay(400).duration(600)}>
-          <Text style={styles.title}>Productif.io</Text>
-        </Animated.View>
-
-        {/* Sous-titre */}
-        <Animated.View entering={FadeInDown.delay(600).duration(600)}>
+        {/* Text */}
+        <Animated.View 
+          entering={FadeInDown.delay(400).duration(600)}
+          style={styles.textContainer}
+        >
+          <Text style={styles.title}>
+            {t('welcomeTitle') || 'You work hard. But without a system.'}
+          </Text>
           <Text style={styles.subtitle}>
-            {t('introSubtitle')}
+            {t('welcomeSubtitle') || 'Productif.io helps students turn effort into results — without burnout.'}
           </Text>
         </Animated.View>
 
-        {/* Bouton CTA */}
-        <Animated.View
-          entering={FadeInDown.delay(1200).duration(600)}
-          style={styles.buttonContainer}
+        {/* CTAs */}
+        <Animated.View 
+          entering={FadeInDown.delay(600).duration(600)}
+          style={styles.ctaContainer}
         >
           <TouchableOpacity
-            activeOpacity={0.9}
+            activeOpacity={0.8}
             onPress={() => router.push('/(onboarding-new)/language')}
+            style={styles.primaryButton}
           >
-            <LinearGradient
-              colors={['#00C27A', '#00D68F']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.ctaButton}
-            >
-              <Text style={styles.ctaText}>{t('letsGo')}</Text>
-              <Ionicons name="arrow-forward" size={20} color="#FFFFFF" />
-            </LinearGradient>
+            <Text style={styles.primaryButtonText}>
+              {t('getStarted') || 'Continue'}
+            </Text>
           </TouchableOpacity>
-        </Animated.View>
 
-        {/* Texte d'information */}
-        <Animated.View entering={FadeInDown.delay(1400).duration(600)}>
-          <Text style={styles.infoText}>{t('takesLessMinutes')}</Text>
+          <TouchableOpacity
+            onPress={() => router.push('/login')}
+            style={styles.secondaryButton}
+          >
+            <Text style={styles.secondaryButtonText}>
+              {t('alreadyHaveAccount') || 'I already have an account'}
+            </Text>
+          </TouchableOpacity>
         </Animated.View>
       </View>
     </View>
@@ -158,87 +80,63 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FFFFFF',
   },
-  particlesContainer: {
-    ...StyleSheet.absoluteFillObject,
-    overflow: 'hidden',
-  },
-  particle: {
-    position: 'absolute',
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: 'rgba(0, 194, 122, 0.2)',
-  },
   content: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 32,
-    zIndex: 10,
+    paddingHorizontal: 24,
   },
   logoContainer: {
-    marginBottom: 32,
-  },
-  logoBox: {
-    width: 120,
-    height: 120,
-    borderRadius: 28,
-    backgroundColor: '#FFFFFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 8,
-    padding: 14,
+    marginBottom: 64,
   },
   logoImage: {
-    width: '100%',
-    height: '100%',
+    width: 96,
+    height: 96,
+  },
+  textContainer: {
+    alignItems: 'center',
+    marginBottom: 64,
   },
   title: {
-    fontSize: 48,
-    fontWeight: '800',
-    color: '#374151',
+    fontSize: 24,
+    fontWeight: '600',
+    color: '#000000',
     textAlign: 'center',
     marginBottom: 16,
-    letterSpacing: -1,
+    letterSpacing: -0.03 * 24,
+    lineHeight: 32,
   },
   subtitle: {
     fontSize: 16,
-    color: '#6B7280',
+    color: 'rgba(0, 0, 0, 0.6)',
     textAlign: 'center',
     lineHeight: 24,
-    marginBottom: 48,
-    paddingHorizontal: 8,
+    paddingHorizontal: 16,
   },
-  buttonContainer: {
+  ctaContainer: {
     width: '100%',
-    marginBottom: 16,
+    gap: 16,
   },
-  ctaButton: {
-    flexDirection: 'row',
+  primaryButton: {
+    width: '100%',
+    backgroundColor: '#16A34A',
+    height: 56,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 16,
-    borderRadius: 16,
-    shadowColor: '#00C27A',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
   },
-  ctaText: {
+  primaryButtonText: {
     fontSize: 16,
     fontWeight: '600',
     color: '#FFFFFF',
   },
-  infoText: {
-    fontSize: 12,
-    color: '#9CA3AF',
-    textAlign: 'center',
+  secondaryButton: {
+    width: '100%',
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  secondaryButtonText: {
+    fontSize: 14,
+    color: 'rgba(0, 0, 0, 0.6)',
   },
 });
-

@@ -119,14 +119,17 @@ export default function SettingsScreen() {
           onPress: async () => {
             try {
               setIsLoggingOut(true);
-              // Naviguer d'abord avant de nettoyer pour éviter les crashs
-              router.replace('/login');
-              // Attendre un court délai pour que la navigation soit initiée
-              await new Promise(resolve => setTimeout(resolve, 100));
-              // Ensuite nettoyer la session
+              // Nettoyer la session d'abord
               await authService.logout();
+              // Supprimer le flag d'onboarding pour forcer la redirection vers l'intro
+              await AsyncStorage.removeItem('onboarding_completed');
+              // Naviguer vers le nouveau formulaire de connexion
+              router.replace('/(onboarding-new)/connection');
             } catch (error) {
               console.error('Erreur lors de la déconnexion:', error);
+              // Même en cas d'erreur, nettoyer et rediriger
+              await AsyncStorage.removeItem('onboarding_completed');
+              router.replace('/(onboarding-new)/connection');
               if (isMountedRef.current) {
                 setIsLoggingOut(false);
               }

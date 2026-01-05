@@ -13,22 +13,23 @@ import Animated, {
   FadeIn,
 } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { onboardingService } from '@/lib/api';
 import { paymentService } from '@/lib/api';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function ProfileRevealScreen() {
   const { t } = useLanguage();
+  const insets = useSafeAreaInsets();
   const [selectedPlan, setSelectedPlan] = useState<'monthly' | 'annual'>('annual');
   const [isLoading, setIsLoading] = useState(false);
 
-  // Profil exemple (devrait être basé sur les réponses du questionnaire)
-  const profileType = t('theAmbitiousAchiever');
+  // Profil exemple
+  const profileType = t('theAmbitiousAchiever') || 'The Ambitious Achiever';
   const profileEmoji = '💭';
-  const description = t('achieverDescription');
+  const description = t('achieverDescription') || 'You have big goals and work hard to achieve them. With the right system, you can accomplish even more.';
 
   const handleStartTrial = async () => {
     setIsLoading(true);
@@ -40,12 +41,10 @@ export default function ProfileRevealScreen() {
       try {
         await onboardingService.saveOnboardingData({
           billingCycle: billingType,
-          currentStep: 9, // Étape du paywall
+          currentStep: 9,
         });
-        console.log('✅ Plan sélectionné sauvegardé dans l\'API:', billingType);
       } catch (error) {
         console.error('❌ Erreur lors de la sauvegarde du plan:', error);
-        // Ne pas bloquer le flux
       }
       
       // Créer la session Stripe via l'API
@@ -63,7 +62,6 @@ export default function ProfileRevealScreen() {
     } catch (error: any) {
       console.error('Erreur lors de la création de la session Stripe:', error);
       
-      // Gérer les erreurs d'authentification
       if (error?.message?.includes('authenticated') || error?.message?.includes('Non authentifié')) {
         Alert.alert(
           'Connexion requise',
@@ -88,16 +86,13 @@ export default function ProfileRevealScreen() {
   };
 
   const handleSkip = async () => {
-    // Marquer l'onboarding comme terminé dans l'API
     try {
       await onboardingService.saveOnboardingData({
         completed: true,
-        currentStep: 10, // Étape finale
+        currentStep: 10,
       });
-      console.log('✅ Onboarding marqué comme terminé dans l\'API');
     } catch (error) {
       console.error('❌ Erreur lors de la sauvegarde:', error);
-      // Ne pas bloquer le flux
     }
     
     await AsyncStorage.setItem('onboarding_completed', 'true');
@@ -105,47 +100,24 @@ export default function ProfileRevealScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      {/* Confetti Effect */}
-      <View style={styles.confettiContainer}>
-        {[...Array(30)].map((_, i) => (
-          <Animated.View
-            key={i}
-            entering={FadeIn.delay(i * 20).duration(2000)}
-            style={[
-              styles.confetti,
-              {
-                left: `${Math.random() * 100}%`,
-              },
-            ]}
-          >
-            <Text style={styles.confettiText}>
-              {['🎉', '✨', '🚀', '💚', '⭐'][Math.floor(Math.random() * 5)]}
-            </Text>
-          </Animated.View>
-        ))}
-      </View>
-
+    <View style={[styles.container, { paddingTop: insets.top }]}>
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
         {/* Success Badge */}
-        <Animated.View entering={FadeIn.delay(300).springify()} style={styles.successBadge}>
+        <Animated.View entering={FadeIn.delay(200).duration(400)} style={styles.successBadge}>
           <View style={styles.checkmarkCircle}>
-            <LinearGradient
-              colors={['#00C27A', '#00D68F']}
-              style={styles.checkmarkGradient}
-            >
-              <Text style={styles.checkmark}>✓</Text>
-            </LinearGradient>
+            <Ionicons name="checkmark" size={40} color="#FFFFFF" />
           </View>
         </Animated.View>
 
         {/* Profile Type */}
-        <Animated.View entering={FadeInDown.delay(500).duration(600)}>
-          <Text style={styles.label}>{t('yourProductivityProfile')}</Text>
+        <Animated.View entering={FadeInDown.delay(300).duration(400)}>
+          <Text style={styles.label}>
+            {t('yourProductivityProfile') || 'Your productivity profile'}
+          </Text>
           <View style={styles.profileTypeContainer}>
             <Text style={styles.profileType}>{profileType}</Text>
             <Text style={styles.profileEmoji}>{profileEmoji}</Text>
@@ -153,63 +125,61 @@ export default function ProfileRevealScreen() {
         </Animated.View>
 
         {/* Description */}
-        <Animated.View entering={FadeInDown.delay(700).duration(600)}>
+        <Animated.View entering={FadeInDown.delay(400).duration(400)}>
           <View style={styles.descriptionBox}>
             <Text style={styles.descriptionText}>{description}</Text>
           </View>
         </Animated.View>
 
-        {/* Transformation Stats */}
-        <Animated.View entering={FadeInDown.delay(800).duration(600)}>
+        {/* Stats */}
+        <Animated.View entering={FadeInDown.delay(500).duration(400)}>
           <View style={styles.statsContainer}>
-            <View style={[styles.statBox, { backgroundColor: 'rgba(16, 185, 129, 0.1)' }]}>
+            <View style={styles.statBox}>
               <Text style={styles.statValue}>+87%</Text>
-              <Text style={styles.statLabel}>{t('focus')}</Text>
+              <Text style={styles.statLabel}>{t('focus') || 'Focus'}</Text>
             </View>
-            <View style={[styles.statBox, { backgroundColor: 'rgba(59, 130, 246, 0.1)' }]}>
-              <Text style={[styles.statValue, { color: '#3B82F6' }]}>3.2x</Text>
-              <Text style={styles.statLabel}>{t('tasks')}</Text>
+            <View style={[styles.statBox, styles.statBoxBlue]}>
+              <Text style={[styles.statValue, styles.statValueBlue]}>3.2x</Text>
+              <Text style={styles.statLabel}>{t('tasks') || 'Tasks'}</Text>
             </View>
-            <View style={[styles.statBox, { backgroundColor: 'rgba(168, 85, 247, 0.1)' }]}>
-              <Text style={[styles.statValue, { color: '#A855F7' }]}>-64%</Text>
-              <Text style={styles.statLabel}>{t('stress')}</Text>
+            <View style={[styles.statBox, styles.statBoxPurple]}>
+              <Text style={[styles.statValue, styles.statValuePurple]}>-64%</Text>
+              <Text style={styles.statLabel}>{t('stress') || 'Stress'}</Text>
             </View>
           </View>
         </Animated.View>
 
         {/* Pricing Section */}
-        <Animated.View entering={FadeInDown.delay(900).duration(600)}>
-          <Text style={styles.pricingTitle}>{t('choosePlan')}</Text>
+        <Animated.View entering={FadeInDown.delay(600).duration(400)}>
+          <Text style={styles.pricingTitle}>
+            {t('choosePlan') || 'Choose your plan'}
+          </Text>
 
-          {/* Annual Plan - Highlighted */}
+          {/* Annual Plan */}
           <TouchableOpacity
             onPress={() => setSelectedPlan('annual')}
-            style={[styles.planButton, styles.annualPlan]}
+            style={[
+              styles.planButton,
+              selectedPlan === 'annual' && styles.planButtonSelected,
+            ]}
             activeOpacity={0.8}
           >
-            <View style={styles.bestValueBadge}>
-              <LinearGradient
-                colors={['#00C27A', '#00D68F']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.bestValueGradient}
-              >
-                <Text style={styles.bestValueText}>⭐ {t('bestValue')}</Text>
-              </LinearGradient>
-            </View>
-
+            {selectedPlan === 'annual' && (
+              <View style={styles.bestValueBadge}>
+                <Text style={styles.bestValueText}>⭐ {t('bestValue') || 'Best value'}</Text>
+              </View>
+            )}
             <View style={styles.planContent}>
               <View style={styles.planLeft}>
-                <Text style={styles.planName}>{t('annualPlan')}</Text>
+                <Text style={styles.planName}>{t('annualPlan') || 'Annual'}</Text>
                 <View style={styles.saveBadge}>
-                  <Text style={styles.saveText}>💰 {t('savePerYear')}</Text>
+                  <Text style={styles.saveText}>💰 {t('savePerYear') || 'Save 33%'}</Text>
                 </View>
               </View>
               <View style={styles.planRight}>
                 <View style={styles.priceBox}>
                   <Text style={styles.price}>$9.99</Text>
-                  <Text style={styles.priceUnit}>{t('perMonth')}</Text>
-                  <Text style={styles.priceBilled}>{t('billedAnnually')}</Text>
+                  <Text style={styles.priceUnit}>{t('perMonth') || '/month'}</Text>
                 </View>
                 <View style={[
                   styles.radioButton,
@@ -234,13 +204,13 @@ export default function ProfileRevealScreen() {
           >
             <View style={styles.planContent}>
               <View style={styles.planLeft}>
-                <Text style={styles.planName}>{t('monthlyPlan')}</Text>
-                <Text style={styles.planFlexible}>{t('flexibleBilling')}</Text>
+                <Text style={styles.planName}>{t('monthlyPlan') || 'Monthly'}</Text>
+                <Text style={styles.planFlexible}>{t('flexibleBilling') || 'Flexible billing'}</Text>
               </View>
               <View style={styles.planRight}>
                 <View style={styles.priceBox}>
                   <Text style={styles.price}>$14.99</Text>
-                  <Text style={styles.priceUnit}>{t('perMonth')}</Text>
+                  <Text style={styles.priceUnit}>{t('perMonth') || '/month'}</Text>
                 </View>
                 <View style={[
                   styles.radioButton,
@@ -256,57 +226,51 @@ export default function ProfileRevealScreen() {
         </Animated.View>
 
         {/* Trial Benefits */}
-        <Animated.View entering={FadeInDown.delay(1000).duration(600)}>
+        <Animated.View entering={FadeInDown.delay(700).duration(400)}>
           <View style={styles.trialBox}>
             <View style={styles.trialHeader}>
-              <Ionicons name="flash" size={20} color="#00C27A" />
-              <Text style={styles.trialTitle}>{t('freeTrial')}</Text>
+              <Ionicons name="flash" size={20} color="#16A34A" />
+              <Text style={styles.trialTitle}>{t('freeTrial') || '7-day free trial'}</Text>
             </View>
             <View style={styles.trialBenefits}>
               <View style={styles.trialBenefit}>
-                <Text style={styles.checkIcon}>✓</Text>
-                <Text style={styles.trialBenefitText}>{t('earlyAdopters')}</Text>
+                <Ionicons name="checkmark-circle" size={16} color="#16A34A" />
+                <Text style={styles.trialBenefitText}>{t('cancelAnytime') || 'Cancel anytime'}</Text>
               </View>
               <View style={styles.trialBenefit}>
-                <Text style={styles.checkIcon}>✓</Text>
-                <Text style={styles.trialBenefitText}>{t('cancelAnytime')}</Text>
+                <Ionicons name="checkmark-circle" size={16} color="#16A34A" />
+                <Text style={styles.trialBenefitText}>{t('noCommitment') || 'No commitment'}</Text>
               </View>
             </View>
           </View>
         </Animated.View>
 
         {/* CTA Buttons */}
-        <Animated.View entering={FadeInDown.delay(1300).duration(600)} style={styles.ctaContainer}>
+        <Animated.View entering={FadeInDown.delay(800).duration(400)} style={styles.ctaContainer}>
           <TouchableOpacity
-            activeOpacity={0.9}
+            activeOpacity={0.8}
             onPress={handleStartTrial}
             disabled={isLoading}
+            style={[styles.startTrialButton, isLoading && styles.buttonDisabled]}
           >
-            <LinearGradient
-              colors={['#00C27A', '#00D68F']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={[styles.startTrialButton, isLoading && styles.startTrialButtonDisabled]}
-            >
-              {isLoading ? (
-                <ActivityIndicator color="#FFFFFF" />
-              ) : (
-                <>
-                  <Ionicons name="flash" size={20} color="#FFFFFF" />
-                  <Text style={styles.startTrialText}>{t('startFreeTrial')}</Text>
-                </>
-              )}
-            </LinearGradient>
+            {isLoading ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <>
+                <Ionicons name="flash" size={20} color="#FFFFFF" />
+                <Text style={styles.startTrialText}>{t('startFreeTrial') || 'Start free trial'}</Text>
+              </>
+            )}
           </TouchableOpacity>
 
           <TouchableOpacity onPress={handleSkip} style={styles.skipButton}>
-            <Text style={styles.skipText}>{t('skip')}</Text>
+            <Text style={styles.skipText}>{t('skip') || 'Skip for now'}</Text>
           </TouchableOpacity>
         </Animated.View>
 
-        <Animated.View entering={FadeInDown.delay(1500).duration(600)}>
+        <Animated.View entering={FadeInDown.delay(900).duration(400)}>
           <Text style={styles.termsText}>
-            {t('agreeTerms')}
+            {t('agreeTerms') || 'By continuing, you agree to our Terms of Service'}
           </Text>
         </Animated.View>
       </ScrollView>
@@ -319,25 +283,13 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FFFFFF',
   },
-  confettiContainer: {
-    ...StyleSheet.absoluteFillObject,
-    overflow: 'hidden',
-  },
-  confetti: {
-    position: 'absolute',
-    top: -40,
-  },
-  confettiText: {
-    fontSize: 24,
-  },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
     paddingHorizontal: 24,
-    paddingTop: 60,
+    paddingTop: 24,
     paddingBottom: 40,
-    zIndex: 10,
   },
   successBadge: {
     alignItems: 'center',
@@ -347,28 +299,16 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    overflow: 'hidden',
-  },
-  checkmarkGradient: {
-    width: '100%',
-    height: '100%',
+    backgroundColor: '#16A34A',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#00C27A',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  checkmark: {
-    fontSize: 40,
-    color: '#FFFFFF',
   },
   label: {
-    fontSize: 12,
-    color: '#00C27A',
+    fontSize: 14,
+    color: '#16A34A',
     textAlign: 'center',
     marginBottom: 8,
+    fontWeight: '500',
   },
   profileTypeContainer: {
     flexDirection: 'row',
@@ -379,99 +319,89 @@ const styles = StyleSheet.create({
   },
   profileType: {
     fontSize: 24,
-    fontWeight: '800',
-    color: '#374151',
+    fontWeight: '600',
+    color: '#000000',
+    letterSpacing: -0.03 * 24,
   },
   profileEmoji: {
-    fontSize: 36,
+    fontSize: 32,
   },
   descriptionBox: {
-    backgroundColor: 'rgba(249, 250, 251, 1)',
+    backgroundColor: 'rgba(0, 0, 0, 0.03)',
     borderRadius: 16,
     padding: 20,
     marginBottom: 20,
-    borderWidth: 1,
-    borderColor: '#F3F4F6',
   },
   descriptionText: {
     fontSize: 14,
-    color: '#4B5563',
+    color: 'rgba(0, 0, 0, 0.6)',
     lineHeight: 22,
     textAlign: 'center',
   },
   statsContainer: {
     flexDirection: 'row',
     gap: 8,
-    marginBottom: 20,
+    marginBottom: 24,
   },
   statBox: {
     flex: 1,
+    backgroundColor: 'rgba(22, 163, 74, 0.1)',
     borderRadius: 12,
     padding: 12,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.2)',
+  },
+  statBoxBlue: {
+    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+  },
+  statBoxPurple: {
+    backgroundColor: 'rgba(168, 85, 247, 0.1)',
   },
   statValue: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '700',
-    color: '#10B981',
+    color: '#16A34A',
     marginBottom: 4,
   },
+  statValueBlue: {
+    color: '#3B82F6',
+  },
+  statValuePurple: {
+    color: '#A855F7',
+  },
   statLabel: {
-    fontSize: 10,
-    color: '#6B7280',
+    fontSize: 12,
+    color: 'rgba(0, 0, 0, 0.6)',
   },
   pricingTitle: {
     fontSize: 20,
-    fontWeight: '700',
-    color: '#374151',
+    fontWeight: '600',
+    color: '#000000',
     textAlign: 'center',
     marginBottom: 16,
+    letterSpacing: -0.03 * 20,
   },
   planButton: {
     borderRadius: 16,
-    borderWidth: 2,
-    borderColor: '#E5E7EB',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.1)',
     backgroundColor: '#FFFFFF',
     padding: 20,
     marginBottom: 12,
     position: 'relative',
   },
-  annualPlan: {
-    borderColor: '#00C27A',
-    backgroundColor: 'rgba(0, 194, 122, 0.05)',
-    shadowColor: '#00C27A',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4,
-  },
   planButtonSelected: {
-    borderColor: '#00C27A',
-    backgroundColor: 'rgba(0, 194, 122, 0.05)',
+    borderColor: '#16A34A',
+    backgroundColor: 'rgba(22, 163, 74, 0.05)',
   },
   bestValueBadge: {
     position: 'absolute',
     top: -12,
     left: '50%',
-    transform: [{ translateX: -80 }],
-    width: 160,
-    height: 32,
-    borderRadius: 16,
-    overflow: 'hidden',
-    shadowColor: '#00C27A',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-  bestValueGradient: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 4,
+    transform: [{ translateX: -60 }],
+    backgroundColor: '#16A34A',
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: 12,
   },
   bestValueText: {
     fontSize: 12,
@@ -482,7 +412,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 8,
   },
   planLeft: {
     flex: 1,
@@ -490,24 +419,24 @@ const styles = StyleSheet.create({
   planName: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#374151',
+    color: '#000000',
     marginBottom: 6,
   },
   saveBadge: {
-    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    backgroundColor: 'rgba(22, 163, 74, 0.1)',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 8,
     alignSelf: 'flex-start',
   },
   saveText: {
-    fontSize: 11,
-    color: '#10B981',
-    fontWeight: '600',
+    fontSize: 12,
+    color: '#16A34A',
+    fontWeight: '500',
   },
   planFlexible: {
     fontSize: 12,
-    color: '#6B7280',
+    color: 'rgba(0, 0, 0, 0.5)',
   },
   planRight: {
     flexDirection: 'row',
@@ -520,36 +449,30 @@ const styles = StyleSheet.create({
   price: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#374151',
+    color: '#000000',
   },
   priceUnit: {
-    fontSize: 10,
-    color: '#6B7280',
-  },
-  priceBilled: {
-    fontSize: 9,
-    color: '#9CA3AF',
+    fontSize: 12,
+    color: 'rgba(0, 0, 0, 0.5)',
   },
   radioButton: {
     width: 24,
     height: 24,
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: '#D1D5DB',
+    borderColor: 'rgba(0, 0, 0, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   radioButtonSelected: {
-    backgroundColor: '#00C27A',
-    borderColor: '#00C27A',
+    backgroundColor: '#16A34A',
+    borderColor: '#16A34A',
   },
   trialBox: {
-    backgroundColor: 'rgba(0, 194, 122, 0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(0, 194, 122, 0.3)',
+    backgroundColor: 'rgba(22, 163, 74, 0.05)',
     borderRadius: 16,
     padding: 16,
-    marginBottom: 32,
+    marginBottom: 24,
   },
   trialHeader: {
     flexDirection: 'row',
@@ -561,44 +484,36 @@ const styles = StyleSheet.create({
   trialTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#374151',
+    color: '#000000',
   },
   trialBenefits: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 16,
+    gap: 24,
   },
   trialBenefit: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-  },
-  checkIcon: {
-    color: '#00C27A',
-    fontSize: 14,
+    gap: 6,
   },
   trialBenefitText: {
-    fontSize: 12,
-    color: '#6B7280',
+    fontSize: 13,
+    color: 'rgba(0, 0, 0, 0.6)',
   },
   ctaContainer: {
     gap: 12,
-    marginBottom: 12,
+    marginBottom: 16,
   },
   startTrialButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    paddingVertical: 16,
+    backgroundColor: '#16A34A',
+    height: 56,
     borderRadius: 16,
-    shadowColor: '#00C27A',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
-    shadowRadius: 16,
-    elevation: 8,
   },
-  startTrialButtonDisabled: {
+  buttonDisabled: {
     opacity: 0.6,
   },
   startTrialText: {
@@ -607,17 +522,17 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   skipButton: {
-    paddingVertical: 12,
     alignItems: 'center',
+    paddingVertical: 12,
   },
   skipText: {
     fontSize: 14,
-    color: '#6B7280',
+    color: 'rgba(0, 0, 0, 0.5)',
   },
   termsText: {
-    fontSize: 10,
-    color: '#9CA3AF',
+    fontSize: 11,
+    color: 'rgba(0, 0, 0, 0.4)',
     textAlign: 'center',
+    lineHeight: 16,
   },
 });
-
