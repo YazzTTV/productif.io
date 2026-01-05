@@ -168,11 +168,16 @@ export async function apiCall<T>(
   };
 
   try {
-    console.log('🌐 apiCall - URL:', `${API_BASE_URL}${endpoint}`);
+    const fullUrl = `${API_BASE_URL}${endpoint}`;
+    console.log('🌐 apiCall - URL complète:', fullUrl);
     console.log('🔑 apiCall - Token présent:', !!token);
+    console.log('📋 apiCall - Méthode:', options.method || 'GET');
+    if (options.body) {
+      console.log('📦 apiCall - Body:', options.body.substring(0, 200));
+    }
     
     // Créer une promesse avec timeout
-    const fetchPromise = fetch(`${API_BASE_URL}${endpoint}`, config);
+    const fetchPromise = fetch(fullUrl, config);
     const timeoutPromise = new Promise<never>((_, reject) => {
       setTimeout(() => reject(new Error(`Request timeout after ${timeout}ms`)), timeout);
     });
@@ -242,6 +247,39 @@ export async function apiCall<T>(
       // L'erreur sera gérée par le code appelant (checkAuth retourne null)
     } else {
       console.error('💥 API Error:', error);
+      console.error('💥 API Error Type:', error instanceof TypeError ? 'TypeError' : typeof error);
+      console.error('💥 API Error Message:', error instanceof Error ? error.message : String(error));
+      
+      // Si c'est une erreur réseau (pas de réponse du serveur), fournir un message plus clair
+      if (error instanceof TypeError) {
+        const errorMsg = error.message || '';
+        if (errorMsg.includes('fetch') || errorMsg.includes('Network request failed') || errorMsg.includes('Failed to fetch')) {
+          const fullUrl = `${API_BASE_URL}${endpoint}`;
+          console.error('💥 Erreur réseau - Impossible de joindre le serveur');
+          console.error('💥 URL complète:', fullUrl);
+          console.error('💥 Endpoint:', endpoint);
+          console.error('💥 Type d erreur:', error.constructor.name);
+          console.error('💥 Message d erreur:', errorMsg);
+          console.error('💥 Stack:', error.stack);
+          
+          // Vérifier si c'est un problème d'endpoint non trouvé
+          if (endpoint.includes('/subjects')) {
+            throw new Error(`L'endpoint ${endpoint} n'est peut-être pas encore déployé en production. Veuillez contacter le support.`);
+          }
+          
+          throw new Error('Erreur de réseau. Vérifiez votre connexion internet et réessayez.');
+        }
+      }
+      
+      // Si c'est une erreur de timeout
+      if (error instanceof Error && error.message.includes('timeout')) {
+        throw new Error('La requête a pris trop de temps. Vérifiez votre connexion internet.');
+      }
+      
+      // Si l'erreur contient des informations sur l'endpoint
+      if (error instanceof Error && error.message.includes('Endpoint non trouvé')) {
+        throw new Error(`L'endpoint ${endpoint} n'est pas disponible. Le service peut être en cours de déploiement.`);
+      }
     }
     throw error;
   }
@@ -500,6 +538,47 @@ export const tasksService = {
     return await apiCall(`/tasks/${taskId}`, {
       method: 'DELETE',
     });
+  },
+};
+
+// Service pour les matières
+export const subjectsService = {
+  // Récupérer toutes les matières
+  async getAll(): Promise<any> {
+    console.log('📥 [subjectsService] Récupération des matières...');
+    try {
+      const result = await apiCall('/subjects');
+      console.log('✅ [subjectsService] Matières récupérées:', result);
+      return result;
+    } catch (error) {
+      console.error('❌ [subjectsService] Erreur lors de la récupération:', error);
+      throw error;
+    }
+  },
+
+  // Créer une matière
+  async create(subjectData: { name: string; coefficient: number; deadline?: string | null }): Promise<any> {
+    console.log('📤 [subjectsService] Création matière - Données:', JSON.stringify(subjectData));
+    console.log('📤 [subjectsService] URL complète:', `${API_BASE_URL}/subjects`);
+    
+    try {
+      const result = await apiCall('/subjects', {
+        method: 'POST',
+        body: JSON.stringify(subjectData),
+      });
+      console.log('✅ [subjectsService] Matière créée avec succès:', result);
+      return result;
+    } catch (error: any) {
+      console.error('❌ [subjectsService] Erreur lors de la création:', error);
+      console.error('❌ [subjectsService] Type d erreur:', error?.constructor?.name);
+      console.error('❌ [subjectsService] Message d erreur:', error?.message);
+      
+      // Re-lancer l'erreur avec un message plus descriptif si nécessaire
+      if (error instanceof TypeError) {
+        throw new Error('Erreur de connexion. Vérifiez votre connexion internet et que le serveur est accessible.');
+      }
+      throw error;
+    }
   },
 };
 

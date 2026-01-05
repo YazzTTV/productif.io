@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Modal, TextInput, Platform, Alert, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { subjectsService } from '@/lib/api';
 
 interface Task {
   id: string;
@@ -23,6 +25,7 @@ interface Subject {
   insight?: string;
   tasks: Task[];
   nextDeadline?: string;
+  deadline?: Date;
 }
 
 const MOCK_SUBJECTS: Subject[] = [
@@ -89,9 +92,44 @@ const MOCK_SUBJECTS: Subject[] = [
 export function TasksNew() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const [subjects, setSubjects] = useState<Subject[]>(MOCK_SUBJECTS);
-  const [expandedSubjects, setExpandedSubjects] = useState<string[]>(['1']);
+  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [expandedSubjects, setExpandedSubjects] = useState<string[]>([]);
   const [expandedTasks, setExpandedTasks] = useState<string[]>([]);
+  const [showAddSubjectModal, setShowAddSubjectModal] = useState(false);
+  const [newSubjectName, setNewSubjectName] = useState('');
+  const [newSubjectCoeff, setNewSubjectCoeff] = useState(1);
+  const [newSubjectDeadline, setNewSubjectDeadline] = useState<Date | null>(null);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  // Charger les matières depuis l'API
+  useEffect(() => {
+    loadSubjects();
+  }, []);
+
+  const loadSubjects = async () => {
+    try {
+      setLoading(true);
+      const data = await subjectsService.getAll();
+      if (Array.isArray(data)) {
+        setSubjects(data);
+        // Ouvrir la première matière par défaut
+        if (data.length > 0) {
+          setExpandedSubjects([data[0].id]);
+        }
+      }
+    } catch (error: any) {
+      console.error('Erreur lors du chargement des matières:', error);
+      // En cas d'erreur, utiliser les données mockées
+      setSubjects(MOCK_SUBJECTS);
+      if (MOCK_SUBJECTS.length > 0) {
+        setExpandedSubjects([MOCK_SUBJECTS[0].id]);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const toggleSubject = (subjectId: string) => {
     setExpandedSubjects(prev =>
@@ -137,6 +175,86 @@ export function TasksNew() {
     });
   };
 
+  const handleAddSubject = async () => {
+    if (!newSubjectName.trim()) {
+      Alert.alert('Erreur', 'Veuillez entrer un nom de matière');
+      return;
+    }
+
+    // Vérifier l'authentification avant de continuer
+    const { getAuthToken } = await import('@/lib/api');
+    const token = await getAuthToken();
+    if (!token) {
+      Alert.alert(
+        'Authentification requise',
+        'Vous devez être connecté pour ajouter une matière. Veuillez vous connecter.'
+      );
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const subjectData = {
+        name: newSubjectName.trim(),
+        coefficient: newSubjectCoeff,
+        deadline: newSubjectDeadline ? newSubjectDeadline.toISOString() : null,
+      };
+
+      console.log('📤 [TasksNew] Création matière - Données:', subjectData);
+      console.log('🔑 [TasksNew] Token présent:', !!token);
+      
+      const newSubject = await subjectsService.create(subjectData);
+      
+      console.log('✅ [TasksNew] Matière créée avec succès:', newSubject);
+      
+      // Ajouter la nouvelle matière à la liste
+      setSubjects([...subjects, newSubject]);
+      // Ouvrir automatiquement la nouvelle matière
+      setExpandedSubjects([...expandedSubjects, newSubject.id]);
+      
+      // Réinitialiser le formulaire
+      setNewSubjectName('');
+      setNewSubjectCoeff(1);
+      setNewSubjectDeadline(null);
+      setShowAddSubjectModal(false);
+      
+      // Recharger les matières depuis l'API pour s'assurer d'avoir les dernières données
+      await loadSubjects();
+    } catch (error: any) {
+      const errorMessage = error?.message || String(error) || 'Erreur inconnue';
+      
+      console.error('[TasksNew] Erreur lors de lajout de la matière:', errorMessage);
+      console.error('[TasksNew] Type d erreur:', error?.constructor?.name);
+      console.error('[TasksNew] Stack:', error?.stack);
+      
+      let userFriendlyMessage = 'Impossible dajouter la matière. Veuillez réessayer.';
+      
+      if (errorMessage.includes('Non authentifié') || errorMessage.includes('401')) {
+        userFriendlyMessage = 'Vous devez être connecté pour ajouter une matière.';
+      } else if (errorMessage.includes('timeout')) {
+        userFriendlyMessage = 'La requête a pris trop de temps. Vérifiez votre connexion internet.';
+      } else if (errorMessage.includes('Endpoint non trouvé') || errorMessage.includes('404') || errorMessage.includes('pas encore déployé')) {
+        userFriendlyMessage = 'Cette fonctionnalité est en cours de déploiement. Veuillez réessayer dans quelques instants ou contacter le support.';
+      } else if (errorMessage.includes('Erreur de réseau') || errorMessage.includes('fetch') || errorMessage.includes('Network')) {
+        userFriendlyMessage = 'Erreur de connexion. Vérifiez votre connexion internet et réessayez.';
+      } else if (errorMessage && errorMessage.length < 150) {
+        userFriendlyMessage = errorMessage;
+      }
+      
+      Alert.alert('Erreur', userFriendlyMessage);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const formatDate = (date: Date) => {
+    return date.toLocaleDateString('fr-FR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    });
+  };
+
   const totalTasks = subjects.reduce((acc, s) => acc + s.tasks.length, 0);
   const completedTasks = subjects.reduce(
     (acc, s) => acc + s.tasks.filter(t => t.completed).length,
@@ -169,6 +287,15 @@ export function TasksNew() {
     }
   };
 
+  if (loading) {
+    return (
+      <View style={[styles.container, styles.loadingContainer, { paddingTop: insets.top }]}>
+        <ActivityIndicator size="large" color="#16A34A" />
+        <Text style={styles.loadingText}>Chargement des matières...</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <ScrollView
@@ -195,6 +322,16 @@ export function TasksNew() {
               {completedTasks} of {totalTasks} completed
             </Text>
           </View>
+
+          {/* Add Subject Button */}
+          <TouchableOpacity
+            style={styles.addSubjectButton}
+            onPress={() => setShowAddSubjectModal(true)}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="add-circle-outline" size={20} color="#16A34A" />
+            <Text style={styles.addSubjectText}>Ajouter une matière</Text>
+          </TouchableOpacity>
         </Animated.View>
 
         {/* Subjects list */}
@@ -366,6 +503,126 @@ export function TasksNew() {
         {/* Bottom spacing */}
         <View style={{ height: 120 }} />
       </ScrollView>
+
+      {/* Add Subject Modal */}
+      <Modal
+        visible={showAddSubjectModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowAddSubjectModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { paddingBottom: insets.bottom + 24 }]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Ajouter une matière</Text>
+              <TouchableOpacity
+                onPress={() => setShowAddSubjectModal(false)}
+                style={styles.closeButton}
+              >
+                <Ionicons name="close" size={24} color="#000" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.modalScrollView} showsVerticalScrollIndicator={false}>
+              {/* Subject Name */}
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Nom de la matière</Text>
+                <TextInput
+                  style={styles.formInput}
+                  placeholder="Ex: Mathématiques, Physique..."
+                  value={newSubjectName}
+                  onChangeText={setNewSubjectName}
+                  autoFocus
+                />
+              </View>
+
+              {/* Coefficient */}
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Coefficient</Text>
+                <Text style={styles.formHint}>L'importance de cette matière pour votre moyenne</Text>
+                <View style={styles.coefficientContainer}>
+                  {[1, 2, 3, 4, 5, 6].map((coeff) => (
+                    <TouchableOpacity
+                      key={coeff}
+                      style={[
+                        styles.coefficientButton,
+                        newSubjectCoeff === coeff && styles.coefficientButtonActive,
+                      ]}
+                      onPress={() => setNewSubjectCoeff(coeff)}
+                    >
+                      <Text
+                        style={[
+                          styles.coefficientText,
+                          newSubjectCoeff === coeff && styles.coefficientTextActive,
+                        ]}
+                      >
+                        {coeff}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              {/* Deadline */}
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Deadline (optionnel)</Text>
+                <TouchableOpacity
+                  style={styles.dateButton}
+                  onPress={() => setShowDatePicker(true)}
+                >
+                  <Ionicons name="calendar-outline" size={20} color="#16A34A" />
+                  <Text style={styles.dateButtonText}>
+                    {newSubjectDeadline
+                      ? formatDate(newSubjectDeadline)
+                      : 'Sélectionner une date'}
+                  </Text>
+                  {newSubjectDeadline && (
+                    <TouchableOpacity
+                      onPress={() => setNewSubjectDeadline(null)}
+                      style={styles.clearDateButton}
+                    >
+                      <Ionicons name="close-circle" size={20} color="rgba(0, 0, 0, 0.4)" />
+                    </TouchableOpacity>
+                  )}
+                </TouchableOpacity>
+              </View>
+
+              {/* Date Picker */}
+              {showDatePicker && (
+                <DateTimePicker
+                  value={newSubjectDeadline || new Date()}
+                  mode="date"
+                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                  onChange={(event, selectedDate) => {
+                    setShowDatePicker(Platform.OS === 'ios');
+                    if (selectedDate) {
+                      setNewSubjectDeadline(selectedDate);
+                    }
+                  }}
+                  minimumDate={new Date()}
+                />
+              )}
+
+              {/* Submit Button */}
+              <TouchableOpacity
+                style={[
+                  styles.submitButton,
+                  (!newSubjectName.trim() || saving) && styles.submitButtonDisabled,
+                ]}
+                onPress={handleAddSubject}
+                disabled={!newSubjectName.trim() || saving}
+                activeOpacity={0.8}
+              >
+                {saving ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.submitButtonText}>Ajouter la matière</Text>
+                )}
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -374,6 +631,15 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#FFFFFF',
+  },
+  loadingContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 16,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: 'rgba(0, 0, 0, 0.6)',
   },
   scrollView: {
     flex: 1,
@@ -598,6 +864,144 @@ const styles = StyleSheet.create({
   startFocusText: {
     color: '#FFFFFF',
     fontSize: 14,
+    fontWeight: '600',
+  },
+  addSubjectButton: {
+    marginTop: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    backgroundColor: 'rgba(22, 163, 74, 0.1)',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(22, 163, 74, 0.2)',
+  },
+  addSubjectText: {
+    color: '#16A34A',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: '90%',
+    paddingBottom: 24,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 24,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0, 0, 0, 0.1)',
+  },
+  modalTitle: {
+    fontSize: 24,
+    fontWeight: '600',
+    letterSpacing: -0.5,
+    color: '#000000',
+  },
+  closeButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalScrollView: {
+    padding: 24,
+  },
+  formGroup: {
+    marginBottom: 24,
+  },
+  formLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#000000',
+    marginBottom: 8,
+  },
+  formHint: {
+    fontSize: 14,
+    color: 'rgba(0, 0, 0, 0.5)',
+    marginBottom: 12,
+  },
+  formInput: {
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.1)',
+    borderRadius: 16,
+    padding: 16,
+    fontSize: 16,
+    backgroundColor: '#FFFFFF',
+  },
+  coefficientContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginTop: 8,
+  },
+  coefficientButton: {
+    width: 60,
+    height: 60,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: 'rgba(0, 0, 0, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+  },
+  coefficientButtonActive: {
+    borderColor: '#16A34A',
+    backgroundColor: 'rgba(22, 163, 74, 0.1)',
+  },
+  coefficientText: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: 'rgba(0, 0, 0, 0.4)',
+  },
+  coefficientTextActive: {
+    color: '#16A34A',
+  },
+  dateButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.1)',
+    borderRadius: 16,
+    padding: 16,
+    backgroundColor: '#FFFFFF',
+  },
+  dateButtonText: {
+    flex: 1,
+    fontSize: 16,
+    color: '#000000',
+  },
+  clearDateButton: {
+    marginLeft: 'auto',
+  },
+  submitButton: {
+    backgroundColor: '#16A34A',
+    borderRadius: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  submitButtonDisabled: {
+    opacity: 0.4,
+  },
+  submitButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
     fontWeight: '600',
   },
 });
