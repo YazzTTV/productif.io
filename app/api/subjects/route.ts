@@ -24,19 +24,17 @@ export async function GET(req: NextRequest) {
 
     console.log(`${routeName} ✅ Utilisateur authentifié: ${user.id} - Temps: ${Date.now() - startTime}ms`)
 
-    // Récupérer toutes les matières de l'utilisateur avec leurs tâches
+    // Récupérer toutes les matières de l'utilisateur avec toutes leurs tâches (complétées et non complétées)
     const subjects = await prisma.subject.findMany({
       where: {
         userId: user.id,
       },
       include: {
         tasks: {
-          where: {
-            completed: false,
-          },
-          orderBy: {
-            dueDate: 'asc',
-          },
+          orderBy: [
+            { completed: 'asc' }, // Tâches non complétées en premier
+            { dueDate: 'asc' },
+          ],
         },
       },
       orderBy: {
@@ -46,9 +44,12 @@ export async function GET(req: NextRequest) {
 
     // Formater les données pour le frontend
     const formattedSubjects = subjects.map(subject => {
-      const completedTasks = subject.tasks.filter(t => t.completed).length
-      const totalTasks = subject.tasks.length
+      const allTasks = subject.tasks || []
+      const completedTasks = allTasks.filter(t => t.completed).length
+      const totalTasks = allTasks.length
       const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0
+      
+      console.log(`${routeName} 📊 Matière "${subject.name}": ${completedTasks}/${totalTasks} tâches complétées (${progress}%)`)
       
       // Déterminer l'impact basé sur le coefficient
       let impact: 'high' | 'medium' | 'low' = 'low'
@@ -69,7 +70,7 @@ export async function GET(req: NextRequest) {
         coefficient: subject.coefficient,
         progress,
         impact,
-        tasks: subject.tasks.map(task => ({
+        tasks: allTasks.map(task => ({
           id: task.id,
           title: task.title,
           estimatedTime: task.estimatedMinutes || 30,

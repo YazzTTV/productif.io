@@ -204,9 +204,9 @@ export function Dashboard() {
         )}
 
         {/* Habits */}
-        {habits.length > 0 && (
-          <Animated.View entering={FadeInDown.delay(500).duration(400)} style={styles.section}>
-            <Text style={styles.cardLabel}>{t('todaysHabits')}</Text>
+        <Animated.View entering={FadeInDown.delay(500).duration(400)} style={styles.section}>
+          <Text style={styles.cardLabel}>{t('todaysHabits')}</Text>
+          {habits.length > 0 ? (
             <View style={styles.habitsList}>
               {habits.map((habit) => (
                 <TouchableOpacity
@@ -229,8 +229,24 @@ export function Dashboard() {
                 </TouchableOpacity>
               ))}
             </View>
-          </Animated.View>
-        )}
+          ) : (
+            <View style={styles.emptyHabitsContainer}>
+              <Text style={styles.emptyHabitsText}>Aucune habitude aujourd'hui</Text>
+            </View>
+          )}
+          
+          {/* Add habit button - Design System style */}
+          <TouchableOpacity
+            style={styles.addHabitButton}
+            onPress={() => router.push('/(tabs)/habits')}
+            activeOpacity={0.8}
+          >
+            <View style={styles.addHabitIconContainer}>
+              <Ionicons name="add" size={16} color="rgba(0, 0, 0, 0.4)" />
+            </View>
+            <Text style={styles.addHabitText}>Add a habit</Text>
+          </TouchableOpacity>
+        </Animated.View>
 
         {/* Bottom spacing */}
         <View style={{ height: 120 }} />
@@ -439,6 +455,41 @@ const styles = StyleSheet.create({
   },
   habitNameCompleted: {
     color: 'rgba(0, 0, 0, 0.6)',
+  },
+  emptyHabitsContainer: {
+    padding: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyHabitsText: {
+    fontSize: 14,
+    color: 'rgba(0, 0, 0, 0.4)',
+  },
+  addHabitButton: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 16,
+    marginTop: 12,
+    borderWidth: 2,
+    borderStyle: 'dashed',
+    borderColor: 'rgba(0, 0, 0, 0.1)',
+    borderRadius: 16,
+    backgroundColor: 'transparent',
+  },
+  addHabitIconContainer: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  addHabitText: {
+    fontSize: 14,
+    color: 'rgba(0, 0, 0, 0.4)',
   },
 });
 

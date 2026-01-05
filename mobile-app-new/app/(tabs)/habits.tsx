@@ -465,17 +465,14 @@ export default function HabitsScreen() {
 
   const handlePreviousDay = () => {
     setSelectedDate(prev => addDays(prev, -1));
-    setCurrentCardIndex(0);
   };
 
   const handleNextDay = () => {
     setSelectedDate(prev => addDays(prev, 1));
-    setCurrentCardIndex(0);
   };
 
   const handleToday = () => {
     setSelectedDate(startOfDay(new Date()));
-    setCurrentCardIndex(0);
   };
 
   if (loading) {
@@ -581,37 +578,26 @@ export default function HabitsScreen() {
         {/* Bouton pour créer une nouvelle habitude */}
         <TouchableOpacity
           style={styles.createHabitButton}
-          onPress={() => setShowCreateModal(true)}
+          onPress={() => {
+            console.log('🔘 Bouton Add Habit cliqué');
+            setShowCreateModal(true);
+          }}
+          activeOpacity={0.8}
         >
           <Ionicons name="add" size={20} color="white" />
-          <Text style={styles.createHabitButtonText}>Nouvelle habitude</Text>
+          <Text style={styles.createHabitButtonText}>Add Habit</Text>
         </TouchableOpacity>
       </View>
 
       <ScrollView
         style={styles.content}
+        contentContainerStyle={styles.scrollContent}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
         showsVerticalScrollIndicator={false}
       >
-        {habitsForToday.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Ionicons name="leaf-outline" size={64} color="#9CA3AF" />
-            <Text style={styles.emptyTitle}>Aucune habitude prévue</Text>
-            <Text style={styles.emptyDescription}>
-              {isToday
-                ? "Aucune habitude n'est programmée pour aujourd'hui."
-                : `Aucune habitude n'est programmée pour le ${format(selectedDate, "d MMMM", { locale: fr })}.`
-              }
-            </Text>
-            <TouchableOpacity style={styles.createButton} onPress={() => setShowCreateModal(true)}>
-              <Ionicons name="add" size={24} color="white" />
-              <Text style={styles.createButtonText}>Créer une habitude</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <View style={styles.cardsContainer}>
+        <View style={styles.cardsContainer}>
             {/* Section Matin */}
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Habitudes du matin</Text>
@@ -636,6 +622,21 @@ export default function HabitsScreen() {
                   </View>
                 ))
               )}
+              
+              {/* Add habit button - Design System style */}
+              <TouchableOpacity
+                style={styles.addHabitButton}
+                onPress={() => {
+                  console.log('🔘 Bouton Add a habit cliqué');
+                  setShowCreateModal(true);
+                }}
+                activeOpacity={0.8}
+              >
+                <View style={styles.addHabitIconContainer}>
+                  <Ionicons name="add" size={16} color="rgba(0, 0, 0, 0.4)" />
+                </View>
+                <Text style={styles.addHabitText}>Add a habit</Text>
+              </TouchableOpacity>
             </View>
 
             {/* Section Journée */}
@@ -662,6 +663,21 @@ export default function HabitsScreen() {
                   </View>
                 ))
               )}
+              
+              {/* Add habit button - Design System style */}
+              <TouchableOpacity
+                style={styles.addHabitButton}
+                onPress={() => {
+                  console.log('🔘 Bouton Add a habit cliqué');
+                  setShowCreateModal(true);
+                }}
+                activeOpacity={0.8}
+              >
+                <View style={styles.addHabitIconContainer}>
+                  <Ionicons name="add" size={16} color="rgba(0, 0, 0, 0.4)" />
+                </View>
+                <Text style={styles.addHabitText}>Add a habit</Text>
+              </TouchableOpacity>
             </View>
 
             {/* Section Soir */}
@@ -688,6 +704,21 @@ export default function HabitsScreen() {
                   </View>
                 ))
               )}
+              
+              {/* Add habit button - Design System style */}
+              <TouchableOpacity
+                style={styles.addHabitButton}
+                onPress={() => {
+                  console.log('🔘 Bouton Add a habit cliqué');
+                  setShowCreateModal(true);
+                }}
+                activeOpacity={0.8}
+              >
+                <View style={styles.addHabitIconContainer}>
+                  <Ionicons name="add" size={16} color="rgba(0, 0, 0, 0.4)" />
+                </View>
+                <Text style={styles.addHabitText}>Add a habit</Text>
+              </TouchableOpacity>
             </View>
 
             {/* Section Anti-habitudes */}
@@ -722,9 +753,23 @@ export default function HabitsScreen() {
                   );
                 })
               )}
+              
+              {/* Add habit button - Design System style */}
+              <TouchableOpacity
+                style={styles.addHabitButton}
+                onPress={() => {
+                  console.log('🔘 Bouton Add a habit cliqué');
+                  setShowCreateModal(true);
+                }}
+                activeOpacity={0.8}
+              >
+                <View style={styles.addHabitIconContainer}>
+                  <Ionicons name="add" size={16} color="rgba(0, 0, 0, 0.4)" />
+                </View>
+                <Text style={styles.addHabitText}>Add a habit</Text>
+              </TouchableOpacity>
             </View>
           </View>
-        )}
       </ScrollView>
 
       {/* Bouton flottant pour ajouter une habitude */}
@@ -896,6 +941,9 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: 120, // Espace pour le bouton flottant
   },
   cardsContainer: {
     padding: 16,
@@ -1096,11 +1144,11 @@ const styles = StyleSheet.create({
   },
   floatingButton: {
     position: 'absolute',
-    bottom: 24,
+    bottom: 32,
     right: 24,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     backgroundColor: '#10B981',
     alignItems: 'center',
     justifyContent: 'center',
@@ -1112,30 +1160,64 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 8,
+    zIndex: 1000,
   },
   createHabitButton: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: '#10B981',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 12,
     alignSelf: 'center',
     marginTop: 16,
+    marginBottom: 8,
+    gap: 8,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
       height: 2,
     },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.2,
     shadowRadius: 4,
-    elevation: 3,
+    elevation: 4,
   },
   createHabitButtonText: {
     color: 'white',
     fontSize: 14,
     fontWeight: '600',
     marginLeft: 6,
+  },
+  addHabitButton: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    marginTop: 12,
+    marginBottom: 0,
+    borderWidth: 2,
+    borderStyle: 'dashed',
+    borderColor: 'rgba(0, 0, 0, 0.1)',
+    borderRadius: 16,
+    backgroundColor: 'transparent',
+    minHeight: 56,
+  },
+  addHabitIconContainer: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  addHabitText: {
+    fontSize: 14,
+    color: 'rgba(0, 0, 0, 0.4)',
+    fontWeight: '500',
   },
 });
 
@@ -1188,7 +1270,7 @@ function CreateHabitModal({ visible, onClose, onCreated }: { visible: boolean; o
     <Modal visible={visible} animationType="slide" transparent>
       <View style={{ flex:1, backgroundColor:'rgba(0,0,0,0.3)', justifyContent:'flex-end' }}>
         <View style={{ backgroundColor:'#fff', borderTopLeftRadius:16, borderTopRightRadius:16, padding:16 }}>
-          <Text style={{ fontSize:18, fontWeight:'700', marginBottom:12 }}>Nouvelle habitude</Text>
+          <Text style={{ fontSize:18, fontWeight:'700', marginBottom:12 }}>Add Habit</Text>
           <Text style={{ fontSize:12, color:'#6B7280', marginBottom:8 }}>Nom</Text>
           <TextInput 
             placeholder="Ex: Sport, Lecture..." 
