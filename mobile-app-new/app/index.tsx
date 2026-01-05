@@ -25,10 +25,11 @@ export default function Entry() {
         if (onboardingFlag === 'true') {
           router.replace('/(tabs)');
         } else {
-          router.replace('/(onboarding-new)/intro');
+          // Si pas de token et pas d'onboarding, rediriger vers la page de connexion
+          router.replace('/(onboarding-new)/connection');
         }
       } catch {
-        router.replace('/(onboarding-new)/intro');
+        router.replace('/(onboarding-new)/connection');
       } finally {
         setBooting(false);
       }

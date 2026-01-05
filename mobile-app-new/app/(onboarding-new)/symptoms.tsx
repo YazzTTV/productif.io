@@ -5,7 +5,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  ActivityIndicator,
 } from 'react-native';
 import Animated, {
   FadeInDown,
@@ -14,14 +13,14 @@ import Animated, {
   useAnimatedStyle,
   withRepeat,
   withTiming,
-  withSequence,
   cancelAnimation,
+  Easing,
 } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { onboardingService } from '@/lib/api';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface Symptom {
   id: string;
@@ -30,6 +29,7 @@ interface Symptom {
 
 export default function SymptomsAnalysisScreen() {
   const { t } = useLanguage();
+  const insets = useSafeAreaInsets();
   
   const symptoms: Symptom[] = [
     { id: 'distraction', textKey: 'symptomDistraction' },
@@ -44,8 +44,7 @@ export default function SymptomsAnalysisScreen() {
   const isMountedRef = useRef(true);
   const isNavigatingRef = useRef(false);
 
-  const rotation = useSharedValue(0);
-  const scale = useSharedValue(1);
+  const spinnerRotation = useSharedValue(0);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -56,17 +55,8 @@ export default function SymptomsAnalysisScreen() {
 
   useEffect(() => {
     if (showAnalyzing) {
-      rotation.value = withRepeat(
-        withTiming(360, { duration: 2000 }),
-        -1,
-        false
-      );
-
-      scale.value = withRepeat(
-        withSequence(
-          withTiming(1.1, { duration: 1000 }),
-          withTiming(1, { duration: 1000 })
-        ),
+      spinnerRotation.value = withRepeat(
+        withTiming(360, { duration: 1000, easing: Easing.linear }),
         -1,
         false
       );
@@ -80,17 +70,13 @@ export default function SymptomsAnalysisScreen() {
 
       return () => {
         clearTimeout(timer);
-        cancelAnimation(rotation);
-        cancelAnimation(scale);
+        cancelAnimation(spinnerRotation);
       };
     }
   }, [showAnalyzing]);
 
-  const animatedIconStyle = useAnimatedStyle(() => ({
-    transform: [
-      { rotate: `${rotation.value}deg` },
-      { scale: scale.value },
-    ],
+  const spinnerStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${spinnerRotation.value}deg` }],
   }));
 
   const toggleSymptom = (symptomId: string) => {
@@ -108,12 +94,11 @@ export default function SymptomsAnalysisScreen() {
     try {
       await onboardingService.saveOnboardingData({
         symptoms: selectedSymptoms,
-        currentStep: 7, // Étape des symptômes
+        currentStep: 7,
       });
       console.log('✅ Symptômes sauvegardés dans l\'API:', selectedSymptoms);
     } catch (error) {
       console.error('❌ Erreur lors de la sauvegarde des symptômes:', error);
-      // Ne pas bloquer le flux
     }
     
     if (isMountedRef.current) {
@@ -123,58 +108,35 @@ export default function SymptomsAnalysisScreen() {
 
   if (showAnalyzing) {
     return (
-      <View style={styles.container}>
+      <View style={[styles.container, { paddingTop: insets.top }]}>
         <View style={styles.analyzingContainer}>
-          <Animated.View style={[styles.analyzingIcon, animatedIconStyle]}>
-            <LinearGradient
-              colors={['#00C27A', '#00D68F']}
-              style={styles.analyzingIconGradient}
-            >
-              <Ionicons name="brain" size={40} color="#FFFFFF" />
-            </LinearGradient>
+          <Animated.View style={[styles.spinnerContainer, spinnerStyle]}>
+            <View style={styles.spinner} />
           </Animated.View>
 
           <Animated.View entering={FadeInDown.delay(200).duration(400)}>
-            <Text style={styles.analyzingTitle}>{t('analyzingSymptoms')}</Text>
+            <Text style={styles.analyzingTitle}>
+              {t('analyzingSymptoms') || 'Analyzing your answers…'}
+            </Text>
           </Animated.View>
 
           <Animated.View entering={FadeInDown.delay(400).duration(400)}>
             <Text style={styles.analyzingDescription}>
-              {t('creatingPersonalizedProfile')}
+              {t('creatingPersonalizedProfile') || 'Creating your personalized profile'}
             </Text>
           </Animated.View>
-
-          {/* Loading Dots */}
-          <View style={styles.loadingDots}>
-            {[0, 1, 2].map((i) => (
-              <Animated.View
-                key={i}
-                style={styles.dot}
-                entering={FadeIn.delay(i * 150).duration(300)}
-              />
-            ))}
-          </View>
         </View>
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
-      {/* Particules */}
-      <View style={styles.particlesContainer}>
-        {[...Array(15)].map((_, i) => (
-          <Animated.View
-            key={i}
-            style={[
-              styles.particle,
-              {
-                left: `${Math.random() * 100}%`,
-                top: `${Math.random() * 100}%`,
-              },
-            ]}
-          />
-        ))}
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+      {/* Progress Bar */}
+      <View style={styles.progressBarContainer}>
+        <View style={styles.progressBar}>
+          <View style={[styles.progressFill, { width: '75%' }]} />
+        </View>
       </View>
 
       <ScrollView
@@ -184,26 +146,12 @@ export default function SymptomsAnalysisScreen() {
       >
         {/* Header */}
         <Animated.View entering={FadeIn.delay(100).duration(400)} style={styles.header}>
-          <View style={styles.headerIcon}>
-            <LinearGradient
-              colors={['#00C27A', '#00D68F']}
-              style={styles.headerIconGradient}
-            >
-              <Ionicons name="brain" size={32} color="#FFFFFF" />
-            </LinearGradient>
-          </View>
-          <Text style={styles.title}>{t('tellUsSymptoms')}</Text>
-          <Text style={styles.description}>
-            {t('selectAllApply')}
+          <Text style={styles.title}>
+            {t('tellUsSymptoms') || 'What makes your days difficult?'}
           </Text>
-        </Animated.View>
-
-        {/* Progress Indicator */}
-        <Animated.View entering={FadeIn.delay(200).duration(400)} style={styles.progressIndicator}>
-          <View style={styles.progressDot} />
-          <View style={styles.progressDot} />
-          <View style={styles.progressDot} />
-          <View style={[styles.progressDot, styles.progressDotInactive]} />
+          <Text style={styles.description}>
+            {t('selectAllApply') || 'Select all that apply'}
+          </Text>
         </Animated.View>
 
         {/* Symptoms List */}
@@ -214,7 +162,7 @@ export default function SymptomsAnalysisScreen() {
             return (
               <Animated.View
                 key={symptom.id}
-                entering={FadeInDown.delay(300 + index * 100).duration(400)}
+                entering={FadeInDown.delay(200 + index * 80).duration(400)}
               >
                 <TouchableOpacity
                   onPress={() => toggleSymptom(symptom.id)}
@@ -224,61 +172,43 @@ export default function SymptomsAnalysisScreen() {
                   ]}
                   activeOpacity={0.7}
                 >
-                  <Ionicons
-                    name={isSelected ? 'checkmark-circle' : 'ellipse-outline'}
-                    size={24}
-                    color={isSelected ? '#00C27A' : '#D1D5DB'}
-                  />
                   <Text style={[styles.symptomText, isSelected && styles.symptomTextSelected]}>
                     {t(symptom.textKey)}
                   </Text>
+                  {isSelected && (
+                    <View style={styles.checkIcon}>
+                      <Ionicons name="checkmark" size={20} color="#16A34A" />
+                    </View>
+                  )}
                 </TouchableOpacity>
               </Animated.View>
             );
           })}
         </View>
 
-        {/* Info Box */}
-        <Animated.View entering={FadeInDown.delay(800).duration(400)}>
-          <View style={styles.infoBox}>
-            <Text style={styles.infoIcon}>💡</Text>
-            <Text style={styles.infoText}>
-              {t('symptomInfo')}
-            </Text>
-          </View>
-        </Animated.View>
-
         {/* Continue Button */}
-        <Animated.View entering={FadeInDown.delay(900).duration(400)}>
+        <Animated.View entering={FadeInDown.delay(700).duration(400)} style={styles.buttonContainer}>
           <TouchableOpacity
-            activeOpacity={0.9}
+            activeOpacity={0.8}
             onPress={handleContinue}
             disabled={selectedSymptoms.length === 0}
+            style={[
+              styles.continueButton,
+              selectedSymptoms.length === 0 && styles.continueButtonDisabled,
+            ]}
           >
-            <LinearGradient
-              colors={selectedSymptoms.length > 0 ? ['#00C27A', '#00D68F'] : ['#E5E7EB', '#E5E7EB']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.continueButton}
-            >
-              <Text style={[
-                styles.continueButtonText,
-                selectedSymptoms.length === 0 && styles.continueButtonTextDisabled
-              ]}>
-                {t('discoverProfile')}
-              </Text>
-              <Ionicons
-                name="arrow-forward"
-                size={20}
-                color={selectedSymptoms.length > 0 ? '#FFFFFF' : '#9CA3AF'}
-              />
-            </LinearGradient>
+            <Text style={[
+              styles.continueButtonText,
+              selectedSymptoms.length === 0 && styles.continueButtonTextDisabled
+            ]}>
+              {t('continue') || 'Continue'}
+            </Text>
           </TouchableOpacity>
 
           {selectedSymptoms.length > 0 && (
             <Animated.View entering={FadeIn.duration(300)}>
               <Text style={styles.selectedCount}>
-                {selectedSymptoms.length} {t('symptomsSelected')}
+                {selectedSymptoms.length} {t('symptomsSelected') || 'selected'}
               </Text>
             </Animated.View>
           )}
@@ -293,133 +223,91 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FFFFFF',
   },
-  particlesContainer: {
-    ...StyleSheet.absoluteFillObject,
+  progressBarContainer: {
+    paddingHorizontal: 24,
+    paddingTop: 8,
+    paddingBottom: 16,
+  },
+  progressBar: {
+    height: 4,
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+    borderRadius: 2,
     overflow: 'hidden',
   },
-  particle: {
-    position: 'absolute',
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: 'rgba(0, 194, 122, 0.1)',
+  progressFill: {
+    height: '100%',
+    backgroundColor: '#16A34A',
+    borderRadius: 2,
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
     paddingHorizontal: 24,
-    paddingTop: 60,
     paddingBottom: 40,
-    zIndex: 10,
   },
   header: {
-    alignItems: 'center',
     marginBottom: 32,
-  },
-  headerIcon: {
-    marginBottom: 16,
-  },
-  headerIconGradient: {
-    width: 64,
-    height: 64,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#00C27A',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
   },
   title: {
     fontSize: 24,
-    fontWeight: '800',
-    color: '#374151',
-    textAlign: 'center',
+    fontWeight: '600',
+    color: '#000000',
     marginBottom: 12,
+    letterSpacing: -0.03 * 24,
   },
   description: {
-    fontSize: 14,
-    color: '#6B7280',
-    textAlign: 'center',
-    lineHeight: 20,
-    paddingHorizontal: 16,
-  },
-  progressIndicator: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 8,
-    marginBottom: 32,
-  },
-  progressDot: {
-    width: 48,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: '#00C27A',
-  },
-  progressDotInactive: {
-    backgroundColor: 'rgba(0, 194, 122, 0.3)',
+    fontSize: 16,
+    color: 'rgba(0, 0, 0, 0.6)',
+    lineHeight: 24,
   },
   symptomsList: {
-    marginBottom: 24,
+    marginBottom: 32,
     gap: 12,
   },
   symptomButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
-    padding: 16,
+    justifyContent: 'space-between',
+    padding: 20,
     borderRadius: 16,
-    borderWidth: 2,
-    borderColor: '#E5E7EB',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.1)',
     backgroundColor: '#FFFFFF',
   },
   symptomButtonSelected: {
-    borderColor: '#00C27A',
-    backgroundColor: 'rgba(0, 194, 122, 0.05)',
+    borderColor: '#16A34A',
+    backgroundColor: 'rgba(22, 163, 74, 0.05)',
   },
   symptomText: {
     flex: 1,
-    fontSize: 14,
-    color: '#6B7280',
+    fontSize: 16,
+    color: '#000000',
   },
   symptomTextSelected: {
-    color: '#374151',
     fontWeight: '500',
   },
-  infoBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    backgroundColor: 'rgba(59, 130, 246, 0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(59, 130, 246, 0.2)',
+  checkIcon: {
+    width: 32,
+    height: 32,
     borderRadius: 16,
-    padding: 16,
-    marginBottom: 24,
-  },
-  infoIcon: {
-    fontSize: 24,
-  },
-  infoText: {
-    flex: 1,
-    fontSize: 12,
-    color: '#4B5563',
-    lineHeight: 18,
-  },
-  continueButton: {
-    flexDirection: 'row',
+    backgroundColor: 'rgba(22, 163, 74, 0.1)',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 16,
+    marginLeft: 12,
+  },
+  buttonContainer: {
+    marginTop: 'auto',
+  },
+  continueButton: {
+    backgroundColor: '#16A34A',
+    height: 56,
     borderRadius: 16,
-    shadowColor: '#00C27A',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  continueButtonDisabled: {
+    opacity: 0.4,
   },
   continueButtonText: {
     fontSize: 16,
@@ -427,11 +315,11 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   continueButtonTextDisabled: {
-    color: '#9CA3AF',
+    color: '#FFFFFF',
   },
   selectedCount: {
-    fontSize: 12,
-    color: '#6B7280',
+    fontSize: 14,
+    color: 'rgba(0, 0, 0, 0.4)',
     textAlign: 'center',
     marginTop: 12,
   },
@@ -439,47 +327,31 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 32,
+    paddingHorizontal: 24,
   },
-  analyzingIcon: {
+  spinnerContainer: {
     marginBottom: 32,
   },
-  analyzingIconGradient: {
-    width: 96,
-    height: 96,
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#00C27A',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
-    shadowRadius: 16,
-    elevation: 8,
+  spinner: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    borderWidth: 4,
+    borderColor: 'rgba(22, 163, 74, 0.2)',
+    borderTopColor: '#16A34A',
   },
   analyzingTitle: {
     fontSize: 24,
-    fontWeight: '800',
-    color: '#374151',
+    fontWeight: '600',
+    color: '#000000',
     textAlign: 'center',
-    marginBottom: 16,
+    marginBottom: 12,
+    letterSpacing: -0.03 * 24,
   },
   analyzingDescription: {
-    fontSize: 14,
-    color: '#6B7280',
+    fontSize: 16,
+    color: 'rgba(0, 0, 0, 0.6)',
     textAlign: 'center',
-    lineHeight: 20,
-    paddingHorizontal: 16,
-  },
-  loadingDots: {
-    flexDirection: 'row',
-    gap: 8,
-    marginTop: 32,
-  },
-  dot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: '#00C27A',
+    lineHeight: 24,
   },
 });
-
