@@ -18,6 +18,9 @@
         "NSPhotoLibraryUsageDescription": "We need access to your photo library to let you select images for your tasks and journal entries.",
         "NSPhotoLibraryAddUsageDescription": "We need permission to save images to your photo library.",
         "NSUserNotificationsUsageDescription": "Nous avons besoin de votre permission pour vous envoyer des notifications importantes concernant vos tâches, habitudes et rappels.",
+        "NSCalendarsUsageDescription": "Nous avons besoin d'accéder à votre calendrier pour synchroniser vos tâches et créer des événements.",
+        "NSCalendarsFullAccessUsageDescription": "Nous avons besoin d'un accès complet à votre calendrier pour synchroniser vos tâches et créer des événements.",
+        "NSRemindersUsageDescription": "Nous avons besoin d'accéder à vos rappels pour synchroniser vos tâches.",
         "CFBundleURLTypes": [
           {
             "CFBundleURLSchemes": [
@@ -84,7 +87,13 @@
           "iosUrlScheme": "com.googleusercontent.apps.738789952398-m6risp9hae6ao11n7s4178nig64largu"
         }
       ],
-      "expo-apple-authentication"
+      "expo-apple-authentication",
+      [
+        "expo-calendar",
+        {
+          "calendarPermission": "Nous avons besoin d'accéder à votre calendrier pour synchroniser vos tâches."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": false
