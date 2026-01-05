@@ -15,7 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle } from 'react-native-svg';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { assistantService } from '@/lib/api';
+import { assistantService, tasksService } from '@/lib/api';
 
 const { width } = Dimensions.get('window');
 const RING_SIZE = Math.min(width * 0.65, 260);
@@ -408,6 +408,7 @@ export default function FocusScreen() {
   const [focusDuration, setFocusDuration] = useState(45);
   const [breakDuration, setBreakDuration] = useState(10);
   const [maxSessions, setMaxSessions] = useState(4);
+  const taskId = params.taskId as string | undefined;
   const taskTitle = (params.title as string) || 'Complete Chapter 12 Summary';
   const taskSubject = (params.subject as string) || 'Organic Chemistry';
   
@@ -455,12 +456,32 @@ export default function FocusScreen() {
     startSession();
   };
 
-  const handleCompleteTask = () => {
+  const handleCompleteTask = async () => {
+    const currentTask = tasks[currentTaskIndex];
+    
+    // Mettre à jour l'état local immédiatement
     setTasks(prev =>
       prev.map((task, index) =>
         index === currentTaskIndex ? { ...task, completed: true } : task
       )
     );
+    
+    // Si on a un vrai ID de tâche (depuis l'API), marquer comme complétée dans la base de données
+    if (taskId && currentTaskIndex === 0) {
+      try {
+        console.log('📤 [Focus] Marquage de la tâche comme complétée:', taskId);
+        await tasksService.updateTask(taskId, { completed: true });
+        console.log('✅ [Focus] Tâche marquée comme complétée avec succès');
+      } catch (error) {
+        console.error('❌ [Focus] Erreur lors du marquage de la tâche:', error);
+        // Annuler la mise à jour locale en cas d'erreur
+        setTasks(prev =>
+          prev.map((task, index) =>
+            index === currentTaskIndex ? { ...task, completed: false } : task
+          )
+        );
+      }
+    }
     
     // Move to next incomplete task
     const nextIncompleteIndex = tasks.findIndex((task, index) => 

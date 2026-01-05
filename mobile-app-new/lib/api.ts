@@ -485,9 +485,16 @@ export const habitsService = {
 
   // Supprimer une habitude
   async delete(habitId: string): Promise<any> {
-    return await apiCall('/habits', {
+    return await apiCall(`/habits/${habitId}`, {
       method: 'DELETE',
-      body: JSON.stringify({ habitId }),
+    });
+  },
+
+  // Mettre à jour une habitude (pour l'ordre notamment)
+  async update(habitId: string, data: any): Promise<any> {
+    return await apiCall(`/habits/${habitId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
     });
   },
 };
