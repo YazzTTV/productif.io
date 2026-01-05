@@ -16,6 +16,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { onboardingService, authService } from '@/lib/api';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useOnboardingData } from '@/hooks/useOnboardingData';
 
 const languages = [
   { code: 'en', label: 'English', flag: '🇬🇧' },
@@ -25,6 +26,7 @@ const languages = [
 
 export default function LanguageSelectionScreen() {
   const { language, setLanguage, t } = useLanguage();
+  const { saveResponse } = useOnboardingData();
   const [selectedLanguage, setSelectedLanguage] = useState<string>(language);
   const [isLoading, setIsLoading] = useState(false);
   const isProcessingRef = useRef(false);
@@ -41,18 +43,9 @@ export default function LanguageSelectionScreen() {
       await setLanguage(langCode as 'fr' | 'en' | 'es');
       await AsyncStorage.setItem('onboarding_language', langCode);
       
-      // Sauvegarder la langue dans l'API si l'utilisateur est authentifié
-      try {
-        const user = await authService.checkAuth();
-        if (user?.id) {
-          await onboardingService.saveOnboardingData({
-            language: langCode,
-            currentStep: 2,
-          });
-        }
-      } catch (error) {
-        // Ne pas bloquer le flux
-      }
+      // Sauvegarder la langue avec le hook (qui gère aussi le backend)
+      await saveResponse('language', langCode);
+      await saveResponse('currentStep', 2);
       
       router.push('/(onboarding-new)/connection');
     } catch (error) {
@@ -70,7 +63,7 @@ export default function LanguageSelectionScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.content}>
-          {/* Header */}
+        {/* Header */}
           <Animated.View entering={FadeIn.delay(100).duration(400)} style={styles.header}>
             <Text style={styles.title}>
               {t('chooseLanguage') || 'Choose your language'}
@@ -78,39 +71,39 @@ export default function LanguageSelectionScreen() {
             <Text style={styles.subtitle}>
               {t('changeAnytime') || 'You can change this anytime.'}
             </Text>
-          </Animated.View>
+        </Animated.View>
 
-          {/* Language List */}
-          <View style={styles.languageList}>
+        {/* Language List */}
+        <View style={styles.languageList}>
             {languages.map((lang, index) => {
               const isSelected = selectedLanguage === lang.code;
-              
-              return (
-                <Animated.View
+            
+            return (
+              <Animated.View
                   key={lang.code}
                   entering={FadeInDown.delay(200 + index * 100).duration(400)}
-                >
-                  <TouchableOpacity
+              >
+                <TouchableOpacity
                     onPress={() => handleSelectLanguage(lang.code)}
-                    style={[
-                      styles.languageButton,
-                      isSelected && styles.languageButtonSelected,
-                    ]}
-                    activeOpacity={0.7}
+                  style={[
+                    styles.languageButton,
+                    isSelected && styles.languageButtonSelected,
+                  ]}
+                  activeOpacity={0.7}
                     disabled={isLoading}
                   >
                     <Text style={styles.languageFlag}>{lang.flag}</Text>
                     <Text style={styles.languageLabel}>{lang.label}</Text>
-                    {isSelected && (
+                  {isSelected && (
                       <View style={styles.checkIcon}>
                         <Ionicons name="checkmark" size={20} color="#16A34A" />
                       </View>
-                    )}
-                  </TouchableOpacity>
-                </Animated.View>
-              );
-            })}
-          </View>
+                  )}
+                </TouchableOpacity>
+              </Animated.View>
+            );
+          })}
+        </View>
         </View>
       </ScrollView>
     </View>

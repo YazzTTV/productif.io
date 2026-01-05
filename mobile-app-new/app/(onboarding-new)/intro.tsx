@@ -47,7 +47,7 @@ export default function IntroScreen() {
         </Animated.View>
 
         {/* CTAs */}
-        <Animated.View 
+        <Animated.View
           entering={FadeInDown.delay(600).duration(600)}
           style={styles.ctaContainer}
         >
@@ -64,7 +64,7 @@ export default function IntroScreen() {
           <TouchableOpacity
             onPress={() => router.push('/login')}
             style={styles.secondaryButton}
-          >
+            >
             <Text style={styles.secondaryButtonText}>
               {t('alreadyHaveAccount') || 'I already have an account'}
             </Text>
