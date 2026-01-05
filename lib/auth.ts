@@ -67,7 +67,8 @@ export async function getAuthUserFromRequest(req: NextRequest) {
     let token: string | null = null
 
     // 1. Essayer de récupérer le token depuis le header Authorization (mobile)
-    const authHeader = req.headers.get("authorization")
+    // Essayer les deux cas (majuscule et minuscule) pour être sûr
+    const authHeader = req.headers.get("authorization") || req.headers.get("Authorization")
     if (authHeader && authHeader.startsWith("Bearer ")) {
       token = authHeader.substring(7) // Enlever "Bearer "
       console.log("Token found in Authorization header")
