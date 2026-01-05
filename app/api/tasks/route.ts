@@ -1,5 +1,5 @@
-import { NextResponse } from "next/server"
-import { getAuthUser } from "@/lib/auth"
+import { NextRequest, NextResponse } from "next/server"
+import { getAuthUser, getAuthUserFromRequest } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { calculateTaskOrder } from "@/lib/tasks"
 import { format, isEqual, isBefore } from "date-fns"
@@ -249,17 +249,35 @@ export async function GET(request: Request) {
 }
 
 // POST /api/tasks - Créer une nouvelle tâche
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const user = await getAuthUser()
+    console.log("[TASKS_POST] Début de la requête")
+    
+    // Debug: vérifier les headers
+    const authHeader = request.headers.get("authorization") || request.headers.get("Authorization")
+    console.log("[TASKS_POST] Authorization header présent:", !!authHeader)
+    
+    // Essayer d'abord avec getAuthUserFromRequest (tokens utilisateur dans headers)
+    let user = await getAuthUserFromRequest(request)
+    console.log("[TASKS_POST] Utilisateur depuis getAuthUserFromRequest:", !!user)
+    
+    // Si pas d'utilisateur, essayer avec getAuthUser (cookies pour web)
     if (!user) {
+      user = await getAuthUser()
+      console.log("[TASKS_POST] Utilisateur depuis getAuthUser:", !!user)
+    }
+    
+    if (!user) {
+      console.log("[TASKS_POST] Aucun utilisateur authentifié")
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 })
     }
+    
+    console.log("[TASKS_POST] Utilisateur authentifié:", user.id)
 
     const authUserId = user.id
     
     // Récupérer le body de la requête
-    const { title, description, priority, energyLevel, dueDate, projectId, userId, processDescription, processId } = await request.json()
+    const { title, description, priority, energyLevel, dueDate, projectId, userId, processDescription, processId, subjectId, estimatedMinutes } = await request.json()
     
     // Si un userId est fourni (différent de l'utilisateur authentifié), vérifier les droits
     let targetUserId = authUserId
@@ -382,6 +400,8 @@ export async function POST(request: Request) {
         dueDate: dueDate ? new Date(dueDate) : null,
         projectId: projectId || null,
         processId: finalProcessId,
+        subjectId: subjectId || null,
+        estimatedMinutes: estimatedMinutes || null,
         completed: false,
         userId: targetUserId,
         order,
