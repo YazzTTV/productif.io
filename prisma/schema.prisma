@@ -63,9 +63,10 @@ model User {
   LeaderboardGroupMember LeaderboardGroupMember[]
   agentInteractions      AgentInteraction[]
   onboardingData         OnboardingData?
-  xpEvents               XpEvent[]
-  pushTokens             PushToken[]
-  googleCalendarToken    GoogleCalendarToken?
+  xpEvents                 XpEvent[]
+  pushTokens               PushToken[]
+  googleCalendarToken      GoogleCalendarToken?
+  appleCalendarConnection  AppleCalendarConnection?
 }
 
 model Company {
@@ -736,24 +737,54 @@ model OnboardingData {
   userId String @unique
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // Informations de base
-  mainGoal    String? // Objectif principal
-  role        String? // Rôle de l'utilisateur
-  frustration String? // Frustration principale
-  language    String? @default("fr") // Langue choisie
+  // Informations de base (ancien + nouveau design)
+  language    String? @default("fr") // Langue choisie (en, fr, es)
+  mainGoal    String? // Objectif principal (ancien)
+  role        String? // Rôle de l'utilisateur (ancien)
+  frustration String? // Frustration principale (ancien)
 
-  // WhatsApp
+  // Nouveau design - Identité
+  firstName   String? // Prénom de l'utilisateur
+  studentType String? // highSchool, university, medLawPrepa, engineeringBusiness, other
+
+  // Nouveau design - Objectifs & Pression
+  goals         Json?   // Array de strings: succeedExams, reduceStress, stayConsistent, stopOverwhelmed, useTimeBetter
+  pressureLevel Int?    // 1-5
+
+  // Nouveau design - Contexte académique
+  currentSituation String? // preparingExams, maintainingConsistency, catchingUp, highPerformance, stressManagement
+
+  // Nouveau design - Difficultés quotidiennes
+  dailyStruggles Json? // Array: tooManyTasks, difficultyFocusing, constantStress, guiltyResting, fearFallingBehind
+
+  // Nouveau design - Style de travail
+  mentalLoad     Int?     // 1-5
+  focusQuality   Int?     // 1-5
+  satisfaction   Int?     // 1-5
+  overthinkTasks Boolean? // Réfléchit trop à ce qu'il faut faire
+  shouldDoMore   Boolean? // Se sent obligé de faire plus
+
+  // Nouveau design - Intentions
+  wantToChange Json?   // Array: workWithClarity, feelInControl, beConsistent, stopWastingEnergy
+  timeHorizon  String? // next2Weeks, thisSemester, thisYear
+
+  // Nouveau design - Tâches & Journée idéale
+  rawTasks       String? // Texte libre saisi par l'utilisateur
+  clarifiedTasks Json?   // Array de tâches clarifiées par l'IA
+  idealDay       Json?   // Structure de journée idéale générée
+
+  // WhatsApp (ancien)
   whatsappNumber  String?
   whatsappConsent Boolean @default(false)
 
-  // Questionnaire de diagnostic
+  // Questionnaire de diagnostic (ancien)
   diagBehavior String? // details, procrastination, distraction, abandon
   timeFeeling  String? // frustrated, tired, proud, lost
   phoneHabit   String? // enemy, twoMinutes, farButBack, managed
 
   // Métadonnées
   offer         String? // early-access, waitlist, etc.
-  utmParams     Json? // Paramètres UTM
+  utmParams     Json?   // Paramètres UTM
   emailFallback String? // Email utilisé avant connexion
   billingCycle  String? // monthly, yearly
 
@@ -796,6 +827,20 @@ model GoogleCalendarToken {
 
   @@index([userId])
   @@map("google_calendar_tokens")
+}
+
+/// Connexion Apple Calendar (via EventKit iOS)
+model AppleCalendarConnection {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  granted     Boolean  @default(true) // Permission accordée par l'utilisateur iOS
+  calendarIds Json?    // IDs des calendriers sélectionnés (optionnel)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("apple_calendar_connections")
 }
 
 /// Événements de tâches planifiés dans Google Calendar

@@ -615,65 +615,147 @@ export const paymentService = {
   },
 };
 
+// Types pour l'onboarding (nouveau design)
+export interface OnboardingDataInput {
+  // Langue
+  language?: string;
+  
+  // Identité
+  firstName?: string;
+  studentType?: string;
+  
+  // Objectifs & Pression
+  goals?: string[];
+  pressureLevel?: number;
+  
+  // Contexte académique
+  currentSituation?: string;
+  
+  // Difficultés quotidiennes
+  dailyStruggles?: string[];
+  
+  // Style de travail
+  mentalLoad?: number;
+  focusQuality?: number;
+  satisfaction?: number;
+  overthinkTasks?: boolean;
+  shouldDoMore?: boolean;
+  
+  // Intentions
+  wantToChange?: string[];
+  timeHorizon?: string;
+  
+  // Tâches & Journée idéale
+  rawTasks?: string;
+  clarifiedTasks?: any[];
+  idealDay?: any;
+  
+  // Ancien questionnaire (compatibilité)
+  diagBehavior?: string;
+  timeFeeling?: string;
+  phoneHabit?: string;
+  mainGoal?: string;
+  
+  // Métadonnées
+  billingCycle?: 'monthly' | 'annual' | 'yearly';
+  currentStep?: number;
+  completed?: boolean;
+  utmParams?: any;
+}
+
 // Service d'onboarding
 export const onboardingService = {
   // Sauvegarder les données d'onboarding
-  async saveOnboardingData(data: {
-    language?: string;
-    diagBehavior?: string; // Q1: details, procrastination, distraction, abandon
-    timeFeeling?: string; // Q2: frustrated, tired, proud, lost
-    phoneHabit?: string; // Q3: enemy, twoMinutes, farButBack, managed
-    mainGoal?: string; // Q6: growBusiness, manageStudies, buildDiscipline, workLifeBalance
-    symptoms?: string[]; // Liste des symptômes sélectionnés
-    billingCycle?: 'monthly' | 'annual' | 'yearly';
-    currentStep?: number;
-    completed?: boolean;
-    utmParams?: any; // Pour permettre d'autres données
-    [key: string]: any; // Pour permettre d'autres champs
-  }): Promise<{ data: any }> {
-    // Vérifier que le token existe
+  async saveOnboardingData(data: OnboardingDataInput): Promise<{ data: any }> {
     const token = await getAuthToken();
     if (!token) {
-      console.error('❌ [ONBOARDING] Aucun token trouvé, impossible de sauvegarder');
+      console.error('❌ [ONBOARDING] Aucun token trouvé');
       throw new Error('User not authenticated - no token found');
     }
 
-    console.log('🔑 [ONBOARDING] Token présent:', !!token);
-
-    // Mapper les réponses du questionnaire
-    const payload: any = {};
+    // Construire le payload avec tous les champs
+    const payload: Record<string, any> = {};
     
-    if (data.language !== undefined) payload.language = data.language;
-    if (data.diagBehavior !== undefined) payload.diagBehavior = data.diagBehavior;
-    if (data.timeFeeling !== undefined) payload.timeFeeling = data.timeFeeling;
-    if (data.phoneHabit !== undefined) payload.phoneHabit = data.phoneHabit;
-    if (data.mainGoal !== undefined) payload.mainGoal = data.mainGoal;
-    if (data.billingCycle !== undefined) payload.billingCycle = data.billingCycle;
-    if (data.currentStep !== undefined) payload.currentStep = data.currentStep;
-    if (data.completed !== undefined) payload.completed = data.completed;
-    
-    // Sauvegarder les symptômes dans utmParams (JSON) pour l'instant
-    // TODO: Créer un champ dédié dans le schéma si nécessaire
-    if (data.symptoms !== undefined && data.symptoms.length > 0) {
-      payload.utmParams = { symptoms: data.symptoms };
-    } else if (data.utmParams !== undefined) {
-      payload.utmParams = data.utmParams;
-    }
+    // Copier tous les champs définis
+    Object.entries(data).forEach(([key, value]) => {
+      if (value !== undefined) {
+        payload[key] = value;
+      }
+    });
 
-    console.log('💾 [ONBOARDING] Sauvegarde des données:', JSON.stringify(payload, null, 2));
+    console.log('💾 [ONBOARDING] Sauvegarde des données');
 
     try {
       const result = await apiCall('/onboarding/data', {
         method: 'POST',
         body: JSON.stringify(payload),
       });
-      console.log('✅ [ONBOARDING] Données sauvegardées avec succès:', result);
+      console.log('✅ [ONBOARDING] Données sauvegardées');
       return result;
     } catch (error: any) {
-      console.error('❌ [ONBOARDING] Erreur lors de la sauvegarde:', error);
-      console.error('❌ [ONBOARDING] Message d\'erreur:', error?.message);
+      console.error('❌ [ONBOARDING] Erreur:', error?.message);
       throw error;
     }
+  },
+
+  // Récupérer les données d'onboarding
+  async getOnboardingData(): Promise<{ data: any }> {
+    return await apiCall('/onboarding/data');
+  },
+};
+
+// Service Google Calendar (mobile)
+export const googleCalendarService = {
+  // Vérifier si Google Calendar est connecté
+  async getStatus(): Promise<{
+    connected: boolean;
+    isExpired?: boolean;
+    expiresAt?: string;
+    scope?: string;
+  }> {
+    return await apiCall('/google-calendar/connect-mobile');
+  },
+
+  // Connecter Google Calendar avec le serverAuthCode
+  async connect(serverAuthCode: string): Promise<{
+    success: boolean;
+    message: string;
+    expiresAt?: string;
+  }> {
+    return await apiCall('/google-calendar/connect-mobile', {
+      method: 'POST',
+      body: JSON.stringify({ serverAuthCode }),
+    });
+  },
+};
+
+// Service Apple Calendar
+export const appleCalendarService = {
+  // Vérifier si Apple Calendar est connecté
+  async getStatus(): Promise<{
+    connected: boolean;
+    calendarIds?: string[];
+    connectedAt?: string;
+  }> {
+    return await apiCall('/apple-calendar/connect');
+  },
+
+  // Signaler que l'accès Apple Calendar a été accordé
+  async connect(granted: boolean, calendarIds?: string[]): Promise<{
+    success: boolean;
+    message: string;
+  }> {
+    return await apiCall('/apple-calendar/connect', {
+      method: 'POST',
+      body: JSON.stringify({ granted, calendarIds }),
+    });
+  },
+
+  // Déconnecter Apple Calendar
+  async disconnect(): Promise<{ success: boolean; message: string }> {
+    return await apiCall('/apple-calendar/connect', {
+      method: 'DELETE',
+    });
   },
 };
 

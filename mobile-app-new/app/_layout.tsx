@@ -164,6 +164,56 @@ function AppContent() {
                 gestureEnabled: true, // Permettre le retour vers (tabs)
               }} 
             />
+            <Stack.Screen 
+              name="(onboarding)" 
+              options={{ 
+                headerShown: false,
+                gestureEnabled: false, // Désactiver le swipe pendant l'onboarding
+              }} 
+            />
+            <Stack.Screen 
+              name="focus" 
+              options={{ 
+                headerShown: false,
+                gestureEnabled: true,
+                presentation: 'fullScreenModal',
+              }} 
+            />
+            <Stack.Screen 
+              name="tasks-new" 
+              options={{ 
+                headerShown: false,
+                gestureEnabled: true,
+              }} 
+            />
+            <Stack.Screen 
+              name="exam-mode" 
+              options={{ 
+                headerShown: false,
+                gestureEnabled: true,
+              }} 
+            />
+            <Stack.Screen 
+              name="review-habits" 
+              options={{ 
+                headerShown: false,
+                gestureEnabled: true,
+              }} 
+            />
+            <Stack.Screen 
+              name="plan-my-day" 
+              options={{ 
+                headerShown: false,
+                gestureEnabled: true,
+              }} 
+            />
+            <Stack.Screen 
+              name="daily-journal" 
+              options={{ 
+                headerShown: false,
+                gestureEnabled: true,
+              }} 
+            />
             <Stack.Screen name="+not-found" />
           </Stack>
         <StatusBar style={actualTheme === 'dark' ? 'light' : 'dark'} />
