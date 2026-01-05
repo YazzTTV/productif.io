@@ -1,0 +1,1061 @@
+import React, { useState, useEffect } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Switch, TextInput } from 'react-native';
+import { useRouter } from 'expo-router';
+import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
+import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { authService } from '@/lib/api';
+
+type SettingsView = 'main' | 'editProfile' | 'dailyStructure' | 'notifications';
+
+type FocusDuration = 25 | 45 | 60 | 90;
+type WorkloadIntensity = 'light' | 'balanced' | 'intensive';
+
+export function SettingsNew() {
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const [view, setView] = useState<SettingsView>('main');
+  const [savedFeedback, setSavedFeedback] = useState(false);
+
+  // Profile
+  const [name, setName] = useState('Marie Dubois');
+  const [academicField, setAcademicField] = useState('Medical School');
+  const [studyLevel, setStudyLevel] = useState('Year 2');
+
+  // Daily Structure
+  const [focusDuration, setFocusDuration] = useState<FocusDuration>(45);
+  const [maxSessions, setMaxSessions] = useState(6);
+  const [workloadIntensity, setWorkloadIntensity] = useState<WorkloadIntensity>('balanced');
+
+  // Notifications
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const [startOfDayReminder, setStartOfDayReminder] = useState(true);
+  const [focusReminder, setFocusReminder] = useState(true);
+  const [breakReminder, setBreakReminder] = useState(false);
+  const [endOfDayRecap, setEndOfDayRecap] = useState(true);
+
+  // Connection status
+  const [calendarConnected, setCalendarConnected] = useState(true);
+
+  useEffect(() => {
+    const loadUserData = async () => {
+      try {
+        const user = await authService.checkAuth();
+        if (user?.name) {
+          setName(user.name);
+        }
+      } catch (error) {
+        console.log('User not loaded');
+      }
+    };
+    loadUserData();
+  }, []);
+
+  const showSavedFeedback = () => {
+    setSavedFeedback(true);
+    setTimeout(() => setSavedFeedback(false), 2000);
+  };
+
+  if (view === 'editProfile') {
+    return (
+      <View style={[styles.container, { paddingTop: insets.top }]}>
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          <Animated.View entering={FadeInUp.delay(100).duration(400)} style={styles.header}>
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={() => setView('main')}
+            >
+              <Ionicons name="arrow-back" size={22} color="#000" />
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>Edit Profile</Text>
+            <View style={{ width: 40 }} />
+          </Animated.View>
+
+          <View style={styles.formContainer}>
+            <View style={styles.formGroup}>
+              <Text style={styles.formLabel}>Name</Text>
+              <TextInput
+                style={styles.formInput}
+                value={name}
+                onChangeText={setName}
+                placeholder="Name"
+              />
+            </View>
+
+            <View style={styles.formGroup}>
+              <Text style={styles.formLabel}>Academic field</Text>
+              <TextInput
+                style={styles.formInput}
+                value={academicField}
+                onChangeText={setAcademicField}
+                placeholder="Academic field"
+              />
+            </View>
+
+            <View style={styles.formGroup}>
+              <Text style={styles.formLabel}>Study level</Text>
+              <TextInput
+                style={styles.formInput}
+                value={studyLevel}
+                onChangeText={setStudyLevel}
+                placeholder="Study level"
+              />
+            </View>
+
+            <TouchableOpacity
+              style={styles.saveButton}
+              onPress={() => {
+                showSavedFeedback();
+                setTimeout(() => setView('main'), 500);
+              }}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.saveButtonText}>Save Changes</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </View>
+    );
+  }
+
+  if (view === 'dailyStructure') {
+    return (
+      <View style={[styles.container, { paddingTop: insets.top }]}>
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          <Animated.View entering={FadeInUp.delay(100).duration(400)} style={styles.header}>
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={() => setView('main')}
+            >
+              <Ionicons name="arrow-back" size={22} color="#000" />
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>Daily Structure</Text>
+            {savedFeedback && (
+              <View style={styles.savedBadge}>
+                <Ionicons name="checkmark" size={16} color="#16A34A" />
+                <Text style={styles.savedText}>Saved</Text>
+              </View>
+            )}
+          </Animated.View>
+
+          <View style={styles.settingsContainer}>
+            <Text style={styles.settingsHint}>
+              These settings help the system adapt to you.
+            </Text>
+
+            {/* Preferred focus duration */}
+            <View style={styles.settingCard}>
+              <View style={styles.settingCardHeader}>
+                <Text style={styles.settingCardTitle}>Preferred focus duration</Text>
+                <Text style={styles.settingCardSubtitle}>Default session length</Text>
+              </View>
+              <View style={styles.durationButtons}>
+                {([25, 45, 60, 90] as const).map((duration) => (
+                  <TouchableOpacity
+                    key={duration}
+                    style={[
+                      styles.durationButton,
+                      focusDuration === duration && styles.durationButtonActive,
+                    ]}
+                    onPress={() => {
+                      setFocusDuration(duration);
+                      showSavedFeedback();
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Text
+                      style={[
+                        styles.durationButtonText,
+                        focusDuration === duration && styles.durationButtonTextActive,
+                      ]}
+                    >
+                      {duration}m
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            {/* Max sessions per day */}
+            <View style={styles.settingCard}>
+              <View style={styles.settingCardHeader}>
+                <Text style={styles.settingCardTitle}>Maximum focus sessions per day</Text>
+                <Text style={styles.settingCardSubtitle}>Daily capacity limit</Text>
+              </View>
+              <View style={styles.sliderContainer}>
+                <View style={styles.sliderTrack}>
+                  <View
+                    style={[
+                      styles.sliderFill,
+                      { width: `${((maxSessions - 3) / 5) * 100}%` },
+                    ]}
+                  />
+                </View>
+                <View style={styles.sliderValueContainer}>
+                  <Text style={styles.sliderValue}>{maxSessions}</Text>
+                </View>
+              </View>
+              <View style={styles.sliderButtons}>
+                <TouchableOpacity
+                  style={styles.sliderButton}
+                  onPress={() => {
+                    if (maxSessions > 3) {
+                      setMaxSessions(maxSessions - 1);
+                      showSavedFeedback();
+                    }
+                  }}
+                >
+                  <Ionicons name="remove" size={20} color="#000" />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.sliderButton}
+                  onPress={() => {
+                    if (maxSessions < 8) {
+                      setMaxSessions(maxSessions + 1);
+                      showSavedFeedback();
+                    }
+                  }}
+                >
+                  <Ionicons name="add" size={20} color="#000" />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Workload intensity */}
+            <View style={styles.settingCard}>
+              <View style={styles.settingCardHeader}>
+                <Text style={styles.settingCardTitle}>Daily workload intensity</Text>
+                <Text style={styles.settingCardSubtitle}>Pace and session frequency</Text>
+              </View>
+              <View style={styles.intensityButtons}>
+                {(['light', 'balanced', 'intensive'] as const).map((intensity) => (
+                  <TouchableOpacity
+                    key={intensity}
+                    style={[
+                      styles.intensityButton,
+                      workloadIntensity === intensity && styles.intensityButtonActive,
+                    ]}
+                    onPress={() => {
+                      setWorkloadIntensity(intensity);
+                      showSavedFeedback();
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Text
+                      style={[
+                        styles.intensityButtonText,
+                        workloadIntensity === intensity && styles.intensityButtonTextActive,
+                      ]}
+                    >
+                      {intensity.charAt(0).toUpperCase() + intensity.slice(1)}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          </View>
+
+          {/* Bottom spacing */}
+          <View style={{ height: 120 }} />
+        </ScrollView>
+      </View>
+    );
+  }
+
+  if (view === 'notifications') {
+    return (
+      <View style={[styles.container, { paddingTop: insets.top }]}>
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          <Animated.View entering={FadeInUp.delay(100).duration(400)} style={styles.header}>
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={() => setView('main')}
+            >
+              <Ionicons name="arrow-back" size={22} color="#000" />
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>Notifications</Text>
+            {savedFeedback && (
+              <View style={styles.savedBadge}>
+                <Ionicons name="checkmark" size={16} color="#16A34A" />
+                <Text style={styles.savedText}>Saved</Text>
+              </View>
+            )}
+          </Animated.View>
+
+          <View style={styles.settingsContainer}>
+            {/* Global toggle */}
+            <View style={styles.settingCard}>
+              <View style={styles.settingCardRow}>
+                <View style={styles.settingCardContent}>
+                  <Text style={styles.settingCardTitle}>Enable notifications</Text>
+                  <Text style={styles.settingCardSubtitle}>Receive reminders and updates</Text>
+                </View>
+                <Switch
+                  value={notificationsEnabled}
+                  onValueChange={(value) => {
+                    setNotificationsEnabled(value);
+                    showSavedFeedback();
+                  }}
+                  trackColor={{ false: 'rgba(0, 0, 0, 0.1)', true: '#16A34A' }}
+                  thumbColor="#FFFFFF"
+                />
+              </View>
+            </View>
+
+            {/* Sub-section: Rappels et horaires */}
+            {notificationsEnabled && (
+              <>
+                <Text style={styles.subsectionLabel}>Rappels et horaires</Text>
+
+                <View style={styles.settingCard}>
+                  <View style={styles.settingCardRow}>
+                    <View style={styles.settingCardContent}>
+                      <Text style={styles.settingCardTitle}>Start of day reminder</Text>
+                      <Text style={styles.settingCardSubtitle}>8:00 AM</Text>
+                    </View>
+                    <Switch
+                      value={startOfDayReminder}
+                      onValueChange={(value) => {
+                        setStartOfDayReminder(value);
+                        showSavedFeedback();
+                      }}
+                      trackColor={{ false: 'rgba(0, 0, 0, 0.1)', true: '#16A34A' }}
+                      thumbColor="#FFFFFF"
+                    />
+                  </View>
+                </View>
+
+                <View style={styles.settingCard}>
+                  <View style={styles.settingCardRow}>
+                    <View style={styles.settingCardContent}>
+                      <Text style={styles.settingCardTitle}>Focus session reminder</Text>
+                      <Text style={styles.settingCardSubtitle}>Before scheduled blocks</Text>
+                    </View>
+                    <Switch
+                      value={focusReminder}
+                      onValueChange={(value) => {
+                        setFocusReminder(value);
+                        showSavedFeedback();
+                      }}
+                      trackColor={{ false: 'rgba(0, 0, 0, 0.1)', true: '#16A34A' }}
+                      thumbColor="#FFFFFF"
+                    />
+                  </View>
+                </View>
+
+                <View style={styles.settingCard}>
+                  <View style={styles.settingCardRow}>
+                    <View style={styles.settingCardContent}>
+                      <Text style={styles.settingCardTitle}>Break reminder</Text>
+                      <Text style={styles.settingCardSubtitle}>When break starts</Text>
+                    </View>
+                    <Switch
+                      value={breakReminder}
+                      onValueChange={(value) => {
+                        setBreakReminder(value);
+                        showSavedFeedback();
+                      }}
+                      trackColor={{ false: 'rgba(0, 0, 0, 0.1)', true: '#16A34A' }}
+                      thumbColor="#FFFFFF"
+                    />
+                  </View>
+                </View>
+
+                <View style={styles.settingCard}>
+                  <View style={styles.settingCardRow}>
+                    <View style={styles.settingCardContent}>
+                      <Text style={styles.settingCardTitle}>End-of-day recap</Text>
+                      <Text style={styles.settingCardSubtitle}>9:00 PM</Text>
+                    </View>
+                    <Switch
+                      value={endOfDayRecap}
+                      onValueChange={(value) => {
+                        setEndOfDayRecap(value);
+                        showSavedFeedback();
+                      }}
+                      trackColor={{ false: 'rgba(0, 0, 0, 0.1)', true: '#16A34A' }}
+                      thumbColor="#FFFFFF"
+                    />
+                  </View>
+                </View>
+              </>
+            )}
+          </View>
+
+          {/* Bottom spacing */}
+          <View style={{ height: 120 }} />
+        </ScrollView>
+      </View>
+    );
+  }
+
+  // MAIN VIEW
+  return (
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Header */}
+        <Animated.View entering={FadeInUp.delay(100).duration(400)} style={styles.header}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => router.back()}
+          >
+            <Ionicons name="arrow-back" size={22} color="#000" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Settings</Text>
+          {savedFeedback && (
+            <View style={styles.savedBadge}>
+              <Ionicons name="checkmark" size={16} color="#16A34A" />
+              <Text style={styles.savedText}>Saved</Text>
+            </View>
+          )}
+        </Animated.View>
+
+        {/* SECTION 1 — ACCOUNT */}
+        <Animated.View entering={FadeInDown.delay(200).duration(400)} style={styles.section}>
+          <Text style={styles.sectionLabel}>Account</Text>
+          <View style={styles.accountCard}>
+            <View style={styles.accountRow}>
+              <Text style={styles.accountLabel}>Name</Text>
+              <Text style={styles.accountValue}>{name}</Text>
+            </View>
+            <View style={styles.accountDivider} />
+            <View style={styles.accountRow}>
+              <Text style={styles.accountLabel}>Academic field</Text>
+              <Text style={styles.accountValue}>{academicField}</Text>
+            </View>
+            <View style={styles.accountDivider} />
+            <View style={styles.accountRow}>
+              <Text style={styles.accountLabel}>Study level</Text>
+              <Text style={styles.accountValue}>{studyLevel}</Text>
+            </View>
+            <View style={styles.accountDivider} />
+            <TouchableOpacity
+              style={styles.accountButton}
+              onPress={() => setView('editProfile')}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.accountButtonText}>Edit profile</Text>
+              <Ionicons name="chevron-forward" size={20} color="rgba(0, 0, 0, 0.4)" />
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
+
+        {/* SECTION 2 — DAILY STRUCTURE */}
+        <Animated.View entering={FadeInDown.delay(300).duration(400)} style={styles.section}>
+          <Text style={styles.sectionLabel}>Daily Structure</Text>
+          <TouchableOpacity
+            style={styles.structureCard}
+            onPress={() => setView('dailyStructure')}
+            activeOpacity={0.7}
+          >
+            <View style={styles.structureCardContent}>
+              <View style={styles.structureIcon}>
+                <Ionicons name="time-outline" size={24} color="#16A34A" />
+              </View>
+              <View style={styles.structureInfo}>
+                <Text style={styles.structureTitle}>Daily Structure</Text>
+                <Text style={styles.structureSubtitle}>
+                  {focusDuration}min • {maxSessions} sessions • {workloadIntensity}
+                </Text>
+              </View>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="rgba(0, 0, 0, 0.4)" />
+          </TouchableOpacity>
+        </Animated.View>
+
+        {/* SECTION 3 — NOTIFICATIONS */}
+        <Animated.View entering={FadeInDown.delay(400).duration(400)} style={styles.section}>
+          <Text style={styles.sectionLabel}>Notifications</Text>
+          <View style={styles.notificationsContainer}>
+            <View style={styles.settingCard}>
+              <View style={styles.settingCardRow}>
+                <View style={styles.settingCardContent}>
+                  <View style={styles.settingIcon}>
+                    <Ionicons name="notifications-outline" size={24} color="#16A34A" />
+                  </View>
+                  <Text style={styles.settingCardTitle}>Notifications</Text>
+                </View>
+                <Switch
+                  value={notificationsEnabled}
+                  onValueChange={(value) => {
+                    setNotificationsEnabled(value);
+                    showSavedFeedback();
+                  }}
+                  trackColor={{ false: 'rgba(0, 0, 0, 0.1)', true: '#16A34A' }}
+                  thumbColor="#FFFFFF"
+                />
+              </View>
+            </View>
+
+            {notificationsEnabled && (
+              <TouchableOpacity
+                style={styles.settingCard}
+                onPress={() => setView('notifications')}
+                activeOpacity={0.7}
+              >
+                <View style={styles.settingCardRow}>
+                  <View style={styles.settingCardContent}>
+                    <View style={styles.settingIcon}>
+                      <Ionicons name="alarm-outline" size={24} color="#16A34A" />
+                    </View>
+                    <View>
+                      <Text style={styles.settingCardTitle}>Rappels et horaires</Text>
+                      <Text style={styles.settingCardSubtitle}>
+                        Matin, midi, soir, questions humeur/stress/focus
+                      </Text>
+                    </View>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color="rgba(0, 0, 0, 0.4)" />
+                </View>
+              </TouchableOpacity>
+            )}
+          </View>
+        </Animated.View>
+
+        {/* SECTION 4 — PRIVACY & DATA */}
+        <Animated.View entering={FadeInDown.delay(500).duration(400)} style={styles.section}>
+          <Text style={styles.sectionLabel}>Privacy & Data</Text>
+          <View style={styles.privacyContainer}>
+            <View style={styles.settingCard}>
+              <View style={styles.settingCardRow}>
+                <View style={styles.settingCardContent}>
+                  <Text style={styles.settingCardTitle}>Google Calendar</Text>
+                  <Text style={styles.settingCardSubtitle}>
+                    {calendarConnected ? 'Connected' : 'Not connected'}
+                  </Text>
+                </View>
+                <View
+                  style={[
+                    styles.statusDot,
+                    calendarConnected && styles.statusDotActive,
+                  ]}
+                />
+              </View>
+              {calendarConnected && (
+                <TouchableOpacity
+                  style={styles.disconnectButton}
+                  onPress={() => {
+                    setCalendarConnected(false);
+                    showSavedFeedback();
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.disconnectButtonText}>Disconnect</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            <TouchableOpacity style={styles.settingCard} activeOpacity={0.7}>
+              <View style={styles.settingCardRow}>
+                <View style={styles.settingCardContent}>
+                  <Text style={styles.settingCardTitle}>Data usage summary</Text>
+                  <Text style={styles.settingCardSubtitle}>See what we collect</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color="rgba(0, 0, 0, 0.4)" />
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.settingCard} activeOpacity={0.7}>
+              <View style={styles.settingCardRow}>
+                <View style={styles.settingCardContent}>
+                  <Text style={styles.settingCardTitle}>Export my data</Text>
+                  <Text style={styles.settingCardSubtitle}>Download all your information</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color="rgba(0, 0, 0, 0.4)" />
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.deleteCard} activeOpacity={0.7}>
+              <Text style={styles.deleteText}>Delete my account</Text>
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
+
+        {/* SECTION 5 — SUBSCRIPTION */}
+        <Animated.View entering={FadeInDown.delay(600).duration(400)} style={styles.section}>
+          <Text style={styles.sectionLabel}>Subscription</Text>
+          <TouchableOpacity
+            style={styles.subscriptionCard}
+            onPress={() => router.push('/onboarding/paywall')}
+            activeOpacity={0.7}
+          >
+            <View style={styles.subscriptionContent}>
+              <Text style={styles.subscriptionTitle}>Current plan: Free</Text>
+              <Text style={styles.subscriptionSubtitle}>
+                Unlock Exam Mode, calendar sync, and advanced AI
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={24} color="#16A34A" />
+          </TouchableOpacity>
+        </Animated.View>
+
+        {/* SECTION 6 — SUPPORT & INFO */}
+        <Animated.View entering={FadeInDown.delay(700).duration(400)} style={styles.section}>
+          <Text style={styles.sectionLabel}>Support & Info</Text>
+          <View style={styles.supportContainer}>
+            <TouchableOpacity style={styles.settingCard} activeOpacity={0.7}>
+              <View style={styles.settingCardRow}>
+                <Text style={styles.settingCardTitle}>Help</Text>
+                <Ionicons name="chevron-forward" size={20} color="rgba(0, 0, 0, 0.4)" />
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.settingCard} activeOpacity={0.7}>
+              <View style={styles.settingCardRow}>
+                <Text style={styles.settingCardTitle}>Contact support</Text>
+                <Ionicons name="chevron-forward" size={20} color="rgba(0, 0, 0, 0.4)" />
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.settingCard} activeOpacity={0.7}>
+              <View style={styles.settingCardRow}>
+                <Text style={styles.settingCardTitle}>Terms & privacy</Text>
+                <Ionicons name="chevron-forward" size={20} color="rgba(0, 0, 0, 0.4)" />
+              </View>
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
+
+        {/* SECTION 7 — LOGOUT */}
+        <Animated.View entering={FadeInDown.delay(800).duration(400)} style={styles.section}>
+          <TouchableOpacity
+            style={styles.logoutCard}
+            onPress={() => router.push('/login')}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="log-out-outline" size={20} color="#EF4444" />
+            <Text style={styles.logoutText}>Log out</Text>
+          </TouchableOpacity>
+        </Animated.View>
+
+        {/* Footer */}
+        <Animated.View entering={FadeInDown.delay(900).duration(400)} style={styles.footer}>
+          <Text style={styles.footerText}>Productif.io — built for serious students.</Text>
+          <Text style={styles.footerVersion}>Version 1.0.0</Text>
+        </Animated.View>
+
+        {/* Bottom spacing */}
+        <View style={{ height: 120 }} />
+      </ScrollView>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingHorizontal: 24,
+    paddingTop: 16,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 32,
+    gap: 16,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.05)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerTitle: {
+    fontSize: 32,
+    fontWeight: '600',
+    letterSpacing: -1.2,
+    color: '#000000',
+    flex: 1,
+  },
+  savedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: 'rgba(22, 163, 74, 0.1)',
+  },
+  savedText: {
+    fontSize: 14,
+    color: '#16A34A',
+    fontWeight: '500',
+  },
+  section: {
+    marginBottom: 48,
+  },
+  sectionLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: 'rgba(0, 0, 0, 0.4)',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: 16,
+  },
+  accountCard: {
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.05)',
+    backgroundColor: '#FFFFFF',
+    overflow: 'hidden',
+  },
+  accountRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+  },
+  accountLabel: {
+    fontSize: 14,
+    color: 'rgba(0, 0, 0, 0.4)',
+  },
+  accountValue: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#000000',
+  },
+  accountDivider: {
+    height: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+    marginHorizontal: 20,
+  },
+  accountButton: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+  },
+  accountButtonText: {
+    fontSize: 16,
+    color: '#000000',
+  },
+  structureCard: {
+    padding: 24,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.05)',
+    backgroundColor: '#FFFFFF',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  structureCardContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    flex: 1,
+  },
+  structureIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    backgroundColor: 'rgba(22, 163, 74, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  structureInfo: {
+    flex: 1,
+  },
+  structureTitle: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#000000',
+    marginBottom: 4,
+  },
+  structureSubtitle: {
+    fontSize: 14,
+    color: 'rgba(0, 0, 0, 0.6)',
+  },
+  notificationsContainer: {
+    gap: 12,
+  },
+  settingCard: {
+    padding: 24,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.05)',
+    backgroundColor: '#FFFFFF',
+  },
+  settingCardRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  settingCardContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    flex: 1,
+  },
+  settingIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    backgroundColor: 'rgba(22, 163, 74, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  settingCardTitle: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#000000',
+    marginBottom: 4,
+  },
+  settingCardSubtitle: {
+    fontSize: 14,
+    color: 'rgba(0, 0, 0, 0.6)',
+  },
+  subsectionLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: 'rgba(0, 0, 0, 0.4)',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginTop: 8,
+    marginBottom: 12,
+  },
+  privacyContainer: {
+    gap: 12,
+  },
+  statusDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: 'rgba(0, 0, 0, 0.2)',
+  },
+  statusDotActive: {
+    backgroundColor: '#16A34A',
+  },
+  disconnectButton: {
+    marginTop: 16,
+    paddingVertical: 10,
+    borderRadius: 16,
+    alignItems: 'center',
+  },
+  disconnectButtonText: {
+    fontSize: 14,
+    color: 'rgba(0, 0, 0, 0.6)',
+  },
+  deleteCard: {
+    padding: 24,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.1)',
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+  },
+  deleteText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: 'rgba(0, 0, 0, 0.6)',
+  },
+  subscriptionCard: {
+    padding: 32,
+    borderRadius: 24,
+    borderWidth: 2,
+    borderColor: 'rgba(22, 163, 74, 0.2)',
+    backgroundColor: 'rgba(22, 163, 74, 0.05)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  subscriptionContent: {
+    flex: 1,
+  },
+  subscriptionTitle: {
+    fontSize: 18,
+    fontWeight: '500',
+    color: '#000000',
+    marginBottom: 4,
+  },
+  subscriptionSubtitle: {
+    fontSize: 14,
+    color: 'rgba(0, 0, 0, 0.6)',
+  },
+  supportContainer: {
+    gap: 12,
+  },
+  logoutCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+    padding: 24,
+    borderRadius: 24,
+    borderWidth: 2,
+    borderColor: 'rgba(239, 68, 68, 0.2)',
+    backgroundColor: 'rgba(239, 68, 68, 0.05)',
+  },
+  logoutText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#EF4444',
+  },
+  footer: {
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 32,
+  },
+  footerText: {
+    fontSize: 14,
+    color: 'rgba(0, 0, 0, 0.4)',
+    fontStyle: 'italic',
+  },
+  footerVersion: {
+    fontSize: 12,
+    color: 'rgba(0, 0, 0, 0.2)',
+  },
+  formContainer: {
+    gap: 24,
+  },
+  formGroup: {
+    gap: 8,
+  },
+  formLabel: {
+    fontSize: 14,
+    color: 'rgba(0, 0, 0, 0.6)',
+    paddingHorizontal: 4,
+  },
+  formInput: {
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.1)',
+    backgroundColor: '#FFFFFF',
+    fontSize: 16,
+    color: '#000000',
+  },
+  saveButton: {
+    backgroundColor: '#16A34A',
+    paddingVertical: 14,
+    borderRadius: 24,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  saveButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  settingsContainer: {
+    gap: 16,
+  },
+  settingsHint: {
+    fontSize: 14,
+    color: 'rgba(0, 0, 0, 0.4)',
+    marginBottom: 16,
+  },
+  durationButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 16,
+  },
+  durationButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.05)',
+    alignItems: 'center',
+  },
+  durationButtonActive: {
+    borderColor: '#16A34A',
+    backgroundColor: 'rgba(22, 163, 74, 0.1)',
+  },
+  durationButtonText: {
+    fontSize: 16,
+    color: '#000000',
+  },
+  durationButtonTextActive: {
+    color: '#16A34A',
+    fontWeight: '600',
+  },
+  sliderContainer: {
+    marginTop: 16,
+    gap: 12,
+  },
+  sliderTrack: {
+    height: 8,
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  sliderFill: {
+    height: '100%',
+    backgroundColor: '#16A34A',
+    borderRadius: 4,
+  },
+  sliderValueContainer: {
+    alignItems: 'center',
+  },
+  sliderValue: {
+    fontSize: 24,
+    fontWeight: '500',
+    color: '#000000',
+  },
+  sliderButtons: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 24,
+  },
+  sliderButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  intensityButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 16,
+  },
+  intensityButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.05)',
+    alignItems: 'center',
+  },
+  intensityButtonActive: {
+    borderColor: '#16A34A',
+    backgroundColor: 'rgba(22, 163, 74, 0.1)',
+  },
+  intensityButtonText: {
+    fontSize: 16,
+    color: '#000000',
+  },
+  intensityButtonTextActive: {
+    color: '#16A34A',
+    fontWeight: '600',
+  },
+});
+

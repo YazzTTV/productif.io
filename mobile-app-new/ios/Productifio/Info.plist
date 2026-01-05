@@ -4,6 +4,8 @@
   <dict>
     <key>CADisableMinimumFrameDurationOnPhone</key>
     <true/>
+    <key>CFBundleAllowMixedLocalizations</key>
+    <true/>
     <key>CFBundleDevelopmentRegion</key>
     <string>$(DEVELOPMENT_LANGUAGE)</string>
     <key>CFBundleDisplayName</key>
@@ -50,6 +52,10 @@
       <key>NSAllowsLocalNetworking</key>
       <true/>
     </dict>
+    <key>NSCalendarsFullAccessUsageDescription</key>
+    <string>Nous avons besoin d'accéder à votre calendrier pour synchroniser vos tâches.</string>
+    <key>NSCalendarsUsageDescription</key>
+    <string>Nous avons besoin d'accéder à votre calendrier pour synchroniser vos tâches.</string>
     <key>NSCameraUsageDescription</key>
     <string>We need access to your camera to allow you to take photos for your tasks and journal entries.</string>
     <key>NSMicrophoneUsageDescription</key>
@@ -58,6 +64,10 @@
     <string>We need permission to save images to your photo library.</string>
     <key>NSPhotoLibraryUsageDescription</key>
     <string>We need access to your photo library to let you select images for your tasks and journal entries.</string>
+    <key>NSRemindersFullAccessUsageDescription</key>
+    <string>Allow $(PRODUCT_NAME) to access your reminders</string>
+    <key>NSRemindersUsageDescription</key>
+    <string>Nous avons besoin d'accéder à vos rappels pour synchroniser vos tâches.</string>
     <key>NSUserActivityTypes</key>
     <array>
       <string>$(PRODUCT_BUNDLE_IDENTIFIER).expo.index_route</string>

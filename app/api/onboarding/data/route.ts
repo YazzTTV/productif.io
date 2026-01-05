@@ -26,20 +26,13 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   console.log('\n🔔 [ONBOARDING_API] Nouvelle requête POST reçue')
   
-  // Log des headers pour déboguer
   const authHeader = req.headers.get('authorization')
   console.log('🔍 [ONBOARDING_API] Authorization header:', authHeader ? 'présent' : 'absent')
-  if (authHeader) {
-    console.log('🔍 [ONBOARDING_API] Token (premiers caractères):', authHeader.substring(0, 50) + '...')
-  }
   
   const user = await getAuthUserFromRequest(req)
   
   if (!user) {
-    console.log('❌ [ONBOARDING_API] Requête non authentifiée - aucun token trouvé')
-    console.log('   - Auth header présent:', !!authHeader)
-    console.log('   - Cookies présents:', !!req.cookies.get('auth_token')?.value)
-    console.log('')
+    console.log('❌ [ONBOARDING_API] Requête non authentifiée')
     return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
   }
 
@@ -47,36 +40,63 @@ export async function POST(req: NextRequest) {
 
   try {
     const data = await req.json()
-    console.log('📥 [ONBOARDING_API] Données reçues:')
-    console.log('   - userId:', user.id)
-    console.log('   - userEmail:', user.email)
-    console.log('   - mainGoal:', data.mainGoal || 'N/A')
-    console.log('   - role:', data.role || 'N/A')
-    console.log('   - frustration:', data.frustration || 'N/A')
-    console.log('   - language:', data.language || 'N/A')
-    console.log('   - diagBehavior:', data.diagBehavior || 'N/A')
-    console.log('   - timeFeeling:', data.timeFeeling || 'N/A')
-    console.log('   - phoneHabit:', data.phoneHabit || 'N/A')
-    console.log('   - currentStep:', data.currentStep || 'N/A')
-    console.log('   - completed:', data.completed || false)
-    console.log('   - Toutes les données:', JSON.stringify(data, null, 2))
+    console.log('📥 [ONBOARDING_API] Données reçues:', JSON.stringify(data, null, 2))
     
-    // Créer ou mettre à jour les données d'onboarding
-    // Ne mettre à jour que les champs qui sont fournis (pas undefined)
+    // Construire l'objet de mise à jour avec tous les champs possibles
     const updateData: any = {}
+    
+    // Champs de base (ancien + nouveau)
+    if (data.language !== undefined) updateData.language = data.language
     if (data.mainGoal !== undefined) updateData.mainGoal = data.mainGoal
     if (data.role !== undefined) updateData.role = data.role
     if (data.frustration !== undefined) updateData.frustration = data.frustration
-    if (data.language !== undefined) updateData.language = data.language
+    
+    // Nouveau design - Identité
+    if (data.firstName !== undefined) updateData.firstName = data.firstName
+    if (data.studentType !== undefined) updateData.studentType = data.studentType
+    
+    // Nouveau design - Objectifs & Pression
+    if (data.goals !== undefined) updateData.goals = data.goals
+    if (data.pressureLevel !== undefined) updateData.pressureLevel = data.pressureLevel
+    
+    // Nouveau design - Contexte académique
+    if (data.currentSituation !== undefined) updateData.currentSituation = data.currentSituation
+    
+    // Nouveau design - Difficultés quotidiennes
+    if (data.dailyStruggles !== undefined) updateData.dailyStruggles = data.dailyStruggles
+    
+    // Nouveau design - Style de travail
+    if (data.mentalLoad !== undefined) updateData.mentalLoad = data.mentalLoad
+    if (data.focusQuality !== undefined) updateData.focusQuality = data.focusQuality
+    if (data.satisfaction !== undefined) updateData.satisfaction = data.satisfaction
+    if (data.overthinkTasks !== undefined) updateData.overthinkTasks = data.overthinkTasks
+    if (data.shouldDoMore !== undefined) updateData.shouldDoMore = data.shouldDoMore
+    
+    // Nouveau design - Intentions
+    if (data.wantToChange !== undefined) updateData.wantToChange = data.wantToChange
+    if (data.timeHorizon !== undefined) updateData.timeHorizon = data.timeHorizon
+    
+    // Nouveau design - Tâches & Journée idéale
+    if (data.rawTasks !== undefined) updateData.rawTasks = data.rawTasks
+    if (data.clarifiedTasks !== undefined) updateData.clarifiedTasks = data.clarifiedTasks
+    if (data.idealDay !== undefined) updateData.idealDay = data.idealDay
+    
+    // WhatsApp
     if (data.whatsappNumber !== undefined) updateData.whatsappNumber = data.whatsappNumber
     if (data.whatsappConsent !== undefined) updateData.whatsappConsent = data.whatsappConsent
+    
+    // Questionnaire ancien
     if (data.diagBehavior !== undefined) updateData.diagBehavior = data.diagBehavior
     if (data.timeFeeling !== undefined) updateData.timeFeeling = data.timeFeeling
     if (data.phoneHabit !== undefined) updateData.phoneHabit = data.phoneHabit
+    
+    // Métadonnées
     if (data.offer !== undefined) updateData.offer = data.offer
-    if (data.utmParams !== undefined) updateData.utmParams = data.utmParams ? JSON.parse(JSON.stringify(data.utmParams)) : null
+    if (data.utmParams !== undefined) updateData.utmParams = data.utmParams
     if (data.emailFallback !== undefined) updateData.emailFallback = data.emailFallback
     if (data.billingCycle !== undefined) updateData.billingCycle = data.billingCycle
+    
+    // Progression
     if (data.currentStep !== undefined) updateData.currentStep = data.currentStep
     if (data.completed !== undefined) updateData.completed = data.completed
     
@@ -84,17 +104,33 @@ export async function POST(req: NextRequest) {
       where: { userId: user.id },
       create: {
         userId: user.id,
+        language: data.language || 'fr',
         mainGoal: data.mainGoal || null,
         role: data.role || null,
         frustration: data.frustration || null,
-        language: data.language || 'fr',
+        firstName: data.firstName || null,
+        studentType: data.studentType || null,
+        goals: data.goals || null,
+        pressureLevel: data.pressureLevel || null,
+        currentSituation: data.currentSituation || null,
+        dailyStruggles: data.dailyStruggles || null,
+        mentalLoad: data.mentalLoad || null,
+        focusQuality: data.focusQuality || null,
+        satisfaction: data.satisfaction || null,
+        overthinkTasks: data.overthinkTasks ?? null,
+        shouldDoMore: data.shouldDoMore ?? null,
+        wantToChange: data.wantToChange || null,
+        timeHorizon: data.timeHorizon || null,
+        rawTasks: data.rawTasks || null,
+        clarifiedTasks: data.clarifiedTasks || null,
+        idealDay: data.idealDay || null,
         whatsappNumber: data.whatsappNumber || null,
         whatsappConsent: data.whatsappConsent ?? false,
         diagBehavior: data.diagBehavior || null,
         timeFeeling: data.timeFeeling || null,
         phoneHabit: data.phoneHabit || null,
         offer: data.offer || null,
-        utmParams: data.utmParams ? JSON.parse(JSON.stringify(data.utmParams)) : null,
+        utmParams: data.utmParams || null,
         emailFallback: data.emailFallback || null,
         billingCycle: data.billingCycle || null,
         currentStep: data.currentStep || 1,
@@ -103,27 +139,25 @@ export async function POST(req: NextRequest) {
       update: updateData
     })
     
-    console.log(`\n📊 [ONBOARDING_DATA] Sauvegardé pour userId: ${user.id} (${user.email})`)
-    console.log('   - mainGoal:', updateData.mainGoal || 'N/A')
-    console.log('   - diagBehavior:', updateData.diagBehavior || 'N/A')
-    console.log('   - timeFeeling:', updateData.timeFeeling || 'N/A')
-    console.log('   - phoneHabit:', updateData.phoneHabit || 'N/A')
-    console.log('   - currentStep:', updateData.currentStep || 'N/A')
-    console.log('   - completed:', updateData.completed || false)
-    console.log('   - Toutes les données:', JSON.stringify(updateData, null, 2))
-    console.log('✅ Sauvegarde réussie\n')
+    // Mettre à jour le prénom de l'utilisateur si fourni
+    if (data.firstName) {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { name: data.firstName }
+      })
+    }
+    
+    console.log(`✅ [ONBOARDING_API] Sauvegardé pour userId: ${user.id}`)
 
     return NextResponse.json({ data: onboardingData })
   } catch (error) {
-    console.error('\n❌ [ONBOARDING_DATA] Erreur POST onboarding data:', error)
-    console.error('   Détails:', error instanceof Error ? error.message : String(error))
-    console.error('')
+    console.error('❌ [ONBOARDING_API] Erreur:', error)
     return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 })
   }
 }
 
 // PUT : mettre à jour les données d'onboarding
 export async function PUT(req: NextRequest) {
-  return POST(req) // Utiliser la même logique que POST
+  return POST(req)
 }
 
