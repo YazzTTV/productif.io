@@ -196,13 +196,13 @@ export default function SymptomsAnalysisScreen() {
               styles.continueButton,
               selectedSymptoms.length === 0 && styles.continueButtonDisabled,
             ]}
-          >
-            <Text style={[
-              styles.continueButtonText,
-              selectedSymptoms.length === 0 && styles.continueButtonTextDisabled
-            ]}>
+            >
+              <Text style={[
+                styles.continueButtonText,
+                selectedSymptoms.length === 0 && styles.continueButtonTextDisabled
+              ]}>
               {t('continue') || 'Continue'}
-            </Text>
+              </Text>
           </TouchableOpacity>
 
           {selectedSymptoms.length > 0 && (

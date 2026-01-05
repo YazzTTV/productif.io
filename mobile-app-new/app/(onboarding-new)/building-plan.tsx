@@ -15,7 +15,7 @@ import Animated, {
   Easing,
 } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import Svg, { Circle } from 'react-native-svg';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -37,6 +37,7 @@ const steps: Step[] = [
 export default function BuildingPlanScreen() {
   const { t } = useLanguage();
   const insets = useSafeAreaInsets();
+  const params = useLocalSearchParams();
   
   const [currentStep, setCurrentStep] = useState(0);
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
@@ -65,18 +66,23 @@ export default function BuildingPlanScreen() {
   useEffect(() => {
     if (currentStep < steps.length) {
       const timer = setTimeout(() => {
-        if (!isMountedRef.current) return;
+      if (!isMountedRef.current) return;
         setCompletedSteps(prev => [...prev, currentStep]);
         setCurrentStep(prev => prev + 1);
       }, steps[currentStep].duration);
       return () => clearTimeout(timer);
     } else {
-      // All steps complete - navigate
+      // All steps complete - navigate to ideal day with tasks
       const timer = setTimeout(() => {
-        if (isMountedRef.current && !isNavigatingRef.current) {
-          isNavigatingRef.current = true;
-          router.push('/(onboarding-new)/symptoms');
-        }
+      if (isMountedRef.current && !isNavigatingRef.current) {
+        isNavigatingRef.current = true;
+        router.push({
+          pathname: '/(onboarding-new)/ideal-day',
+          params: {
+            tasks: params.tasks as string || '[]',
+          },
+        });
+      }
       }, 500);
       return () => clearTimeout(timer);
     }
@@ -144,7 +150,7 @@ export default function BuildingPlanScreen() {
             const isCurrent = currentStep === index;
 
             return (
-              <Animated.View
+            <Animated.View
                 key={step.key}
                 entering={FadeInDown.delay(300 + index * 100).duration(400)}
                 style={[

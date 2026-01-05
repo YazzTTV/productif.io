@@ -62,15 +62,15 @@ export default function SocialProofScreen() {
 
         {/* Stats Grid */}
         <Animated.View entering={FadeInDown.delay(200).duration(400)} style={styles.statsGrid}>
-          {stats.map((stat, index) => (
+            {stats.map((stat, index) => (
             <View key={index} style={styles.statItem}>
               <View style={styles.statIconContainer}>
                 <Ionicons name={stat.icon as any} size={20} color="#16A34A" />
               </View>
-              <Text style={styles.statValue}>{stat.value}</Text>
-              <Text style={styles.statLabel}>{stat.label}</Text>
+                <Text style={styles.statValue}>{stat.value}</Text>
+                <Text style={styles.statLabel}>{stat.label}</Text>
             </View>
-          ))}
+            ))}
         </Animated.View>
 
         {/* Testimonials */}
@@ -92,9 +92,9 @@ export default function SocialProofScreen() {
                 <Text style={styles.testimonialText}>"{testimonial.text}"</Text>
                 <View style={styles.testimonialAuthor}>
                   <Text style={styles.authorName}>{testimonial.author}</Text>
-                  <View style={styles.verifiedBadge}>
+                    <View style={styles.verifiedBadge}>
                     <Ionicons name="checkmark-circle" size={14} color="#16A34A" />
-                  </View>
+                    </View>
                 </View>
               </View>
             </Animated.View>
@@ -109,13 +109,13 @@ export default function SocialProofScreen() {
               <Text style={styles.trustText}>
                 {t('freeTrialCancelAnytime') || 'Free trial, cancel anytime'}
               </Text>
-            </View>
+                </View>
             <View style={styles.trustItem}>
               <Ionicons name="lock-closed" size={20} color="#16A34A" />
               <Text style={styles.trustText}>
                 {t('moneyBackGuarantee') || 'Money-back guarantee'}
               </Text>
-            </View>
+              </View>
           </View>
         </Animated.View>
 
@@ -124,8 +124,8 @@ export default function SocialProofScreen() {
           <TouchableOpacity
             activeOpacity={0.8}
             onPress={handleContinue}
-            style={styles.ctaButton}
-          >
+              style={styles.ctaButton}
+            >
             <Text style={styles.ctaText}>
               {t('seeMyResults') || 'See my results'}
             </Text>
