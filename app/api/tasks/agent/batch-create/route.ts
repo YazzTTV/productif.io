@@ -137,7 +137,13 @@ export async function POST(req: NextRequest) {
 
     // Matin : 8h-12h
     for (const task of organized.morning) {
-      const dueDate = new Date(targetDate)
+      // Utiliser la date spécifique de la tâche si elle existe, sinon la targetDate globale
+      let taskDate = targetDate
+      if (task.dueDate) {
+        taskDate = new Date(task.dueDate)
+        taskDate.setHours(0, 0, 0, 0)
+      }
+      const dueDate = new Date(taskDate)
       // Répartir les tâches sur le matin (8h-11h)
       const hoursOffset = Math.floor((currentOrder * 60) / (organized.morning.length || 1))
       dueDate.setHours(8 + Math.floor(hoursOffset / 60), hoursOffset % 60, 0, 0)
@@ -179,7 +185,13 @@ export async function POST(req: NextRequest) {
 
     // Après-midi : 14h-17h
     for (const task of organized.afternoon) {
-      const dueDate = new Date(targetDate)
+      // Utiliser la date spécifique de la tâche si elle existe, sinon la targetDate globale
+      let taskDate = targetDate
+      if (task.dueDate) {
+        taskDate = new Date(task.dueDate)
+        taskDate.setHours(0, 0, 0, 0)
+      }
+      const dueDate = new Date(taskDate)
       // Répartir les tâches sur l'après-midi (14h-16h)
       const afternoonIndex = currentOrder - organized.morning.length
       const hoursOffset = Math.floor((afternoonIndex * 60) / (organized.afternoon.length || 1))
@@ -221,7 +233,13 @@ export async function POST(req: NextRequest) {
 
     // Soir : 17h-19h
     for (const task of organized.evening) {
-      const dueDate = new Date(targetDate)
+      // Utiliser la date spécifique de la tâche si elle existe, sinon la targetDate globale
+      let taskDate = targetDate
+      if (task.dueDate) {
+        taskDate = new Date(task.dueDate)
+        taskDate.setHours(0, 0, 0, 0)
+      }
+      const dueDate = new Date(taskDate)
       // Répartir les tâches sur le soir (17h-18h)
       const eveningIndex = currentOrder - organized.morning.length - organized.afternoon.length
       const hoursOffset = Math.floor((eveningIndex * 30) / (organized.evening.length || 1))

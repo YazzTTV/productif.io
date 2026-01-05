@@ -8,6 +8,7 @@ export interface AnalyzedTask {
   estimatedDuration?: number // en minutes
   reasoning: string // Explication du scoring
   suggestedTime?: string // morning, afternoon, evening
+  dueDate?: string // Date ISO spécifique pour cette tâche (si mentionnée dans le texte)
 }
 
 export interface TaskAnalysisResult {
@@ -82,6 +83,9 @@ Analyse le contexte pour déterminer QUAND l'utilisateur veut faire ces tâches 
 - "dans 3 jours", "dans une semaine" → calcul de date
 - Par défaut si non mentionné → demain
 
+**IMPORTANT** : Si plusieurs dates sont mentionnées dans le texte (ex: "aujourd'hui je dois X, demain je dois Y, mercredi je dois Z"), 
+associe chaque tâche à sa date spécifique. Chaque tâche peut avoir sa propre date dans le champ "dueDate".
+
 Retourne la date au format ISO (YYYY-MM-DD).
 
 Réponds UNIQUEMENT au format JSON valide.`
@@ -105,7 +109,7 @@ Jour de la semaine actuel : ${new Date().toLocaleDateString('fr-FR', { weekday: 
 
 Réponds UNIQUEMENT en JSON avec cette structure :
 {
-  "targetDate": "YYYY-MM-DD (date pour laquelle planifier les tâches)",
+  "targetDate": "YYYY-MM-DD (date principale pour laquelle planifier, ou date par défaut)",
   "tasks": [
     {
       "title": "Titre court et clair",
@@ -114,7 +118,8 @@ Réponds UNIQUEMENT en JSON avec cette structure :
       "energy": 0-3,
       "estimatedDuration": minutes,
       "reasoning": "Explication du scoring",
-      "suggestedTime": "morning|afternoon|evening"
+      "suggestedTime": "morning|afternoon|evening",
+      "dueDate": "YYYY-MM-DD (date spécifique pour cette tâche si mentionnée, sinon null)"
     }
   ],
   "summary": "Résumé de la journée planifiée",

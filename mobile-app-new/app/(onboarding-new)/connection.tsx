@@ -55,7 +55,7 @@ export default function ConnectionScreen() {
       if (!isMountedRef.current) return;
       
       if (response.success) {
-        router.replace('/(onboarding-new)/question');
+        router.replace('/(onboarding-new)/value-awareness');
       } else {
         Alert.alert('Erreur', 'Échec de la connexion avec Google');
       }
@@ -93,7 +93,7 @@ export default function ConnectionScreen() {
       if (!isMountedRef.current) return;
       
       if (response.success) {
-        router.replace('/(onboarding-new)/question');
+        router.replace('/(onboarding-new)/value-awareness');
       } else {
         Alert.alert('Erreur', 'Échec de la connexion avec Apple');
       }
@@ -134,10 +134,10 @@ export default function ConnectionScreen() {
         const name = email.split('@')[0] || 'User';
         const response = await authService.signup({ name, email, password });
         if (response.success) {
-          router.replace('/(onboarding-new)/question');
-        } else {
+          router.replace('/(onboarding-new)/value-awareness');
+    } else {
           Alert.alert('Erreur', response.message || 'Échec de la création du compte');
-        }
+    }
       }
     } catch (error) {
       console.error('Erreur lors de l\'authentification:', error);
@@ -167,7 +167,7 @@ export default function ConnectionScreen() {
             <Text style={styles.subtitle}>
               {t('chooseFastest') || 'Choose the fastest way to continue.'}
             </Text>
-          </Animated.View>
+        </Animated.View>
 
           {/* Social Auth Buttons */}
           <Animated.View entering={FadeInDown.delay(200).duration(400)} style={styles.socialButtons}>
@@ -192,32 +192,32 @@ export default function ConnectionScreen() {
 
             {/* Apple Button */}
             {appleAvailable && (
-              <TouchableOpacity
+          <TouchableOpacity
                 onPress={handleAppleSignup}
                 style={styles.socialButton}
                 activeOpacity={0.7}
                 disabled={isLoadingApple}
-              >
+          >
                 {isLoadingApple ? (
                   <ActivityIndicator color="#000" />
-                ) : (
-                  <>
+            ) : (
+              <>
                     <Ionicons name="logo-apple" size={20} color="#000" />
                     <Text style={styles.socialButtonText}>
                       {t('continueWithApple') || 'Continue with Apple'}
                     </Text>
-                  </>
-                )}
-              </TouchableOpacity>
+              </>
             )}
-          </Animated.View>
+          </TouchableOpacity>
+            )}
+        </Animated.View>
 
-          {/* Divider */}
+        {/* Divider */}
           <Animated.View entering={FadeInDown.delay(300).duration(400)} style={styles.divider}>
-            <View style={styles.dividerLine} />
+          <View style={styles.dividerLine} />
             <Text style={styles.dividerText}>{t('or') || 'or'}</Text>
-            <View style={styles.dividerLine} />
-          </Animated.View>
+          <View style={styles.dividerLine} />
+        </Animated.View>
 
           {/* Email & Password */}
           <Animated.View entering={FadeInDown.delay(400).duration(400)} style={styles.form}>
@@ -242,7 +242,7 @@ export default function ConnectionScreen() {
               autoComplete="password"
             />
 
-            <TouchableOpacity
+          <TouchableOpacity
               onPress={handleEmailAuth}
               style={[
                 styles.primaryButton,
@@ -250,7 +250,7 @@ export default function ConnectionScreen() {
               ]}
               activeOpacity={0.8}
               disabled={!email || !password || isLoadingEmail}
-            >
+          >
               {isLoadingEmail ? (
                 <ActivityIndicator color="#FFF" />
               ) : (
@@ -261,8 +261,8 @@ export default function ConnectionScreen() {
                   }
                 </Text>
               )}
-            </TouchableOpacity>
-          </Animated.View>
+          </TouchableOpacity>
+        </Animated.View>
 
           {/* Toggle Login/Signup */}
           <Animated.View entering={FadeInDown.delay(500).duration(400)}>

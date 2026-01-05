@@ -539,6 +539,22 @@ export const tasksService = {
       method: 'DELETE',
     });
   },
+
+  // Récupérer les tâches d'aujourd'hui
+  async getTodayTasks(): Promise<any> {
+    return await apiCall('/tasks/today');
+  },
+
+  // Créer des tâches intelligentes (plan tomorrow)
+  async planTomorrow(userInput: string, date?: string): Promise<any> {
+    return await apiCall('/tasks/agent/batch-create', {
+      method: 'POST',
+      body: JSON.stringify({
+        userInput,
+        date,
+      }),
+    });
+  },
 };
 
 // Service pour les matières
@@ -805,6 +821,31 @@ export const googleCalendarService = {
       method: 'POST',
       body: JSON.stringify({ serverAuthCode }),
     });
+  },
+
+  // Créer un événement dans Google Calendar pour une tâche
+  async scheduleTask(taskId: string, start: string, end: string, timezone?: string): Promise<{
+    success: boolean;
+    eventId?: string;
+    error?: string;
+  }> {
+    try {
+      return await apiCall('/calendar/schedule', {
+        method: 'POST',
+        body: JSON.stringify({
+          taskId,
+          start,
+          end,
+          timezone: timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
+        }),
+      });
+    } catch (error: any) {
+      console.error('❌ [GoogleCalendarService] Erreur création événement:', error);
+      return {
+        success: false,
+        error: error.message || 'Erreur lors de la création de l\'événement',
+      };
+    }
   },
 };
 

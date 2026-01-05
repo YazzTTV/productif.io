@@ -66,7 +66,7 @@ export default function AnalyzingSymptomsScreen() {
   useEffect(() => {
     if (currentStep < steps.length) {
       const timer = setTimeout(() => {
-        if (!isMountedRef.current) return;
+      if (!isMountedRef.current) return;
         setCompletedSteps(prev => [...prev, currentStep]);
         setCurrentStep(prev => prev + 1);
       }, steps[currentStep].duration);
@@ -74,10 +74,10 @@ export default function AnalyzingSymptomsScreen() {
     } else {
       // All steps complete - navigate
       const timer = setTimeout(() => {
-        if (isMountedRef.current && !isNavigatingRef.current) {
-          isNavigatingRef.current = true;
-          router.push('/(onboarding-new)/social-proof');
-        }
+      if (isMountedRef.current && !isNavigatingRef.current) {
+        isNavigatingRef.current = true;
+        router.push('/(onboarding-new)/social-proof');
+      }
       }, 500);
       return () => clearTimeout(timer);
     }
@@ -145,7 +145,7 @@ export default function AnalyzingSymptomsScreen() {
             const isCurrent = currentStep === index;
 
             return (
-              <Animated.View
+            <Animated.View
                 key={step.key}
                 entering={FadeInDown.delay(300 + index * 100).duration(400)}
                 style={[

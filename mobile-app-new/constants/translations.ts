@@ -58,6 +58,7 @@ export const translations = {
     
     // ─── Goals & Pressure ──────────────────────────────────────────────────────
     whatMatters: "Qu'est-ce qui compte le plus en ce moment ?",
+    selectUpTo2: 'Sélectionnez jusqu\'à 2',
     succeedExams: 'Réussir mes examens',
     reduceStress: 'Réduire le stress',
     stayConsistent: 'Rester constant',
@@ -142,6 +143,8 @@ export const translations = {
     enoughForGoodDay: 'Cela suffit pour faire de demain une bonne journée.',
     syncCalendar: 'Synchroniser avec Google Agenda',
     startFocusNow: 'Commencer Focus maintenant',
+    connecting: 'Connexion...',
+    creatingEvents: 'Création des événements...',
     adjust: 'Ajuster',
     
     // ─── Calendar Sync ─────────────────────────────────────────────────────────
@@ -306,6 +309,7 @@ export const translations = {
     save: 'Sauvegarder',
     delete: 'Supprimer',
     confirm: 'Confirmer',
+    selectTime: 'Sélectionner l\'heure',
     networkError: 'Erreur de connexion',
     tryAgain: 'Veuillez réessayer',
     somethingWentWrong: "Une erreur s'est produite",
@@ -363,6 +367,7 @@ export const translations = {
     
     // ─── Goals & Pressure ──────────────────────────────────────────────────────
     whatMatters: 'What matters most right now?',
+    selectUpTo2: 'Select up to 2',
     succeedExams: 'Succeed in exams',
     reduceStress: 'Reduce stress',
     stayConsistent: 'Stay consistent',
@@ -456,6 +461,8 @@ export const translations = {
     createEvents: 'We create events for your plan.',
     connectCalendar: 'Connect Calendar',
     skip: 'Skip for now',
+    connecting: 'Connecting...',
+    creatingEvents: 'Creating events...',
     
     // ─── Success ───────────────────────────────────────────────────────────────
     dayIsReady: 'Your day is ready.',
@@ -611,6 +618,7 @@ export const translations = {
     save: 'Save',
     delete: 'Delete',
     confirm: 'Confirm',
+    selectTime: 'Select time',
     networkError: 'Connection error',
     tryAgain: 'Please try again',
     somethingWentWrong: 'Something went wrong',
@@ -668,6 +676,7 @@ export const translations = {
     
     // ─── Goals & Pressure ──────────────────────────────────────────────────────
     whatMatters: '¿Qué es lo más importante ahora?',
+    selectUpTo2: 'Selecciona hasta 2',
     succeedExams: 'Aprobar los exámenes',
     reduceStress: 'Reducir el estrés',
     stayConsistent: 'Mantener la consistencia',
@@ -761,6 +770,8 @@ export const translations = {
     createEvents: 'Creamos eventos para tu plan.',
     connectCalendar: 'Conectar calendario',
     skip: 'Omitir por ahora',
+    connecting: 'Conectando...',
+    creatingEvents: 'Creando eventos...',
     
     // ─── Success ───────────────────────────────────────────────────────────────
     dayIsReady: 'Tu día está listo.',
@@ -916,6 +927,7 @@ export const translations = {
     save: 'Guardar',
     delete: 'Eliminar',
     confirm: 'Confirmar',
+    selectTime: 'Seleccionar hora',
     networkError: 'Error de conexión',
     tryAgain: 'Por favor, inténtalo de nuevo',
     somethingWentWrong: 'Algo salió mal',

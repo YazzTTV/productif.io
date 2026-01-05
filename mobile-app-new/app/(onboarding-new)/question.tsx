@@ -243,16 +243,16 @@ export default function QuestionScreen() {
                 ]}
                 activeOpacity={0.7}
               >
-                <Text style={[
-                  styles.optionText,
-                  selectedOption === option.id && styles.optionTextSelected,
-                ]}>
-                  {t(option.textKey)}
-                </Text>
+                  <Text style={[
+                    styles.optionText,
+                    selectedOption === option.id && styles.optionTextSelected,
+                  ]}>
+                    {t(option.textKey)}
+                  </Text>
                 {selectedOption === option.id && (
                   <View style={styles.checkIcon}>
                     <Ionicons name="checkmark" size={20} color="#16A34A" />
-                  </View>
+                </View>
                 )}
               </TouchableOpacity>
             </Animated.View>

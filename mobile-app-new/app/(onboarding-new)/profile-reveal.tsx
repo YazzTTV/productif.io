@@ -165,9 +165,9 @@ export default function ProfileRevealScreen() {
             activeOpacity={0.8}
           >
             {selectedPlan === 'annual' && (
-              <View style={styles.bestValueBadge}>
+            <View style={styles.bestValueBadge}>
                 <Text style={styles.bestValueText}>⭐ {t('bestValue') || 'Best value'}</Text>
-              </View>
+            </View>
             )}
             <View style={styles.planContent}>
               <View style={styles.planLeft}>
@@ -252,15 +252,15 @@ export default function ProfileRevealScreen() {
             onPress={handleStartTrial}
             disabled={isLoading}
             style={[styles.startTrialButton, isLoading && styles.buttonDisabled]}
-          >
-            {isLoading ? (
-              <ActivityIndicator color="#FFFFFF" />
-            ) : (
-              <>
-                <Ionicons name="flash" size={20} color="#FFFFFF" />
+            >
+              {isLoading ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <>
+                  <Ionicons name="flash" size={20} color="#FFFFFF" />
                 <Text style={styles.startTrialText}>{t('startFreeTrial') || 'Start free trial'}</Text>
-              </>
-            )}
+                </>
+              )}
           </TouchableOpacity>
 
           <TouchableOpacity onPress={handleSkip} style={styles.skipButton}>

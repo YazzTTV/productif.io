@@ -410,7 +410,7 @@ export default function FocusScreen() {
   const [maxSessions, setMaxSessions] = useState(4);
   const taskTitle = (params.title as string) || 'Complete Chapter 12 Summary';
   const taskSubject = (params.subject as string) || 'Organic Chemistry';
-
+  
   // Tasks management
   const [tasks, setTasks] = useState([
     { id: '1', title: taskTitle, subject: taskSubject, completed: false },
@@ -440,8 +440,8 @@ export default function FocusScreen() {
     setPhase('active');
     setIsRunning(true);
     setCurrentTaskIndex(0);
-    
-    // Démarrer la session Deep Work
+
+  // Démarrer la session Deep Work
     const startSession = async () => {
       try {
         const result = await assistantService.startDeepWorkSession(selectedDuration, 'deepwork', currentTask.title);
@@ -468,8 +468,8 @@ export default function FocusScreen() {
     );
     if (nextIncompleteIndex !== -1) {
       setCurrentTaskIndex(nextIncompleteIndex);
-    }
-  };
+      }
+    };
 
   // Timer logic
   useEffect(() => {
@@ -500,10 +500,10 @@ export default function FocusScreen() {
   // Update progress animation
   useEffect(() => {
     if (phase === 'active') {
-      progressAnimation.value = withTiming(progress, {
-        duration: 1000,
-        easing: Easing.linear,
-      });
+    progressAnimation.value = withTiming(progress, {
+      duration: 1000,
+      easing: Easing.linear,
+    });
     }
   }, [progress, phase]);
 
@@ -529,10 +529,10 @@ export default function FocusScreen() {
       
       // Arrêter la session deep work
       if (sessionId) {
-        try {
-          await assistantService.endDeepWorkSession(sessionId, 'cancel');
-        } catch (error) {
-          console.log('Session annulée localement');
+      try {
+        await assistantService.endDeepWorkSession(sessionId, 'cancel');
+      } catch (error) {
+        console.log('Session annulée localement');
         }
       }
     }

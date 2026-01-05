@@ -24,6 +24,12 @@ async function getCalendarModule() {
 }
 
 // Configuration pour Google Calendar
+// iOS Client ID (OAuth client pour iOS)
+const IOS_CLIENT_ID = Constants.expoConfig?.extra?.googleClientId || 
+  process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID || 
+  '738789952398-m6risp9hae6ao11n7s4178nig64largu.apps.googleusercontent.com';
+
+// Web Client ID (celui du backend - utilisé pour vérifier l'idToken)
 const GOOGLE_WEB_CLIENT_ID = Constants.expoConfig?.extra?.googleWebClientId ||
   process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
 
@@ -44,7 +50,12 @@ export async function configureGoogleCalendar(): Promise<void> {
       throw new Error('Google Web Client ID not configured');
     }
 
+    // Configuration Google Sign-In avec iosClientId et webClientId
+    // iosClientId: Client ID iOS (pour l'authentification native)
+    // webClientId: Client ID Web (pour générer le serverAuthCode)
+    // IMPORTANT: Les deux doivent être dans le même projet Google Cloud
     GoogleSignin.configure({
+      iosClientId: IOS_CLIENT_ID,
       webClientId: GOOGLE_WEB_CLIENT_ID,
       scopes: CALENDAR_SCOPES,
       offlineAccess: true,
@@ -52,6 +63,8 @@ export async function configureGoogleCalendar(): Promise<void> {
     });
 
     console.log('✅ [CalendarAuth] Google Calendar configuré');
+    console.log('📱 [CalendarAuth] iOS Client ID:', IOS_CLIENT_ID);
+    console.log('🌐 [CalendarAuth] Web Client ID:', GOOGLE_WEB_CLIENT_ID);
   } catch (error) {
     console.error('❌ [CalendarAuth] Erreur configuration:', error);
     throw error;
@@ -75,33 +88,25 @@ export async function connectGoogleCalendar(): Promise<boolean> {
     // Lancer la connexion Google
     console.log('🔐 [CalendarAuth] Lancement connexion Google Calendar...');
     
-    // Si l'utilisateur est déjà connecté, on peut avoir besoin de re-demander les scopes
-    const isSignedIn = await GoogleSignin.isSignedIn();
-    
-    let response;
-    if (isSignedIn) {
-      // Essayer de récupérer les tokens actuels
-      try {
-        const tokens = await GoogleSignin.getTokens();
-        if (tokens.accessToken) {
-          // Vérifier si les scopes calendar sont inclus
-          // Si non, on doit se reconnecter
-          await GoogleSignin.signOut();
-        }
-      } catch {
-        // Ignorer et continuer avec signIn
-      }
+    // Essayer de se déconnecter d'abord pour forcer la demande de nouveaux scopes
+    try {
+      await GoogleSignin.signOut();
+    } catch (error) {
+      // Ignorer si l'utilisateur n'était pas connecté ou si signOut échoue
+      console.log('ℹ️ [CalendarAuth] Pas de session active à déconnecter ou erreur signOut:', error);
     }
     
-    response = await GoogleSignin.signIn();
+    // Lancer la connexion avec les nouveaux scopes Calendar
+    const response = await GoogleSignin.signIn();
     
     // Récupérer le serverAuthCode
-    const userInfo = (response as any).data || response;
-    const serverAuthCode = userInfo.serverAuthCode;
+    // La réponse peut être soit directement l'objet, soit dans .data
+    const userInfo = (response as any)?.data || response;
+    const serverAuthCode = userInfo?.serverAuthCode;
 
     if (!serverAuthCode) {
-      console.error('❌ [CalendarAuth] serverAuthCode manquant');
-      throw new Error('Impossible d\'obtenir le code d\'autorisation Google');
+      console.error('❌ [CalendarAuth] serverAuthCode manquant. Réponse:', JSON.stringify(userInfo, null, 2));
+      throw new Error('Impossible d\'obtenir le code d\'autorisation Google. Assurez-vous que webClientId est correctement configuré.');
     }
 
     console.log('✅ [CalendarAuth] serverAuthCode obtenu');
@@ -119,7 +124,8 @@ export async function connectGoogleCalendar(): Promise<boolean> {
     console.error('❌ [CalendarAuth] Erreur connexion Google Calendar:', error);
     
     // Ne pas afficher d'erreur si l'utilisateur a annulé
-    if (error.code === 'SIGN_IN_CANCELLED' || error.message?.includes('annulée')) {
+    if (error.code === 'SIGN_IN_CANCELLED' || error.code === '12500' || error.message?.includes('annulée') || error.message?.includes('cancelled')) {
+      console.log('ℹ️ [CalendarAuth] Connexion annulée par l\'utilisateur');
       return false;
     }
     
