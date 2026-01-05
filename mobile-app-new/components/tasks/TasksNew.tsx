@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Modal, TextInput, Platform, Alert, ActivityIndicator } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { subjectsService } from '@/lib/api';
+import { subjectsService, tasksService } from '@/lib/api';
 
 interface Task {
   id: string;
@@ -102,21 +102,34 @@ export function TasksNew() {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [showAddTaskModal, setShowAddTaskModal] = useState(false);
+  const [selectedSubjectForTask, setSelectedSubjectForTask] = useState<string | null>(null);
+  const [newTaskTitle, setNewTaskTitle] = useState('');
+  const [newTaskEstimatedTime, setNewTaskEstimatedTime] = useState(30);
+  const [newTaskPriority, setNewTaskPriority] = useState<'high' | 'medium' | 'low'>('medium');
+  const [creatingTask, setCreatingTask] = useState(false);
 
-  // Charger les matières depuis l'API
-  useEffect(() => {
-    loadSubjects();
-  }, []);
-
-  const loadSubjects = async () => {
+  const loadSubjects = React.useCallback(async () => {
     try {
       setLoading(true);
       const data = await subjectsService.getAll();
+      console.log('📥 [TasksNew] Données reçues de l\'API:', JSON.stringify(data, null, 2));
       if (Array.isArray(data)) {
-        setSubjects(data);
+        // S'assurer que chaque matière a un tableau tasks
+        const normalizedData = data.map(subject => ({
+          ...subject,
+          tasks: Array.isArray(subject.tasks) ? subject.tasks : [],
+        }));
+        console.log('📥 [TasksNew] Données normalisées:', normalizedData.map(s => ({
+          id: s.id,
+          name: s.name,
+          tasksCount: s.tasks.length,
+          completedCount: s.tasks.filter(t => t.completed).length,
+        })));
+        setSubjects(normalizedData);
         // Ouvrir la première matière par défaut
-        if (data.length > 0) {
-          setExpandedSubjects([data[0].id]);
+        if (normalizedData.length > 0) {
+          setExpandedSubjects([normalizedData[0].id]);
         }
       }
     } catch (error: any) {
@@ -129,7 +142,19 @@ export function TasksNew() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  // Charger les matières depuis l'API au montage
+  useEffect(() => {
+    loadSubjects();
+  }, [loadSubjects]);
+
+  // Recharger les données quand on revient du focus mode
+  useFocusEffect(
+    React.useCallback(() => {
+      loadSubjects();
+    }, [loadSubjects])
+  );
 
   const toggleSubject = (subjectId: string) => {
     setExpandedSubjects(prev =>
@@ -147,7 +172,15 @@ export function TasksNew() {
     );
   };
 
-  const handleCompleteTask = (subjectId: string, taskId: string) => {
+  const handleCompleteTask = async (subjectId: string, taskId: string) => {
+    // Trouver la tâche pour obtenir son état actuel
+    const subject = subjects.find(s => s.id === subjectId);
+    const task = subject?.tasks.find(t => t.id === taskId);
+    if (!task) return;
+
+    const newCompletedState = !task.completed;
+
+    // Mise à jour optimiste de l'UI
     setSubjects(prev =>
       prev.map(subject =>
         subject.id === subjectId
@@ -155,19 +188,44 @@ export function TasksNew() {
               ...subject,
               tasks: subject.tasks.map(task =>
                 task.id === taskId
-                  ? { ...task, completed: !task.completed }
+                  ? { ...task, completed: newCompletedState }
                   : task
               ),
             }
           : subject
       )
     );
+
+    // Synchroniser avec l'API
+    try {
+      await tasksService.updateTask(taskId, { completed: newCompletedState });
+      console.log('✅ [TasksNew] Tâche mise à jour avec succès');
+    } catch (error) {
+      console.error('❌ [TasksNew] Erreur lors de la mise à jour de la tâche:', error);
+      // Annuler la mise à jour locale en cas d'erreur
+      setSubjects(prev =>
+        prev.map(subject =>
+          subject.id === subjectId
+            ? {
+                ...subject,
+                tasks: subject.tasks.map(task =>
+                  task.id === taskId
+                    ? { ...task, completed: task.completed } // Revenir à l'état précédent
+                    : task
+                ),
+              }
+            : subject
+        )
+      );
+      Alert.alert('Erreur', 'Impossible de mettre à jour la tâche. Veuillez réessayer.');
+    }
   };
 
   const handleStartFocus = (task: Task, subject: Subject) => {
     router.push({
       pathname: '/focus',
       params: {
+        taskId: task.id,
         title: task.title,
         subject: subject.name,
         duration: task.estimatedTime,
@@ -255,9 +313,72 @@ export function TasksNew() {
     });
   };
 
-  const totalTasks = subjects.reduce((acc, s) => acc + s.tasks.length, 0);
+  const handleAddTask = async () => {
+    if (!newTaskTitle.trim()) {
+      Alert.alert('Erreur', 'Veuillez entrer un titre pour la tâche');
+      return;
+    }
+
+    if (!selectedSubjectForTask) {
+      Alert.alert('Erreur', 'Aucune matière sélectionnée');
+      return;
+    }
+
+    try {
+      setCreatingTask(true);
+      const selectedSubject = subjects.find(s => s.id === selectedSubjectForTask);
+      
+      // Convertir la priorité en format API (high=4, medium=3, low=2)
+      const priorityMap: Record<'high' | 'medium' | 'low', number> = {
+        high: 4,
+        medium: 3,
+        low: 2,
+      };
+
+      const taskData = {
+        title: newTaskTitle.trim(),
+        description: undefined,
+        estimatedMinutes: newTaskEstimatedTime,
+        priority: priorityMap[newTaskPriority],
+        subjectId: selectedSubjectForTask,
+        subject: selectedSubject?.name || undefined,
+      };
+
+      console.log('📤 [TasksNew] Création tâche - Données:', taskData);
+      
+      const newTask = await tasksService.create(taskData);
+      
+      console.log('✅ [TasksNew] Tâche créée avec succès:', newTask);
+      
+      // Recharger les matières pour afficher la nouvelle tâche
+      await loadSubjects();
+      
+      // Réinitialiser le formulaire
+      setNewTaskTitle('');
+      setNewTaskEstimatedTime(30);
+      setNewTaskPriority('medium');
+      setShowAddTaskModal(false);
+      setSelectedSubjectForTask(null);
+      
+      Alert.alert('Succès', 'Tâche ajoutée avec succès');
+    } catch (error: any) {
+      const errorMessage = error?.message || String(error) || 'Erreur inconnue';
+      console.error('[TasksNew] Erreur lors de lajout de la tâche:', errorMessage);
+      Alert.alert('Erreur', errorMessage.includes('réseau') ? 'Erreur de connexion. Vérifiez votre connexion internet.' : 'Impossible dajouter la tâche. Veuillez réessayer.');
+    } finally {
+      setCreatingTask(false);
+    }
+  };
+
+  const totalTasks = subjects.reduce((acc, s) => {
+    const tasks = Array.isArray(s.tasks) ? s.tasks : [];
+    return acc + tasks.length;
+  }, 0);
   const completedTasks = subjects.reduce(
-    (acc, s) => acc + s.tasks.filter(t => t.completed).length,
+    (acc, s) => {
+      const tasks = Array.isArray(s.tasks) ? s.tasks : [];
+      return acc + tasks.filter(t => t.completed).length;
+    },
     0
   );
 
@@ -338,8 +459,12 @@ export function TasksNew() {
         <View style={styles.subjectsContainer}>
           {subjects.map((subject, index) => {
             const isExpanded = expandedSubjects.includes(subject.id);
-            const completedCount = subject.tasks.filter(t => t.completed).length;
-            const totalCount = subject.tasks.length;
+            // S'assurer que tasks est un tableau
+            const tasks = Array.isArray(subject.tasks) ? subject.tasks : [];
+            const completedCount = tasks.filter(t => t.completed).length;
+            const totalCount = tasks.length;
+            // Calculer dynamiquement le progress basé sur les tâches complétées
+            const calculatedProgress = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
 
             return (
               <Animated.View
@@ -373,14 +498,14 @@ export function TasksNew() {
                         <Text style={styles.progressLabel}>
                           {completedCount}/{totalCount} tasks
                         </Text>
-                        <Text style={styles.progressLabel}>{subject.progress}%</Text>
+                        <Text style={styles.progressLabel}>{calculatedProgress}%</Text>
                       </View>
                       <View style={styles.progressBarContainer}>
                         <View
                           style={[
                             styles.progressBarFill,
                             {
-                              width: `${subject.progress}%`,
+                              width: `${calculatedProgress}%`,
                               backgroundColor: subject.impact === 'high' ? '#16A34A' : 'rgba(0, 0, 0, 0.2)',
                             },
                           ]}
@@ -408,7 +533,7 @@ export function TasksNew() {
 
                     {/* Tasks list */}
                     <View style={styles.tasksList}>
-                      {subject.tasks.map((task, taskIndex) => {
+                      {tasks.map((task, taskIndex) => {
                         const isTaskExpanded = expandedTasks.includes(task.id);
 
                         return (
@@ -493,6 +618,21 @@ export function TasksNew() {
                         );
                       })}
                     </View>
+
+                    {/* Add task button */}
+                    <TouchableOpacity
+                      style={styles.addTaskButton}
+                      onPress={() => {
+                        setSelectedSubjectForTask(subject.id);
+                        setShowAddTaskModal(true);
+                      }}
+                      activeOpacity={0.8}
+                    >
+                      <View style={styles.addTaskIconContainer}>
+                        <Ionicons name="add" size={16} color="rgba(0, 0, 0, 0.4)" />
+                      </View>
+                      <Text style={styles.addTaskText}>Add task</Text>
+                    </TouchableOpacity>
                   </View>
                 )}
               </Animated.View>
@@ -619,6 +759,135 @@ export function TasksNew() {
                   <Text style={styles.submitButtonText}>Ajouter la matière</Text>
                 )}
               </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Add Task Modal */}
+      <Modal
+        visible={showAddTaskModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowAddTaskModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { paddingBottom: insets.bottom + 24 }]}>
+            <View style={styles.modalHeader}>
+              <View style={styles.modalHeaderContent}>
+                <Text style={styles.modalTitle}>Add a task</Text>
+                <Text style={styles.modalSubtitle}>One clear task is enough.</Text>
+                {selectedSubjectForTask && (
+                  <Text style={styles.modalSubjectName}>
+                    For <Text style={styles.modalSubjectNameBold}>{subjects.find(s => s.id === selectedSubjectForTask)?.name}</Text>
+                  </Text>
+                )}
+              </View>
+              <TouchableOpacity
+                onPress={() => setShowAddTaskModal(false)}
+                style={styles.closeButton}
+              >
+                <Ionicons name="close" size={24} color="#000" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.modalScrollView} showsVerticalScrollIndicator={false}>
+              {/* Task title input */}
+              <View style={styles.formGroup}>
+                <TextInput
+                  style={styles.formInput}
+                  placeholder="e.g. Review chapter 3 / Finish problem set"
+                  value={newTaskTitle}
+                  onChangeText={setNewTaskTitle}
+                  autoFocus
+                  multiline={false}
+                />
+                <Text style={styles.formHint}>Keep it specific and doable.</Text>
+              </View>
+
+              {/* Estimated effort */}
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Estimated effort</Text>
+                <View style={styles.effortContainer}>
+                  {[15, 30, 45, 60].map((minutes) => (
+                    <TouchableOpacity
+                      key={minutes}
+                      style={[
+                        styles.effortButton,
+                        newTaskEstimatedTime === minutes && styles.effortButtonActive,
+                      ]}
+                      onPress={() => setNewTaskEstimatedTime(minutes)}
+                    >
+                      <Text
+                        style={[
+                          styles.effortButtonText,
+                          newTaskEstimatedTime === minutes && styles.effortButtonTextActive,
+                        ]}
+                      >
+                        {minutes === 60 ? '1h' : `${minutes} min`}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              {/* Priority */}
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Priority</Text>
+                <View style={styles.priorityContainer}>
+                  <TouchableOpacity
+                    style={[
+                      styles.priorityButton,
+                      newTaskPriority === 'medium' && styles.priorityButtonActive,
+                    ]}
+                    onPress={() => setNewTaskPriority('medium')}
+                  >
+                    <Text
+                      style={[
+                        styles.priorityButtonText,
+                        newTaskPriority === 'medium' && styles.priorityButtonTextActive,
+                      ]}
+                    >
+                      Normal
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.priorityButton,
+                      newTaskPriority === 'high' && styles.priorityButtonActive,
+                    ]}
+                    onPress={() => setNewTaskPriority('high')}
+                  >
+                    <Text
+                      style={[
+                        styles.priorityButtonText,
+                        newTaskPriority === 'high' && styles.priorityButtonTextActive,
+                      ]}
+                    >
+                      Important
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* Submit Button */}
+              <TouchableOpacity
+                style={[
+                  styles.submitButton,
+                  (!newTaskTitle.trim() || creatingTask) && styles.submitButtonDisabled,
+                ]}
+                onPress={handleAddTask}
+                disabled={!newTaskTitle.trim() || creatingTask}
+                activeOpacity={0.8}
+              >
+                {creatingTask ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.submitButtonText}>Add task</Text>
+                )}
+              </TouchableOpacity>
+
+              <Text style={styles.modalFooterText}>You can always adjust later.</Text>
             </ScrollView>
           </View>
         </View>
@@ -1003,6 +1272,108 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
+  },
+  addTaskButton: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 16,
+    marginTop: 12,
+    borderWidth: 2,
+    borderStyle: 'dashed',
+    borderColor: 'rgba(0, 0, 0, 0.1)',
+    borderRadius: 16,
+    backgroundColor: 'transparent',
+  },
+  addTaskIconContainer: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  addTaskText: {
+    fontSize: 14,
+    color: 'rgba(0, 0, 0, 0.4)',
+  },
+  modalHeaderContent: {
+    flex: 1,
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    color: 'rgba(0, 0, 0, 0.4)',
+    marginTop: 4,
+  },
+  modalSubjectName: {
+    fontSize: 14,
+    color: 'rgba(0, 0, 0, 0.6)',
+    marginTop: 8,
+  },
+  modalSubjectNameBold: {
+    fontWeight: '600',
+    color: '#000000',
+  },
+  effortContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 8,
+  },
+  effortButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  effortButtonActive: {
+    backgroundColor: '#000000',
+    borderColor: '#000000',
+  },
+  effortButtonText: {
+    fontSize: 14,
+    color: 'rgba(0, 0, 0, 0.6)',
+  },
+  effortButtonTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '500',
+  },
+  priorityContainer: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 8,
+  },
+  priorityButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+    borderWidth: 1,
+    borderColor: 'transparent',
+    alignItems: 'center',
+  },
+  priorityButtonActive: {
+    backgroundColor: '#000000',
+    borderColor: '#000000',
+  },
+  priorityButtonText: {
+    fontSize: 14,
+    color: 'rgba(0, 0, 0, 0.6)',
+  },
+  priorityButtonTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '500',
+  },
+  modalFooterText: {
+    fontSize: 12,
+    color: 'rgba(0, 0, 0, 0.3)',
+    textAlign: 'center',
+    marginTop: 8,
   },
 });
 
