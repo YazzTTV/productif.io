@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Modal, TextInput, Platform, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Modal, TextInput, Platform, Alert, ActivityIndicator, Image } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { subjectsService, tasksService } from '@/lib/api';
+import * as ImagePicker from 'expo-image-picker';
+import { subjectsService, tasksService, weeklyPlanningService } from '@/lib/api';
+import { format } from 'date-fns';
 
 interface Task {
   id: string;
@@ -108,6 +110,11 @@ export function TasksNew() {
   const [newTaskEstimatedTime, setNewTaskEstimatedTime] = useState(30);
   const [newTaskPriority, setNewTaskPriority] = useState<'high' | 'medium' | 'low'>('medium');
   const [creatingTask, setCreatingTask] = useState(false);
+  const [analyzingImage, setAnalyzingImage] = useState(false);
+  const [showImagePickerOptions, setShowImagePickerOptions] = useState(false);
+  const [planningWeek, setPlanningWeek] = useState(false);
+  const [weeklyPlan, setWeeklyPlan] = useState<any>(null);
+  const [showPlanPreview, setShowPlanPreview] = useState(false);
 
   const loadSubjects = React.useCallback(async () => {
     try {
@@ -124,7 +131,7 @@ export function TasksNew() {
           id: s.id,
           name: s.name,
           tasksCount: s.tasks.length,
-          completedCount: s.tasks.filter(t => t.completed).length,
+          completedCount: s.tasks.filter((t: Task) => t.completed).length,
         })));
         setSubjects(normalizedData);
         // Ouvrir la première matière par défaut
@@ -231,6 +238,227 @@ export function TasksNew() {
         duration: task.estimatedTime,
       },
     });
+  };
+
+  const handlePickImage = async () => {
+    try {
+      // Demander les permissions
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(
+          'Permission requise',
+          'Nous avons besoin de votre permission pour accéder à vos photos.'
+        );
+        return;
+      }
+
+      // Ouvrir le sélecteur d'image avec une qualité réduite pour optimiser la vitesse
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.6, // Réduire la qualité pour accélérer le traitement
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        await handleAnalyzeImage(result.assets[0].uri);
+      }
+    } catch (error: any) {
+      console.error('Erreur sélection image:', error);
+      Alert.alert('Erreur', 'Impossible de sélectionner l\'image');
+    }
+  };
+
+  const handleTakePhoto = async () => {
+    try {
+      // Demander les permissions
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(
+          'Permission requise',
+          'Nous avons besoin de votre permission pour accéder à votre appareil photo.'
+        );
+        return;
+      }
+
+      // Ouvrir l'appareil photo avec une qualité réduite pour optimiser la vitesse
+      const result = await ImagePicker.launchCameraAsync({
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.6, // Réduire la qualité pour accélérer le traitement
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        await handleAnalyzeImage(result.assets[0].uri);
+      }
+    } catch (error: any) {
+      console.error('Erreur prise photo:', error);
+      Alert.alert('Erreur', 'Impossible de prendre la photo');
+    }
+  };
+
+  const handleAnalyzeImage = async (imageUri: string) => {
+    try {
+      setAnalyzingImage(true);
+      setShowImagePickerOptions(false);
+
+      // Analyser l'image avec un timeout plus long
+      const result = await Promise.race([
+        subjectsService.analyzeImage(imageUri),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('L\'analyse prend trop de temps. Veuillez réessayer avec une image plus claire.')), 55000)
+        )
+      ]) as any;
+
+      if (!result.success || !result.subjects || result.subjects.length === 0) {
+        Alert.alert(
+          'Aucune matière trouvée',
+          'Aucune matière n\'a pu être extraite de l\'image. Assurez-vous que l\'image contient une liste de matières avec leurs ECTS.'
+        );
+        return;
+      }
+
+      // Afficher un message de confirmation
+      const message = `${result.validCount} matière(s) trouvée(s). Voulez-vous les créer ?`;
+      
+      Alert.alert(
+        'Matières trouvées',
+        message,
+        [
+          {
+            text: 'Annuler',
+            style: 'cancel',
+          },
+          {
+            text: 'Créer',
+            onPress: async () => {
+              await createSubjectsFromAnalysis(result.subjects);
+            },
+          },
+        ]
+      );
+    } catch (error: any) {
+      console.error('Erreur analyse image:', error);
+      
+      let errorMessage = 'Impossible d\'analyser l\'image. Veuillez réessayer.';
+      
+      if (error.message?.includes('504') || error.message?.includes('timeout') || error.message?.includes('trop de temps')) {
+        errorMessage = 'L\'analyse prend trop de temps. Veuillez réessayer avec une image plus claire et mieux éclairée.';
+      } else if (error.message?.includes('Non authentifié') || error.message?.includes('401')) {
+        errorMessage = 'Vous devez être connecté pour analyser une image.';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      Alert.alert('Erreur', errorMessage);
+    } finally {
+      setAnalyzingImage(false);
+    }
+  };
+
+  const handlePlanWeek = async () => {
+    try {
+      setPlanningWeek(true);
+
+      // Générer le plan
+      const result = await weeklyPlanningService.generatePlan();
+      
+      if (result.success && result.plan) {
+        setWeeklyPlan(result.plan);
+        setShowPlanPreview(true);
+      } else {
+        Alert.alert('Erreur', 'Impossible de générer le plan. Vérifiez que vous avez des tâches à planifier.');
+      }
+    } catch (error: any) {
+      console.error('Erreur planification:', error);
+      let errorMessage = 'Impossible de planifier la semaine.';
+      
+      if (error.message?.includes('Google Calendar non connecté')) {
+        errorMessage = 'Connectez votre Google Calendar pour utiliser la planification automatique.';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      Alert.alert('Erreur', errorMessage);
+    } finally {
+      setPlanningWeek(false);
+    }
+  };
+
+  const handleApplyPlan = async () => {
+    try {
+      setPlanningWeek(true);
+      
+      const result = await weeklyPlanningService.applyPlan();
+      
+      if (result.success) {
+        Alert.alert(
+          'Succès',
+          result.message || `${result.eventsCreated} session(s) créée(s) dans Google Calendar`,
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                setShowPlanPreview(false);
+                setWeeklyPlan(null);
+                loadSubjects(); // Recharger pour voir les mises à jour
+              },
+            },
+          ]
+        );
+      } else {
+        Alert.alert('Erreur', 'Impossible d\'appliquer le plan.');
+      }
+    } catch (error: any) {
+      console.error('Erreur application plan:', error);
+      Alert.alert('Erreur', error.message || 'Impossible d\'appliquer le plan.');
+    } finally {
+      setPlanningWeek(false);
+    }
+  };
+
+  const createSubjectsFromAnalysis = async (subjectsToCreate: Array<{ name: string; coefficient: number; ue?: string | null }>) => {
+    try {
+      setSaving(true);
+      const createdSubjects: Subject[] = [];
+
+      for (const subjectData of subjectsToCreate) {
+        try {
+          const newSubject = await subjectsService.create({
+            name: subjectData.name,
+            coefficient: subjectData.coefficient,
+            deadline: null,
+          });
+          createdSubjects.push(newSubject);
+        } catch (error: any) {
+          console.error(`Erreur création matière ${subjectData.name}:`, error);
+          // Continuer avec les autres matières même si une échoue
+        }
+      }
+
+      if (createdSubjects.length > 0) {
+        // Recharger les matières
+        await loadSubjects();
+        
+        // Ouvrir les nouvelles matières
+        setExpandedSubjects([...expandedSubjects, ...createdSubjects.map(s => s.id)]);
+        
+        Alert.alert(
+          'Succès',
+          `${createdSubjects.length} matière(s) créée(s) avec succès !`
+        );
+      } else {
+        Alert.alert(
+          'Erreur',
+          'Aucune matière n\'a pu être créée. Elles existent peut-être déjà.'
+        );
+      }
+    } catch (error: any) {
+      console.error('Erreur création matières:', error);
+      Alert.alert('Erreur', 'Impossible de créer les matières');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleAddSubject = async () => {
@@ -377,7 +605,7 @@ export function TasksNew() {
   const completedTasks = subjects.reduce(
     (acc, s) => {
       const tasks = Array.isArray(s.tasks) ? s.tasks : [];
-      return acc + tasks.filter(t => t.completed).length;
+      return acc + tasks.filter((t: Task) => t.completed).length;
     },
     0
   );
@@ -444,15 +672,52 @@ export function TasksNew() {
             </Text>
           </View>
 
-          {/* Add Subject Button */}
-          <TouchableOpacity
-            style={styles.addSubjectButton}
-            onPress={() => setShowAddSubjectModal(true)}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="add-circle-outline" size={20} color="#16A34A" />
-            <Text style={styles.addSubjectText}>Ajouter une matière</Text>
-          </TouchableOpacity>
+          {/* Add Subject Buttons */}
+          <View style={styles.addSubjectButtonsContainer}>
+            <TouchableOpacity
+              style={styles.addSubjectButton}
+              onPress={() => setShowAddSubjectModal(true)}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="add-circle-outline" size={20} color="#16A34A" />
+              <Text style={styles.addSubjectText}>Ajouter une matière</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={[styles.addSubjectButton, styles.addSubjectButtonImage]}
+              onPress={() => setShowImagePickerOptions(true)}
+              activeOpacity={0.8}
+              disabled={analyzingImage}
+            >
+              {analyzingImage ? (
+                <ActivityIndicator size="small" color="#16A34A" />
+              ) : (
+                <Ionicons name="camera-outline" size={20} color="#16A34A" />
+              )}
+              <Text style={styles.addSubjectText}>
+                {analyzingImage ? 'Analyse en cours...' : 'Créer depuis une image'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Plan My Week Button */}
+          {subjects.length > 0 && (
+            <TouchableOpacity
+              style={styles.planWeekButton}
+              onPress={handlePlanWeek}
+              activeOpacity={0.8}
+              disabled={planningWeek}
+            >
+              {planningWeek ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Ionicons name="calendar-outline" size={20} color="#FFFFFF" />
+              )}
+              <Text style={styles.planWeekText}>
+                {planningWeek ? 'Planification en cours...' : 'Plan my week'}
+              </Text>
+            </TouchableOpacity>
+          )}
         </Animated.View>
 
         {/* Subjects list */}
@@ -643,6 +908,65 @@ export function TasksNew() {
         {/* Bottom spacing */}
         <View style={{ height: 120 }} />
       </ScrollView>
+
+      {/* Image Picker Options Modal */}
+      <Modal
+        visible={showImagePickerOptions}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowImagePickerOptions(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { paddingBottom: insets.bottom + 24 }]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Créer des matières depuis une image</Text>
+              <TouchableOpacity
+                onPress={() => setShowImagePickerOptions(false)}
+                style={styles.closeButton}
+              >
+                <Ionicons name="close" size={24} color="#000" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.imagePickerOptions}>
+              <TouchableOpacity
+                style={styles.imagePickerOption}
+                onPress={handleTakePhoto}
+                activeOpacity={0.7}
+              >
+                <View style={styles.imagePickerIconContainer}>
+                  <Ionicons name="camera" size={32} color="#16A34A" />
+                </View>
+                <Text style={styles.imagePickerOptionText}>Prendre une photo</Text>
+                <Text style={styles.imagePickerOptionSubtext}>
+                  Photographiez votre liste de matières
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.imagePickerOption}
+                onPress={handlePickImage}
+                activeOpacity={0.7}
+              >
+                <View style={styles.imagePickerIconContainer}>
+                  <Ionicons name="images" size={32} color="#16A34A" />
+                </View>
+                <Text style={styles.imagePickerOptionText}>Choisir depuis la galerie</Text>
+                <Text style={styles.imagePickerOptionSubtext}>
+                  Sélectionnez une image de votre liste
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.imagePickerHint}>
+              <Ionicons name="information-circle-outline" size={16} color="rgba(0, 0, 0, 0.4)" />
+              <Text style={styles.imagePickerHintText}>
+                L'IA analysera l'image et extraira automatiquement les matières avec leurs coefficients (ECTS)
+              </Text>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* Add Subject Modal */}
       <Modal
@@ -892,6 +1216,105 @@ export function TasksNew() {
           </View>
         </View>
       </Modal>
+
+      {/* Weekly Plan Preview Modal */}
+      <Modal
+        visible={showPlanPreview}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowPlanPreview(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { paddingBottom: insets.bottom + 24, maxHeight: '90%' }]}>
+            <View style={styles.modalHeader}>
+              <View>
+                <Text style={styles.modalTitle}>Plan de la semaine</Text>
+                <Text style={styles.modalSubtitle}>
+                  {weeklyPlan?.summary?.totalSessions || 0} session(s) • {Math.round((weeklyPlan?.summary?.totalMinutes || 0) / 60)}h
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setShowPlanPreview(false)}
+                style={styles.closeButton}
+              >
+                <Ionicons name="close" size={24} color="#000" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.modalScrollView} showsVerticalScrollIndicator={false}>
+              {weeklyPlan?.sessions && weeklyPlan.sessions.length > 0 ? (
+                <>
+                  {/* Summary */}
+                  <View style={styles.planSummaryCard}>
+                    <Text style={styles.planSummaryTitle}>Répartition par matière</Text>
+                    {Object.entries(weeklyPlan.summary.distribution || {}).map(([subject, minutes]) => (
+                      <View key={subject} style={styles.planSummaryRow}>
+                        <Text style={styles.planSummarySubject}>{subject}</Text>
+                        <Text style={styles.planSummaryTime}>{Math.round(Number(minutes) / 60)}h {Number(minutes) % 60}min</Text>
+                      </View>
+                    ))}
+                  </View>
+
+                  {/* Sessions */}
+                  <View style={styles.planSessionsContainer}>
+                    <Text style={styles.planSessionsTitle}>Sessions planifiées</Text>
+                    {weeklyPlan.sessions.map((session: any, index: number) => (
+                      <View key={index} style={styles.planSessionCard}>
+                        <View style={styles.planSessionHeader}>
+                          <View style={styles.planSessionSubjectBadge}>
+                            <Text style={styles.planSessionSubjectText}>{session.subjectName}</Text>
+                          </View>
+                          <Text style={styles.planSessionTime}>
+                            {format(new Date(session.start), 'EEE d MMM')} • {format(new Date(session.start), 'HH:mm')} - {format(new Date(session.end), 'HH:mm')}
+                          </Text>
+                        </View>
+                        <Text style={styles.planSessionDuration}>
+                          {Math.floor(session.durationMinutes / 60)}h {session.durationMinutes % 60}min
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                </>
+              ) : (
+                <View style={styles.planEmptyContainer}>
+                  <Text style={styles.planEmptyText}>Aucune session à planifier</Text>
+                  <Text style={styles.planEmptySubtext}>
+                    Assurez-vous d'avoir des tâches non complétées liées à vos matières.
+                  </Text>
+                </View>
+              )}
+            </ScrollView>
+
+            {/* Actions */}
+            {weeklyPlan?.sessions && weeklyPlan.sessions.length > 0 && (
+              <View style={styles.planActions}>
+                <TouchableOpacity
+                  style={styles.planCancelButton}
+                  onPress={() => setShowPlanPreview(false)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.planCancelText}>Annuler</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.planApplyButton}
+                  onPress={handleApplyPlan}
+                  activeOpacity={0.8}
+                  disabled={planningWeek}
+                >
+                  {planningWeek ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <>
+                      <Ionicons name="calendar" size={18} color="#FFFFFF" />
+                      <Text style={styles.planApplyText}>Appliquer au calendrier</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -1135,8 +1558,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
-  addSubjectButton: {
+  addSubjectButtonsContainer: {
     marginTop: 16,
+    gap: 12,
+  },
+  addSubjectButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -1148,10 +1574,198 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(22, 163, 74, 0.2)',
   },
+  addSubjectButtonImage: {
+    backgroundColor: 'rgba(22, 163, 74, 0.05)',
+  },
   addSubjectText: {
     color: '#16A34A',
     fontSize: 16,
     fontWeight: '600',
+  },
+  imagePickerOptions: {
+    padding: 24,
+    gap: 16,
+  },
+  imagePickerOption: {
+    padding: 20,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.1)',
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    gap: 12,
+  },
+  imagePickerIconContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: 'rgba(22, 163, 74, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  imagePickerOptionText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#000000',
+  },
+  imagePickerOptionSubtext: {
+    fontSize: 14,
+    color: 'rgba(0, 0, 0, 0.6)',
+    textAlign: 'center',
+  },
+  imagePickerHint: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    paddingHorizontal: 24,
+    paddingBottom: 24,
+  },
+  imagePickerHintText: {
+    flex: 1,
+    fontSize: 13,
+    color: 'rgba(0, 0, 0, 0.6)',
+    lineHeight: 18,
+  },
+  planWeekButton: {
+    marginTop: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    backgroundColor: '#16A34A',
+    borderRadius: 16,
+    shadowColor: '#16A34A',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  planWeekText: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  planSummaryCard: {
+    padding: 20,
+    borderRadius: 16,
+    backgroundColor: 'rgba(0, 0, 0, 0.02)',
+    marginBottom: 24,
+  },
+  planSummaryTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#000000',
+    marginBottom: 12,
+  },
+  planSummaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  planSummarySubject: {
+    fontSize: 15,
+    color: '#000000',
+    fontWeight: '500',
+  },
+  planSummaryTime: {
+    fontSize: 14,
+    color: 'rgba(0, 0, 0, 0.6)',
+  },
+  planSessionsContainer: {
+    gap: 12,
+  },
+  planSessionsTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#000000',
+    marginBottom: 12,
+  },
+  planSessionCard: {
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.1)',
+    backgroundColor: '#FFFFFF',
+  },
+  planSessionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  planSessionSubjectBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    backgroundColor: 'rgba(22, 163, 74, 0.1)',
+  },
+  planSessionSubjectText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#16A34A',
+  },
+  planSessionTime: {
+    fontSize: 13,
+    color: 'rgba(0, 0, 0, 0.6)',
+  },
+  planSessionDuration: {
+    fontSize: 14,
+    color: 'rgba(0, 0, 0, 0.4)',
+  },
+  planEmptyContainer: {
+    padding: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  planEmptyText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#000000',
+    marginBottom: 8,
+  },
+  planEmptySubtext: {
+    fontSize: 14,
+    color: 'rgba(0, 0, 0, 0.6)',
+    textAlign: 'center',
+  },
+  planActions: {
+    flexDirection: 'row',
+    gap: 12,
+    paddingTop: 24,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0, 0, 0, 0.05)',
+  },
+  planCancelButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  planCancelText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: 'rgba(0, 0, 0, 0.6)',
+  },
+  planApplyButton: {
+    flex: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 16,
+    backgroundColor: '#16A34A',
+  },
+  planApplyText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
   modalOverlay: {
     flex: 1,

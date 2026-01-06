@@ -4,7 +4,8 @@ import { useRouter } from 'expo-router';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { authService } from '@/lib/api';
+import { authService, googleCalendarService } from '@/lib/api';
+import { format, parseISO, isBefore, isAfter } from 'date-fns';
 
 interface KeyMoment {
   time: string;
@@ -13,27 +14,95 @@ interface KeyMoment {
   active: boolean;
 }
 
+interface CalendarEvent {
+  id: string;
+  summary: string;
+  description?: string;
+  start: string;
+  end: string;
+  timeZone: string;
+  isAllDay?: boolean;
+  isProductif: boolean;
+}
+
 export function DashboardEnhanced() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   
   const [userName, setUserName] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
+  const [isCalendarConnected, setIsCalendarConnected] = useState(false);
 
   const currentHour = new Date().getHours();
   const greeting = currentHour < 12 ? 'Good morning' : currentHour < 18 ? 'Good afternoon' : 'Good evening';
 
-  const keyMoments: KeyMoment[] = [
-    { time: '09:00', label: 'Morning focus', type: 'focus', active: true },
-    { time: '11:30', label: 'Break', type: 'break', active: false },
-    { time: '14:00', label: 'Afternoon focus', type: 'focus', active: false },
-  ];
+  // Convertir les événements Google Calendar en KeyMoments
+  const keyMoments: KeyMoment[] = React.useMemo(() => {
+    if (!calendarEvents.length) {
+      // Si pas d'événements, retourner un tableau vide
+      return [];
+    }
+
+    const now = new Date();
+    
+    return calendarEvents
+      .filter((event) => {
+        // Filtrer les événements all-day (on ne les affiche pas dans la timeline)
+        if (event.isAllDay) {
+          return false;
+        }
+        // Vérifier que l'événement a une date valide
+        try {
+          const startTime = parseISO(event.start);
+          return !isNaN(startTime.getTime());
+        } catch {
+          return false;
+        }
+      })
+      .slice(0, 5) // Limiter à 5 événements
+      .map((event) => {
+        try {
+          const startTime = parseISO(event.start);
+          const endTime = parseISO(event.end);
+          
+          // Un événement est actif s'il a commencé et n'est pas encore terminé
+          const isActive = isBefore(startTime, now) && isAfter(endTime, now);
+          
+          return {
+            time: format(startTime, 'HH:mm'),
+            label: event.summary,
+            type: event.isProductif ? 'focus' : 'break',
+            active: isActive,
+          };
+        } catch (error) {
+          console.error('Erreur parsing date événement:', error);
+          return null;
+        }
+      })
+      .filter((moment): moment is KeyMoment => moment !== null);
+  }, [calendarEvents]);
 
   const loadData = async () => {
     try {
       const user = await authService.checkAuth();
       if (user?.name) {
         setUserName(user.name.split(' ')[0]);
+      }
+
+      // Récupérer les événements Google Calendar
+      try {
+        const calendarData = await googleCalendarService.getTodayEvents();
+        setIsCalendarConnected(calendarData.connected);
+        if (calendarData.connected && calendarData.events) {
+          setCalendarEvents(calendarData.events);
+        } else {
+          setCalendarEvents([]);
+        }
+      } catch (error) {
+        console.error('Erreur récupération événements Google Calendar:', error);
+        setCalendarEvents([]);
+        setIsCalendarConnected(false);
       }
     } catch (error) {
       console.error('Erreur chargement dashboard:', error);
@@ -127,46 +196,65 @@ export function DashboardEnhanced() {
           {/* Key Moments Timeline */}
           <Animated.View entering={FadeInDown.delay(300).duration(400)} style={styles.section}>
             <Text style={styles.sectionLabel}>Key moments today</Text>
-            <View style={styles.timeline}>
-              {keyMoments.map((moment, index) => (
-                <View key={index} style={styles.timelineItem}>
-                  <View style={styles.timelineLeft}>
-                    <View style={[
-                      styles.timelineDot,
-                      moment.active && styles.timelineDotActive
-                    ]} />
-                    {index < keyMoments.length - 1 && (
+            {keyMoments.length > 0 ? (
+              <View style={styles.timeline}>
+                {keyMoments.map((moment, index) => (
+                  <View key={index} style={styles.timelineItem}>
+                    <View style={styles.timelineLeft}>
                       <View style={[
-                        styles.timelineLine,
-                        moment.active && styles.timelineLineActive
+                        styles.timelineDot,
+                        moment.active && styles.timelineDotActive
                       ]} />
-                    )}
-                  </View>
-                  <View style={[
-                    styles.timelineCard,
-                    moment.active && styles.timelineCardActive
-                  ]}>
-                    <View style={styles.timelineCardContent}>
-                      <Text style={[
-                        styles.timelineTime,
-                        moment.active && styles.timelineTimeActive
-                      ]}>
-                        {moment.time}
-                      </Text>
-                      <Text style={[
-                        styles.timelineLabel,
-                        moment.active && styles.timelineLabelActive
-                      ]}>
-                        {moment.label}
-                      </Text>
+                      {index < keyMoments.length - 1 && (
+                        <View style={[
+                          styles.timelineLine,
+                          moment.active && styles.timelineLineActive
+                        ]} />
+                      )}
                     </View>
-                    {moment.type === 'focus' && moment.active && (
-                      <View style={styles.activePulse} />
-                    )}
+                    <View style={[
+                      styles.timelineCard,
+                      moment.active && styles.timelineCardActive
+                    ]}>
+                      <View style={styles.timelineCardContent}>
+                        <Text style={[
+                          styles.timelineTime,
+                          moment.active && styles.timelineTimeActive
+                        ]}>
+                          {moment.time}
+                        </Text>
+                        <Text style={[
+                          styles.timelineLabel,
+                          moment.active && styles.timelineLabelActive
+                        ]}>
+                          {moment.label}
+                        </Text>
+                      </View>
+                      {moment.type === 'focus' && moment.active && (
+                        <View style={styles.activePulse} />
+                      )}
+                    </View>
                   </View>
-                </View>
-              ))}
-            </View>
+                ))}
+              </View>
+            ) : (
+              <View style={styles.emptyCalendarContainer}>
+                {isCalendarConnected ? (
+                  <Text style={styles.emptyCalendarText}>Aucun événement aujourd'hui</Text>
+                ) : (
+                  <View style={styles.connectCalendarContainer}>
+                    <Text style={styles.emptyCalendarText}>Connectez votre Google Calendar pour voir vos événements</Text>
+                    <TouchableOpacity
+                      style={styles.connectCalendarButton}
+                      onPress={() => router.push('/parametres')}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={styles.connectCalendarButtonText}>Connecter</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
+            )}
           </Animated.View>
 
           {/* Community Progress Card */}
@@ -560,6 +648,33 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: 'rgba(0, 0, 0, 0.4)',
     fontStyle: 'italic',
+  },
+  emptyCalendarContainer: {
+    padding: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 120,
+  },
+  emptyCalendarText: {
+    fontSize: 14,
+    color: 'rgba(0, 0, 0, 0.4)',
+    textAlign: 'center',
+  },
+  connectCalendarContainer: {
+    alignItems: 'center',
+    gap: 16,
+  },
+  connectCalendarButton: {
+    backgroundColor: '#16A34A',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 16,
+    marginTop: 8,
+  },
+  connectCalendarButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
   },
 });
 

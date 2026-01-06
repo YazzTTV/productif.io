@@ -93,6 +93,13 @@
         {
           "calendarPermission": "Nous avons besoin d'accéder à votre calendrier pour synchroniser vos tâches."
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Nous avons besoin d'accéder à vos photos pour analyser les images de matières.",
+          "cameraPermission": "Nous avons besoin d'accéder à votre appareil photo pour photographier vos listes de matières."
+        }
       ]
     ],
     "experiments": {
