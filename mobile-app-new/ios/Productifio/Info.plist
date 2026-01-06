@@ -57,13 +57,13 @@
     <key>NSCalendarsUsageDescription</key>
     <string>Nous avons besoin d'accéder à votre calendrier pour synchroniser vos tâches.</string>
     <key>NSCameraUsageDescription</key>
-    <string>We need access to your camera to allow you to take photos for your tasks and journal entries.</string>
+    <string>Nous avons besoin d'accéder à votre appareil photo pour photographier vos listes de matières.</string>
     <key>NSMicrophoneUsageDescription</key>
     <string>Autoriser l'accès au microphone pour enregistrer votre voix.</string>
     <key>NSPhotoLibraryAddUsageDescription</key>
     <string>We need permission to save images to your photo library.</string>
     <key>NSPhotoLibraryUsageDescription</key>
-    <string>We need access to your photo library to let you select images for your tasks and journal entries.</string>
+    <string>Nous avons besoin d'accéder à vos photos pour analyser les images de matières.</string>
     <key>NSRemindersFullAccessUsageDescription</key>
     <string>Allow $(PRODUCT_NAME) to access your reminders</string>
     <key>NSRemindersUsageDescription</key>

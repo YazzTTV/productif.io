@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 
 // Configuration de l'API  
 const API_BASE_URL = 'https://www.productif.io/api'; // Utilisation de l'API de production avec www
@@ -603,6 +604,55 @@ export const subjectsService = {
       throw error;
     }
   },
+
+  // Analyser une image pour extraire les matières
+  async analyzeImage(imageUri: string): Promise<{
+    success: boolean;
+    subjects: Array<{ name: string; coefficient: number; ue?: string | null }>;
+    totalFound: number;
+    validCount: number;
+    skippedCount: number;
+  }> {
+    try {
+      const token = await getAuthToken();
+      if (!token) {
+        throw new Error('Non authentifié');
+      }
+
+      // Créer un FormData avec l'image
+      // Pour React Native, on doit utiliser un objet avec uri, type, name
+      const formData = new FormData();
+      const filename = imageUri.split('/').pop() || 'subject-image.jpg';
+      const match = /\.(\w+)$/.exec(filename);
+      const type = match ? `image/${match[1]}` : 'image/jpeg';
+      
+      formData.append('image', {
+        uri: Platform.OS === 'ios' ? imageUri.replace('file://', '') : imageUri,
+        type: type,
+        name: filename,
+      } as any);
+
+      const response = await fetch(`${API_BASE_URL}/subjects/analyze-image`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          // Ne pas définir Content-Type, FormData le fait automatiquement avec boundary
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Erreur ${response.status}`);
+      }
+
+      const result = await response.json();
+      return result;
+    } catch (error: any) {
+      console.error('❌ [subjectsService] Erreur analyse image:', error);
+      throw error;
+    }
+  },
 };
 
 // Service pour les projets
@@ -830,6 +880,31 @@ export const googleCalendarService = {
     });
   },
 
+  // Récupérer les événements du jour depuis Google Calendar
+  async getTodayEvents(): Promise<{
+    events: Array<{
+      id: string;
+      summary: string;
+      description?: string;
+      start: string;
+      end: string;
+      timeZone: string;
+      isAllDay?: boolean;
+      isProductif: boolean;
+    }>;
+    connected: boolean;
+  }> {
+    try {
+      return await apiCall('/google-calendar/events');
+    } catch (error: any) {
+      console.error('❌ [GoogleCalendarService] Erreur récupération événements:', error);
+      return {
+        events: [],
+        connected: false,
+      };
+    }
+  },
+
   // Créer un événement dans Google Calendar pour une tâche
   async scheduleTask(taskId: string, start: string, end: string, timezone?: string): Promise<{
     success: boolean;
@@ -895,6 +970,82 @@ export const trialService = {
   }> {
     return await apiCall('/user/start-trial', {
       method: 'POST',
+    });
+  },
+};
+
+// Service de planification hebdomadaire
+export const weeklyPlanningService = {
+  // Générer un plan hebdomadaire (preview)
+  async generatePlan(weekStart?: string): Promise<{
+    success: boolean;
+    plan: {
+      sessions: Array<{
+        subjectId: string;
+        subjectName: string;
+        tasks: string[];
+        start: string;
+        end: string;
+        durationMinutes: number;
+        priority: number;
+      }>;
+      summary: {
+        totalSessions: number;
+        totalMinutes: number;
+        subjectsCovered: string[];
+        distribution: Record<string, number>;
+      };
+    };
+  }> {
+    const params = weekStart ? `?weekStart=${weekStart}` : '';
+    return await apiCall(`/planning/weekly-plan${params}`);
+  },
+
+  // Appliquer le plan (créer les événements dans Google Calendar)
+  async applyPlan(weekStart?: string): Promise<{
+    success: boolean;
+    plan: any;
+    applied: boolean;
+    eventsCreated: number;
+    eventsFailed: number;
+    message: string;
+  }> {
+    return await apiCall('/planning/weekly-plan', {
+      method: 'POST',
+      body: JSON.stringify({
+        weekStart,
+        apply: true,
+      }),
+    });
+  },
+};
+
+// Service pour associer les tâches aux matières
+export const taskAssociationService = {
+  // Analyser une transcription et associer les tâches aux matières
+  async associateTasks(transcription: string): Promise<{
+    success: boolean;
+    tasks: Array<{
+      title: string;
+      description?: string;
+      priority: number;
+      energy: number;
+      estimatedDuration: number;
+      subjectId: string | null;
+      subjectName: string | null;
+      confidence: number;
+    }>;
+    summary: string;
+    targetDate: string;
+    subjects: Array<{
+      id: string;
+      name: string;
+      coefficient: number;
+    }>;
+  }> {
+    return await apiCall('/tasks/associate-subjects', {
+      method: 'POST',
+      body: JSON.stringify({ transcription }),
     });
   },
 }; 

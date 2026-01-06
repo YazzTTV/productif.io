@@ -8,6 +8,9 @@
     },
     "app/api/analytics/**/*.ts": {
       "maxDuration": 60
+    },
+    "app/api/subjects/analyze-image/**/*.ts": {
+      "maxDuration": 60
     }
   },
   "routes": [
