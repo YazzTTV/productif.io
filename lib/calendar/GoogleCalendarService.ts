@@ -341,6 +341,52 @@ export class GoogleCalendarService {
   }
 
   /**
+   * Récupère tous les événements du jour depuis Google Calendar
+   */
+  async getTodayEvents(userId: string): Promise<GoogleCalendarEvent[]> {
+    const accessToken = await this.refreshTokenIfNeeded(userId)
+    if (!accessToken) {
+      return []
+    }
+
+    const now = new Date()
+    // Début de la journée (00:00:00)
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    // Fin de la journée (23:59:59)
+    const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59)
+
+    try {
+      const params = new URLSearchParams({
+        timeMin: startOfDay.toISOString(),
+        timeMax: endOfDay.toISOString(),
+        singleEvents: 'true',
+        orderBy: 'startTime',
+        maxResults: '50'
+      })
+
+      const response = await fetch(
+        `${CALENDAR_API_BASE}/calendars/primary/events?${params}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`
+          }
+        }
+      )
+
+      if (!response.ok) {
+        console.error('Erreur récupération événements du jour:', response.status)
+        return []
+      }
+
+      const data = await response.json()
+      return data.items || []
+    } catch (error) {
+      console.error('Erreur getTodayEvents:', error)
+      return []
+    }
+  }
+
+  /**
    * Vérifie si l'utilisateur a connecté Google Calendar
    */
   async isConnected(userId: string): Promise<boolean> {
@@ -348,6 +394,143 @@ export class GoogleCalendarService {
       where: { userId }
     })
     return !!token
+  }
+
+  /**
+   * Crée plusieurs événements en batch pour une planification hebdomadaire
+   */
+  async createBatchEvents(
+    userId: string,
+    sessions: Array<{
+      subjectName: string
+      tasks: string[]
+      start: Date
+      end: Date
+      taskTitles?: string[]
+    }>
+  ): Promise<Array<{ success: boolean; eventId?: string; error?: string }>> {
+    const accessToken = await this.refreshTokenIfNeeded(userId)
+    if (!accessToken) {
+      return sessions.map(() => ({
+        success: false,
+        error: 'Token non disponible',
+      }))
+    }
+
+    const results = []
+
+    // Créer les événements séquentiellement pour éviter les rate limits
+    for (const session of sessions) {
+      try {
+        const taskList = session.taskTitles?.join('\n- ') || 'Tâches à compléter'
+        
+        // Convertir les dates UTC en format ISO local pour Europe/Paris
+        // Les dates reçues sont en UTC, mais on doit les envoyer comme si elles étaient en Europe/Paris
+        const formatForParis = (dateUTC: Date): string => {
+          // Utiliser Intl.DateTimeFormat pour obtenir les composants en heure de Paris
+          const formatter = new Intl.DateTimeFormat('en-CA', {
+            timeZone: 'Europe/Paris',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false
+          })
+          
+          // Formater la date UTC en heure de Paris
+          const parts = formatter.formatToParts(dateUTC)
+          const year = parts.find(p => p.type === 'year')?.value
+          const month = parts.find(p => p.type === 'month')?.value
+          const day = parts.find(p => p.type === 'day')?.value
+          const hour = parts.find(p => p.type === 'hour')?.value
+          const minute = parts.find(p => p.type === 'minute')?.value
+          const second = parts.find(p => p.type === 'second')?.value
+          
+          return `${year}-${month}-${day}T${hour}:${minute}:${second}`
+        }
+        
+        const startDateTime = formatForParis(session.start)
+        const endDateTime = formatForParis(session.end)
+        
+        console.log('📅 [GoogleCalendar] createBatchEvents - Session:', {
+          subject: session.subjectName,
+          startUTC: session.start.toISOString(),
+          startParis: startDateTime,
+          endUTC: session.end.toISOString(),
+          endParis: endDateTime
+        })
+        
+        const event = {
+          summary: `[Productif] ${session.subjectName}`,
+          description: `📚 Session d'étude: ${session.subjectName}\n\nTâches:\n- ${taskList}\n\nMarque tes tâches comme faites après la session !`,
+          start: {
+            dateTime: startDateTime,
+            timeZone: 'Europe/Paris',
+          },
+          end: {
+            dateTime: endDateTime,
+            timeZone: 'Europe/Paris',
+          },
+          reminders: {
+            useDefault: false,
+            overrides: [
+              {
+                method: 'popup',
+                minutes: 15, // Rappel 15 min avant
+              },
+            ],
+          },
+          extendedProperties: {
+            private: {
+              productif: 'true',
+              type: 'weekly_plan',
+              version: '1',
+            },
+          },
+          colorId: PRODUCTIF_CALENDAR_COLOR,
+        }
+
+        const response = await fetch(
+          `${CALENDAR_API_BASE}/calendars/primary/events`,
+          {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(event),
+          }
+        )
+
+        if (!response.ok) {
+          const error = await response.json().catch(() => ({}))
+          results.push({
+            success: false,
+            error: error.error?.message || 'Erreur création événement',
+          })
+          continue
+        }
+
+        const createdEvent = await response.json()
+        results.push({
+          success: true,
+          eventId: createdEvent.id,
+        })
+
+        // Petit délai pour éviter les rate limits
+        await new Promise((resolve) => setTimeout(resolve, 100))
+      } catch (error: any) {
+        console.error('Erreur création événement batch:', error)
+        results.push({
+          success: false,
+          error: error.message || 'Erreur réseau',
+        })
+      }
+    }
+
+    return results
   }
 }
 
