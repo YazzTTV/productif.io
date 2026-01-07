@@ -563,7 +563,7 @@ export default function FocusScreen() {
   const strokeDashoffset = CIRCUMFERENCE * (1 - progress);
 
   // ━━━━━━━━━━━━━━━━━━━━━━
-  // INTRO SCREEN
+  // INTRO SCREEN - Design System
   // ━━━━━━━━━━━━━━━━━━━━━━
   if (phase === 'intro') {
     return (
@@ -574,7 +574,7 @@ export default function FocusScreen() {
             contentContainerStyle={introStyles.scrollContent}
             showsVerticalScrollIndicator={false}
           >
-            {/* Header */}
+            {/* Header - Design System */}
             <Animated.View entering={FadeInUp.delay(100).duration(400)} style={introStyles.header}>
               <View style={introStyles.headerLeft}>
                 <TouchableOpacity
@@ -585,9 +585,7 @@ export default function FocusScreen() {
                   <Ionicons name="arrow-back" size={20} color="#000" />
                 </TouchableOpacity>
                 <View style={introStyles.headerTitleContainer}>
-                  <View style={introStyles.targetIcon}>
-                    <Ionicons name="flag" size={20} color="#16A34A" />
-                  </View>
+                  <Ionicons name="flag" size={20} color="#16A34A" />
                   <View>
                     <Text style={introStyles.headerTitle}>Focus Session</Text>
                     <Text style={introStyles.headerSubtitle}>AI-selected task</Text>
@@ -604,20 +602,20 @@ export default function FocusScreen() {
             </Animated.View>
 
             <View style={introStyles.content}>
-              {/* Main heading */}
+              {/* Main heading - Design System */}
               <Animated.View entering={FadeInDown.delay(200).duration(400)} style={introStyles.headingSection}>
                 <Text style={introStyles.mainHeading}>Ready to focus</Text>
                 <Text style={introStyles.subHeading}>First task is selected for you.</Text>
               </Animated.View>
 
-              {/* Task card */}
+              {/* Task card - Design System */}
               <Animated.View entering={FadeInDown.delay(300).duration(400)} style={introStyles.taskCard}>
                 <Text style={introStyles.taskCardLabel}>Primary task</Text>
                 <Text style={introStyles.taskCardTitle}>{tasks[0].title}</Text>
                 {tasks[0].subject ? <Text style={introStyles.taskCardSubject}>{tasks[0].subject}</Text> : null}
               </Animated.View>
 
-              {/* Duration selection */}
+              {/* Duration selection - Design System */}
               <Animated.View entering={FadeInDown.delay(400).duration(400)} style={introStyles.durationSection}>
                 <Text style={introStyles.durationQuestion}>How long can you stay focused right now?</Text>
                 
@@ -630,7 +628,7 @@ export default function FocusScreen() {
 
                 <DurationSlider value={selectedDuration} onValueChange={setSelectedDuration} />
 
-                {/* Preset buttons */}
+                {/* Preset buttons - Design System */}
                 <View style={introStyles.presetButtons}>
                   {PRESET_DURATIONS.map((preset) => (
                     <TouchableOpacity
@@ -655,7 +653,7 @@ export default function FocusScreen() {
                 </View>
               </Animated.View>
 
-              {/* Start button */}
+              {/* Start button - Design System */}
               <Animated.View entering={FadeInDown.delay(500).duration(400)} style={introStyles.startButtonContainer}>
                 <TouchableOpacity
                   style={introStyles.startButton}
@@ -669,7 +667,7 @@ export default function FocusScreen() {
           </ScrollView>
         </View>
 
-        {/* Session Settings Modal - Outside ScrollView */}
+        {/* Session Settings Modal */}
         <SessionSettingsModal
           isVisible={showSettings}
           onClose={() => setShowSettings(false)}
@@ -688,7 +686,7 @@ export default function FocusScreen() {
   }
 
   // ━━━━━━━━━━━━━━━━━━━━━━
-  // ACTIVE FOCUS SESSION
+  // ACTIVE FOCUS SESSION (Ancienne version)
   // ━━━━━━━━━━━━━━━━━━━━━━
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -809,10 +807,11 @@ const introStyles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 24,
-    paddingTop: 12,
-    paddingBottom: 16,
+    paddingTop: 48,
+    paddingBottom: 24,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(0, 0, 0, 0.05)',
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
   },
   headerLeft: {
     flexDirection: 'row',
@@ -833,19 +832,13 @@ const introStyles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
   },
-  targetIcon: {
-    width: 20,
-    height: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
   headerTitle: {
     fontSize: 16,
     fontWeight: '500',
     color: '#000000',
   },
   headerSubtitle: {
-    fontSize: 12,
+    fontSize: 14,
     color: 'rgba(0, 0, 0, 0.6)',
   },
   settingsButton: {
@@ -858,21 +851,24 @@ const introStyles = StyleSheet.create({
     alignItems: 'center',
   },
   content: {
+    flex: 1,
+    justifyContent: 'center',
     paddingHorizontal: 24,
-    paddingTop: 32,
+    paddingTop: 64,
+    paddingBottom: 64,
     alignItems: 'center',
   },
   headingSection: {
     alignItems: 'center',
-    marginBottom: 48,
+    marginBottom: 64,
+    gap: 12,
   },
   mainHeading: {
     fontSize: 32,
     fontWeight: '600',
-    letterSpacing: -0.04 * 32,
+    letterSpacing: -1.28, // -0.04em * 32
     color: '#000000',
     textAlign: 'center',
-    marginBottom: 12,
   },
   subHeading: {
     fontSize: 16,
@@ -881,26 +877,26 @@ const introStyles = StyleSheet.create({
   },
   taskCard: {
     width: '100%',
+    maxWidth: 400,
     padding: 32,
     borderWidth: 2,
-    borderColor: 'rgba(22, 163, 74, 0.2)',
-    backgroundColor: 'rgba(22, 163, 74, 0.05)',
-    borderRadius: 24,
+    borderColor: 'rgba(22, 163, 74, 0.2)', // border-[#16A34A]/20
+    backgroundColor: 'rgba(22, 163, 74, 0.05)', // bg-[#16A34A]/5
+    borderRadius: 24, // rounded-3xl
     marginBottom: 64,
     alignItems: 'center',
+    gap: 8,
   },
   taskCardLabel: {
     fontSize: 14,
     color: 'rgba(0, 0, 0, 0.4)',
-    marginBottom: 8,
   },
   taskCardTitle: {
     fontSize: 20,
     fontWeight: '600',
-    letterSpacing: -0.03 * 20,
+    letterSpacing: -0.6, // -0.03em * 20
     color: '#000000',
     textAlign: 'center',
-    marginBottom: 8,
   },
   taskCardSubject: {
     fontSize: 16,
@@ -909,35 +905,34 @@ const introStyles = StyleSheet.create({
   },
   durationSection: {
     width: '100%',
+    maxWidth: 400,
     alignItems: 'center',
-    marginBottom: 48,
+    marginBottom: 64,
+    gap: 24,
   },
   durationQuestion: {
     fontSize: 16,
     color: 'rgba(0, 0, 0, 0.6)',
     textAlign: 'center',
-    marginBottom: 24,
   },
   durationDisplay: {
     fontSize: 64,
     fontWeight: '600',
-    letterSpacing: -0.04 * 64,
+    letterSpacing: -2.56, // -0.04em * 64
     color: '#000000',
     textAlign: 'center',
-    marginBottom: 24,
     lineHeight: 64,
   },
   presetButtons: {
     flexDirection: 'row',
     gap: 12,
     justifyContent: 'center',
-    marginTop: 24,
   },
   presetButton: {
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 9999,
-    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+    backgroundColor: 'rgba(0, 0, 0, 0.05)', // bg-black/5
   },
   presetButtonActive: {
     backgroundColor: '#000000',
@@ -952,13 +947,13 @@ const introStyles = StyleSheet.create({
   },
   startButtonContainer: {
     width: '100%',
-    marginTop: 32,
+    maxWidth: 400,
   },
   startButton: {
     width: '100%',
     paddingVertical: 20,
     backgroundColor: '#16A34A',
-    borderRadius: 24,
+    borderRadius: 24, // rounded-3xl
     alignItems: 'center',
     shadowColor: '#16A34A',
     shadowOffset: { width: 0, height: 4 },
