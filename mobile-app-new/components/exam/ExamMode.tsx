@@ -60,7 +60,7 @@ export function ExamMode() {
   };
 
   const handleStartFocus = () => {
-    setPhase('focus');
+    router.push('/focus');
   };
 
   if (phase === 'dashboard') {
@@ -196,12 +196,8 @@ export function ExamMode() {
     );
   }
 
-  // Focus phase - simplified for now
-  return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      <Text>Focus Mode - Coming soon</Text>
-    </View>
-  );
+  // This should not be reached anymore since we redirect to /focus
+  return null;
 }
 
 const styles = StyleSheet.create({

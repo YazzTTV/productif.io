@@ -602,23 +602,22 @@ export default function FocusScreen() {
             </Animated.View>
 
             <View style={introStyles.content}>
-              {/* Main heading - Design System */}
+              {/* Main heading - Simplifié */}
               <Animated.View entering={FadeInDown.delay(200).duration(400)} style={introStyles.headingSection}>
                 <Text style={introStyles.mainHeading}>Ready to focus</Text>
-                <Text style={introStyles.subHeading}>First task is selected for you.</Text>
               </Animated.View>
 
-              {/* Task card - Design System */}
+              {/* Task card - Simplifié */}
               <Animated.View entering={FadeInDown.delay(300).duration(400)} style={introStyles.taskCard}>
-                <Text style={introStyles.taskCardLabel}>Primary task</Text>
                 <Text style={introStyles.taskCardTitle}>{tasks[0].title}</Text>
-                {tasks[0].subject ? <Text style={introStyles.taskCardSubject}>{tasks[0].subject}</Text> : null}
+                {tasks[0].subject && (
+                  <Text style={introStyles.taskCardSubject}>{tasks[0].subject}</Text>
+                )}
               </Animated.View>
 
-              {/* Duration selection - Design System */}
+              {/* Duration selection - Avec cursor/timer et slider */}
               <Animated.View entering={FadeInDown.delay(400).duration(400)} style={introStyles.durationSection}>
-                <Text style={introStyles.durationQuestion}>How long can you stay focused right now?</Text>
-                
+                {/* Cursor/Timer - Affichage de la durée en grand */}
                 <Animated.View 
                   key={selectedDuration}
                   entering={FadeInDown.delay(100).duration(300)}
@@ -626,9 +625,10 @@ export default function FocusScreen() {
                   <Text style={introStyles.durationDisplay}>{selectedDuration} min</Text>
                 </Animated.View>
 
+                {/* Slider pour ajuster la durée */}
                 <DurationSlider value={selectedDuration} onValueChange={setSelectedDuration} />
 
-                {/* Preset buttons - Design System */}
+                {/* Preset buttons */}
                 <View style={introStyles.presetButtons}>
                   {PRESET_DURATIONS.map((preset) => (
                     <TouchableOpacity
@@ -653,7 +653,7 @@ export default function FocusScreen() {
                 </View>
               </Animated.View>
 
-              {/* Start button - Design System */}
+              {/* Start button - Simplifié */}
               <Animated.View entering={FadeInDown.delay(500).duration(400)} style={introStyles.startButtonContainer}>
                 <TouchableOpacity
                   style={introStyles.startButton}
@@ -860,8 +860,7 @@ const introStyles = StyleSheet.create({
   },
   headingSection: {
     alignItems: 'center',
-    marginBottom: 64,
-    gap: 12,
+    marginBottom: 48,
   },
   mainHeading: {
     fontSize: 32,
@@ -870,26 +869,17 @@ const introStyles = StyleSheet.create({
     color: '#000000',
     textAlign: 'center',
   },
-  subHeading: {
-    fontSize: 16,
-    color: 'rgba(0, 0, 0, 0.6)',
-    textAlign: 'center',
-  },
   taskCard: {
     width: '100%',
     maxWidth: 400,
-    padding: 32,
+    padding: 24,
     borderWidth: 2,
-    borderColor: 'rgba(22, 163, 74, 0.2)', // border-[#16A34A]/20
-    backgroundColor: 'rgba(22, 163, 74, 0.05)', // bg-[#16A34A]/5
-    borderRadius: 24, // rounded-3xl
-    marginBottom: 64,
+    borderColor: 'rgba(22, 163, 74, 0.2)',
+    backgroundColor: 'rgba(22, 163, 74, 0.05)',
+    borderRadius: 24,
+    marginBottom: 48,
     alignItems: 'center',
     gap: 8,
-  },
-  taskCardLabel: {
-    fontSize: 14,
-    color: 'rgba(0, 0, 0, 0.4)',
   },
   taskCardTitle: {
     fontSize: 20,
@@ -907,13 +897,8 @@ const introStyles = StyleSheet.create({
     width: '100%',
     maxWidth: 400,
     alignItems: 'center',
-    marginBottom: 64,
+    marginBottom: 48,
     gap: 24,
-  },
-  durationQuestion: {
-    fontSize: 16,
-    color: 'rgba(0, 0, 0, 0.6)',
-    textAlign: 'center',
   },
   durationDisplay: {
     fontSize: 64,

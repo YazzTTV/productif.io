@@ -130,6 +130,13 @@ function AppContent() {
               }} 
             />
             <Stack.Screen 
+              name="exam" 
+              options={{ 
+                headerShown: false,
+                gestureEnabled: true,
+              }} 
+            />
+            <Stack.Screen 
               name="time-history" 
               options={{ 
                 headerShown: false,

@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { authService, googleCalendarService } from '@/lib/api';
 import { format, parseISO, isBefore, isAfter } from 'date-fns';
+import { checkPremiumStatus } from '@/utils/premium';
 
 interface KeyMoment {
   time: string;
@@ -33,6 +34,7 @@ export function DashboardEnhanced() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
   const [isCalendarConnected, setIsCalendarConnected] = useState(false);
+  const [isPremium, setIsPremium] = useState(false);
 
   const currentHour = new Date().getHours();
   const greeting = currentHour < 12 ? 'Good morning' : currentHour < 18 ? 'Good afternoon' : 'Good evening';
@@ -89,6 +91,10 @@ export function DashboardEnhanced() {
       if (user?.name) {
         setUserName(user.name.split(' ')[0]);
       }
+
+      // Check premium status
+      const premiumStatus = await checkPremiumStatus();
+      setIsPremium(premiumStatus.isPremium);
 
       // Récupérer les événements Google Calendar
       try {
@@ -191,6 +197,53 @@ export function DashboardEnhanced() {
                 <Text style={styles.startFocusText}>Start to Focus</Text>
               </TouchableOpacity>
             </View>
+          </Animated.View>
+
+          {/* Exam Mode Card */}
+          <Animated.View entering={FadeInDown.delay(250).duration(400)} style={styles.section}>
+            <Text style={styles.sectionLabel}>Exam Mode</Text>
+            <TouchableOpacity
+              style={[styles.examModeCard, !isPremium && styles.examModeCardLocked]}
+              onPress={() => {
+                if (isPremium) {
+                  router.push('/exam/setup');
+                } else {
+                  router.push('/exam/preview');
+                }
+              }}
+              activeOpacity={0.8}
+            >
+              <View style={styles.examModeContent}>
+                <View style={styles.examModeHeader}>
+                  <View style={styles.examModeIconContainer}>
+                    <Ionicons 
+                      name="school-outline" 
+                      size={24} 
+                      color={isPremium ? "#16A34A" : "rgba(0, 0, 0, 0.4)"} 
+                    />
+                  </View>
+                  {!isPremium && (
+                    <Ionicons name="lock-closed" size={16} color="rgba(0, 0, 0, 0.4)" />
+                  )}
+                </View>
+                <Text style={styles.examModeTitle}>Exam Mode</Text>
+                <Text style={styles.examModeDescription}>
+                  {isPremium 
+                    ? "Focus intensely on your most important tasks"
+                    : "Locked - Preview available"}
+                </Text>
+              </View>
+              <View style={[styles.examModeCTA, !isPremium && styles.examModeCTALocked]}>
+                <Text style={[styles.examModeCTAText, !isPremium && styles.examModeCTATextLocked]}>
+                  {isPremium ? "Start" : "Preview"}
+                </Text>
+                <Ionicons 
+                  name="chevron-forward" 
+                  size={16} 
+                  color={isPremium ? "#FFFFFF" : "rgba(0, 0, 0, 0.4)"} 
+                />
+              </View>
+            </TouchableOpacity>
           </Animated.View>
 
           {/* Key Moments Timeline */}
@@ -639,6 +692,66 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: 'rgba(0, 0, 0, 0.4)',
     textAlign: 'center',
+  },
+  examModeCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.05)',
+    padding: 20,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  examModeCardLocked: {
+    opacity: 0.6,
+  },
+  examModeContent: {
+    flex: 1,
+  },
+  examModeHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  examModeIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(22, 163, 74, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  examModeTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#000000',
+    marginBottom: 4,
+  },
+  examModeDescription: {
+    fontSize: 14,
+    color: 'rgba(0, 0, 0, 0.6)',
+  },
+  examModeCTA: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    backgroundColor: '#16A34A',
+  },
+  examModeCTALocked: {
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+  },
+  examModeCTAText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  examModeCTATextLocked: {
+    color: 'rgba(0, 0, 0, 0.4)',
   },
   microcopy: {
     paddingVertical: 24,
