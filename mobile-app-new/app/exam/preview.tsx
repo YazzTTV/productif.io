@@ -5,8 +5,11 @@ import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { checkPremiumStatus } from '@/utils/premium';
+import { Paywall } from '@/components/paywall/Paywall';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 export default function ExamPreviewScreen() {
+  const { t } = useLanguage();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [isPremium, setIsPremium] = useState(false);
@@ -53,60 +56,59 @@ export default function ExamPreviewScreen() {
             <Ionicons name="arrow-back" size={22} color="#000" />
           </TouchableOpacity>
           <View style={styles.headerContent}>
-            <Text style={styles.headerTitle}>Exam Mode</Text>
-            <Text style={styles.headerSubtitle}>Preview</Text>
+            <Text style={styles.headerTitle}>{t('examMode')}</Text>
+            <Text style={styles.headerSubtitle}>{t('preview') || 'Preview'}</Text>
           </View>
           <View style={styles.backButton} />
         </Animated.View>
 
         {/* Preview Content */}
         <Animated.View entering={FadeInDown.delay(200).duration(400)} style={styles.previewSection}>
-          <Text style={styles.previewTitle}>What is Exam Mode?</Text>
+          <Text style={styles.previewTitle}>{t('whatIsExamMode') || 'What is Exam Mode?'}</Text>
           <Text style={styles.previewDescription}>
-            Exam Mode helps you focus intensely on your most important tasks before exams. 
-            It chains tasks automatically, tracks your progress, and keeps you locked in.
+            {t('examModeDescription')}
           </Text>
         </Animated.View>
 
         {/* Demo Timer */}
         <Animated.View entering={FadeInDown.delay(300).duration(400)} style={styles.demoSection}>
           <View style={styles.demoTimerCard}>
-            <Text style={styles.demoTimerLabel}>Demo Timer</Text>
+            <Text style={styles.demoTimerLabel}>{t('demoTimer') || 'Demo Timer'}</Text>
             <Text style={styles.demoTimerValue}>45:00</Text>
-            <Text style={styles.demoTimerNote}>Static preview - timer doesn't run</Text>
+            <Text style={styles.demoTimerNote}>{t('staticPreview') || 'Static preview - timer doesn\'t run'}</Text>
           </View>
         </Animated.View>
 
         {/* Sample Task Card */}
         <Animated.View entering={FadeInDown.delay(400).duration(400)} style={styles.demoSection}>
           <View style={styles.taskCard}>
-            <Text style={styles.taskCardLabel}>Sample Task</Text>
-            <Text style={styles.taskCardTitle}>Complete Chapter 12 Summary</Text>
-            <Text style={styles.taskCardSubject}>Organic Chemistry</Text>
+            <Text style={styles.taskCardLabel}>{t('sampleTask') || 'Sample Task'}</Text>
+            <Text style={styles.taskCardTitle}>{t('sampleTaskTitle') || 'Complete Chapter 12 Summary'}</Text>
+            <Text style={styles.taskCardSubject}>{t('sampleTaskSubject') || 'Organic Chemistry'}</Text>
             <View style={styles.lockedOverlay}>
               <Ionicons name="lock-closed" size={24} color="rgba(0, 0, 0, 0.4)" />
-              <Text style={styles.lockedText}>Task chaining locked</Text>
+              <Text style={styles.lockedText}>{t('taskChainingLocked') || 'Task chaining locked'}</Text>
             </View>
           </View>
         </Animated.View>
 
         {/* Locked Features */}
         <Animated.View entering={FadeInDown.delay(500).duration(400)} style={styles.featuresSection}>
-          <Text style={styles.featuresTitle}>Premium Features</Text>
+          <Text style={styles.featuresTitle}>{t('premiumFeatures') || 'Premium Features'}</Text>
           
           <View style={styles.featureItem}>
             <Ionicons name="lock-closed" size={20} color="rgba(0, 0, 0, 0.4)" />
-            <Text style={styles.featureText}>Automatic task chaining</Text>
+            <Text style={styles.featureText}>{t('automaticTaskChaining') || 'Automatic task chaining'}</Text>
           </View>
           
           <View style={styles.featureItem}>
             <Ionicons name="lock-closed" size={20} color="rgba(0, 0, 0, 0.4)" />
-            <Text style={styles.featureText}>Pressure pacing & analytics</Text>
+            <Text style={styles.featureText}>{t('pressurePacingAnalytics') || 'Pressure pacing & analytics'}</Text>
           </View>
           
           <View style={styles.featureItem}>
             <Ionicons name="lock-closed" size={20} color="rgba(0, 0, 0, 0.4)" />
-            <Text style={styles.featureText}>Full session history</Text>
+            <Text style={styles.featureText}>{t('fullSessionHistory') || 'Full session history'}</Text>
           </View>
         </Animated.View>
 
@@ -117,7 +119,7 @@ export default function ExamPreviewScreen() {
             onPress={handleUnlock}
             activeOpacity={0.8}
           >
-            <Text style={styles.unlockButtonText}>Unlock Exam Mode</Text>
+            <Text style={styles.unlockButtonText}>{t('unlockExamMode')}</Text>
           </TouchableOpacity>
           
           <TouchableOpacity
@@ -125,7 +127,7 @@ export default function ExamPreviewScreen() {
             onPress={handleStartDemo}
             activeOpacity={0.7}
           >
-            <Text style={styles.demoButtonText}>Try 5-min demo</Text>
+            <Text style={styles.demoButtonText}>{t('tryDemo') || 'Try 5-min demo'}</Text>
           </TouchableOpacity>
         </Animated.View>
 
@@ -136,32 +138,9 @@ export default function ExamPreviewScreen() {
       <Modal
         visible={showPaywall}
         animationType="slide"
-        transparent={true}
         onRequestClose={handlePaywallClose}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <TouchableOpacity
-              style={styles.modalCloseButton}
-              onPress={handlePaywallClose}
-            >
-              <Ionicons name="close" size={24} color="#000" />
-            </TouchableOpacity>
-            <Text style={styles.modalTitle}>Unlock Exam Mode</Text>
-            <Text style={styles.modalDescription}>
-              Get full access to Exam Mode and all premium features
-            </Text>
-            <TouchableOpacity
-              style={styles.paywallButton}
-              onPress={() => {
-                router.push('/onboarding/paywall');
-                handlePaywallClose();
-              }}
-            >
-              <Text style={styles.paywallButtonText}>View Plans</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+        <Paywall onClose={handlePaywallClose} source="exam-preview" />
       </Modal>
     </View>
   );

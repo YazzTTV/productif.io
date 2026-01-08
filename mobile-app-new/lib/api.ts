@@ -1071,6 +1071,53 @@ export const gamificationService = {
     const params = `?limit=${limit}&includeUserRank=${includeUserRank ? 'true' : 'false'}`;
     return await apiCall(`/gamification/leaderboard${params}`);
   },
+
+  // Récupérer le classement des amis
+  async getFriendsLeaderboard(): Promise<Array<{
+    userId: string;
+    userName: string | null;
+    userEmail: string;
+    totalPoints: number;
+    level: number;
+    currentStreak: number;
+    longestStreak: number;
+    totalHabitsCompleted: number;
+    achievements: number;
+    rank: number;
+  }>> {
+    try {
+      // Récupérer les utilisateurs de la même entreprise
+      const companyUsers = await apiCall('/my-company/users');
+      if (!companyUsers || !companyUsers.users || companyUsers.users.length === 0) {
+        console.log('ℹ️ Aucun utilisateur dans l\'entreprise');
+        return [];
+      }
+
+      // Récupérer le classement général
+      const leaderboard = await apiCall('/gamification/leaderboard?limit=100&includeUserRank=false');
+      const leaderboardData = Array.isArray(leaderboard) ? leaderboard : (leaderboard?.leaderboard || []);
+      
+      if (!leaderboardData || leaderboardData.length === 0) {
+        console.log('ℹ️ Aucun classement disponible');
+        return [];
+      }
+
+      // Filtrer pour ne garder que les utilisateurs de l'entreprise
+      const companyUserIds = companyUsers.users.map((u: any) => u.id);
+      const friendsLeaderboard = leaderboardData
+        .filter((entry: any) => companyUserIds.includes(entry.userId))
+        .sort((a: any, b: any) => (b.totalPoints || 0) - (a.totalPoints || 0))
+        .map((entry: any, index: number) => ({
+          ...entry,
+          rank: index + 1,
+        }));
+      
+      return friendsLeaderboard;
+    } catch (error) {
+      console.error('❌ Erreur récupération classement amis:', error);
+      return [];
+    }
+  },
   
   async getAchievements(): Promise<{
     achievements: Array<{
@@ -1087,6 +1134,75 @@ export const gamificationService = {
     totalAvailable: number;
   }> {
     return await apiCall('/gamification/achievements');
+  },
+
+  // Récupérer les groupes de l'utilisateur
+  async getUserGroups(): Promise<Array<{
+    id: string;
+    name: string;
+    description?: string;
+    memberCount?: number;
+    type?: string;
+  }>> {
+    try {
+      const response = await apiCall('/gamification/groups');
+      if (Array.isArray(response)) {
+        return response;
+      }
+      if (response && response.groups) {
+        return response.groups;
+      }
+      return [];
+    } catch (error) {
+      console.error('❌ Erreur récupération groupes:', error);
+      return [];
+    }
+  },
+
+  // Récupérer le classement d'un groupe spécifique
+  async getGroupLeaderboard(groupId: string): Promise<Array<{
+    userId: string;
+    userName: string | null;
+    userEmail: string;
+    totalPoints: number;
+    level: number;
+    currentStreak: number;
+    longestStreak: number;
+    totalHabitsCompleted: number;
+    achievements: number;
+    rank: number;
+  }>> {
+    try {
+      const response = await apiCall(`/gamification/groups/${groupId}/leaderboard`);
+      if (Array.isArray(response)) {
+        return response;
+      }
+      if (response && response.leaderboard) {
+        return response.leaderboard;
+      }
+      return [];
+    } catch (error) {
+      console.error('❌ Erreur récupération classement groupe:', error);
+      return [];
+    }
+  },
+
+  // Créer un nouveau groupe
+  async createGroup(data: {
+    name: string;
+    description?: string;
+    memberIds?: string[];
+  }): Promise<{
+    id: string;
+    name: string;
+    description?: string;
+    memberCount?: number;
+    type?: string;
+  }> {
+    return await apiCall('/gamification/groups', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
   },
 };
 
@@ -1180,31 +1296,51 @@ export const assistantService = {
       }),
     });
   },
+};
 
-  // Récupérer les habitudes
-  async getHabits(): Promise<any> {
-    return await apiCall('/habits');
-  },
-
-  // Trouver une habitude par nom
-  async findHabitByName(name: string): Promise<any> {
-    const habits = await apiCall('/habits');
-    return habits.find((h: any) => 
-      h.name.toLowerCase().includes(name.toLowerCase())
-    );
-  },
-
-  // Enregistrer une entrée d'habitude avec note
-  async saveHabitEntry(habitId: string, date: string, note: string, rating?: number): Promise<any> {
-    return await apiCall('/habits/entries', {
+// Service pour les journaux
+export const journalService = {
+  // Enregistrer un journal complet
+  async saveJournalEntry(data: {
+    date: string;
+    emotionalLevel: number;
+    energyLevel: number;
+    note?: string;
+  }): Promise<any> {
+    // Utiliser l'endpoint /journal/agent avec la note complète
+    const transcription = `Emotional Level: ${data.emotionalLevel}/100 (${data.emotionalLevel < 25 ? 'Calm' : data.emotionalLevel < 50 ? 'Steady' : data.emotionalLevel < 75 ? 'Tense' : 'Heavy'})\nEnergy Level: ${data.energyLevel}/100 (${data.energyLevel < 25 ? 'Low' : data.energyLevel < 50 ? 'Moderate' : data.energyLevel < 75 ? 'Good' : 'High'})\n${data.note ? `\n${data.note}` : ''}`;
+    
+    return await apiCall('/journal/agent', {
       method: 'POST',
       body: JSON.stringify({
-        habitId,
-        date,
-        completed: true,
-        note,
-        rating,
+        transcription,
+        date: data.date,
+        emotionalLevel: data.emotionalLevel,
+        energyLevel: data.energyLevel,
+        note: data.note,
       }),
     });
+  },
+
+  // Récupérer tous les journaux (utilise l'endpoint agent si disponible)
+  async getAll(): Promise<any> {
+    try {
+      // Essayer d'abord /journal/agent
+      return await apiCall('/journal/agent');
+    } catch (error) {
+      // Si l'endpoint n'existe pas, retourner un tableau vide
+      console.warn('⚠️ Endpoint /journal/agent non disponible, retour d\'un tableau vide');
+      return [];
+    }
+  },
+
+  // Récupérer un journal pour une date spécifique
+  async getByDate(date: string): Promise<any> {
+    try {
+      return await apiCall(`/journal/agent?date=${date}`);
+    } catch (error) {
+      console.warn('⚠️ Endpoint /journal/agent non disponible pour cette date');
+      return null;
+    }
   },
 };

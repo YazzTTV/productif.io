@@ -4,8 +4,10 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 export default function ExamSummaryScreen() {
+  const { t } = useLanguage();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams();
@@ -44,30 +46,30 @@ export default function ExamSummaryScreen() {
           <View style={styles.statCard}>
             <Ionicons name="time-outline" size={24} color="#16A34A" />
             <Text style={styles.statValue}>{duration}</Text>
-            <Text style={styles.statLabel}>Minutes focused</Text>
+            <Text style={styles.statLabel}>{t('minutesFocused') || 'Minutes focused'}</Text>
           </View>
 
           <View style={styles.statCard}>
             <Ionicons name="checkmark-circle-outline" size={24} color="#16A34A" />
             <Text style={styles.statValue}>{completed}</Text>
-            <Text style={styles.statLabel}>Tasks completed</Text>
+            <Text style={styles.statLabel}>{t('tasksCompleted')}</Text>
           </View>
         </Animated.View>
 
         {/* XP (if system exists) */}
         <Animated.View entering={FadeInDown.delay(300).duration(400)} style={styles.xpSection}>
           <View style={styles.xpCard}>
-            <Text style={styles.xpLabel}>XP Gained</Text>
+            <Text style={styles.xpLabel}>{t('xpGained')}</Text>
             <Text style={styles.xpValue}>+{completed * 10}</Text>
           </View>
         </Animated.View>
 
         {/* Quick Check-ins */}
         <Animated.View entering={FadeInDown.delay(400).duration(400)} style={styles.checkInSection}>
-          <Text style={styles.checkInTitle}>Quick check-in</Text>
+          <Text style={styles.checkInTitle}>{t('quickCheckIn') || 'Quick check-in'}</Text>
           
           <View style={styles.checkInItem}>
-            <Text style={styles.checkInLabel}>Stress now?</Text>
+            <Text style={styles.checkInLabel}>{t('stressNow')}</Text>
             <View style={styles.ratingButtons}>
               {[1, 2, 3, 4, 5].map((level) => (
                 <TouchableOpacity
@@ -92,7 +94,7 @@ export default function ExamSummaryScreen() {
           </View>
 
           <View style={styles.checkInItem}>
-            <Text style={styles.checkInLabel}>Mood now?</Text>
+            <Text style={styles.checkInLabel}>{t('moodNow')}</Text>
             <View style={styles.ratingButtons}>
               {[1, 2, 3, 4, 5].map((level) => (
                 <TouchableOpacity
@@ -124,7 +126,7 @@ export default function ExamSummaryScreen() {
             onPress={handleBackToDashboard}
             activeOpacity={0.8}
           >
-            <Text style={styles.primaryButtonText}>Back to Dashboard</Text>
+            <Text style={styles.primaryButtonText}>{t('backToDashboard')}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -132,7 +134,7 @@ export default function ExamSummaryScreen() {
             onPress={handleStartAnother}
             activeOpacity={0.7}
           >
-            <Text style={styles.secondaryButtonText}>Start another session</Text>
+            <Text style={styles.secondaryButtonText}>{t('startAnotherSession')}</Text>
           </TouchableOpacity>
         </Animated.View>
 
