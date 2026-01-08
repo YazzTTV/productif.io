@@ -20,6 +20,7 @@ interface Task {
 }
 
 export default function ExamSessionScreen() {
+  const { t } = useLanguage();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams();
@@ -351,8 +352,8 @@ export default function ExamSessionScreen() {
         exiting={SlideOutLeft.duration(200)}
         style={styles.taskCard}
       >
-        <Text style={styles.taskTitle}>{currentTask.title}</Text>
-        <Text style={styles.taskSubject}>{currentTask.subjectName}</Text>
+        <Text style={styles.taskTitle} numberOfLines={0}>{currentTask.title}</Text>
+        <Text style={styles.taskSubject} numberOfLines={0}>{currentTask.subjectName}</Text>
       </Animated.View>
 
       {/* Actions */}
@@ -443,16 +444,22 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.1)',
     marginBottom: 32,
+    width: '100%',
+    alignSelf: 'stretch',
   },
   taskTitle: {
     fontSize: 24,
     fontWeight: '600',
     color: '#FFFFFF',
     marginBottom: 8,
+    flexShrink: 0,
+    flexWrap: 'wrap',
   },
   taskSubject: {
     fontSize: 16,
     color: 'rgba(255, 255, 255, 0.6)',
+    flexShrink: 0,
+    flexWrap: 'wrap',
   },
   actions: {
     flexDirection: 'row',

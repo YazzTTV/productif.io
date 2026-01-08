@@ -137,6 +137,14 @@ function AppContent() {
               }} 
             />
             <Stack.Screen 
+              name="paywall" 
+              options={{ 
+                headerShown: false,
+                gestureEnabled: true,
+                presentation: 'modal',
+              }} 
+            />
+            <Stack.Screen 
               name="time-history" 
               options={{ 
                 headerShown: false,

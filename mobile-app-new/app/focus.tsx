@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle } from 'react-native-svg';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { assistantService, tasksService } from '@/lib/api';
+import { selectExamTasks, TaskForExam } from '@/utils/taskSelection';
 
 const { width } = Dimensions.get('window');
 const RING_SIZE = Math.min(width * 0.65, 260);
@@ -195,8 +196,8 @@ function SessionSettingsModal({
 
             {/* Focus Duration */}
             <View style={settingsModalStyles.section}>
-              <Text style={settingsModalStyles.sectionTitle}>Focus duration</Text>
-              <Text style={settingsModalStyles.sectionSubtitle}>Length of each focus session</Text>
+              <Text style={settingsModalStyles.sectionTitle}>{t('focusDuration') || 'Focus duration'}</Text>
+              <Text style={settingsModalStyles.sectionSubtitle}>{t('lengthOfEachSession') || 'Length of each focus session'}</Text>
               <View style={settingsModalStyles.buttonRow}>
                 {PRESET_DURATIONS.map((duration) => (
                   <TouchableOpacity
@@ -223,8 +224,8 @@ function SessionSettingsModal({
 
             {/* Break Duration */}
             <View style={settingsModalStyles.section}>
-              <Text style={settingsModalStyles.sectionTitle}>Break duration</Text>
-              <Text style={settingsModalStyles.sectionSubtitle}>Rest between sessions</Text>
+              <Text style={settingsModalStyles.sectionTitle}>{t('breakDuration') || 'Break duration'}</Text>
+              <Text style={settingsModalStyles.sectionSubtitle}>{t('restBetweenSessions') || 'Rest between sessions'}</Text>
               <View style={settingsModalStyles.buttonRow}>
                 {BREAK_DURATIONS.map((duration) => (
                   <TouchableOpacity
@@ -251,8 +252,8 @@ function SessionSettingsModal({
 
             {/* Maximum Sessions */}
             <View style={settingsModalStyles.section}>
-              <Text style={settingsModalStyles.sectionTitle}>Maximum sessions</Text>
-              <Text style={settingsModalStyles.sectionSubtitle}>Sessions planned for today</Text>
+              <Text style={settingsModalStyles.sectionTitle}>{t('maximumSessions') || 'Maximum sessions'}</Text>
+              <Text style={settingsModalStyles.sectionSubtitle}>{t('sessionsPlannedToday') || 'Sessions planned for today'}</Text>
               <View style={settingsModalStyles.sliderContainer}>
                 <MaxSessionsSlider
                   value={maxSessions}
@@ -266,7 +267,7 @@ function SessionSettingsModal({
 
             {/* Session Preview */}
             <View style={settingsModalStyles.previewCard}>
-              <Text style={settingsModalStyles.previewLabel}>Session preview</Text>
+              <Text style={settingsModalStyles.previewLabel}>{t('sessionPreview') || 'Session preview'}</Text>
               <Text style={settingsModalStyles.previewText}>
                 {maxSessions} × {focusDuration}min focus + {breakDuration}min break
               </Text>
@@ -281,7 +282,7 @@ function SessionSettingsModal({
               onPress={handleSave}
               activeOpacity={0.8}
             >
-              <Text style={settingsModalStyles.saveButtonText}>Save Settings</Text>
+              <Text style={settingsModalStyles.saveButtonText}>{t('saveSettings') || t('save')}</Text>
             </TouchableOpacity>
           </ScrollView>
         </Animated.View>
@@ -409,20 +410,90 @@ export default function FocusScreen() {
   const [breakDuration, setBreakDuration] = useState(10);
   const [maxSessions, setMaxSessions] = useState(4);
   const taskId = params.taskId as string | undefined;
-  const taskTitle = (params.title as string) || 'Complete Chapter 12 Summary';
-  const taskSubject = (params.subject as string) || 'Organic Chemistry';
   
   // Tasks management
-  const [tasks, setTasks] = useState([
-    { id: '1', title: taskTitle, subject: taskSubject, completed: false },
-    { id: '2', title: 'Review lecture notes', subject: 'Physics - Thermodynamics', completed: false },
-    { id: '3', title: 'Practice exercises 15-20', subject: 'Mathematics', completed: false },
-    { id: '4', title: 'Organize study materials', subject: 'General', completed: false },
-  ]);
+  const [tasks, setTasks] = useState<Array<{ id: string; title: string; subject: string; completed: boolean }>>([]);
   const [currentTaskIndex, setCurrentTaskIndex] = useState(0);
+  const [loadingTasks, setLoadingTasks] = useState(true);
   
-  const currentTask = tasks[currentTaskIndex];
+  const currentTask = tasks[currentTaskIndex] || { id: '', title: '', subject: '', completed: false };
   const completedCount = tasks.filter(t => t.completed).length;
+
+  // Load prioritized tasks on mount
+  useEffect(() => {
+    loadPrioritizedTasks();
+  }, []);
+
+  const loadPrioritizedTasks = async () => {
+    try {
+      setLoadingTasks(true);
+      
+      // Si on a des paramètres de tâche depuis la navigation, les utiliser
+      if (taskId && params.title && params.subject) {
+        setTasks([
+          { 
+            id: taskId, 
+            title: params.title as string, 
+            subject: params.subject as string, 
+            completed: false 
+          }
+        ]);
+        setLoadingTasks(false);
+        return;
+      }
+
+      // Sinon, charger les tâches prioritaires depuis l'API
+      const { primary, next } = await selectExamTasks();
+
+      const allTasks: Array<{ id: string; title: string; subject: string; completed: boolean }> = [];
+
+      // Ajouter la tâche principale
+      if (primary) {
+        allTasks.push({
+          id: primary.id,
+          title: primary.title,
+          subject: primary.subjectName,
+          completed: false,
+        });
+      }
+
+      // Ajouter les 3 prochaines tâches les plus importantes
+      next.slice(0, 3).forEach(task => {
+        allTasks.push({
+          id: task.id,
+          title: task.title,
+          subject: task.subjectName,
+          completed: false,
+        });
+      });
+
+      // Si aucune tâche n'est trouvée, utiliser des valeurs par défaut
+      if (allTasks.length === 0) {
+        allTasks.push({
+          id: 'default',
+          title: 'No tasks available',
+          subject: 'Add tasks to get started',
+          completed: false,
+        });
+      }
+
+      setTasks(allTasks);
+      setCurrentTaskIndex(0);
+    } catch (error) {
+      console.error('Error loading prioritized tasks:', error);
+      // En cas d'erreur, utiliser des valeurs par défaut
+      setTasks([
+        {
+          id: 'error',
+          title: 'Unable to load tasks',
+          subject: 'Please try again',
+          completed: false,
+        }
+      ]);
+    } finally {
+      setLoadingTasks(false);
+    }
+  };
   
   const totalSeconds = selectedDuration * 60;
   const [timeLeft, setTimeLeft] = useState(totalSeconds);
@@ -436,28 +507,71 @@ export default function FocusScreen() {
 
   const progressAnimation = useSharedValue(0);
 
-  const handleStartFocus = () => {
-    setTimeLeft(selectedDuration * 60);
-    setPhase('active');
-    setIsRunning(true);
-    setCurrentTaskIndex(0);
-
-  // Démarrer la session Deep Work
-    const startSession = async () => {
+  const handleStartFocus = async () => {
+    try {
+      // Vérifier s'il y a une session active
       try {
-        const result = await assistantService.startDeepWorkSession(selectedDuration, 'deepwork', currentTask.title);
-        if (result?.session?.id) {
-          setSessionId(result.session.id);
+        const activeSessionData = await assistantService.getActiveDeepWorkSession();
+        
+        // La réponse peut être un tableau ou un objet avec une propriété sessions
+        const activeSessions = Array.isArray(activeSessionData) 
+          ? activeSessionData 
+          : activeSessionData?.sessions || activeSessionData?.data || [];
+        
+        if (activeSessions && activeSessions.length > 0) {
+          // Il y a une session active, la terminer proprement d'abord
+          const existingSession = activeSessions[0];
+          const sessionIdToCancel = existingSession.id || existingSession.sessionId;
+          
+          if (sessionIdToCancel) {
+            console.log('⚠️ [Focus] Session active trouvée, arrêt de la session précédente...', sessionIdToCancel);
+            try {
+              await assistantService.endDeepWorkSession(sessionIdToCancel, 'cancel');
+              console.log('✅ [Focus] Session précédente terminée');
+            } catch (cancelError) {
+              console.log('ℹ️ [Focus] Erreur lors de l\'arrêt de la session précédente (peut être déjà terminée):', cancelError);
+            }
+          }
         }
-      } catch (error) {
-        console.log('Session démarrée localement');
+      } catch (checkError) {
+        // Si la vérification échoue, on continue quand même
+        console.log('ℹ️ [Focus] Impossible de vérifier les sessions actives, continuation:', checkError);
       }
-    };
-    startSession();
+
+      // Démarrer la nouvelle session
+      setTimeLeft(selectedDuration * 60);
+      setPhase('active');
+      setIsRunning(true);
+      setCurrentTaskIndex(0);
+
+      const result = await assistantService.startDeepWorkSession(selectedDuration, 'deepwork', currentTask.title);
+      if (result?.session?.id) {
+        setSessionId(result.session.id);
+        console.log('✅ [Focus] Nouvelle session démarrée:', result.session.id);
+      }
+    } catch (error: any) {
+      // Si l'erreur indique qu'une session est déjà en cours, on continue quand même localement
+      const errorMessage = error?.message || '';
+      if (errorMessage.includes('session') || errorMessage.includes('déjà') || errorMessage.includes('en cours')) {
+        console.log('⚠️ [Focus] Session déjà en cours côté serveur, continuation locale');
+        setTimeLeft(selectedDuration * 60);
+        setPhase('active');
+        setIsRunning(true);
+        setCurrentTaskIndex(0);
+      } else {
+        console.error('❌ [Focus] Erreur lors du démarrage de la session:', error);
+        // Continuer quand même en mode local
+        setTimeLeft(selectedDuration * 60);
+        setPhase('active');
+        setIsRunning(true);
+        setCurrentTaskIndex(0);
+      }
+    }
   };
 
   const handleCompleteTask = async () => {
-    const currentTask = tasks[currentTaskIndex];
+    const taskToComplete = tasks[currentTaskIndex];
+    if (!taskToComplete) return;
     
     // Mettre à jour l'état local immédiatement
     setTasks(prev =>
@@ -466,11 +580,11 @@ export default function FocusScreen() {
       )
     );
     
-    // Si on a un vrai ID de tâche (depuis l'API), marquer comme complétée dans la base de données
-    if (taskId && currentTaskIndex === 0) {
+    // Marquer la tâche comme complétée dans la base de données
+    if (taskToComplete.id && taskToComplete.id !== 'default' && taskToComplete.id !== 'error') {
       try {
-        console.log('📤 [Focus] Marquage de la tâche comme complétée:', taskId);
-        await tasksService.updateTask(taskId, { completed: true });
+        console.log('📤 [Focus] Marquage de la tâche comme complétée:', taskToComplete.id);
+        await tasksService.updateTask(taskToComplete.id, { completed: true });
         console.log('✅ [Focus] Tâche marquée comme complétée avec succès');
       } catch (error) {
         console.error('❌ [Focus] Erreur lors du marquage de la tâche:', error);
@@ -489,8 +603,8 @@ export default function FocusScreen() {
     );
     if (nextIncompleteIndex !== -1) {
       setCurrentTaskIndex(nextIncompleteIndex);
-      }
-    };
+    }
+  };
 
   // Timer logic
   useEffect(() => {
@@ -587,8 +701,8 @@ export default function FocusScreen() {
                 <View style={introStyles.headerTitleContainer}>
                   <Ionicons name="flag" size={20} color="#16A34A" />
                   <View>
-                    <Text style={introStyles.headerTitle}>Focus Session</Text>
-                    <Text style={introStyles.headerSubtitle}>AI-selected task</Text>
+                    <Text style={introStyles.headerTitle}>{t('focusSession') || 'Focus Session'}</Text>
+                    <Text style={introStyles.headerSubtitle}>{t('aiSelectedTask') || 'AI-selected task'}</Text>
                   </View>
                 </View>
               </View>
@@ -604,16 +718,22 @@ export default function FocusScreen() {
             <View style={introStyles.content}>
               {/* Main heading - Simplifié */}
               <Animated.View entering={FadeInDown.delay(200).duration(400)} style={introStyles.headingSection}>
-                <Text style={introStyles.mainHeading}>Ready to focus</Text>
+                <Text style={introStyles.mainHeading}>{t('readyToFocus')}</Text>
               </Animated.View>
 
               {/* Task card - Simplifié */}
-              <Animated.View entering={FadeInDown.delay(300).duration(400)} style={introStyles.taskCard}>
-                <Text style={introStyles.taskCardTitle}>{tasks[0].title}</Text>
-                {tasks[0].subject && (
-                  <Text style={introStyles.taskCardSubject}>{tasks[0].subject}</Text>
-                )}
-              </Animated.View>
+              {loadingTasks ? (
+                <Animated.View entering={FadeInDown.delay(300).duration(400)} style={introStyles.taskCard}>
+                  <Text style={introStyles.taskCardTitle}>{t('loadingTask') || t('loading')}</Text>
+                </Animated.View>
+              ) : (
+                <Animated.View entering={FadeInDown.delay(300).duration(400)} style={introStyles.taskCard}>
+                  <Text style={introStyles.taskCardTitle} numberOfLines={0}>{currentTask.title}</Text>
+                  {currentTask.subject && (
+                    <Text style={introStyles.taskCardSubject} numberOfLines={0}>{currentTask.subject}</Text>
+                  )}
+                </Animated.View>
+              )}
 
               {/* Duration selection - Avec cursor/timer et slider */}
               <Animated.View entering={FadeInDown.delay(400).duration(400)} style={introStyles.durationSection}>
@@ -660,7 +780,7 @@ export default function FocusScreen() {
                   onPress={handleStartFocus}
                   activeOpacity={0.8}
                 >
-                  <Text style={introStyles.startButtonText}>Start focus</Text>
+                  <Text style={introStyles.startButtonText}>{t('startFocus')}</Text>
                 </TouchableOpacity>
               </Animated.View>
             </View>
@@ -737,12 +857,12 @@ export default function FocusScreen() {
         {/* Task Info Section */}
         <Animated.View entering={FadeInDown.delay(300).duration(500)} style={styles.taskSection}>
           <Text style={styles.taskIndicator}>
-            Current task • {currentTaskIndex + 1} of {tasks.length}
+            {t('currentTask')} • {currentTaskIndex + 1} {t('of') || 'of'} {tasks.length}
           </Text>
           
           <View style={styles.taskCard}>
-            <Text style={styles.taskTitle}>{currentTask.title}</Text>
-            <Text style={styles.taskSubject}>{currentTask.subject}</Text>
+            <Text style={styles.taskTitle} numberOfLines={0}>{currentTask.title}</Text>
+            <Text style={styles.taskSubject} numberOfLines={0}>{currentTask.subject}</Text>
             
             {!currentTask.completed && (
               <TouchableOpacity
@@ -750,14 +870,14 @@ export default function FocusScreen() {
                 onPress={handleCompleteTask}
                 activeOpacity={0.8}
               >
-                <Text style={styles.completeTaskButtonText}>Complete task</Text>
+                <Text style={styles.completeTaskButtonText}>{t('completeTaskButton')}</Text>
               </TouchableOpacity>
             )}
             
             {currentTask.completed && (
               <View style={styles.taskCompletedIndicator}>
                 <Ionicons name="checkmark-circle" size={24} color="#16A34A" />
-                <Text style={styles.taskCompletedText}>Task complete</Text>
+                <Text style={styles.taskCompletedText}>{t('taskComplete') || 'Task complete'}</Text>
               </View>
             )}
           </View>
@@ -783,7 +903,7 @@ export default function FocusScreen() {
             activeOpacity={0.7}
           >
             <Ionicons name="close" size={20} color="rgba(255, 255, 255, 0.6)" />
-            <Text style={styles.endSessionButtonText}>End session</Text>
+            <Text style={styles.endSessionButtonText}>{t('endSessionButton')}</Text>
           </TouchableOpacity>
         </Animated.View>
       </View>

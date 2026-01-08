@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { authService } from '@/lib/api';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 type SettingsView = 'main' | 'editProfile' | 'dailyStructure' | 'notifications';
 
@@ -13,6 +14,7 @@ type FocusDuration = 25 | 45 | 60 | 90;
 type WorkloadIntensity = 'light' | 'balanced' | 'intensive';
 
 export function SettingsNew() {
+  const { t } = useLanguage();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [view, setView] = useState<SettingsView>('main');
@@ -72,7 +74,7 @@ export function SettingsNew() {
               router.replace('/(onboarding-new)/intro');
             } catch (error) {
               console.error('Erreur lors de la réinitialisation de l\'onboarding:', error);
-              Alert.alert('Erreur', 'Impossible de réinitialiser l\'onboarding');
+              Alert.alert(t('error'), t('resetOnboardingError') || 'Impossible de réinitialiser l\'onboarding');
             }
           },
         },
@@ -95,7 +97,7 @@ export function SettingsNew() {
             >
               <Ionicons name="arrow-back" size={22} color="#000" />
             </TouchableOpacity>
-            <Text style={styles.headerTitle}>Edit Profile</Text>
+            <Text style={styles.headerTitle}>{t('editProfile') || 'Edit Profile'}</Text>
             <View style={{ width: 40 }} />
           </Animated.View>
 
@@ -161,11 +163,11 @@ export function SettingsNew() {
             >
               <Ionicons name="arrow-back" size={22} color="#000" />
             </TouchableOpacity>
-            <Text style={styles.headerTitle}>Daily Structure</Text>
+            <Text style={styles.headerTitle}>{t('dailyStructure') || 'Daily Structure'}</Text>
             {savedFeedback && (
               <View style={styles.savedBadge}>
                 <Ionicons name="checkmark" size={16} color="#16A34A" />
-                <Text style={styles.savedText}>Saved</Text>
+                <Text style={styles.savedText}>{t('saved') || 'Saved'}</Text>
               </View>
             )}
           </Animated.View>
@@ -313,7 +315,7 @@ export function SettingsNew() {
             {savedFeedback && (
               <View style={styles.savedBadge}>
                 <Ionicons name="checkmark" size={16} color="#16A34A" />
-                <Text style={styles.savedText}>Saved</Text>
+                <Text style={styles.savedText}>{t('saved') || 'Saved'}</Text>
               </View>
             )}
           </Animated.View>
@@ -441,7 +443,7 @@ export function SettingsNew() {
           >
             <Ionicons name="arrow-back" size={22} color="#000" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Settings</Text>
+          <Text style={styles.headerTitle}>{t('settings')}</Text>
           {savedFeedback && (
             <View style={styles.savedBadge}>
               <Ionicons name="checkmark" size={16} color="#16A34A" />
@@ -452,20 +454,20 @@ export function SettingsNew() {
 
         {/* SECTION 1 — ACCOUNT */}
         <Animated.View entering={FadeInDown.delay(200).duration(400)} style={styles.section}>
-          <Text style={styles.sectionLabel}>Account</Text>
+          <Text style={styles.sectionLabel}>{t('account')}</Text>
           <View style={styles.accountCard}>
             <View style={styles.accountRow}>
-              <Text style={styles.accountLabel}>Name</Text>
+              <Text style={styles.accountLabel}>{t('name') || 'Name'}</Text>
               <Text style={styles.accountValue}>{name}</Text>
             </View>
             <View style={styles.accountDivider} />
             <View style={styles.accountRow}>
-              <Text style={styles.accountLabel}>Academic field</Text>
+              <Text style={styles.accountLabel}>{t('academicField') || 'Academic field'}</Text>
               <Text style={styles.accountValue}>{academicField}</Text>
             </View>
             <View style={styles.accountDivider} />
             <View style={styles.accountRow}>
-              <Text style={styles.accountLabel}>Study level</Text>
+              <Text style={styles.accountLabel}>{t('studyLevel') || 'Study level'}</Text>
               <Text style={styles.accountValue}>{studyLevel}</Text>
             </View>
             <View style={styles.accountDivider} />
@@ -474,7 +476,7 @@ export function SettingsNew() {
               onPress={() => setView('editProfile')}
               activeOpacity={0.7}
             >
-              <Text style={styles.accountButtonText}>Edit profile</Text>
+              <Text style={styles.accountButtonText}>{t('editProfile')}</Text>
               <Ionicons name="chevron-forward" size={20} color="rgba(0, 0, 0, 0.4)" />
             </TouchableOpacity>
           </View>
@@ -482,7 +484,7 @@ export function SettingsNew() {
 
         {/* SECTION 2 — DAILY STRUCTURE */}
         <Animated.View entering={FadeInDown.delay(300).duration(400)} style={styles.section}>
-          <Text style={styles.sectionLabel}>Daily Structure</Text>
+          <Text style={styles.sectionLabel}>{t('dailyStructure') || 'Daily Structure'}</Text>
           <TouchableOpacity
             style={styles.structureCard}
             onPress={() => setView('dailyStructure')}
@@ -493,7 +495,7 @@ export function SettingsNew() {
                 <Ionicons name="time-outline" size={24} color="#16A34A" />
               </View>
               <View style={styles.structureInfo}>
-                <Text style={styles.structureTitle}>Daily Structure</Text>
+                <Text style={styles.structureTitle}>{t('dailyStructure') || 'Daily Structure'}</Text>
                 <Text style={styles.structureSubtitle}>
                   {focusDuration}min • {maxSessions} sessions • {workloadIntensity}
                 </Text>
@@ -505,7 +507,7 @@ export function SettingsNew() {
 
         {/* SECTION 3 — NOTIFICATIONS */}
         <Animated.View entering={FadeInDown.delay(400).duration(400)} style={styles.section}>
-          <Text style={styles.sectionLabel}>Notifications</Text>
+          <Text style={styles.sectionLabel}>{t('notifications')}</Text>
           <View style={styles.notificationsContainer}>
             <View style={styles.settingCard}>
               <View style={styles.settingCardRow}>
@@ -513,7 +515,7 @@ export function SettingsNew() {
                   <View style={styles.settingIcon}>
                     <Ionicons name="notifications-outline" size={24} color="#16A34A" />
                   </View>
-                  <Text style={styles.settingCardTitle}>Notifications</Text>
+                  <Text style={styles.settingCardTitle}>{t('notifications')}</Text>
                 </View>
                 <Switch
                   value={notificationsEnabled}
@@ -554,14 +556,14 @@ export function SettingsNew() {
 
         {/* SECTION 4 — PRIVACY & DATA */}
         <Animated.View entering={FadeInDown.delay(500).duration(400)} style={styles.section}>
-          <Text style={styles.sectionLabel}>Privacy & Data</Text>
+          <Text style={styles.sectionLabel}>{t('privacyData') || 'Privacy & Data'}</Text>
           <View style={styles.privacyContainer}>
             <View style={styles.settingCard}>
               <View style={styles.settingCardRow}>
                 <View style={styles.settingCardContent}>
-                  <Text style={styles.settingCardTitle}>Google Calendar</Text>
+                  <Text style={styles.settingCardTitle}>{t('googleCalendar')}</Text>
                   <Text style={styles.settingCardSubtitle}>
-                    {calendarConnected ? 'Connected' : 'Not connected'}
+                    {calendarConnected ? (t('connected') || 'Connected') : (t('notConnected') || 'Not connected')}
                   </Text>
                 </View>
                 <View
@@ -580,7 +582,7 @@ export function SettingsNew() {
                   }}
                   activeOpacity={0.7}
                 >
-                  <Text style={styles.disconnectButtonText}>Disconnect</Text>
+                  <Text style={styles.disconnectButtonText}>{t('disconnect') || 'Disconnect'}</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -613,16 +615,16 @@ export function SettingsNew() {
 
         {/* SECTION 5 — SUBSCRIPTION */}
         <Animated.View entering={FadeInDown.delay(600).duration(400)} style={styles.section}>
-          <Text style={styles.sectionLabel}>Subscription</Text>
+          <Text style={styles.sectionLabel}>{t('subscription') || 'Subscription'}</Text>
           <TouchableOpacity
             style={styles.subscriptionCard}
-            onPress={() => router.push('/onboarding/paywall')}
+            onPress={() => router.push('/paywall')}
             activeOpacity={0.7}
           >
             <View style={styles.subscriptionContent}>
-              <Text style={styles.subscriptionTitle}>Current plan: Free</Text>
+              <Text style={styles.subscriptionTitle}>{t('currentPlan')}: {t('free')}</Text>
               <Text style={styles.subscriptionSubtitle}>
-                Unlock Exam Mode, calendar sync, and advanced AI
+                {t('unlockFeaturesDescription') || 'Unlock Exam Mode, calendar sync, and advanced AI'}
               </Text>
             </View>
             <Ionicons name="chevron-forward" size={24} color="#16A34A" />
@@ -631,25 +633,25 @@ export function SettingsNew() {
 
         {/* SECTION 6 — SUPPORT & INFO */}
         <Animated.View entering={FadeInDown.delay(700).duration(400)} style={styles.section}>
-          <Text style={styles.sectionLabel}>Support & Info</Text>
+          <Text style={styles.sectionLabel}>{t('supportInfo') || 'Support & Info'}</Text>
           <View style={styles.supportContainer}>
             <TouchableOpacity style={styles.settingCard} activeOpacity={0.7}>
               <View style={styles.settingCardRow}>
-                <Text style={styles.settingCardTitle}>Help</Text>
+                <Text style={styles.settingCardTitle}>{t('help')}</Text>
                 <Ionicons name="chevron-forward" size={20} color="rgba(0, 0, 0, 0.4)" />
               </View>
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.settingCard} activeOpacity={0.7}>
               <View style={styles.settingCardRow}>
-                <Text style={styles.settingCardTitle}>Contact support</Text>
+                <Text style={styles.settingCardTitle}>{t('contactSupport') || 'Contact support'}</Text>
                 <Ionicons name="chevron-forward" size={20} color="rgba(0, 0, 0, 0.4)" />
               </View>
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.settingCard} activeOpacity={0.7}>
               <View style={styles.settingCardRow}>
-                <Text style={styles.settingCardTitle}>Terms & privacy</Text>
+                <Text style={styles.settingCardTitle}>{t('termsPrivacy') || 'Terms & privacy'}</Text>
                 <Ionicons name="chevron-forward" size={20} color="rgba(0, 0, 0, 0.4)" />
               </View>
             </TouchableOpacity>
@@ -696,7 +698,7 @@ export function SettingsNew() {
             activeOpacity={0.7}
           >
             <Ionicons name="log-out-outline" size={20} color="#EF4444" />
-            <Text style={styles.logoutText}>Log out</Text>
+            <Text style={styles.logoutText}>{t('logout')}</Text>
           </TouchableOpacity>
         </Animated.View>
 
