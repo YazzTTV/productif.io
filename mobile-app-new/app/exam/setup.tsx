@@ -7,12 +7,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { selectExamTasks, TaskForExam } from '@/utils/taskSelection';
 import { saveExamSession, getActiveExamSession } from '@/utils/examSession';
 import { checkPremiumStatus } from '@/utils/premium';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 const MIN_DURATION = 25;
 const MAX_DURATION = 180;
 const DEFAULT_DURATION = 45;
 
 export default function ExamSetupScreen() {
+  const { t } = useLanguage();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [duration, setDuration] = useState(DEFAULT_DURATION);
@@ -100,7 +102,7 @@ export default function ExamSetupScreen() {
     return (
       <View style={[styles.container, styles.centerContent, { paddingTop: insets.top }]}>
         <ActivityIndicator size="large" color="#16A34A" />
-        <Text style={styles.loadingText}>Loading tasks...</Text>
+        <Text style={styles.loadingText}>{t('loadingTasks') || t('loading')}</Text>
       </View>
     );
   }
@@ -122,14 +124,14 @@ export default function ExamSetupScreen() {
             <Ionicons name="arrow-back" size={22} color="#000" />
           </TouchableOpacity>
           <View style={styles.headerContent}>
-            <Text style={styles.headerTitle}>Start Exam Mode</Text>
+            <Text style={styles.headerTitle}>{t('startExamMode')}</Text>
           </View>
           <View style={styles.backButton} />
         </Animated.View>
 
         {/* Duration Slider */}
         <Animated.View entering={FadeInDown.delay(200).duration(400)} style={styles.section}>
-          <Text style={styles.sectionLabel}>Duration</Text>
+          <Text style={styles.sectionLabel}>{t('duration')}</Text>
           <View style={styles.durationCard}>
             <Text style={styles.durationValue}>{duration} min</Text>
             <View style={styles.sliderContainer}>
@@ -175,22 +177,22 @@ export default function ExamSetupScreen() {
 
         {/* Primary Task */}
         <Animated.View entering={FadeInDown.delay(300).duration(400)} style={styles.section}>
-          <Text style={styles.sectionLabel}>Primary task</Text>
+          <Text style={styles.sectionLabel}>{t('primaryTask')}</Text>
           {primaryTask ? (
             <View style={styles.taskCard}>
-              <Text style={styles.taskTitle}>{primaryTask.title}</Text>
-              <Text style={styles.taskSubject}>{primaryTask.subjectName}</Text>
+              <Text style={styles.taskTitle} numberOfLines={0}>{primaryTask.title}</Text>
+              <Text style={styles.taskSubject} numberOfLines={0}>{primaryTask.subjectName}</Text>
               <Text style={styles.taskCoeff}>Coef {primaryTask.subjectCoefficient}</Text>
             </View>
           ) : (
             <View style={styles.emptyTaskCard}>
               <Ionicons name="add-circle-outline" size={32} color="rgba(0, 0, 0, 0.3)" />
-              <Text style={styles.emptyTaskText}>No tasks available</Text>
+              <Text style={styles.emptyTaskText}>{t('noTasksAvailable') || 'No tasks available'}</Text>
               <TouchableOpacity
                 style={styles.addTaskButton}
                 onPress={handleEditTasks}
               >
-                <Text style={styles.addTaskText}>Add your first task</Text>
+                <Text style={styles.addTaskText}>{t('addFirstTask') || 'Add your first task'}</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -199,15 +201,15 @@ export default function ExamSetupScreen() {
         {/* Up Next */}
         {nextTasks.length > 0 && (
           <Animated.View entering={FadeInDown.delay(400).duration(400)} style={styles.section}>
-            <Text style={styles.sectionLabel}>Up next</Text>
+            <Text style={styles.sectionLabel}>{t('upNext')}</Text>
             {nextTasks.map((task, index) => (
               <View key={task.id} style={styles.nextTaskItem}>
                 <View style={styles.nextTaskNumber}>
                   <Text style={styles.nextTaskNumberText}>{index + 2}</Text>
                 </View>
                 <View style={styles.nextTaskContent}>
-                  <Text style={styles.nextTaskTitle}>{task.title}</Text>
-                  <Text style={styles.nextTaskSubject}>{task.subjectName}</Text>
+                  <Text style={styles.nextTaskTitle} numberOfLines={0}>{task.title}</Text>
+                  <Text style={styles.nextTaskSubject} numberOfLines={0}>{task.subjectName}</Text>
                 </View>
               </View>
             ))}
@@ -218,8 +220,8 @@ export default function ExamSetupScreen() {
         <Animated.View entering={FadeInDown.delay(500).duration(400)} style={styles.section}>
           <View style={styles.optionItem}>
             <View style={styles.optionContent}>
-              <Text style={styles.optionTitle}>Hard Mode</Text>
-              <Text style={styles.optionDescription}>Disables pause and blocks back button</Text>
+              <Text style={styles.optionTitle}>{t('hardMode')}</Text>
+              <Text style={styles.optionDescription}>{t('hardModeDescription')}</Text>
             </View>
             <Switch
               value={hardMode}
@@ -231,8 +233,8 @@ export default function ExamSetupScreen() {
 
           <View style={styles.optionItem}>
             <View style={styles.optionContent}>
-              <Text style={styles.optionTitle}>Breaks</Text>
-              <Text style={styles.optionDescription}>Allow one 5-min break per 50 min</Text>
+              <Text style={styles.optionTitle}>{t('breaks')}</Text>
+              <Text style={styles.optionDescription}>{t('breaksDescription')}</Text>
             </View>
             <Switch
               value={breaks}
@@ -254,7 +256,7 @@ export default function ExamSetupScreen() {
             {starting ? (
               <ActivityIndicator color="#FFFFFF" />
             ) : (
-              <Text style={styles.startButtonText}>Start Exam Mode</Text>
+              <Text style={styles.startButtonText}>{t('startExamMode')}</Text>
             )}
           </TouchableOpacity>
 
@@ -263,7 +265,7 @@ export default function ExamSetupScreen() {
               style={styles.editTasksButton}
               onPress={handleEditTasks}
             >
-              <Text style={styles.editTasksText}>Edit tasks</Text>
+              <Text style={styles.editTasksText}>{t('editTasks')}</Text>
             </TouchableOpacity>
           )}
         </Animated.View>
@@ -392,17 +394,22 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(22, 163, 74, 0.2)',
     borderRadius: 16,
     padding: 20,
+    width: '100%',
   },
   taskTitle: {
     fontSize: 18,
     fontWeight: '600',
     color: '#000',
     marginBottom: 4,
+    flexShrink: 0,
+    flexWrap: 'wrap',
   },
   taskSubject: {
     fontSize: 14,
     color: 'rgba(0, 0, 0, 0.6)',
     marginBottom: 4,
+    flexShrink: 0,
+    flexWrap: 'wrap',
   },
   taskCoeff: {
     fontSize: 12,
@@ -464,10 +471,14 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#000',
     marginBottom: 2,
+    flexShrink: 0,
+    flexWrap: 'wrap',
   },
   nextTaskSubject: {
     fontSize: 12,
     color: 'rgba(0, 0, 0, 0.4)',
+    flexShrink: 0,
+    flexWrap: 'wrap',
   },
   optionItem: {
     flexDirection: 'row',

@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Modal } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { selectExamTasks, TaskForExam } from '@/utils/taskSelection';
+import { subjectsService } from '@/lib/api';
 
 type ExamPhase = 'dashboard' | 'focus' | 'paused' | 'complete';
 
@@ -15,41 +17,120 @@ interface Task {
   completed: boolean;
 }
 
+interface ExamInfo {
+  subject: string;
+  date: string;
+  daysUntil: number;
+}
+
 export function ExamMode() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [phase, setPhase] = useState<ExamPhase>('dashboard');
-  const [tasks, setTasks] = useState<Task[]>([
-    {
-      id: '1',
-      title: 'Complete Chapter 12 Summary',
-      subject: 'Organic Chemistry',
-      priority: 'critical',
-      completed: false,
-    },
-    {
-      id: '2',
-      title: 'Review lecture notes',
-      subject: 'Physics - Thermodynamics',
-      priority: 'supporting',
-      completed: false,
-    },
-    {
-      id: '3',
-      title: 'Organize study materials',
-      subject: 'General',
-      priority: 'light',
-      completed: false,
-    },
-  ]);
-
-  const upcomingExams = [
-    { subject: 'Organic Chemistry', date: 'March 15', daysUntil: 3 },
-    { subject: 'Physics', date: 'March 18', daysUntil: 6 },
-  ];
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [upcomingExam, setUpcomingExam] = useState<ExamInfo | null>(null);
+  const [loading, setLoading] = useState(true);
 
   const completedCount = tasks.filter(t => t.completed).length;
   const allTasksCompleted = tasks.every(t => t.completed);
+
+  useEffect(() => {
+    loadExamData();
+  }, []);
+
+  const loadExamData = async () => {
+    try {
+      setLoading(true);
+      
+      // Récupérer les matières pour trouver celle avec la deadline la plus proche
+      const subjectsData = await subjectsService.getAll();
+      const subjects = Array.isArray(subjectsData) ? subjectsData : [];
+
+      // Trouver la matière la plus importante (coefficient + deadline)
+      let primarySubject: any = null;
+      let highestScore = -1;
+
+      for (const subject of subjects) {
+        if (!subject.deadline) continue;
+
+        const deadlineDate = new Date(subject.deadline);
+        const now = new Date();
+        const daysUntilDeadline = Math.ceil(
+          (deadlineDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
+        );
+
+        // Score combinant coefficient et urgence de deadline
+        const score = subject.coefficient * 100 + (daysUntilDeadline <= 7 ? 500 : daysUntilDeadline <= 30 ? 200 : 50);
+
+        if (score > highestScore) {
+          highestScore = score;
+          primarySubject = subject;
+        }
+      }
+
+      // Si on a trouvé une matière principale, créer l'info d'examen
+      if (primarySubject && primarySubject.deadline) {
+        const deadlineDate = new Date(primarySubject.deadline);
+        const now = new Date();
+        const daysUntil = Math.ceil(
+          (deadlineDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
+        );
+
+        const dateStr = deadlineDate.toLocaleDateString('fr-FR', {
+          day: 'numeric',
+          month: 'long',
+        });
+
+        setUpcomingExam({
+          subject: primarySubject.name,
+          date: dateStr,
+          daysUntil: Math.max(0, daysUntil),
+        });
+      }
+
+      // Récupérer toutes les tâches pour Exam Mode
+      const { primary, next } = await selectExamTasks();
+
+      // Si on a une matière principale, filtrer les tâches pour ne garder que celles de cette matière
+      let tasksForPrimarySubject: TaskForExam[] = [];
+      
+      if (primarySubject) {
+        // Récupérer toutes les tâches et filtrer par matière principale
+        const allTasks = [primary, ...next].filter(Boolean) as TaskForExam[];
+        tasksForPrimarySubject = allTasks.filter(
+          task => task.subjectId === primarySubject.id
+        );
+
+        // Si on n'a pas assez de tâches pour la matière principale, prendre les plus importantes globalement
+        if (tasksForPrimarySubject.length < 3) {
+          // Prendre les 3 tâches les plus importantes (peu importe la matière)
+          tasksForPrimarySubject = allTasks.slice(0, 3);
+        } else {
+          // Prendre les 3 tâches les plus importantes de la matière principale
+          tasksForPrimarySubject = tasksForPrimarySubject.slice(0, 3);
+        }
+      } else {
+        // Pas de matière principale trouvée, prendre les 3 tâches les plus importantes globalement
+        const allTasks = [primary, ...next].filter(Boolean) as TaskForExam[];
+        tasksForPrimarySubject = allTasks.slice(0, 3);
+      }
+
+      // Convertir les tâches en format Task
+      const allExamTasks: Task[] = tasksForPrimarySubject.map(task => ({
+        id: task.id,
+        title: task.title,
+        subject: task.subjectName,
+        priority: task.priority === 'high' ? 'critical' : task.priority === 'medium' ? 'supporting' : 'light',
+        completed: false,
+      }));
+
+      setTasks(allExamTasks);
+    } catch (error) {
+      console.error('Error loading exam data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleCompleteTask = (taskId: string) => {
     setTasks(prev =>
@@ -64,7 +145,14 @@ export function ExamMode() {
   };
 
   if (phase === 'dashboard') {
-    const nextExam = upcomingExams[0];
+    if (loading) {
+      return (
+        <View style={[styles.container, styles.centerContent, { paddingTop: insets.top }]}>
+          <ActivityIndicator size="large" color="#16A34A" />
+          <Text style={styles.loadingText}>Loading exam data...</Text>
+        </View>
+      );
+    }
 
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -96,18 +184,18 @@ export function ExamMode() {
           </Animated.View>
 
           {/* Exam Countdown */}
-          {nextExam && (
+          {upcomingExam && (
             <Animated.View entering={FadeInDown.delay(200).duration(400)} style={styles.examCard}>
               <View style={styles.examCardContent}>
                 <View style={styles.examIcon}>
                   <Ionicons name="calendar-outline" size={24} color="#16A34A" />
                 </View>
                 <View style={styles.examInfo}>
-                  <Text style={styles.examSubject}>{nextExam.subject}</Text>
-                  <Text style={styles.examDate}>{nextExam.date}</Text>
+                  <Text style={styles.examSubject} numberOfLines={0}>{upcomingExam.subject}</Text>
+                  <Text style={styles.examDate}>{upcomingExam.date}</Text>
                 </View>
                 <View style={styles.examDays}>
-                  <Text style={styles.examDaysNumber}>{nextExam.daysUntil}</Text>
+                  <Text style={styles.examDaysNumber}>{upcomingExam.daysUntil}</Text>
                   <Text style={styles.examDaysLabel}>days</Text>
                 </View>
               </View>
@@ -145,8 +233,8 @@ export function ExamMode() {
                         </View>
                       )}
                     </View>
-                    <Text style={styles.taskTitle}>{task.title}</Text>
-                    <Text style={styles.taskSubject}>{task.subject}</Text>
+                    <Text style={styles.taskTitle} numberOfLines={0}>{task.title}</Text>
+                    <Text style={styles.taskSubject} numberOfLines={0}>{task.subject}</Text>
                   </View>
                   {task.completed && (
                     <View style={styles.completedIcon}>
@@ -204,6 +292,15 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#FFFFFF',
+  },
+  centerContent: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: 'rgba(0, 0, 0, 0.6)',
   },
   scrollView: {
     flex: 1,
@@ -282,6 +379,8 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     letterSpacing: -0.5,
     color: '#000000',
+    flexShrink: 0,
+    flexWrap: 'wrap',
   },
   examDate: {
     fontSize: 14,
@@ -380,10 +479,14 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     letterSpacing: -0.5,
     color: '#000000',
+    flexShrink: 0,
+    flexWrap: 'wrap',
   },
   taskSubject: {
     fontSize: 14,
     color: 'rgba(0, 0, 0, 0.6)',
+    flexShrink: 0,
+    flexWrap: 'wrap',
   },
   completedIcon: {
     marginLeft: 16,

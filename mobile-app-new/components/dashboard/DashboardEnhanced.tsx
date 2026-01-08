@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { authService, googleCalendarService } from '@/lib/api';
 import { format, parseISO, isBefore, isAfter } from 'date-fns';
 import { checkPremiumStatus } from '@/utils/premium';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface KeyMoment {
   time: string;
@@ -27,6 +28,7 @@ interface CalendarEvent {
 }
 
 export function DashboardEnhanced() {
+  const { t } = useLanguage();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   
@@ -37,7 +39,7 @@ export function DashboardEnhanced() {
   const [isPremium, setIsPremium] = useState(false);
 
   const currentHour = new Date().getHours();
-  const greeting = currentHour < 12 ? 'Good morning' : currentHour < 18 ? 'Good afternoon' : 'Good evening';
+  const greeting = currentHour < 12 ? t('goodMorning') : currentHour < 18 ? t('goodAfternoon') : t('goodEvening');
 
   // Convertir les événements Google Calendar en KeyMoments
   const keyMoments: KeyMoment[] = React.useMemo(() => {
@@ -154,7 +156,7 @@ export function DashboardEnhanced() {
         <View style={styles.content}>
           {/* Today's Structure Card */}
           <Animated.View entering={FadeInDown.delay(200).duration(400)} style={styles.section}>
-            <Text style={styles.sectionLabel}>Today's structure</Text>
+            <Text style={styles.sectionLabel}>{t('todaysStructure') || 'Today\'s structure'}</Text>
             <View style={styles.structureCard}>
               <View style={styles.structureContent}>
                 {/* Main Focus Block */}
@@ -194,61 +196,14 @@ export function DashboardEnhanced() {
                 onPress={() => router.push('/focus')}
                 activeOpacity={0.8}
               >
-                <Text style={styles.startFocusText}>Start to Focus</Text>
+                <Text style={styles.startFocusText}>{t('startFocus')}</Text>
               </TouchableOpacity>
             </View>
           </Animated.View>
 
-          {/* Exam Mode Card */}
-          <Animated.View entering={FadeInDown.delay(250).duration(400)} style={styles.section}>
-            <Text style={styles.sectionLabel}>Exam Mode</Text>
-            <TouchableOpacity
-              style={[styles.examModeCard, !isPremium && styles.examModeCardLocked]}
-              onPress={() => {
-                if (isPremium) {
-                  router.push('/exam/setup');
-                } else {
-                  router.push('/exam/preview');
-                }
-              }}
-              activeOpacity={0.8}
-            >
-              <View style={styles.examModeContent}>
-                <View style={styles.examModeHeader}>
-                  <View style={styles.examModeIconContainer}>
-                    <Ionicons 
-                      name="school-outline" 
-                      size={24} 
-                      color={isPremium ? "#16A34A" : "rgba(0, 0, 0, 0.4)"} 
-                    />
-                  </View>
-                  {!isPremium && (
-                    <Ionicons name="lock-closed" size={16} color="rgba(0, 0, 0, 0.4)" />
-                  )}
-                </View>
-                <Text style={styles.examModeTitle}>Exam Mode</Text>
-                <Text style={styles.examModeDescription}>
-                  {isPremium 
-                    ? "Focus intensely on your most important tasks"
-                    : "Locked - Preview available"}
-                </Text>
-              </View>
-              <View style={[styles.examModeCTA, !isPremium && styles.examModeCTALocked]}>
-                <Text style={[styles.examModeCTAText, !isPremium && styles.examModeCTATextLocked]}>
-                  {isPremium ? "Start" : "Preview"}
-                </Text>
-                <Ionicons 
-                  name="chevron-forward" 
-                  size={16} 
-                  color={isPremium ? "#FFFFFF" : "rgba(0, 0, 0, 0.4)"} 
-                />
-              </View>
-            </TouchableOpacity>
-          </Animated.View>
-
           {/* Key Moments Timeline */}
-          <Animated.View entering={FadeInDown.delay(300).duration(400)} style={styles.section}>
-            <Text style={styles.sectionLabel}>Key moments today</Text>
+          <Animated.View entering={FadeInDown.delay(250).duration(400)} style={styles.section}>
+            <Text style={styles.sectionLabel}>{t('keyMomentsToday') || 'Key moments today'}</Text>
             {keyMoments.length > 0 ? (
               <View style={styles.timeline}>
                 {keyMoments.map((moment, index) => (
@@ -293,16 +248,16 @@ export function DashboardEnhanced() {
             ) : (
               <View style={styles.emptyCalendarContainer}>
                 {isCalendarConnected ? (
-                  <Text style={styles.emptyCalendarText}>Aucun événement aujourd'hui</Text>
+                  <Text style={styles.emptyCalendarText}>{t('noEventsToday') || 'Aucun événement aujourd\'hui'}</Text>
                 ) : (
                   <View style={styles.connectCalendarContainer}>
-                    <Text style={styles.emptyCalendarText}>Connectez votre Google Calendar pour voir vos événements</Text>
+                    <Text style={styles.emptyCalendarText}>{t('connectCalendarDescription') || 'Connectez votre Google Calendar pour voir vos événements'}</Text>
                     <TouchableOpacity
                       style={styles.connectCalendarButton}
                       onPress={() => router.push('/parametres')}
                       activeOpacity={0.8}
                     >
-                      <Text style={styles.connectCalendarButtonText}>Connecter</Text>
+                      <Text style={styles.connectCalendarButtonText}>{t('connect') || 'Connecter'}</Text>
                     </TouchableOpacity>
                   </View>
                 )}
@@ -311,7 +266,7 @@ export function DashboardEnhanced() {
           </Animated.View>
 
           {/* Community Progress Card */}
-          <Animated.View entering={FadeInDown.delay(500).duration(400)} style={styles.section}>
+          <Animated.View entering={FadeInDown.delay(400).duration(400)} style={styles.section}>
             <TouchableOpacity
               style={styles.communityCard}
               onPress={() => router.push('/(tabs)/leaderboard')}
@@ -319,8 +274,8 @@ export function DashboardEnhanced() {
             >
               <View style={styles.communityHeader}>
                 <View>
-                  <Text style={styles.communityTitle}>Community Progress</Text>
-                  <Text style={styles.communitySubtitle}>Your group this week</Text>
+                  <Text style={styles.communityTitle}>{t('communityProgress') || 'Community Progress'}</Text>
+                  <Text style={styles.communitySubtitle}>{t('yourGroupThisWeek') || 'Your group this week'}</Text>
                 </View>
                 <Ionicons name="chevron-forward" size={20} color="rgba(0,0,0,0.2)" />
               </View>
@@ -354,14 +309,14 @@ export function DashboardEnhanced() {
               </View>
 
               <View style={styles.communityFooter}>
-                <Text style={styles.viewLeaderboardText}>View full leaderboard →</Text>
+                <Text style={styles.viewLeaderboardText}>{t('viewFullLeaderboard') || 'View full leaderboard →'}</Text>
               </View>
             </TouchableOpacity>
           </Animated.View>
 
           {/* Microcopy */}
-          <Animated.View entering={FadeInDown.delay(700).duration(400)} style={styles.microcopy}>
-            <Text style={styles.microcopyText}>Everything else is handled.</Text>
+          <Animated.View entering={FadeInDown.delay(500).duration(400)} style={styles.microcopy}>
+            <Text style={styles.microcopyText}>{t('everythingElseHandled') || 'Everything else is handled.'}</Text>
           </Animated.View>
 
           {/* Bottom spacing */}
@@ -692,66 +647,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: 'rgba(0, 0, 0, 0.4)',
     textAlign: 'center',
-  },
-  examModeCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.05)',
-    padding: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  examModeCardLocked: {
-    opacity: 0.6,
-  },
-  examModeContent: {
-    flex: 1,
-  },
-  examModeHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 8,
-  },
-  examModeIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(22, 163, 74, 0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  examModeTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#000000',
-    marginBottom: 4,
-  },
-  examModeDescription: {
-    fontSize: 14,
-    color: 'rgba(0, 0, 0, 0.6)',
-  },
-  examModeCTA: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
-    backgroundColor: '#16A34A',
-  },
-  examModeCTALocked: {
-    backgroundColor: 'rgba(0, 0, 0, 0.05)',
-  },
-  examModeCTAText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-  examModeCTATextLocked: {
-    color: 'rgba(0, 0, 0, 0.4)',
   },
   microcopy: {
     paddingVertical: 24,

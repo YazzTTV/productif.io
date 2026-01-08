@@ -22,6 +22,8 @@ import { format, addDays, startOfDay, isToday } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import Svg, { Circle } from 'react-native-svg';
 import { HabitNoteModal } from '@/components/habits/HabitNoteModal';
+import Reanimated, { FadeInDown } from 'react-native-reanimated';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = width - 32; // 16px padding on each side
@@ -35,6 +37,7 @@ interface Habit {
   targetCount: number;
   createdAt: string;
   daysOfWeek: string[];
+  order?: number;
   completions?: Array<{
     id: string;
     date: string;
@@ -59,11 +62,27 @@ interface HabitCardProps {
   onToggle: (habitId: string, date: Date, currentCompleted: boolean) => Promise<void>;
   onSaveWithNote: (habitId: string, date: Date, note: string, rating?: number) => Promise<void>;
   isUpdating: boolean;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
+  canMoveUp?: boolean;
+  canMoveDown?: boolean;
+  onLongPress?: () => void;
 }
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
-const HabitCard: React.FC<HabitCardProps> = ({ habit, selectedDate, onToggle, onSaveWithNote, isUpdating }) => {
+const HabitCard: React.FC<HabitCardProps> = ({ 
+  habit, 
+  selectedDate, 
+  onToggle, 
+  onSaveWithNote, 
+  isUpdating,
+  onMoveUp,
+  onMoveDown,
+  canMoveUp = false,
+  canMoveDown = false,
+  onLongPress,
+}) => {
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const colorAnim = useRef(new Animated.Value(0)).current;
   const progressAnim = useRef(new Animated.Value(0)).current;
@@ -220,24 +239,59 @@ const HabitCard: React.FC<HabitCardProps> = ({ habit, selectedDate, onToggle, on
         </Animated.View>
       )}
 
-      {/* Nom de l'habitude */}
+      {/* Nom de l'habitude avec boutons de déplacement */}
       <View style={styles.habitHeader}>
-        <Text style={styles.habitName}>{habit.name}</Text>
-        {!isScheduledDay ? (
-          <View style={styles.notScheduledBadge}>
-            <Text style={styles.notScheduledText}>Non prévu aujourd'hui</Text>
-          </View>
-        ) : (
-          <Text style={styles.habitDescription}>
-            {habit.description || "Cliquez pour compléter"}
-          </Text>
-        )}
+        <View style={styles.habitHeaderContent}>
+          <Text style={styles.habitName}>{habit.name}</Text>
+          {!isScheduledDay ? (
+            <View style={styles.notScheduledBadge}>
+              <Text style={styles.notScheduledText}>Non prévu aujourd'hui</Text>
+            </View>
+          ) : (
+            <Text style={styles.habitDescription}>
+              {habit.description || "Cliquez pour compléter"}
+            </Text>
+          )}
+        </View>
+        {/* Boutons de déplacement - SIMPLES ET VISIBLES */}
+        <View style={styles.moveButtonsContainer}>
+          {onMoveUp && (
+            <TouchableOpacity
+              style={[styles.moveButton, !canMoveUp && styles.moveButtonDisabled]}
+              onPress={() => {
+                if (canMoveUp && onMoveUp) {
+                  onMoveUp();
+                }
+              }}
+              disabled={!canMoveUp}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="chevron-up" size={20} color={canMoveUp ? "#16A34A" : "rgba(0, 0, 0, 0.2)"} />
+            </TouchableOpacity>
+          )}
+          {onMoveDown && (
+            <TouchableOpacity
+              style={[styles.moveButton, !canMoveDown && styles.moveButtonDisabled]}
+              onPress={() => {
+                if (canMoveDown && onMoveDown) {
+                  onMoveDown();
+                }
+              }}
+              disabled={!canMoveDown}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="chevron-down" size={20} color={canMoveDown ? "#16A34A" : "rgba(0, 0, 0, 0.2)"} />
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
+
 
       {/* Cercle de progression animé */}
       <TouchableOpacity 
         style={styles.progressContainer} 
         onPress={handleToggle}
+        onLongPress={onLongPress}
         disabled={isUpdating}
         activeOpacity={0.8}
       >
@@ -289,6 +343,7 @@ const HabitCard: React.FC<HabitCardProps> = ({ habit, selectedDate, onToggle, on
             !isCompleted && styles.actionButtonActive
           ]}
           onPress={handleToggle}
+          onLongPress={onLongPress}
           disabled={isUpdating}
         >
           <Ionicons 
@@ -304,6 +359,7 @@ const HabitCard: React.FC<HabitCardProps> = ({ habit, selectedDate, onToggle, on
             isCompleted && styles.actionButtonActive
           ]}
           onPress={handleToggle}
+          onLongPress={onLongPress}
           disabled={isUpdating}
         >
           <Ionicons 
@@ -325,7 +381,7 @@ const HabitCard: React.FC<HabitCardProps> = ({ habit, selectedDate, onToggle, on
             {isLearningHabit ? "✏️" : "📝"}
           </Text>
           <Text style={styles.specialButtonText}>
-            {isLearningHabit ? "Ajouter apprentissage" : "Ajouter note"}
+            {isLearningHabit ? t('addLearning') : t('addNote')}
           </Text>
         </TouchableOpacity>
       )}
@@ -344,6 +400,7 @@ const HabitCard: React.FC<HabitCardProps> = ({ habit, selectedDate, onToggle, on
 };
 
 export default function HabitsScreen() {
+  const { t } = useLanguage();
   const [habits, setHabits] = useState<Habit[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -370,10 +427,12 @@ export default function HabitsScreen() {
       }
       
       console.log('📊 Habitudes traitées:', habitsData);
-      setHabits(habitsData);
+      // Trier les habitudes par ordre
+      const sortedHabits = habitsData.sort((a, b) => (a.order || 0) - (b.order || 0));
+      setHabits(sortedHabits);
     } catch (error) {
       console.error('❌ Erreur lors du chargement des habitudes:', error);
-      Alert.alert('Erreur', 'Impossible de charger les habitudes');
+      Alert.alert(t('error'), t('loadHabitsError'));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -421,7 +480,7 @@ export default function HabitsScreen() {
       dashboardEvents.emit(DASHBOARD_DATA_CHANGED);
     } catch (error) {
       console.error('❌ Erreur lors de la mise à jour (rollback):', error);
-      Alert.alert('Erreur', 'Impossible de mettre à jour l\'habitude');
+      Alert.alert(t('error'), t('updateHabitError'));
       // Rollback
       setHabits(previous);
     } finally {
@@ -451,7 +510,7 @@ export default function HabitsScreen() {
       
     } catch (error) {
       console.error('❌ Erreur lors de la sauvegarde avec note:', error);
-      Alert.alert('Erreur', 'Impossible de sauvegarder la note');
+      Alert.alert(t('error'), t('saveNoteError'));
       throw error;
     } finally {
       // Retirer l'habitude des habitudes en cours de mise à jour
@@ -461,6 +520,91 @@ export default function HabitsScreen() {
         return newSet;
       });
     }
+  };
+
+  const handleMoveHabit = async (habitId: string, direction: 'up' | 'down', category: HabitCategory) => {
+    try {
+      // Récupérer les habitudes de la même catégorie et trier par ordre
+      const categoryHabits = habits
+        .filter(h => getHabitCategory(h) === category)
+        .sort((a, b) => (a.order || 0) - (b.order || 0));
+      
+      const currentIndex = categoryHabits.findIndex(h => h.id === habitId);
+      
+      if (currentIndex === -1) {
+        console.error('Habitude non trouvée:', habitId);
+        return;
+      }
+      
+      if (direction === 'up' && currentIndex === 0) {
+        console.log('Déjà en première position');
+        return;
+      }
+      if (direction === 'down' && currentIndex === categoryHabits.length - 1) {
+        console.log('Déjà en dernière position');
+        return;
+      }
+      
+      const newIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+      const targetHabit = categoryHabits[newIndex];
+      
+      // Échanger les ordres
+      const currentHabit = categoryHabits[currentIndex];
+      const currentOrder = currentHabit.order ?? currentIndex;
+      const targetOrder = targetHabit.order ?? newIndex;
+      
+      console.log('Déplacement habitude:', {
+        habitId,
+        direction,
+        currentIndex,
+        newIndex,
+        currentOrder,
+        targetOrder,
+      });
+      
+      // Mise à jour optimiste
+      setHabits(prev => prev.map(h => {
+        if (h.id === habitId) return { ...h, order: targetOrder };
+        if (h.id === targetHabit.id) return { ...h, order: currentOrder };
+        return h;
+      }));
+      
+      // Appel API
+      await habitsService.update(habitId, { order: targetOrder });
+      await habitsService.update(targetHabit.id, { order: currentOrder });
+      
+      // Recharger pour s'assurer que tout est synchronisé
+      await fetchHabits();
+    } catch (error) {
+      console.error('Erreur lors du déplacement:', error);
+      Alert.alert(t('error'), t('moveHabitError'));
+      // Rollback
+      await fetchHabits();
+    }
+  };
+
+  const handleDeleteHabit = async (habitId: string) => {
+    Alert.alert(
+      'Supprimer l\'habitude',
+      'Êtes-vous sûr de vouloir supprimer cette habitude ?',
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Supprimer',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await habitsService.delete(habitId);
+              await fetchHabits();
+              dashboardEvents.emit(DASHBOARD_DATA_CHANGED);
+            } catch (error) {
+              console.error('Erreur lors de la suppression:', error);
+              Alert.alert(t('error'), t('deleteHabitError'));
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handlePreviousDay = () => {
@@ -512,11 +656,19 @@ export default function HabitsScreen() {
     return 'DAY'; // Par défaut
   };
 
-  // Organiser les habitudes par sections
-  const morningHabits = habitsForToday.filter(h => getHabitCategory(h) === 'MORNING');
-  const dayHabits = habitsForToday.filter(h => getHabitCategory(h) === 'DAY');
-  const eveningHabits = habitsForToday.filter(h => getHabitCategory(h) === 'EVENING');
-  const antiHabits = habitsForToday.filter(h => getHabitCategory(h) === 'ANTI');
+  // Organiser les habitudes par sections et trier par ordre
+  const morningHabits = habitsForToday
+    .filter(h => getHabitCategory(h) === 'MORNING')
+    .sort((a, b) => (a.order || 0) - (b.order || 0));
+  const dayHabits = habitsForToday
+    .filter(h => getHabitCategory(h) === 'DAY')
+    .sort((a, b) => (a.order || 0) - (b.order || 0));
+  const eveningHabits = habitsForToday
+    .filter(h => getHabitCategory(h) === 'EVENING')
+    .sort((a, b) => (a.order || 0) - (b.order || 0));
+  const antiHabits = habitsForToday
+    .filter(h => getHabitCategory(h) === 'ANTI')
+    .sort((a, b) => (a.order || 0) - (b.order || 0));
 
   // Calculer les statistiques du jour
   const completedHabits = habitsForToday.filter(habit => {
@@ -540,7 +692,7 @@ export default function HabitsScreen() {
               {format(selectedDate, 'EEEE d MMMM', { locale: fr })}
             </Text>
             <Text style={styles.dateSubtext}>
-              {isToday ? "Aujourd'hui" : format(selectedDate, 'yyyy')}
+              {isToday ? t('today') : format(selectedDate, 'yyyy')}
             </Text>
           </TouchableOpacity>
 
@@ -585,7 +737,7 @@ export default function HabitsScreen() {
           activeOpacity={0.8}
         >
           <Ionicons name="add" size={20} color="white" />
-          <Text style={styles.createHabitButtonText}>Add Habit</Text>
+          <Text style={styles.createHabitButtonText}>{t('addHabit')}</Text>
         </TouchableOpacity>
       </View>
 
@@ -605,7 +757,7 @@ export default function HabitsScreen() {
               {morningHabits.length === 0 ? (
                 <Text style={styles.sectionEmpty}>Aucune habitude du matin définie.</Text>
               ) : (
-                morningHabits.map((habit) => (
+                morningHabits.map((habit, index) => (
                   <View key={habit.id} style={styles.cardWrapper}>
                     {habit.userCategoryOverride && (
                       <View style={styles.manualBadgeContainer}>
@@ -618,6 +770,24 @@ export default function HabitsScreen() {
                       onToggle={handleToggleHabit}
                       onSaveWithNote={handleSaveWithNote}
                       isUpdating={updatingHabits.has(habit.id)}
+                      onMoveUp={() => handleMoveHabit(habit.id, 'up', 'MORNING')}
+                      onMoveDown={() => handleMoveHabit(habit.id, 'down', 'MORNING')}
+                      canMoveUp={index > 0}
+                      canMoveDown={index < morningHabits.length - 1}
+                      onLongPress={() => {
+                        Alert.alert(
+                          t('deleteHabit'),
+                          `Voulez-vous supprimer "${habit.name}" ?`,
+                          [
+                            { text: t('cancel'), style: 'cancel' },
+                            {
+                              text: t('delete'),
+                              style: 'destructive',
+                              onPress: () => handleDeleteHabit(habit.id),
+                            },
+                          ]
+                        );
+                      }}
                     />
                   </View>
                 ))
@@ -646,7 +816,7 @@ export default function HabitsScreen() {
               {dayHabits.length === 0 ? (
                 <Text style={styles.sectionEmpty}>Aucune habitude de journée définie.</Text>
               ) : (
-                dayHabits.map((habit) => (
+                dayHabits.map((habit, index) => (
                   <View key={habit.id} style={styles.cardWrapper}>
                     {habit.userCategoryOverride && (
                       <View style={styles.manualBadgeContainer}>
@@ -659,6 +829,24 @@ export default function HabitsScreen() {
                       onToggle={handleToggleHabit}
                       onSaveWithNote={handleSaveWithNote}
                       isUpdating={updatingHabits.has(habit.id)}
+                      onMoveUp={() => handleMoveHabit(habit.id, 'up', 'DAY')}
+                      onMoveDown={() => handleMoveHabit(habit.id, 'down', 'DAY')}
+                      canMoveUp={index > 0}
+                      canMoveDown={index < dayHabits.length - 1}
+                      onLongPress={() => {
+                        Alert.alert(
+                          t('deleteHabit'),
+                          `Voulez-vous supprimer "${habit.name}" ?`,
+                          [
+                            { text: t('cancel'), style: 'cancel' },
+                            {
+                              text: t('delete'),
+                              style: 'destructive',
+                              onPress: () => handleDeleteHabit(habit.id),
+                            },
+                          ]
+                        );
+                      }}
                     />
                   </View>
                 ))
@@ -687,7 +875,7 @@ export default function HabitsScreen() {
               {eveningHabits.length === 0 ? (
                 <Text style={styles.sectionEmpty}>Aucune habitude du soir définie.</Text>
               ) : (
-                eveningHabits.map((habit) => (
+                eveningHabits.map((habit, index) => (
                   <View key={habit.id} style={styles.cardWrapper}>
                     {habit.userCategoryOverride && (
                       <View style={styles.manualBadgeContainer}>
@@ -700,6 +888,24 @@ export default function HabitsScreen() {
                       onToggle={handleToggleHabit}
                       onSaveWithNote={handleSaveWithNote}
                       isUpdating={updatingHabits.has(habit.id)}
+                      onMoveUp={() => handleMoveHabit(habit.id, 'up', 'EVENING')}
+                      onMoveDown={() => handleMoveHabit(habit.id, 'down', 'EVENING')}
+                      canMoveUp={index > 0}
+                      canMoveDown={index < eveningHabits.length - 1}
+                      onLongPress={() => {
+                        Alert.alert(
+                          t('deleteHabit'),
+                          `Voulez-vous supprimer "${habit.name}" ?`,
+                          [
+                            { text: t('cancel'), style: 'cancel' },
+                            {
+                              text: t('delete'),
+                              style: 'destructive',
+                              onPress: () => handleDeleteHabit(habit.id),
+                            },
+                          ]
+                        );
+                      }}
                     />
                   </View>
                 ))
@@ -771,6 +977,7 @@ export default function HabitsScreen() {
             </View>
           </View>
       </ScrollView>
+
 
       {/* Bouton flottant pour ajouter une habitude */}
       <TouchableOpacity style={styles.floatingButton} onPress={() => setShowCreateModal(true)}>
@@ -969,6 +1176,7 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 4,
     position: 'relative',
+    zIndex: 1,
   },
   colorIndicator: {
     position: 'absolute',
@@ -992,6 +1200,113 @@ const styles = StyleSheet.create({
   },
   habitHeader: {
     marginBottom: 24,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    width: '100%',
+    position: 'relative',
+  },
+  habitHeaderContent: {
+    flex: 1,
+    marginRight: 12,
+  },
+  moveButtonsContainer: {
+    flexDirection: 'column',
+    gap: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingLeft: 12,
+    minHeight: 88, // Hauteur minimale pour 2 boutons + gap
+  },
+  moveButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: '#16A34A',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  moveButtonDisabled: {
+    opacity: 0.3,
+    backgroundColor: '#F9FAFB',
+    borderColor: 'rgba(0, 0, 0, 0.1)',
+  },
+  actionMenu: {
+    position: 'absolute',
+    top: '100%',
+    left: 0,
+    right: 0,
+    marginTop: 8,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.1)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 8,
+    zIndex: 1000,
+    overflow: 'hidden',
+  },
+  actionMenuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    gap: 12,
+    minHeight: 48,
+  },
+  actionMenuItemDisabled: {
+    opacity: 0.5,
+  },
+  actionMenuText: {
+    fontSize: 16,
+    color: '#000000',
+    fontWeight: '500',
+  },
+  actionMenuTextDelete: {
+    fontSize: 16,
+    color: '#EF4444',
+    fontWeight: '500',
+  },
+  actionMenuTextDisabled: {
+    color: '#9CA3AF',
+  },
+  actionMenuDivider: {
+    height: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+    marginHorizontal: 12,
+    marginVertical: 4,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  actionMenuModal: {
+    width: '80%',
+    maxWidth: 300,
+  },
+  actionMenuContent: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.1)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 8,
+    overflow: 'visible',
   },
   habitName: {
     fontSize: 18,
@@ -1232,6 +1547,7 @@ const DAYS: { key: string; label: string }[] = [
 ];
 
 function CreateHabitModal({ visible, onClose, onCreated }: { visible: boolean; onClose: () => void; onCreated: () => void }) {
+  const { t } = useLanguage();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [daily, setDaily] = useState(true);
@@ -1243,8 +1559,8 @@ function CreateHabitModal({ visible, onClose, onCreated }: { visible: boolean; o
   };
 
   const handleSave = async () => {
-    if (!name.trim()) return Alert.alert('Erreur', "Le nom est requis");
-    if (!daily && daysOfWeek.length === 0) return Alert.alert('Erreur', 'Sélectionnez au moins un jour');
+    if (!name.trim()) return Alert.alert(t('error'), t('habitNameRequired'));
+    if (!daily && daysOfWeek.length === 0) return Alert.alert(t('error'), t('selectAtLeastOneDay'));
     setLoading(true);
     try {
       await habitsService.create({
@@ -1260,7 +1576,7 @@ function CreateHabitModal({ visible, onClose, onCreated }: { visible: boolean; o
       setDaysOfWeek(['monday','tuesday','wednesday','thursday','friday','saturday','sunday']);
     } catch (e: any) {
       console.error('Erreur création habitude:', e);
-      Alert.alert('Erreur', e?.message || "Création impossible");
+      Alert.alert(t('error'), e?.message || t('somethingWentWrong'));
     } finally {
       setLoading(false);
     }
@@ -1270,28 +1586,28 @@ function CreateHabitModal({ visible, onClose, onCreated }: { visible: boolean; o
     <Modal visible={visible} animationType="slide" transparent>
       <View style={{ flex:1, backgroundColor:'rgba(0,0,0,0.3)', justifyContent:'flex-end' }}>
         <View style={{ backgroundColor:'#fff', borderTopLeftRadius:16, borderTopRightRadius:16, padding:16 }}>
-          <Text style={{ fontSize:18, fontWeight:'700', marginBottom:12 }}>Add Habit</Text>
-          <Text style={{ fontSize:12, color:'#6B7280', marginBottom:8 }}>Nom</Text>
+          <Text style={{ fontSize:18, fontWeight:'700', marginBottom:12 }}>{t('addHabit')}</Text>
+          <Text style={{ fontSize:12, color:'#6B7280', marginBottom:8 }}>{t('name') || 'Nom'}</Text>
           <TextInput 
-            placeholder="Ex: Sport, Lecture..." 
+            placeholder={t('name') || 'Ex: Sport, Lecture...'} 
             value={name} 
             onChangeText={setName}
             style={{ borderWidth:1, borderColor:'#E5E7EB', borderRadius:8, padding:12, marginBottom:12 }}
           />
-          <Text style={{ fontSize:12, color:'#6B7280', marginBottom:8 }}>Description (optionnel)</Text>
+          <Text style={{ fontSize:12, color:'#6B7280', marginBottom:8 }}>{t('description') || 'Description (optionnel)'}</Text>
           <TextInput 
-            placeholder="Détails" 
+            placeholder={t('details') || 'Détails'} 
             value={description} 
             onChangeText={setDescription}
             style={{ borderWidth:1, borderColor:'#E5E7EB', borderRadius:8, padding:12, marginBottom:12 }}
           />
           <View style={{ flexDirection:'row', alignItems:'center', justifyContent:'space-between', marginBottom:12 }}>
-            <Text style={{ fontSize:14, fontWeight:'600' }}>Quotidienne</Text>
+            <Text style={{ fontSize:14, fontWeight:'600' }}>{t('daily') || 'Quotidienne'}</Text>
             <Switch value={daily} onValueChange={setDaily} trackColor={{ true: '#10B981' }} />
           </View>
           {!daily && (
             <View style={{ marginBottom:12 }}>
-              <Text style={{ fontSize:12, color:'#6B7280', marginBottom:8 }}>Jours de la semaine</Text>
+              <Text style={{ fontSize:12, color:'#6B7280', marginBottom:8 }}>{t('daysOfWeek') || 'Jours de la semaine'}</Text>
               <View style={{ flexDirection:'row', flexWrap:'wrap', gap:8 }}>
                 {DAYS.map(d => (
                   <TouchableOpacity
@@ -1312,10 +1628,10 @@ function CreateHabitModal({ visible, onClose, onCreated }: { visible: boolean; o
           )}
           <View style={{ flexDirection:'row', justifyContent:'flex-end', gap:12, marginTop:4 }}>
             <TouchableOpacity onPress={onClose} style={{ paddingHorizontal:16, paddingVertical:12 }}>
-              <Text style={{ color:'#6B7280' }}>Annuler</Text>
+              <Text style={{ color:'#6B7280' }}>{t('cancel')}</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={handleSave} disabled={loading} style={{ backgroundColor:'#10B981', paddingHorizontal:16, paddingVertical:12, borderRadius:8 }}>
-              <Text style={{ color:'#fff', fontWeight:'600' }}>{loading ? 'Enregistrement...' : 'Créer'}</Text>
+              <Text style={{ color:'#fff', fontWeight:'600' }}>{loading ? t('saving') : t('create')}</Text>
             </TouchableOpacity>
           </View>
         </View>
