@@ -11,6 +11,7 @@ export interface OnboardingResponses {
   // Identité
   firstName?: string;
   studentType?: string;
+  studyLevel?: number;
   
   // Objectifs & Pression
   goals?: string[];
