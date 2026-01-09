@@ -532,6 +532,97 @@ export class GoogleCalendarService {
 
     return results
   }
+
+  /**
+   * Crée des événements pour Plan My Day (sans tâches existantes)
+   * Chaque événement a: title, subjectName, start (Date), durationMinutes
+   */
+  async createPlanMyDayEvents(
+    userId: string,
+    events: Array<{
+      title: string
+      subjectName?: string | null
+      start: Date
+      durationMinutes: number
+    }>
+  ): Promise<Array<{ success: boolean; eventId?: string; error?: string }>> {
+    const accessToken = await this.refreshTokenIfNeeded(userId)
+    if (!accessToken) {
+      return events.map(() => ({
+        success: false,
+        error: 'Token non disponible',
+      }))
+    }
+
+    const results = []
+
+    const formatForParis = (dateUTC: Date): string => {
+      const formatter = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Europe/Paris',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+      })
+      const parts = formatter.formatToParts(dateUTC)
+      const year = parts.find(p => p.type === 'year')?.value
+      const month = parts.find(p => p.type === 'month')?.value
+      const day = parts.find(p => p.type === 'day')?.value
+      const hour = parts.find(p => p.type === 'hour')?.value
+      const minute = parts.find(p => p.type === 'minute')?.value
+      const second = parts.find(p => p.type === 'second')?.value
+      return `${year}-${month}-${day}T${hour}:${minute}:${second}`
+    }
+
+    for (const evt of events) {
+      try {
+        const endDate = new Date(evt.start.getTime() + evt.durationMinutes * 60 * 1000)
+        const startDateTime = formatForParis(evt.start)
+        const endDateTime = formatForParis(endDate)
+
+        const eventTitle = evt.subjectName 
+          ? `[Productif] ${evt.title} (${evt.subjectName})` 
+          : `[Productif] ${evt.title}`
+        const description = evt.subjectName
+          ? `📚 ${evt.title}\nMatière: ${evt.subjectName}\n\nPlanifié par Plan My Day`
+          : `📚 ${evt.title}\n\nPlanifié par Plan My Day`
+
+        const event = {
+          summary: eventTitle,
+          description,
+          start: { dateTime: startDateTime, timeZone: 'Europe/Paris' },
+          end: { dateTime: endDateTime, timeZone: 'Europe/Paris' },
+          reminders: { useDefault: false, overrides: [{ method: 'popup', minutes: 15 }] },
+          extendedProperties: { private: { productif: 'true', type: 'plan_my_day', version: '1' } },
+          colorId: PRODUCTIF_CALENDAR_COLOR,
+        }
+
+        const response = await fetch(`${CALENDAR_API_BASE}/calendars/primary/events`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify(event),
+        })
+
+        if (!response.ok) {
+          const error = await response.json().catch(() => ({}))
+          results.push({ success: false, error: error.error?.message || 'Erreur création' })
+          continue
+        }
+
+        const createdEvent = await response.json()
+        results.push({ success: true, eventId: createdEvent.id })
+        await new Promise((resolve) => setTimeout(resolve, 100))
+      } catch (error: any) {
+        console.error('Erreur createPlanMyDayEvents:', error)
+        results.push({ success: false, error: error.message || 'Erreur réseau' })
+      }
+    }
+
+    return results
+  }
 }
 
 // Instance singleton
