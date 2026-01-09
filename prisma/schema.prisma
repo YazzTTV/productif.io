@@ -764,6 +764,7 @@ model OnboardingData {
   // Nouveau design - Identité
   firstName   String? // Prénom de l'utilisateur
   studentType String? // highSchool, university, medLawPrepa, engineeringBusiness, other
+  studyLevel  Int?    // Année d'études (1-9)
 
   // Nouveau design - Objectifs & Pression
   goals         Json?   // Array de strings: succeedExams, reduceStress, stayConsistent, stopOverwhelmed, useTimeBetter

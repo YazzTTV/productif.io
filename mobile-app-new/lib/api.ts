@@ -775,6 +775,7 @@ export interface OnboardingDataInput {
   // Identité
   firstName?: string;
   studentType?: string;
+  studyLevel?: number;
   
   // Objectifs & Pression
   goals?: string[];

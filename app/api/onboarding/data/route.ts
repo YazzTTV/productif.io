@@ -54,6 +54,7 @@ export async function POST(req: NextRequest) {
     // Nouveau design - Identité
     if (data.firstName !== undefined) updateData.firstName = data.firstName
     if (data.studentType !== undefined) updateData.studentType = data.studentType
+    if (data.studyLevel !== undefined) updateData.studyLevel = data.studyLevel
     
     // Nouveau design - Objectifs & Pression
     if (data.goals !== undefined) updateData.goals = data.goals
@@ -110,6 +111,7 @@ export async function POST(req: NextRequest) {
         frustration: data.frustration || null,
         firstName: data.firstName || null,
         studentType: data.studentType || null,
+        studyLevel: data.studyLevel || null,
         goals: data.goals || null,
         pressureLevel: data.pressureLevel || null,
         currentSituation: data.currentSituation || null,

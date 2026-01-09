@@ -7,6 +7,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { authService } from '@/lib/api';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useOnboardingData } from '@/hooks/useOnboardingData';
+import { usePushNotifications } from '@/hooks/usePushNotifications';
 
 type SettingsView = 'main' | 'editProfile' | 'dailyStructure' | 'notifications';
 
@@ -17,13 +19,15 @@ export function SettingsNew() {
   const { t } = useLanguage();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { getResponse, saveResponse, responses } = useOnboardingData();
+  const { requestPermissions, permissionStatus } = usePushNotifications();
   const [view, setView] = useState<SettingsView>('main');
   const [savedFeedback, setSavedFeedback] = useState(false);
 
   // Profile
-  const [name, setName] = useState('Marie Dubois');
-  const [academicField, setAcademicField] = useState('Medical School');
-  const [studyLevel, setStudyLevel] = useState('Year 2');
+  const [name, setName] = useState('');
+  const [academicField, setAcademicField] = useState('');
+  const [studyLevel, setStudyLevel] = useState<number>(1);
 
   // Daily Structure
   const [focusDuration, setFocusDuration] = useState<FocusDuration>(45);
@@ -31,7 +35,7 @@ export function SettingsNew() {
   const [workloadIntensity, setWorkloadIntensity] = useState<WorkloadIntensity>('balanced');
 
   // Notifications
-  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [startOfDayReminder, setStartOfDayReminder] = useState(true);
   const [focusReminder, setFocusReminder] = useState(true);
   const [breakReminder, setBreakReminder] = useState(false);
@@ -47,12 +51,71 @@ export function SettingsNew() {
         if (user?.name) {
           setName(user.name);
         }
+        
+        // Charger les données de l'onboarding
+        const savedStudentType = getResponse('studentType');
+        const savedStudyLevel = getResponse('studyLevel');
+        
+        if (savedStudentType) {
+          setAcademicField(savedStudentType);
+        }
+        if (savedStudyLevel) {
+          setStudyLevel(typeof savedStudyLevel === 'number' ? savedStudyLevel : 1);
+        }
       } catch (error) {
         console.log('User not loaded');
       }
     };
     loadUserData();
   }, []);
+
+  // Recharger les données quand on revient à la vue principale
+  useEffect(() => {
+    if (view === 'main') {
+      const savedStudentType = getResponse('studentType');
+      const savedStudyLevel = getResponse('studyLevel');
+      
+      if (savedStudentType) {
+        setAcademicField(savedStudentType);
+      }
+      if (savedStudyLevel) {
+        setStudyLevel(typeof savedStudyLevel === 'number' ? savedStudyLevel : 1);
+      }
+    }
+  }, [view, responses]);
+
+  // Synchroniser l'état des notifications avec le statut des permissions
+  useEffect(() => {
+    if (permissionStatus === 'granted') {
+      setNotificationsEnabled(true);
+    } else if (permissionStatus === 'denied') {
+      setNotificationsEnabled(false);
+    }
+  }, [permissionStatus]);
+
+  // Fonction pour gérer le changement du toggle de notifications
+  const handleNotificationToggle = async (value: boolean) => {
+    if (value) {
+      // L'utilisateur veut activer les notifications, demander la permission
+      const granted = await requestPermissions();
+      if (granted) {
+        setNotificationsEnabled(true);
+        showSavedFeedback();
+      } else {
+        // Permission refusée
+        setNotificationsEnabled(false);
+        Alert.alert(
+          t('notificationPermissionRequired') || 'Permission requise',
+          t('notificationPermissionMessage') || 'Veuillez autoriser les notifications dans les paramètres de votre appareil.',
+          [{ text: 'OK' }]
+        );
+      }
+    } else {
+      // L'utilisateur désactive les notifications
+      setNotificationsEnabled(false);
+      showSavedFeedback();
+    }
+  };
 
   const showSavedFeedback = () => {
     setSavedFeedback(true);
@@ -103,44 +166,62 @@ export function SettingsNew() {
 
           <View style={styles.formContainer}>
             <View style={styles.formGroup}>
-              <Text style={styles.formLabel}>Name</Text>
+              <Text style={styles.formLabel}>{t('name') || 'Name'}</Text>
               <TextInput
                 style={styles.formInput}
                 value={name}
                 onChangeText={setName}
-                placeholder="Name"
+                placeholder={t('name') || 'Name'}
               />
             </View>
 
             <View style={styles.formGroup}>
-              <Text style={styles.formLabel}>Academic field</Text>
+              <Text style={styles.formLabel}>{t('academicField') || 'Academic field'}</Text>
               <TextInput
                 style={styles.formInput}
                 value={academicField}
                 onChangeText={setAcademicField}
-                placeholder="Academic field"
+                placeholder={t('academicField') || 'Academic field'}
               />
             </View>
 
             <View style={styles.formGroup}>
-              <Text style={styles.formLabel}>Study level</Text>
-              <TextInput
-                style={styles.formInput}
-                value={studyLevel}
-                onChangeText={setStudyLevel}
-                placeholder="Study level"
-              />
+              <Text style={styles.formLabel}>{t('studyLevel') || 'Study level'}</Text>
+              <Text style={styles.formHint}>{t('selectYearLevel') || 'Select your year (1-9)'}</Text>
+              <View style={styles.yearSelector}>
+                {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((year) => (
+                  <TouchableOpacity
+                    key={year}
+                    style={[
+                      styles.yearButton,
+                      studyLevel === year && styles.yearButtonSelected,
+                    ]}
+                    onPress={() => setStudyLevel(year)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[
+                      styles.yearButtonText,
+                      studyLevel === year && styles.yearButtonTextSelected,
+                    ]}>
+                      {year}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
             </View>
 
             <TouchableOpacity
               style={styles.saveButton}
-              onPress={() => {
+              onPress={async () => {
+                // Sauvegarder dans useOnboardingData
+                await saveResponse('studentType', academicField);
+                await saveResponse('studyLevel', studyLevel);
                 showSavedFeedback();
                 setTimeout(() => setView('main'), 500);
               }}
               activeOpacity={0.8}
             >
-              <Text style={styles.saveButtonText}>Save Changes</Text>
+              <Text style={styles.saveButtonText}>{t('saveChanges') || 'Save Changes'}</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>
@@ -330,10 +411,7 @@ export function SettingsNew() {
                 </View>
                 <Switch
                   value={notificationsEnabled}
-                  onValueChange={(value) => {
-                    setNotificationsEnabled(value);
-                    showSavedFeedback();
-                  }}
+                  onValueChange={handleNotificationToggle}
                   trackColor={{ false: 'rgba(0, 0, 0, 0.1)', true: '#16A34A' }}
                   thumbColor="#FFFFFF"
                 />
@@ -468,7 +546,7 @@ export function SettingsNew() {
             <View style={styles.accountDivider} />
             <View style={styles.accountRow}>
               <Text style={styles.accountLabel}>{t('studyLevel') || 'Study level'}</Text>
-              <Text style={styles.accountValue}>{studyLevel}</Text>
+              <Text style={styles.accountValue}>{t('yearLevel', { year: studyLevel }) || `Year ${studyLevel}`}</Text>
             </View>
             <View style={styles.accountDivider} />
             <TouchableOpacity
@@ -519,10 +597,7 @@ export function SettingsNew() {
                 </View>
                 <Switch
                   value={notificationsEnabled}
-                  onValueChange={(value) => {
-                    setNotificationsEnabled(value);
-                    showSavedFeedback();
-                  }}
+                  onValueChange={handleNotificationToggle}
                   trackColor={{ false: 'rgba(0, 0, 0, 0.1)', true: '#16A34A' }}
                   thumbColor="#FFFFFF"
                 />
@@ -999,6 +1074,12 @@ const styles = StyleSheet.create({
     color: 'rgba(0, 0, 0, 0.6)',
     paddingHorizontal: 4,
   },
+  formHint: {
+    fontSize: 12,
+    color: 'rgba(0, 0, 0, 0.4)',
+    paddingHorizontal: 4,
+    marginTop: -4,
+  },
   formInput: {
     padding: 16,
     borderRadius: 16,
@@ -1007,6 +1088,35 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     fontSize: 16,
     color: '#000000',
+  },
+  yearSelector: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 8,
+  },
+  yearButton: {
+    width: 56,
+    height: 56,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.1)',
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  yearButtonSelected: {
+    borderColor: '#16A34A',
+    backgroundColor: 'rgba(22, 163, 74, 0.1)',
+  },
+  yearButtonText: {
+    fontSize: 18,
+    fontWeight: '500',
+    color: 'rgba(0, 0, 0, 0.6)',
+  },
+  yearButtonTextSelected: {
+    color: '#16A34A',
+    fontWeight: '600',
   },
   saveButton: {
     backgroundColor: '#16A34A',
