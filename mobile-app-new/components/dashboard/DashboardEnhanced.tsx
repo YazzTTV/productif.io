@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, RefreshControl } from 'react-native';
 import { useRouter } from 'expo-router';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
@@ -31,6 +31,8 @@ export function DashboardEnhanced() {
   const { t } = useLanguage();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const timelineScrollRef = useRef<ScrollView>(null);
+  const timelineItemPositions = useRef<{ [key: number]: number }>({});
   
   const [userName, setUserName] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -64,7 +66,7 @@ export function DashboardEnhanced() {
           return false;
         }
       })
-      .slice(0, 5) // Limiter à 5 événements
+      // Afficher TOUS les événements sans limite
       .map((event) => {
         try {
           const startTime = parseISO(event.start);
@@ -120,6 +122,45 @@ export function DashboardEnhanced() {
   useEffect(() => {
     loadData();
   }, []);
+
+  // Scroll automatique vers l'événement actif ou le prochain événement
+  useEffect(() => {
+    if (keyMoments.length > 0) {
+      // Trouver l'index de l'événement actif ou du prochain événement
+      const activeIndex = keyMoments.findIndex(moment => moment.active);
+      const now = new Date();
+      
+      let targetIndex = -1;
+      
+      if (activeIndex !== -1) {
+        // Si un événement est actif, scroller vers celui-ci
+        targetIndex = activeIndex;
+      } else {
+        // Sinon, trouver le prochain événement à venir
+        for (let i = 0; i < keyMoments.length; i++) {
+          const [hours, minutes] = keyMoments[i].time.split(':').map(Number);
+          const eventTime = new Date();
+          eventTime.setHours(hours, minutes, 0, 0);
+          
+          if (eventTime > now) {
+            targetIndex = i;
+            break;
+          }
+        }
+      }
+      
+      // Scroller vers l'événement cible avec un délai pour laisser le temps au rendu
+      if (targetIndex !== -1 && timelineItemPositions.current[targetIndex] !== undefined) {
+        setTimeout(() => {
+          const yPosition = timelineItemPositions.current[targetIndex];
+          timelineScrollRef.current?.scrollTo({
+            y: Math.max(0, yPosition - 50), // Offset pour centrer l'événement
+            animated: true,
+          });
+        }, 500);
+      }
+    }
+  }, [keyMoments]);
 
   const onRefresh = async () => {
     setIsRefreshing(true);
@@ -205,46 +246,60 @@ export function DashboardEnhanced() {
           <Animated.View entering={FadeInDown.delay(250).duration(400)} style={styles.section}>
             <Text style={styles.sectionLabel}>{t('keyMomentsToday') || 'Key moments today'}</Text>
             {keyMoments.length > 0 ? (
-              <View style={styles.timeline}>
-                {keyMoments.map((moment, index) => (
-                  <View key={index} style={styles.timelineItem}>
-                    <View style={styles.timelineLeft}>
-                      <View style={[
-                        styles.timelineDot,
-                        moment.active && styles.timelineDotActive
-                      ]} />
-                      {index < keyMoments.length - 1 && (
+              <ScrollView
+                ref={timelineScrollRef}
+                style={styles.timelineScrollView}
+                nestedScrollEnabled={true}
+                showsVerticalScrollIndicator={false}
+              >
+                <View style={styles.timeline}>
+                  {keyMoments.map((moment, index) => (
+                    <View 
+                      key={index} 
+                      style={styles.timelineItem}
+                      onLayout={(event) => {
+                        const { y } = event.nativeEvent.layout;
+                        timelineItemPositions.current[index] = y;
+                      }}
+                    >
+                      <View style={styles.timelineLeft}>
                         <View style={[
-                          styles.timelineLine,
-                          moment.active && styles.timelineLineActive
+                          styles.timelineDot,
+                          moment.active && styles.timelineDotActive
                         ]} />
-                      )}
-                    </View>
-                    <View style={[
-                      styles.timelineCard,
-                      moment.active && styles.timelineCardActive
-                    ]}>
-                      <View style={styles.timelineCardContent}>
-                        <Text style={[
-                          styles.timelineTime,
-                          moment.active && styles.timelineTimeActive
-                        ]}>
-                          {moment.time}
-                        </Text>
-                        <Text style={[
-                          styles.timelineLabel,
-                          moment.active && styles.timelineLabelActive
-                        ]}>
-                          {moment.label}
-                        </Text>
+                        {index < keyMoments.length - 1 && (
+                          <View style={[
+                            styles.timelineLine,
+                            moment.active && styles.timelineLineActive
+                          ]} />
+                        )}
                       </View>
-                      {moment.type === 'focus' && moment.active && (
-                        <View style={styles.activePulse} />
-                      )}
+                      <View style={[
+                        styles.timelineCard,
+                        moment.active && styles.timelineCardActive
+                      ]}>
+                        <View style={styles.timelineCardContent}>
+                          <Text style={[
+                            styles.timelineTime,
+                            moment.active && styles.timelineTimeActive
+                          ]}>
+                            {moment.time}
+                          </Text>
+                          <Text style={[
+                            styles.timelineLabel,
+                            moment.active && styles.timelineLabelActive
+                          ]}>
+                            {moment.label}
+                          </Text>
+                        </View>
+                        {moment.type === 'focus' && moment.active && (
+                          <View style={styles.activePulse} />
+                        )}
+                      </View>
                     </View>
-                  </View>
-                ))}
-              </View>
+                  ))}
+                </View>
+              </ScrollView>
             ) : (
               <View style={styles.emptyCalendarContainer}>
                 {isCalendarConnected ? (
@@ -480,6 +535,9 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 18,
     fontWeight: '600',
+  },
+  timelineScrollView: {
+    maxHeight: 400, // Hauteur maximale pour la timeline scrollable
   },
   timeline: {
     gap: 0,
