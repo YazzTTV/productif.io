@@ -222,6 +222,12 @@ export async function apiCall<T>(
         throw new Error(`Endpoint non trouvé: ${endpoint}. Vérifiez que l'endpoint existe sur le serveur.`);
       }
 
+      // 405 Method Not Allowed - souvent signifie que la route n'est pas déployée ou pas à jour
+      if (response.status === 405) {
+        console.error('❌ apiCall - Method Not Allowed (405):', `${API_BASE_URL}${endpoint}`);
+        throw new Error('Cette fonctionnalité n\'est pas encore disponible. Assurez-vous que l\'application est à jour.');
+      }
+
       const message =
         errorData?.error ||
         errorData?.message ||
@@ -538,6 +544,13 @@ export const tasksService = {
   async complete(taskId: string): Promise<any> {
     return await apiCall(`/tasks/${taskId}/complete`, {
       method: 'POST',
+    });
+  },
+
+  // Supprimer une tâche
+  async deleteTask(taskId: string): Promise<any> {
+    return await apiCall(`/tasks/${taskId}`, {
+      method: 'DELETE',
     });
   },
 
@@ -1049,7 +1062,50 @@ export const taskAssociationService = {
       body: JSON.stringify({ transcription }),
     });
   },
-}; 
+};
+
+// Service pour Plan My Day - créer les événements dans Google Calendar ET les tâches dans AI Tasks
+export const dailyPlanningService = {
+  async createDayEvents(events: Array<{
+    title: string;
+    description?: string | null;
+    subjectName?: string | null;
+    subjectId?: string | null;
+    priority?: number;
+    energy?: number;
+    start: string; // ISO string
+    durationMinutes: number;
+  }>): Promise<{
+    success: boolean;
+    eventsCreated: number;
+    eventsFailed: number;
+    tasksCreated?: number;
+    taskIds?: string[];
+    message: string;
+    results?: Array<{ success: boolean; eventId?: string; error?: string }>;
+  }> {
+    return await apiCall('/planning/daily-events', {
+      method: 'POST',
+      body: JSON.stringify({ events }),
+    });
+  },
+
+  // Récupérer les événements Google Calendar d'une date pour éviter les chevauchements
+  async getCalendarEvents(dateStr: string): Promise<{
+    events: Array<{
+      id: string;
+      title: string;
+      start: string;
+      end: string;
+      startDate: string | null;
+      endDate: string | null;
+    }>;
+    connected: boolean;
+    date?: string;
+  }> {
+    return await apiCall(`/planning/calendar-events?date=${encodeURIComponent(dateStr)}`);
+  },
+};
 
 // Service de gamification (classement, points, etc.)
 export const gamificationService = {

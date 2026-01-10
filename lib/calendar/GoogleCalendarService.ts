@@ -344,16 +344,23 @@ export class GoogleCalendarService {
    * Récupère tous les événements du jour depuis Google Calendar
    */
   async getTodayEvents(userId: string): Promise<GoogleCalendarEvent[]> {
+    return this.getEventsForDate(userId, new Date())
+  }
+
+  /**
+   * Récupère tous les événements d'une date spécifique depuis Google Calendar
+   * Utilisé par Plan My Day pour éviter les créneaux déjà occupés
+   */
+  async getEventsForDate(userId: string, date: Date): Promise<GoogleCalendarEvent[]> {
     const accessToken = await this.refreshTokenIfNeeded(userId)
     if (!accessToken) {
       return []
     }
 
-    const now = new Date()
-    // Début de la journée (00:00:00)
-    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    // Début de la journée (00:00:00) pour la date donnée
+    const startOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate())
     // Fin de la journée (23:59:59)
-    const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59)
+    const endOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59)
 
     try {
       const params = new URLSearchParams({
@@ -374,14 +381,14 @@ export class GoogleCalendarService {
       )
 
       if (!response.ok) {
-        console.error('Erreur récupération événements du jour:', response.status)
+        console.error('Erreur récupération événements pour date:', response.status)
         return []
       }
 
       const data = await response.json()
       return data.items || []
     } catch (error) {
-      console.error('Erreur getTodayEvents:', error)
+      console.error('Erreur getEventsForDate:', error)
       return []
     }
   }
@@ -556,7 +563,15 @@ export class GoogleCalendarService {
 
     const results = []
 
-    const formatForParis = (dateUTC: Date): string => {
+    // Formate une date en ISO string pour Paris
+    // IMPORTANT: evt.start est une Date qui, quand sérialisée en JSON (toISOString()), 
+    // devient une string ISO en UTC. Mais on veut interpréter les composants année/mois/jour/heure/minute
+    // comme étant déjà en heure de Paris, pas en UTC.
+    // Solution: extraire les composants de la date reçue et les interpréter comme heure de Paris
+    const formatForParis = (date: Date): string => {
+      // La date reçue peut être en UTC (si elle vient de toISOString()), 
+      // mais on veut extraire les composants comme s'ils étaient en heure de Paris
+      // On utilise formatToParts avec timeZone: 'Europe/Paris' pour obtenir les composants corrects
       const formatter = new Intl.DateTimeFormat('en-CA', {
         timeZone: 'Europe/Paris',
         year: 'numeric',
@@ -567,21 +582,55 @@ export class GoogleCalendarService {
         second: '2-digit',
         hour12: false
       })
-      const parts = formatter.formatToParts(dateUTC)
-      const year = parts.find(p => p.type === 'year')?.value
-      const month = parts.find(p => p.type === 'month')?.value
-      const day = parts.find(p => p.type === 'day')?.value
-      const hour = parts.find(p => p.type === 'hour')?.value
-      const minute = parts.find(p => p.type === 'minute')?.value
-      const second = parts.find(p => p.type === 'second')?.value
+      
+      const parts = formatter.formatToParts(date)
+      const year = parts.find(p => p.type === 'year')?.value || '2026'
+      const month = parts.find(p => p.type === 'month')?.value || '01'
+      const day = parts.find(p => p.type === 'day')?.value || '01'
+      const hour = parts.find(p => p.type === 'hour')?.value || '00'
+      const minute = parts.find(p => p.type === 'minute')?.value || '00'
+      const second = parts.find(p => p.type === 'second')?.value || '00'
+      
       return `${year}-${month}-${day}T${hour}:${minute}:${second}`
     }
 
     for (const evt of events) {
       try {
-        const endDate = new Date(evt.start.getTime() + evt.durationMinutes * 60 * 1000)
-        const startDateTime = formatForParis(evt.start)
-        const endDateTime = formatForParis(endDate)
+        // evt.start peut être:
+        // 1. Une string ISO complète (avec timezone) de toISOString() -> UTC
+        // 2. Une string ISO sans timezone (YYYY-MM-DDTHH:mm:ss) -> à interpréter comme heure de Paris
+        // 3. Une Date object
+        let startDateTime: string;
+        let endDateTime: string;
+        
+        if (typeof evt.start === 'string') {
+          // Si la string contient 'Z' ou un offset (+/-), c'est une date UTC/ISO complète
+          if (evt.start.includes('Z') || evt.start.match(/[+-]\d{2}:\d{2}$/)) {
+            // Date UTC: utiliser formatForParis pour convertir en heure de Paris
+            const startDate = new Date(evt.start);
+            const endDate = new Date(startDate.getTime() + evt.durationMinutes * 60 * 1000);
+            startDateTime = formatForParis(startDate);
+            endDateTime = formatForParis(endDate);
+          } else {
+            // String sans timezone (YYYY-MM-DDTHH:mm:ss): les composants sont déjà en heure de Paris
+            // Utiliser directement cette string (elle est déjà au bon format)
+            startDateTime = evt.start;
+            // Calculer la fin en ajoutant les minutes
+            const [datePart, timePart] = evt.start.split('T');
+            const [hour, minute] = timePart.split(':').map(Number);
+            const endMinute = minute + evt.durationMinutes;
+            const endHour = hour + Math.floor(endMinute / 60);
+            const finalMinute = endMinute % 60;
+            const finalHour = endHour % 24;
+            endDateTime = `${datePart}T${String(finalHour).padStart(2, '0')}:${String(finalMinute).padStart(2, '0')}:00`;
+          }
+        } else {
+          // Date object: utiliser formatForParis
+          const startDate = new Date(evt.start);
+          const endDate = new Date(startDate.getTime() + evt.durationMinutes * 60 * 1000);
+          startDateTime = formatForParis(startDate);
+          endDateTime = formatForParis(endDate);
+        }
 
         const eventTitle = evt.subjectName 
           ? `[Productif] ${evt.title} (${evt.subjectName})` 
