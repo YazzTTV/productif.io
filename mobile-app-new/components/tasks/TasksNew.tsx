@@ -123,9 +123,25 @@ export function TasksNew() {
       console.log('📥 [TasksNew] Données reçues de l\'API:', JSON.stringify(data, null, 2));
       if (Array.isArray(data)) {
         // S'assurer que chaque matière a un tableau tasks
+        // Filtrer les tâches complétées qui ont été complétées il y a plus de 24h
+        const now = new Date();
+        const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        
         const normalizedData = data.map(subject => ({
           ...subject,
-          tasks: Array.isArray(subject.tasks) ? subject.tasks : [],
+          tasks: Array.isArray(subject.tasks) 
+            ? subject.tasks.filter((t: Task & { updatedAt?: string }) => {
+                // Garder les tâches non complétées
+                if (!t.completed) return true;
+                // Pour les tâches complétées, vérifier si elles ont été mises à jour il y a moins de 24h
+                if (t.completed && t.updatedAt) {
+                  const updatedAt = new Date(t.updatedAt);
+                  return updatedAt > oneDayAgo;
+                }
+                // Si pas de updatedAt, garder la tâche (cas de compatibilité)
+                return false;
+              })
+            : [],
         }));
         console.log('📥 [TasksNew] Données normalisées:', normalizedData.map(s => ({
           id: s.id,
@@ -207,6 +223,22 @@ export function TasksNew() {
     try {
       await tasksService.updateTask(taskId, { completed: newCompletedState });
       console.log('✅ [TasksNew] Tâche mise à jour avec succès');
+      
+      // Si la tâche est complétée, la retirer de l'affichage après un court délai
+      if (newCompletedState) {
+        setTimeout(() => {
+          setSubjects(prev =>
+            prev.map(subject =>
+              subject.id === subjectId
+                ? {
+                    ...subject,
+                    tasks: subject.tasks.filter(t => t.id !== taskId),
+                  }
+                : subject
+            )
+          );
+        }, 2000); // Retirer après 2 secondes
+      }
     } catch (error) {
       console.error('❌ [TasksNew] Erreur lors de la mise à jour de la tâche:', error);
       // Annuler la mise à jour locale en cas d'erreur
@@ -226,6 +258,47 @@ export function TasksNew() {
       );
       Alert.alert('Erreur', 'Impossible de mettre à jour la tâche. Veuillez réessayer.');
     }
+  };
+
+  const handleDeleteTask = async (subjectId: string, taskId: string) => {
+    Alert.alert(
+      'Supprimer la tâche',
+      'Êtes-vous sûr de vouloir supprimer cette tâche ?',
+      [
+        {
+          text: 'Annuler',
+          style: 'cancel',
+        },
+        {
+          text: 'Supprimer',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              // Mise à jour optimiste : retirer la tâche de l'UI immédiatement
+              setSubjects(prev =>
+                prev.map(subject =>
+                  subject.id === subjectId
+                    ? {
+                        ...subject,
+                        tasks: subject.tasks.filter(t => t.id !== taskId),
+                      }
+                    : subject
+                )
+              );
+
+              // Supprimer via l'API
+              await tasksService.deleteTask(taskId);
+              console.log('✅ [TasksNew] Tâche supprimée avec succès');
+            } catch (error: any) {
+              console.error('❌ [TasksNew] Erreur lors de la suppression de la tâche:', error);
+              // Recharger les données en cas d'erreur
+              await loadSubjects();
+              Alert.alert('Erreur', 'Impossible de supprimer la tâche. Veuillez réessayer.');
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleStartFocus = (task: Task, subject: Subject) => {
@@ -870,15 +943,26 @@ export function TasksNew() {
                             )}
 
                             {/* Task actions */}
-                            {!task.completed && (
+                            <View style={styles.taskActions}>
+                              {!task.completed && (
+                                <TouchableOpacity
+                                  style={styles.startFocusButton}
+                                  onPress={() => handleStartFocus(task, subject)}
+                                  activeOpacity={0.8}
+                                >
+                                  <Text style={styles.startFocusText}>Start Focus Session</Text>
+                                </TouchableOpacity>
+                              )}
+                              
+                              {/* Delete button */}
                               <TouchableOpacity
-                                style={styles.startFocusButton}
-                                onPress={() => handleStartFocus(task, subject)}
-                                activeOpacity={0.8}
+                                style={styles.deleteTaskButton}
+                                onPress={() => handleDeleteTask(subject.id, task.id)}
+                                activeOpacity={0.7}
                               >
-                                <Text style={styles.startFocusText}>Start Focus Session</Text>
+                                <Ionicons name="trash-outline" size={18} color="#EF4444" />
                               </TouchableOpacity>
-                            )}
+                            </View>
                           </View>
                         );
                       })}
@@ -1544,19 +1628,32 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: 'rgba(0, 0, 0, 0.6)',
   },
-  startFocusButton: {
+  taskActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
     marginTop: 8,
     marginLeft: 36,
+  },
+  startFocusButton: {
     backgroundColor: '#16A34A',
     paddingVertical: 12,
     paddingHorizontal: 24,
     borderRadius: 12,
-    alignSelf: 'flex-start',
+    flex: 1,
   },
   startFocusText: {
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '600',
+    textAlign: 'center',
+  },
+  deleteTaskButton: {
+    padding: 10,
+    borderRadius: 8,
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.2)',
   },
   addSubjectButtonsContainer: {
     marginTop: 16,
