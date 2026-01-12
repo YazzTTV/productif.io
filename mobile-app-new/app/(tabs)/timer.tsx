@@ -18,6 +18,7 @@ import { PomodoroTimer } from '../../components/time/PomodoroTimer';
 import { ProcessSteps } from '../../components/time/ProcessSteps';
 import { ProcessSelector } from '../../components/time/ProcessSelector';
 import { apiCall } from '../../lib/api';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 interface Task {
   id: string;
@@ -41,6 +42,7 @@ interface Process {
 export default function TimerScreen() {
   const { taskId, taskTitle } = useLocalSearchParams<{ taskId?: string; taskTitle?: string }>();
   const router = useRouter();
+  const { t } = useLanguage();
   
   const [task, setTask] = useState<Task | null>(null);
   const [process, setProcess] = useState("");
@@ -57,7 +59,7 @@ export default function TimerScreen() {
       // TODO: Charger les détails de la tâche depuis l'API
       setTask({
         id: taskId,
-        title: taskTitle || 'Tâche sans titre',
+        title: taskTitle || t('untitledTask'),
         completed: false,
       });
       setIsCompleted(false);
@@ -93,21 +95,21 @@ export default function TimerScreen() {
   // Gestionnaire de completion du timer
   const handleTimerComplete = () => {
     Alert.alert(
-      '🎉 Session terminée !',
-      'Félicitations ! Voulez-vous marquer la tâche comme terminée ?',
+      t('sessionCompleted'),
+      t('markTaskCompleted'),
       [
-        { text: 'Non', style: 'cancel' },
+        { text: t('no'), style: 'cancel' },
         {
-          text: 'Oui',
+          text: t('yes'),
           onPress: async () => {
             try {
               // TODO: Marquer la tâche comme terminée via l'API
               console.log('✅ Marquer tâche terminée:', taskId);
               setIsCompleted(true);
-              Alert.alert('Succès', 'Tâche marquée comme terminée !');
+              Alert.alert(t('success'), t('taskMarkedCompleted'));
             } catch (error) {
               console.error('Erreur:', error);
-              Alert.alert('Erreur', 'Impossible de marquer la tâche comme terminée');
+              Alert.alert(t('error'), t('taskMarkCompletedError'));
             }
           }
         }
@@ -118,12 +120,12 @@ export default function TimerScreen() {
   // Sauvegarder le processus
   const handleSaveProcess = async () => {
     if (!processName.trim()) {
-      Alert.alert('Erreur', 'Veuillez entrer un nom pour le processus');
+      Alert.alert(t('error'), t('enterProcessName'));
       return;
     }
 
     if (!process.trim()) {
-      Alert.alert('Erreur', 'Veuillez créer au moins une étape dans le processus');
+      Alert.alert(t('error'), t('createProcessStep'));
       return;
     }
 
@@ -144,7 +146,7 @@ export default function TimerScreen() {
       });
 
       console.log('✅ Processus sauvegardé:', savedProcess);
-      Alert.alert('Succès', 'Processus sauvegardé avec succès !');
+      Alert.alert(t('success'), t('processSavedSuccess'));
       setShowSaveProcessDialog(false);
       setProcessName("");
       setSaveAsTemplate(false);
@@ -153,7 +155,7 @@ export default function TimerScreen() {
       setRefreshProcesses(prev => prev + 1);
     } catch (error) {
       console.error('❌ Erreur sauvegarde processus:', error);
-      Alert.alert('Erreur', 'Impossible de sauvegarder le processus');
+      Alert.alert(t('error'), t('processSaveError'));
     }
   };
 
@@ -172,7 +174,7 @@ export default function TimerScreen() {
         <Text style={styles.headerTitle}>Timer</Text>
         <TouchableOpacity
           style={styles.soundButton}
-          onPress={() => Alert.alert('Son', 'Paramètres de son')}
+          onPress={() => Alert.alert(t('sound'), t('soundSettings'))}
         >
           <Ionicons name="volume-high" size={20} color="#10b981" />
         </TouchableOpacity>

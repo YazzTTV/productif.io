@@ -68,6 +68,13 @@ export async function GET() {
             id: true,
             name: true
           }
+        },
+        subject: {
+          select: {
+            id: true,
+            name: true,
+            coefficient: true
+          }
         }
       }
     });

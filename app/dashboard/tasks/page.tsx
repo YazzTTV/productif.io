@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation"
 import { getAuthUser } from "@/lib/auth"
-import { NewTasksPage } from "@/components/tasks/new-tasks-page"
+import { TasksEnhanced } from "@/components/tasks/tasks-enhanced"
 
 export const dynamic = 'force-dynamic'
 
@@ -11,6 +11,6 @@ export default async function TasksPage() {
     redirect("/login")
   }
 
-  return <NewTasksPage />
+  return <TasksEnhanced />
 }
 

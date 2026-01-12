@@ -8,7 +8,7 @@ export function FonctionnalitesCTA() {
     const params = new URLSearchParams()
     params.set('offer', 'early-access')
     params.set('billing', billing)
-    window.location.href = `/onboarding/welcome?${params.toString()}`
+    window.location.href = `/onboarding?${params.toString()}`
   }
 
   return (
