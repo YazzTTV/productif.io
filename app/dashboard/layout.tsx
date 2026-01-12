@@ -1,99 +1,113 @@
 "use client";
 
 import type React from "react"
-import Link from "next/link"
 import { useState, useEffect } from "react"
 import { usePathname } from "next/navigation"
-import { LogoutButton } from "@/components/auth/logout-button"
-import { useLocale } from "@/lib/i18n"
 import { ClientAuthProvider } from "@/components/auth/client-auth-provider"
 import { AutoLogout } from "@/components/auth/auto-logout"
+import { WebSidebar } from "@/components/layout/web-sidebar"
+import { WebTopbar } from "@/components/layout/web-topbar"
 import { cn } from "@/lib/utils"
 import { Capacitor } from '@capacitor/core'
 import { MobileNav } from "@/components/navigation/mobile-nav"
-import { TrialBanner } from "@/components/trial/TrialBanner"
 import { TrialExpiredOverlay } from "@/components/trial/TrialExpiredOverlay"
-import { SuperAdminMenu } from "@/components/admin/super-admin-menu"
 
-export default function DashboardLayout({
-  children,
-}: {
+interface DashboardLayoutProps {
   children: React.ReactNode
-}) {
-  const { locale } = useLocale();
-  const [isNativeMobile, setIsNativeMobile] = useState(false);
-  const pathname = usePathname();
-  
+}
+
+export default function DashboardLayout({ children }: DashboardLayoutProps) {
+  const pathname = usePathname()
+  const [isNativeMobile, setIsNativeMobile] = useState(false)
+  const [isPremium, setIsPremium] = useState(false)
+  const [userName, setUserName] = useState('')
+  const [userEmail, setUserEmail] = useState('')
+  const [isLoading, setIsLoading] = useState(true)
+
   useEffect(() => {
-    setIsNativeMobile(Capacitor.isNativePlatform());
-  }, []);
+    setIsNativeMobile(Capacitor.isNativePlatform())
+  }, [])
 
-  // Masquer le header global pour toutes les pages du dashboard (nouveau design plein écran)
-  const isDashboardPage = pathname.startsWith("/dashboard");
-  
-  return (
-    <ClientAuthProvider>
-      {/* Composant de déconnexion automatique */}
-      <AutoLogout />
-      
-      <div className={cn(
-        "flex flex-col",
-        isNativeMobile ? "ios-viewport-fix" : "min-h-screen"
-      )}>
-        {!isDashboardPage && (
-          <header className={cn(
-            "bg-card border-b border-border shadow z-20 sticky top-0",
-            isNativeMobile && "pt-safe-area-inset-top"
-          )}>
-            <div className={cn(
-              "mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8",
-              isNativeMobile && "pt-2"
-            )}>
-              <div className="flex items-center">
-                <Link href="/dashboard" className="text-xl sm:text-2xl font-bold text-foreground">
-                  productif.io
-                </Link>
-              </div>
-              
-              <div className="flex items-center space-x-4">
-                <LogoutButton />
-              </div>
-            </div>
-          </header>
-        )}
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        const response = await fetch('/api/auth/me', { credentials: 'include' })
+        if (response.ok) {
+          const data = await response.json()
+          setUserName(data.user?.name || '')
+          setUserEmail(data.user?.email || '')
+          
+          // Check premium status
+          const premiumResponse = await fetch('/api/user/trial-status', { credentials: 'include' })
+          if (premiumResponse.ok) {
+            const premiumData = await premiumResponse.json()
+            setIsPremium(premiumData.hasAccess || false)
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching user data:', error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
 
-        {/* Bannière de rappel du trial */}
-        {!isDashboardPage && <TrialBanner />}
+    fetchUserData()
+  }, [])
 
-        <div className="flex flex-1 relative">
-          {/* Main content - Full width without sidebar */}
-          <main className={cn(
-            "flex-1 w-full",
-            isNativeMobile 
-              ? "ios-content-wrapper" 
-              : "overflow-auto"
-          )}>
+  const isDashboardPage = pathname?.startsWith("/dashboard")
+  const isFullScreenPage = pathname === '/dashboard/focus' || pathname === '/dashboard/exam' || pathname === '/focus'
+  const showBackButton = isDashboardPage && pathname !== '/dashboard'
+
+  // Mobile: keep existing layout
+  if (isNativeMobile || typeof window !== 'undefined' && window.innerWidth < 1280) {
+    return (
+      <ClientAuthProvider>
+        <AutoLogout />
+        <div className={cn("flex flex-col", isNativeMobile ? "ios-viewport-fix" : "min-h-screen")}>
+          <main className={cn("flex-1 w-full", isNativeMobile ? "ios-content-wrapper" : "overflow-auto")}>
             {children}
           </main>
-          
-          {/* Menu Super Admin - visible uniquement pour les Super Admin */}
-          {isDashboardPage && <SuperAdminMenu />}
+          <MobileNav />
+          <TrialExpiredOverlay />
         </div>
+      </ClientAuthProvider>
+    )
+  }
 
-        <footer className="bg-card border-t border-border z-10 hidden md:block">
-          <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
-            <p className="text-center text-sm text-muted-foreground">
-              &copy; {new Date().getFullYear()} productif.io. {locale === 'fr' ? 'Tous droits réservés.' : 'All rights reserved.'}
-            </p>
-          </div>
-        </footer>
-        
-        {/* Navigation mobile globale - fixe en bas de l'écran */}
-        <MobileNav />
-        {/* Trial overlay + lock mask when trial expiré */}
+  // Desktop: 2-column layout
+  return (
+    <ClientAuthProvider>
+      <AutoLogout />
+      <div className="min-h-screen bg-white">
+        {/* Full screen pages (Focus, Exam) - no sidebar */}
+        {isFullScreenPage ? (
+          <main className="min-h-screen">
+            {children}
+          </main>
+        ) : (
+          <>
+            {/* Sidebar - fixed left */}
+            <WebSidebar isPremium={isPremium} />
+
+            {/* Main content area */}
+            <div className="xl:ml-64">
+              {/* Top bar */}
+              <WebTopbar 
+                userName={userName}
+                userEmail={userEmail}
+                isPremium={isPremium}
+                showBackButton={showBackButton}
+              />
+
+              {/* Content */}
+              <main className="max-w-[1200px] mx-auto px-8 py-8">
+                {children}
+              </main>
+            </div>
+          </>
+        )}
         <TrialExpiredOverlay />
       </div>
     </ClientAuthProvider>
   )
 }
-

@@ -22,7 +22,13 @@ function AuthCallbackContent() {
           if (res.ok) {
             // Récupérer l'URL de redirection depuis les paramètres ou utiliser le dashboard par défaut
             const redirectUrl = searchParams.get("callbackUrl") || "/dashboard"
-            router.push(redirectUrl)
+            
+            // Si on vient de l'onboarding, continuer l'onboarding
+            if (redirectUrl === "/onboarding") {
+              router.push("/onboarding")
+            } else {
+              router.push(redirectUrl)
+            }
           } else {
             router.push("/login?error=session_sync_failed")
           }

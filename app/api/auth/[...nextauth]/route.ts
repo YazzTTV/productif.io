@@ -103,7 +103,7 @@ const authOptions: NextAuthOptions = {
     },
   },
   pages: {
-    signIn: "/login",
+    signIn: "/onboarding", // Rediriger vers l'onboarding au lieu de /login pour éviter l'ancien design
   },
   session: {
     strategy: "jwt",

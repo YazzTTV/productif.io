@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation"
 import { getAuthUser } from "@/lib/auth"
-import { NewDashboard } from "@/components/dashboard/new-dashboard"
-import { FitbitMobileDashboard } from "@/components/dashboard/fitbit-mobile-dashboard"
+import { checkPremiumStatus } from "@/lib/premium"
+import { WebDashboard } from "@/components/dashboard/web-dashboard"
 
 export const dynamic = 'force-dynamic'
 
@@ -13,18 +13,19 @@ export default async function DashboardPage() {
   }
 
   try {
-    return (
-      <>
-        {/* Interface mobile Fitbit-style */}
-        <div className="block md:hidden">
-          <FitbitMobileDashboard />
-        </div>
+    // Récupérer le nom de l'utilisateur
+    let userName = "Student"
+    if (user.name) {
+      userName = user.name.split(' ')[0] || user.name
+    } else if (user.email) {
+      userName = user.email.split('@')[0]
+    }
 
-        {/* Interface desktop avec nouveau design */}
-        <div className="hidden md:block">
-          <NewDashboard />
-        </div>
-      </>
+    // Vérifier le statut premium
+    const premiumStatus = await checkPremiumStatus(user.id)
+
+    return (
+      <WebDashboard userName={userName} isPremium={premiumStatus.isPremium} />
     )
   } catch (error) {
     console.error("Error loading dashboard:", error)

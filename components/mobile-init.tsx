@@ -1,37 +1,46 @@
 "use client"
 
 import { useEffect } from 'react';
-import { Capacitor } from '@capacitor/core';
-import { SplashScreen } from '@capacitor/splash-screen';
-import { StatusBar, Style } from '@capacitor/status-bar';
-import { Keyboard } from '@capacitor/keyboard';
 
 export function MobileInit() {
   useEffect(() => {
     // Configuration du viewport avec safe area pour tous les appareils
-    const metaViewport = document.querySelector('meta[name="viewport"]');
-    if (metaViewport) {
-      metaViewport.setAttribute('content', 'width=device-width, initial-scale=1.0, viewport-fit=cover');
-    } else {
-      const meta = document.createElement('meta');
-      meta.name = 'viewport';
-      meta.content = 'width=device-width, initial-scale=1.0, viewport-fit=cover';
-      document.head.appendChild(meta);
-    }
+    if (typeof window !== 'undefined') {
+      const metaViewport = document.querySelector('meta[name="viewport"]');
+      if (metaViewport) {
+        metaViewport.setAttribute('content', 'width=device-width, initial-scale=1.0, viewport-fit=cover');
+      } else {
+        const meta = document.createElement('meta');
+        meta.name = 'viewport';
+        meta.content = 'width=device-width, initial-scale=1.0, viewport-fit=cover';
+        document.head.appendChild(meta);
+      }
 
-    if (Capacitor.isNativePlatform()) {
-      initializeMobileFeatures();
+      // Only initialize mobile features if Capacitor is available
+      try {
+        const { Capacitor } = require('@capacitor/core');
+        if (Capacitor && Capacitor.isNativePlatform()) {
+          initializeMobileFeatures();
+        }
+      } catch (error) {
+        // Capacitor not available, skip mobile initialization
+        console.log('Capacitor not available, skipping mobile init');
+      }
     }
   }, []);
 
   const initializeMobileFeatures = async () => {
     try {
+      const { StatusBar, Style } = require('@capacitor/status-bar');
+      const { Keyboard } = require('@capacitor/keyboard');
+      const { SplashScreen } = require('@capacitor/splash-screen');
+      
       // Configuration de la barre de statut
       await StatusBar.setStyle({ style: Style.Light });
       await StatusBar.setBackgroundColor({ color: '#22c55e' });
 
       // Configuration du clavier
-      Keyboard.addListener('keyboardWillShow', (info) => {
+      Keyboard.addListener('keyboardWillShow', (info: any) => {
         document.body.style.transform = `translateY(-${info.keyboardHeight / 2}px)`;
       });
 
@@ -56,7 +65,12 @@ export function MobileInit() {
 
 // Hook personnalisé pour détecter si on est sur mobile
 export const useIsMobile = () => {
-  return Capacitor.isNativePlatform();
+  try {
+    const { Capacitor } = require('@capacitor/core');
+    return Capacitor?.isNativePlatform() || false;
+  } catch {
+    return false;
+  }
 };
 
 // Hook pour les fonctionnalités tactiles
