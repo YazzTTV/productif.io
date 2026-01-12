@@ -17,6 +17,7 @@ import Svg, { Circle } from 'react-native-svg';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { assistantService, tasksService } from '@/lib/api';
 import { selectExamTasks, TaskForExam } from '@/utils/taskSelection';
+import { useDailyStructureSettings } from '@/hooks/useDailyStructureSettings';
 
 const { width } = Dimensions.get('window');
 const RING_SIZE = Math.min(width * 0.65, 260);
@@ -402,13 +403,14 @@ export default function FocusScreen() {
   const insets = useSafeAreaInsets();
   const { t } = useLanguage();
   const params = useLocalSearchParams();
+  const { settings: dailyStructure } = useDailyStructureSettings();
   
   const [phase, setPhase] = useState<FocusPhase>('intro');
-  const [selectedDuration, setSelectedDuration] = useState(parseInt(params.duration as string) || 45);
+  const [selectedDuration, setSelectedDuration] = useState(parseInt(params.duration as string) || dailyStructure.focusDuration);
   const [showSettings, setShowSettings] = useState(false);
-  const [focusDuration, setFocusDuration] = useState(45);
+  const [focusDuration, setFocusDuration] = useState(dailyStructure.focusDuration);
   const [breakDuration, setBreakDuration] = useState(10);
-  const [maxSessions, setMaxSessions] = useState(4);
+  const [maxSessions, setMaxSessions] = useState(dailyStructure.maxSessions);
   const taskId = params.taskId as string | undefined;
   
   // Tasks management
@@ -418,6 +420,15 @@ export default function FocusScreen() {
   
   const currentTask = tasks[currentTaskIndex] || { id: '', title: '', subject: '', completed: false };
   const completedCount = tasks.filter(t => t.completed).length;
+
+  // Synchroniser avec les paramètres de Daily Structure
+  useEffect(() => {
+    if (!params.duration) {
+      setSelectedDuration(dailyStructure.focusDuration);
+    }
+    setFocusDuration(dailyStructure.focusDuration);
+    setMaxSessions(dailyStructure.maxSessions);
+  }, [dailyStructure]);
 
   // Load prioritized tasks on mount
   useEffect(() => {

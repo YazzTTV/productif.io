@@ -125,12 +125,30 @@ class NotificationService {
                     const title = notification.pushTitle || getNotificationTitle(notification.type);
                     const body = notification.pushBody || this.extractBodyFromContent(notification.content);
                     
+                    // Déterminer l'action selon le type de notification
+                    let action = 'open_assistant';
+                    let checkInType = null;
+                    
+                    // Pour les notifications mood/stress/focus, rediriger vers Analytics
+                    if (notification.type === 'MOOD_CHECK') {
+                        action = 'open_analytics';
+                        checkInType = 'mood';
+                    } else if (notification.type === 'STRESS_CHECK') {
+                        action = 'open_analytics';
+                        checkInType = 'stress';
+                    } else if (notification.type === 'FOCUS_CHECK') {
+                        action = 'open_analytics';
+                        checkInType = 'focus';
+                    }
+                    
                     const pushData = {
                         notificationId: notification.id,
                         type: notification.type,
-                        action: 'open_assistant',
-                        // Message complet destiné à préremplir l'assistant IA mobile
-                        message: notification.assistantMessage || notification.content
+                        action: action,
+                        // Message complet destiné à préremplir l'assistant IA mobile (pour les autres notifications)
+                        message: notification.assistantMessage || notification.content,
+                        // Type de check-in pour les notifications mood/stress/focus
+                        checkInType: checkInType
                     };
                     
                     console.log(`📤 [${processingId}] Payload push APNs envoyé:`, {
@@ -563,7 +581,7 @@ class NotificationService {
 
             // Version courte pour la push
             const shortTitle = '🙂 Humeur du moment';
-            const shortBody = 'Note ton humeur (1–10) et ajoute un mot-clé.';
+            const shortBody = 'Note ton humeur sur 10';
 
             await this.createNotification(
               userId,
@@ -588,7 +606,7 @@ class NotificationService {
 
             // Version courte pour la push
             const shortTitle = '😌 Stress du moment';
-            const shortBody = 'Sur une échelle de 1 à 10, comment te sens-tu ?';
+            const shortBody = 'Note ton niveau de stress sur 10';
 
             await this.createNotification(
               userId,
@@ -613,7 +631,7 @@ class NotificationService {
 
             // Version courte pour la push
             const shortTitle = '🎯 Check Focus';
-            const shortBody = 'Es-tu sur ta tâche prioritaire ou es-tu en train de procrastiner ?';
+            const shortBody = 'Note ton niveau de focus sur 10';
 
             await this.createNotification(
               userId,
