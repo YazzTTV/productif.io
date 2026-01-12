@@ -96,6 +96,7 @@ export default function TabLayout() {
       <Tabs.Screen name="timer" options={{ href: null }} />
       <Tabs.Screen name="habits" options={{ href: null }} />
       <Tabs.Screen name="more" options={{ href: null }} />
+      <Tabs.Screen name="analytics" options={{ href: null }} />
     </Tabs>
   );
 }

@@ -141,6 +141,37 @@ export function usePushNotifications() {
         hasMessage: !!data?.message,
       });
 
+      // Navigation vers Analytics pour les notifications mood/stress/focus
+      if (data?.action === 'open_analytics' && data?.checkInType) {
+        console.log('✅ Conditions remplies - Navigation vers Analytics', {
+          type: data.type,
+          checkInType: data.checkInType,
+        });
+        
+        // Délai pour s'assurer que l'app et le router sont prêts (cold start)
+        if (navigationTimeoutRef.current) {
+          clearTimeout(navigationTimeoutRef.current);
+        }
+        navigationTimeoutRef.current = setTimeout(() => {
+          if (!isMountedRef.current) {
+            console.log('⚠️ Composant démonté, navigation annulée');
+            return;
+          }
+          try {
+            console.log('🚀 Navigation vers /(tabs)/assistant avec checkInType pour Analytics');
+            router.replace({
+              pathname: '/(tabs)/assistant',
+              params: { checkInType: data.checkInType },
+            } as any);
+            console.log('✅ Navigation vers Analytics déclenchée avec succès');
+          } catch (navError) {
+            console.error('❌ Erreur de navigation vers Analytics:', navError);
+          }
+        }, 500);
+        
+        return;
+      }
+
       // Nouveau flux : ouvrir l'assistant IA (onglet assistant) avec le message complet
       if (data?.action === 'open_assistant' && data?.message) {
         console.log('✅ Conditions remplies - Navigation vers assistant IA', {
