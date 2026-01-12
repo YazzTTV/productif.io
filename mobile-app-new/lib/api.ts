@@ -1401,3 +1401,50 @@ export const journalService = {
     }
   },
 };
+
+// Service pour les check-ins comportementaux (mood, stress, focus)
+export const behaviorService = {
+  // Enregistrer un check-in
+  async createCheckIn(data: {
+    type: 'mood' | 'stress' | 'focus' | 'motivation' | 'energy';
+    value: number;
+    note?: string;
+    context?: any;
+  }): Promise<any> {
+    return await apiCall('/behavior/agent/checkin', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  // Récupérer les analytics sur 7 jours
+  async getAnalytics(): Promise<{
+    data: Array<{
+      date: string;
+      mood: number | null;
+      stress: number | null;
+      focus: number | null;
+      moodCount: number;
+      stressCount: number;
+      focusCount: number;
+    }>;
+    averages: {
+      mood: number | null;
+      stress: number | null;
+      focus: number | null;
+    };
+    totalCheckIns: number;
+  }> {
+    return await apiCall('/behavior/analytics');
+  },
+
+  // Récupérer les check-ins récents
+  async getRecentCheckIns(days: number = 7, type?: string): Promise<any> {
+    const params = new URLSearchParams();
+    params.append('days', days.toString());
+    if (type) {
+      params.append('type', type);
+    }
+    return await apiCall(`/behavior/agent/checkin?${params.toString()}`);
+  },
+};

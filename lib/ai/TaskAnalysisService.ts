@@ -58,8 +58,24 @@ Extrais toutes les tâches mentionnées. Pour chaque tâche:
 - title: court et clair
 - description: optionnel
 - priority: 1-5 (5 = plus urgent)
-- energy: 1-5 (5 = nécessite beaucoup de concentration)
+- energy: 1-5 (5 = nécessite beaucoup de concentration, 1 = tâche simple)
 - estimatedDuration: en minutes
+
+=== ESTIMATION AUTOMATIQUE de la difficulté et de l'énergie ===
+Si l'utilisateur NE PRÉCISE PAS explicitement la difficulté ou le niveau d'énergie dans sa transcription, ESTIME-les automatiquement selon le type de tâche:
+
+**Niveau d'énergie (energy) - Estimation automatique:**
+- Révision simple, lecture, exercices basiques → 1-2 (faible énergie)
+- Exercices standards, devoirs maison → 2-3 (énergie modérée)
+- Contrôle, examen blanc, projet complexe → 4-5 (haute énergie)
+- Dissertation, mémoire, recherche approfondie → 5 (énergie maximale)
+
+**Priorité (priority) - Estimation automatique:**
+- Si l'utilisateur mentionne "urgent", "important", "prioritaire" → 4-5
+- Si l'utilisateur mentionne "pas urgent", "peut attendre" → 1-2
+- Sinon, estime selon le contexte: contrôle/examen proche → 4-5, révision générale → 2-3
+
+**IMPORTANT:** Si l'utilisateur précise explicitement "facile", "difficile", "urgent", "pas urgent", etc., RESPECTE sa demande. Sinon, ESTIME intelligemment.
 
 === RÈGLES pour targetDate (YYYY-MM-DD) - TRÈS IMPORTANT ===
 - "demain", "Demain", "DEMAIN" (au début ou dans la phrase) → ${tomorrowStr} (PAS ${todayStr})
@@ -87,7 +103,16 @@ Retourne UNIQUEMENT ce JSON (pas de texte avant/après):
         messages: [
           {
             role: 'system',
-            content: `Tu es un assistant qui extrait des tâches académiques depuis des transcriptions vocales. Tu réponds UNIQUEMENT avec un objet JSON valide. Pour targetDate, tu DOIS toujours retourner une date YYYY-MM-DD en te basant sur le contexte temporel fourni. Interprète correctement: aujourd'hui, demain, les jours de la semaine (lundi, mardi...), "la semaine prochaine", "dans X jours", etc.`,
+            content: `Tu es un assistant qui extrait des tâches académiques depuis des transcriptions vocales. Tu réponds UNIQUEMENT avec un objet JSON valide. 
+
+RÈGLES IMPORTANTES:
+1. Pour targetDate: tu DOIS toujours retourner une date YYYY-MM-DD en te basant sur le contexte temporel fourni. Interprète correctement: aujourd'hui, demain, les jours de la semaine (lundi, mardi...), "la semaine prochaine", "dans X jours", etc.
+
+2. Pour priority et energy: 
+   - Si l'utilisateur précise explicitement "urgent", "important", "prioritaire", "facile", "difficile", "simple", "complexe", etc. → RESPECTE sa demande
+   - Sinon, ESTIME intelligemment selon le type de tâche (révision simple = energy 1-2, contrôle = energy 4-5, etc.)
+
+3. Analyse chaque tâche pour déterminer sa difficulté réelle et son besoin en concentration, même si l'utilisateur ne le précise pas explicitement.`,
           },
           { role: 'user', content: prompt },
         ],

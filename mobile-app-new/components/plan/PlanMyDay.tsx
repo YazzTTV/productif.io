@@ -279,15 +279,55 @@ export function PlanMyDay() {
         setExistingCalendarEvents([]);
       }
 
+      // Trier les tâches en priorisant selon les coefficients des matières
+      // Les matières avec un coefficient élevé sont plus importantes
+      const sortedTasks = [...tasks].sort((a, b) => {
+        // 1. D'abord par coefficient de la matière (plus élevé = plus prioritaire)
+        const getCoefficient = (task: TaskWithSubject): number => {
+          if (!task.subjectId) return 0; // Tâche sans matière = coefficient 0
+          const subject = subjects.find(s => s.id === task.subjectId);
+          return subject?.coefficient || 0;
+        };
+        
+        const coeffA = getCoefficient(a);
+        const coeffB = getCoefficient(b);
+        
+        if (coeffB !== coeffA) {
+          return coeffB - coeffA; // Coefficient décroissant
+        }
+        
+        // 2. En cas d'égalité de coefficient, par priorité décroissante (5 > 4 > 3 > 2 > 1)
+        if (b.priority !== a.priority) {
+          return b.priority - a.priority;
+        }
+        
+        // 3. En cas d'égalité de priorité, par niveau d'énergie décroissant (5 > 4 > 3 > 2 > 1)
+        // Les tâches qui nécessitent plus de concentration sont placées tôt dans la journée
+        return b.energy - a.energy;
+      });
+
+      console.log('📋 [PlanMyDay] Tâches triées par coefficient puis priorité:', sortedTasks.map(t => {
+        const subject = subjects.find(s => s.id === t.subjectId);
+        return {
+          title: t.title,
+          subject: t.subjectName || 'Aucune',
+          coefficient: subject?.coefficient || 0,
+          priority: t.priority,
+          energy: t.energy
+        };
+      }));
+
       // Calculer les heures de début en évitant les créneaux occupés
       const dayStart = startOfDay(targetDate);
       const defaultStart = setMinutes(setHours(dayStart, 9), 0); // 9h par défaut
-      const times: Date[] = [];
       let currentTime = new Date(defaultStart);
 
-      console.log('📋 [PlanMyDay] Calcul des créneaux pour', tasks.length, 'tâches');
+      console.log('📋 [PlanMyDay] Calcul des créneaux pour', sortedTasks.length, 'tâches');
 
-      for (const task of tasks) {
+      // Créer un mapping pour stocker les heures par index original
+      const timesByOriginalIndex = new Map<number, Date>();
+
+      for (const task of sortedTasks) {
         const taskEnd = addMinutes(currentTime, task.estimatedDuration);
 
         // Vérifier si le créneau chevauche un événement existant
@@ -317,12 +357,32 @@ export function PlanMyDay() {
           );
         }
 
-        times.push(new Date(currentTime));
+        // Trouver l'index original de cette tâche
+        const originalIndex = tasks.findIndex(t => 
+          t.title === task.title && 
+          t.priority === task.priority && 
+          t.energy === task.energy &&
+          t.estimatedDuration === task.estimatedDuration
+        );
+        
+        if (originalIndex !== -1) {
+          timesByOriginalIndex.set(originalIndex, new Date(currentTime));
+        }
+        
         currentTime = addMinutes(currentTime, task.estimatedDuration);
       }
 
+      // Créer le tableau times dans l'ordre original des tâches
+      const times = tasks.map((_, index) => {
+        return timesByOriginalIndex.get(index) || new Date(defaultStart);
+      });
+
       console.log('✅ [PlanMyDay] Créneaux calculés:', times.length);
+      console.log('📊 [PlanMyDay] Ordre de priorisation appliqué');
       setEventStartTimes(times);
+      
+      // Mettre à jour l'ordre des tâches pour que l'affichage corresponde à la priorisation
+      setTasks(sortedTasks);
       setPhase('overview');
       console.log('✅ [PlanMyDay] Phase changée vers overview');
     } catch (error: any) {

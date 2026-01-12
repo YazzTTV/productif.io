@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Switch, TextInput, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Switch, TextInput, Alert, Linking } from 'react-native';
 import { useRouter } from 'expo-router';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { authService } from '@/lib/api';
+import { authService, onboardingService } from '@/lib/api';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useOnboardingData } from '@/hooks/useOnboardingData';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
+import { useDailyStructureSettings } from '@/hooks/useDailyStructureSettings';
 
 type SettingsView = 'main' | 'editProfile' | 'dailyStructure' | 'notifications';
 
@@ -21,6 +22,7 @@ export function SettingsNew() {
   const insets = useSafeAreaInsets();
   const { getResponse, saveResponse, responses } = useOnboardingData();
   const { requestPermissions, permissionStatus } = usePushNotifications();
+  const { settings: dailyStructure, saveSettings: saveDailyStructure } = useDailyStructureSettings();
   const [view, setView] = useState<SettingsView>('main');
   const [savedFeedback, setSavedFeedback] = useState(false);
 
@@ -29,10 +31,17 @@ export function SettingsNew() {
   const [academicField, setAcademicField] = useState('');
   const [studyLevel, setStudyLevel] = useState<number>(1);
 
-  // Daily Structure
-  const [focusDuration, setFocusDuration] = useState<FocusDuration>(45);
-  const [maxSessions, setMaxSessions] = useState(6);
-  const [workloadIntensity, setWorkloadIntensity] = useState<WorkloadIntensity>('balanced');
+  // Daily Structure - Initialiser depuis le hook
+  const [focusDuration, setFocusDuration] = useState<FocusDuration>(dailyStructure.focusDuration);
+  const [maxSessions, setMaxSessions] = useState(dailyStructure.maxSessions);
+  const [workloadIntensity, setWorkloadIntensity] = useState<WorkloadIntensity>(dailyStructure.workloadIntensity);
+
+  // Synchroniser avec les paramètres du hook
+  useEffect(() => {
+    setFocusDuration(dailyStructure.focusDuration);
+    setMaxSessions(dailyStructure.maxSessions);
+    setWorkloadIntensity(dailyStructure.workloadIntensity);
+  }, [dailyStructure]);
 
   // Notifications
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
@@ -52,15 +61,29 @@ export function SettingsNew() {
           setName(user.name);
         }
         
-        // Charger les données de l'onboarding
-        const savedStudentType = getResponse('studentType');
-        const savedStudyLevel = getResponse('studyLevel');
-        
-        if (savedStudentType) {
-          setAcademicField(savedStudentType);
-        }
-        if (savedStudyLevel) {
-          setStudyLevel(typeof savedStudyLevel === 'number' ? savedStudyLevel : 1);
+        // Charger les données de l'onboarding depuis le backend
+        try {
+          const { data: onboardingData } = await onboardingService.getOnboardingData();
+          if (onboardingData) {
+            if (onboardingData.studentType) {
+              setAcademicField(onboardingData.studentType);
+            }
+            if (onboardingData.studyLevel) {
+              setStudyLevel(onboardingData.studyLevel);
+            }
+          }
+        } catch (error) {
+          console.log('Onboarding data not loaded from backend, using local');
+          // Fallback sur AsyncStorage si le backend échoue
+          const savedStudentType = getResponse('studentType');
+          const savedStudyLevel = getResponse('studyLevel');
+          
+          if (savedStudentType) {
+            setAcademicField(savedStudentType);
+          }
+          if (savedStudyLevel) {
+            setStudyLevel(typeof savedStudyLevel === 'number' ? savedStudyLevel : 1);
+          }
         }
       } catch (error) {
         console.log('User not loaded');
@@ -72,17 +95,33 @@ export function SettingsNew() {
   // Recharger les données quand on revient à la vue principale
   useEffect(() => {
     if (view === 'main') {
-      const savedStudentType = getResponse('studentType');
-      const savedStudyLevel = getResponse('studyLevel');
-      
-      if (savedStudentType) {
-        setAcademicField(savedStudentType);
-      }
-      if (savedStudyLevel) {
-        setStudyLevel(typeof savedStudyLevel === 'number' ? savedStudyLevel : 1);
-      }
+      const reloadData = async () => {
+        try {
+          const { data: onboardingData } = await onboardingService.getOnboardingData();
+          if (onboardingData) {
+            if (onboardingData.studentType) {
+              setAcademicField(onboardingData.studentType);
+            }
+            if (onboardingData.studyLevel) {
+              setStudyLevel(onboardingData.studyLevel);
+            }
+          }
+        } catch (error) {
+          console.log('Failed to reload from backend, using local');
+          const savedStudentType = getResponse('studentType');
+          const savedStudyLevel = getResponse('studyLevel');
+          
+          if (savedStudentType) {
+            setAcademicField(savedStudentType);
+          }
+          if (savedStudyLevel) {
+            setStudyLevel(typeof savedStudyLevel === 'number' ? savedStudyLevel : 1);
+          }
+        }
+      };
+      reloadData();
     }
-  }, [view, responses]);
+  }, [view]);
 
   // Synchroniser l'état des notifications avec le statut des permissions
   useEffect(() => {
@@ -274,6 +313,7 @@ export function SettingsNew() {
                     ]}
                     onPress={() => {
                       setFocusDuration(duration);
+                      saveDailyStructure({ focusDuration: duration });
                       showSavedFeedback();
                     }}
                     activeOpacity={0.7}
@@ -315,7 +355,9 @@ export function SettingsNew() {
                   style={styles.sliderButton}
                   onPress={() => {
                     if (maxSessions > 3) {
-                      setMaxSessions(maxSessions - 1);
+                      const newValue = maxSessions - 1;
+                      setMaxSessions(newValue);
+                      saveDailyStructure({ maxSessions: newValue });
                       showSavedFeedback();
                     }
                   }}
@@ -326,7 +368,9 @@ export function SettingsNew() {
                   style={styles.sliderButton}
                   onPress={() => {
                     if (maxSessions < 8) {
-                      setMaxSessions(maxSessions + 1);
+                      const newValue = maxSessions + 1;
+                      setMaxSessions(newValue);
+                      saveDailyStructure({ maxSessions: newValue });
                       showSavedFeedback();
                     }
                   }}
@@ -352,6 +396,7 @@ export function SettingsNew() {
                     ]}
                     onPress={() => {
                       setWorkloadIntensity(intensity);
+                      saveDailyStructure({ workloadIntensity: intensity });
                       showSavedFeedback();
                     }}
                     activeOpacity={0.7}
@@ -662,26 +707,6 @@ export function SettingsNew() {
               )}
             </View>
 
-            <TouchableOpacity style={styles.settingCard} activeOpacity={0.7}>
-              <View style={styles.settingCardRow}>
-                <View style={styles.settingCardContent}>
-                  <Text style={styles.settingCardTitle}>Data usage summary</Text>
-                  <Text style={styles.settingCardSubtitle}>See what we collect</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={20} color="rgba(0, 0, 0, 0.4)" />
-              </View>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.settingCard} activeOpacity={0.7}>
-              <View style={styles.settingCardRow}>
-                <View style={styles.settingCardContent}>
-                  <Text style={styles.settingCardTitle}>Export my data</Text>
-                  <Text style={styles.settingCardSubtitle}>Download all your information</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={20} color="rgba(0, 0, 0, 0.4)" />
-              </View>
-            </TouchableOpacity>
-
             <TouchableOpacity style={styles.deleteCard} activeOpacity={0.7}>
               <Text style={styles.deleteText}>Delete my account</Text>
             </TouchableOpacity>
@@ -710,21 +735,58 @@ export function SettingsNew() {
         <Animated.View entering={FadeInDown.delay(700).duration(400)} style={styles.section}>
           <Text style={styles.sectionLabel}>{t('supportInfo') || 'Support & Info'}</Text>
           <View style={styles.supportContainer}>
-            <TouchableOpacity style={styles.settingCard} activeOpacity={0.7}>
-              <View style={styles.settingCardRow}>
-                <Text style={styles.settingCardTitle}>{t('help')}</Text>
-                <Ionicons name="chevron-forward" size={20} color="rgba(0, 0, 0, 0.4)" />
-              </View>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.settingCard} activeOpacity={0.7}>
+            <TouchableOpacity 
+              style={styles.settingCard} 
+              activeOpacity={0.7}
+              onPress={async () => {
+                const email = 'mailto:contact@productif.io';
+                try {
+                  const canOpen = await Linking.canOpenURL(email);
+                  if (canOpen) {
+                    await Linking.openURL(email);
+                  } else {
+                    Alert.alert(
+                      t('error') || 'Erreur',
+                      'Impossible d\'ouvrir l\'application email. Veuillez envoyer un email à contact@productif.io'
+                    );
+                  }
+                } catch (error) {
+                  Alert.alert(
+                    t('error') || 'Erreur',
+                    'Impossible d\'ouvrir l\'application email. Veuillez envoyer un email à contact@productif.io'
+                  );
+                }
+              }}
+            >
               <View style={styles.settingCardRow}>
                 <Text style={styles.settingCardTitle}>{t('contactSupport') || 'Contact support'}</Text>
                 <Ionicons name="chevron-forward" size={20} color="rgba(0, 0, 0, 0.4)" />
               </View>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.settingCard} activeOpacity={0.7}>
+            <TouchableOpacity 
+              style={styles.settingCard} 
+              activeOpacity={0.7}
+              onPress={async () => {
+                const url = 'https://productif.io/terms';
+                try {
+                  const canOpen = await Linking.canOpenURL(url);
+                  if (canOpen) {
+                    await Linking.openURL(url);
+                  } else {
+                    Alert.alert(
+                      t('error') || 'Erreur',
+                      'Impossible d\'ouvrir le navigateur.'
+                    );
+                  }
+                } catch (error) {
+                  Alert.alert(
+                    t('error') || 'Erreur',
+                    'Impossible d\'ouvrir le navigateur.'
+                  );
+                }
+              }}
+            >
               <View style={styles.settingCardRow}>
                 <Text style={styles.settingCardTitle}>{t('termsPrivacy') || 'Terms & privacy'}</Text>
                 <Ionicons name="chevron-forward" size={20} color="rgba(0, 0, 0, 0.4)" />
