@@ -60,7 +60,7 @@ export function Header({ bg = "transparent", hideAuth = false, hideCTA = false }
                     if (v) params.set(k, v)
                   })
                   params.set('offer','early-access')
-                  window.location.href = `/onboarding/welcome?${params.toString()}`
+                  window.location.href = `/onboarding?${params.toString()}`
                 }}
               >
                 Start Now for Free

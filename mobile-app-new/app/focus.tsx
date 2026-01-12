@@ -270,10 +270,10 @@ function SessionSettingsModal({
             <View style={settingsModalStyles.previewCard}>
               <Text style={settingsModalStyles.previewLabel}>{t('sessionPreview') || 'Session preview'}</Text>
               <Text style={settingsModalStyles.previewText}>
-                {maxSessions} × {focusDuration}min focus + {breakDuration}min break
+                {maxSessions} × {focusDuration}{t('min')} {t('focus')} + {breakDuration}{t('min')} {t('break')}
               </Text>
               <Text style={settingsModalStyles.previewSubtext}>
-                Total time: ~{totalTime}min
+                {t('totalTime')}: ~{totalTime}{t('min')}
               </Text>
             </View>
 

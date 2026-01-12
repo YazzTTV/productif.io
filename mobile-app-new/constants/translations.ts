@@ -249,6 +249,9 @@ export const translations = {
     help: 'Aide',
     privacy: 'Confidentialité',
     terms: 'Conditions',
+    french: 'Français',
+    english: 'Anglais',
+    spanish: 'Espagnol',
     
     // ─── Paywall ───────────────────────────────────────────────────────────────
     unlockFullPotential: 'Débloquez tout le potentiel',
@@ -491,6 +494,7 @@ export const translations = {
     // ─── Focus Mode ───────────────────────────────────────────────────────────
     readyToFocus: 'Prêt à se concentrer',
     focusDuration: 'Durée de focus',
+    breakDuration: 'Durée de pause',
     startFocus: 'Commencer Focus',
     currentTask: 'Tâche actuelle',
     nextTask: 'Tâche suivante',
@@ -509,6 +513,10 @@ export const translations = {
     saveSettings: 'Enregistrer les paramètres',
     of: 'de',
     taskComplete: 'Tâche terminée',
+    totalTime: 'Temps total',
+    min: 'min',
+    focus: 'focus',
+    break: 'pause',
     
     // ─── Settings ──────────────────────────────────────────────────────────────
     currentPlan: 'Plan actuel',
@@ -539,6 +547,9 @@ export const translations = {
     contactSupport: 'Contacter le support',
     termsPrivacy: 'Conditions et confidentialité',
     unlockFeaturesDescription: 'Débloquez le Mode Examen, la synchronisation du calendrier et l\'IA avancée',
+    user: 'Utilisateur',
+    untitledTask: 'Tâche sans titre',
+    disconnectButton: 'Se déconnecter',
     
     // ─── Paywall ───────────────────────────────────────────────────────────────
     unlockFeatures: 'Débloquer les fonctionnalités',
@@ -596,6 +607,18 @@ export const translations = {
     tryAgain: 'Veuillez réessayer',
     somethingWentWrong: "Une erreur s'est produite",
     unauthenticated: 'Non authentifié. Veuillez vous reconnecter.',
+    yes: 'Oui',
+    no: 'Non',
+    sessionCompleted: '🎉 Session terminée !',
+    markTaskCompleted: 'Félicitations ! Voulez-vous marquer la tâche comme terminée ?',
+    taskMarkedCompleted: 'Tâche marquée comme terminée !',
+    taskMarkCompletedError: 'Impossible de marquer la tâche comme terminée',
+    enterProcessName: 'Veuillez entrer un nom pour le processus',
+    createProcessStep: 'Veuillez créer au moins une étape dans le processus',
+    processSavedSuccess: 'Processus sauvegardé avec succès !',
+    processSaveError: 'Impossible de sauvegarder le processus',
+    sound: 'Son',
+    soundSettings: 'Paramètres de son',
     endpointNotFound: 'Endpoint non trouvé',
   },
 
@@ -842,6 +865,9 @@ export const translations = {
     help: 'Help',
     privacy: 'Privacy',
     terms: 'Terms',
+    french: 'French',
+    english: 'English',
+    spanish: 'Spanish',
     
     // ─── Paywall ───────────────────────────────────────────────────────────────
     unlockFullPotential: 'Unlock full potential',
@@ -1084,6 +1110,7 @@ export const translations = {
     // ─── Focus Mode ───────────────────────────────────────────────────────────
     readyToFocus: 'Ready to focus',
     focusDuration: 'Focus duration',
+    breakDuration: 'Break duration',
     startFocus: 'Start Focus',
     currentTask: 'Current task',
     nextTask: 'Next task',
@@ -1102,6 +1129,10 @@ export const translations = {
     saveSettings: 'Save Settings',
     of: 'of',
     taskComplete: 'Task complete',
+    totalTime: 'Total time',
+    min: 'min',
+    focus: 'focus',
+    break: 'break',
     
     // ─── Settings ──────────────────────────────────────────────────────────────
     currentPlan: 'Current plan',
@@ -1132,6 +1163,9 @@ export const translations = {
     contactSupport: 'Contact support',
     termsPrivacy: 'Terms & privacy',
     unlockFeaturesDescription: 'Unlock Exam Mode, calendar sync, and advanced AI',
+    user: 'User',
+    untitledTask: 'Untitled task',
+    disconnectButton: 'Log out',
     
     // ─── Paywall ───────────────────────────────────────────────────────────────
     unlockFeatures: 'Unlock features',
@@ -1189,6 +1223,18 @@ export const translations = {
     tryAgain: 'Please try again',
     somethingWentWrong: 'Something went wrong',
     unauthenticated: 'Unauthenticated. Please log in again.',
+    yes: 'Yes',
+    no: 'No',
+    sessionCompleted: '🎉 Session completed!',
+    markTaskCompleted: 'Congratulations! Would you like to mark the task as completed?',
+    taskMarkedCompleted: 'Task marked as completed!',
+    taskMarkCompletedError: 'Unable to mark task as completed',
+    enterProcessName: 'Please enter a name for the process',
+    createProcessStep: 'Please create at least one step in the process',
+    processSavedSuccess: 'Process saved successfully!',
+    processSaveError: 'Unable to save the process',
+    sound: 'Sound',
+    soundSettings: 'Sound settings',
     endpointNotFound: 'Endpoint not found',
   },
 
@@ -1435,6 +1481,9 @@ export const translations = {
     help: 'Ayuda',
     privacy: 'Privacidad',
     terms: 'Términos',
+    french: 'Francés',
+    english: 'Inglés',
+    spanish: 'Español',
     
     // ─── Paywall ───────────────────────────────────────────────────────────────
     unlockFullPotential: 'Desbloquea todo el potencial',
@@ -1670,6 +1719,7 @@ export const translations = {
     // ─── Modo Focus ───────────────────────────────────────────────────────────
     readyToFocus: 'Listo para enfocarse',
     focusDuration: 'Duración del enfoque',
+    breakDuration: 'Duración del descanso',
     startFocus: 'Iniciar Focus',
     currentTask: 'Tarea actual',
     nextTask: 'Tarea siguiente',
@@ -1688,6 +1738,10 @@ export const translations = {
     saveSettings: 'Guardar configuración',
     of: 'de',
     taskComplete: 'Tarea completa',
+    totalTime: 'Tiempo total',
+    min: 'min',
+    focus: 'enfoque',
+    break: 'descanso',
     
     // ─── Ajustes ──────────────────────────────────────────────────────────────
     currentPlan: 'Plan actual',
@@ -1718,6 +1772,9 @@ export const translations = {
     contactSupport: 'Contactar soporte',
     termsPrivacy: 'Términos y privacidad',
     unlockFeaturesDescription: 'Desbloquea Modo Examen, sincronización de calendario e IA avanzada',
+    user: 'Usuario',
+    untitledTask: 'Tarea sin título',
+    disconnectButton: 'Cerrar sesión',
     
     // ─── Paywall ───────────────────────────────────────────────────────────────
     unlockFeatures: 'Desbloquear funciones',
@@ -1775,6 +1832,18 @@ export const translations = {
     tryAgain: 'Por favor, inténtalo de nuevo',
     somethingWentWrong: 'Algo salió mal',
     unauthenticated: 'No autenticado. Por favor inicia sesión nuevamente.',
+    yes: 'Sí',
+    no: 'No',
+    sessionCompleted: '🎉 ¡Sesión completada!',
+    markTaskCompleted: '¡Felicidades! ¿Quieres marcar la tarea como completada?',
+    taskMarkedCompleted: '¡Tarea marcada como completada!',
+    taskMarkCompletedError: 'No se puede marcar la tarea como completada',
+    enterProcessName: 'Por favor, ingresa un nombre para el proceso',
+    createProcessStep: 'Por favor, crea al menos un paso en el proceso',
+    processSavedSuccess: '¡Proceso guardado con éxito!',
+    processSaveError: 'No se puede guardar el proceso',
+    sound: 'Sonido',
+    soundSettings: 'Configuración de sonido',
     endpointNotFound: 'Endpoint no encontrado',
   },
 };

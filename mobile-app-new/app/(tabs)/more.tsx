@@ -26,7 +26,6 @@ import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { useTranslation } from '@/hooks/useTranslation';
 
 const { width } = Dimensions.get('window');
 
@@ -73,8 +72,7 @@ const ShimmerEffect = () => {
 
 export default function SettingsScreen() {
   const { theme, setTheme: setThemeContext, actualTheme, colors } = useTheme();
-  const { locale, setLocale } = useLanguage();
-  const t = useTranslation();
+  const { language, setLanguage, t } = useLanguage();
   const [notifications, setNotifications] = useState(true);
   const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'annual'>('monthly');
   const [user, setUser] = useState<User | null>(null);
@@ -109,12 +107,12 @@ export default function SettingsScreen() {
     if (isLoggingOut) return; // Éviter les doubles appels
     
     Alert.alert(
-      'Déconnexion',
-      'Êtes-vous sûr de vouloir vous déconnecter ?',
+      t('logout'),
+      t('logoutConfirm'),
       [
-        { text: 'Annuler', style: 'cancel' },
+        { text: t('cancel'), style: 'cancel' },
         {
-          text: 'Déconnexion',
+          text: t('logout'),
           style: 'destructive',
           onPress: async () => {
             try {
@@ -142,12 +140,12 @@ export default function SettingsScreen() {
 
   const resetOnboarding = async () => {
     Alert.alert(
-      'Réinitialiser l\'onboarding',
-      'Voulez-vous vraiment réinitialiser l\'onboarding ? Vous serez redirigé vers l\'écran d\'accueil.',
+      t('resetOnboarding'),
+      t('resetOnboardingConfirm'),
       [
-        { text: 'Annuler', style: 'cancel' },
+        { text: t('cancel'), style: 'cancel' },
         {
-          text: 'Réinitialiser',
+          text: t('reset'),
           style: 'default',
           onPress: async () => {
             try {
@@ -155,7 +153,7 @@ export default function SettingsScreen() {
               router.replace('/(onboarding-new)/intro');
             } catch (error) {
               console.error('Erreur lors de la réinitialisation de l\'onboarding:', error);
-              Alert.alert('Erreur', 'Impossible de réinitialiser l\'onboarding');
+              Alert.alert(t('error'), t('resetOnboardingError'));
             }
           },
         },
@@ -172,7 +170,7 @@ export default function SettingsScreen() {
     );
   }
 
-  const userName = user?.name || 'Utilisateur';
+  const userName = user?.name || t('user');
   const userEmail = user?.email || '';
   const userInitial = userName.charAt(0).toUpperCase();
 
@@ -437,31 +435,45 @@ export default function SettingsScreen() {
               </View>
               <View style={styles.languageButtons}>
                 <TouchableOpacity
-                  onPress={() => setLocale('fr')}
+                  onPress={() => setLanguage('fr')}
                   style={[
                     styles.languageButton,
-                    locale === 'fr' && styles.languageButtonActive,
+                    language === 'fr' && styles.languageButtonActive,
                   ]}
                 >
                   <Text style={[
                     styles.languageButtonText,
-                    locale === 'fr' && styles.languageButtonTextActive,
+                    language === 'fr' && styles.languageButtonTextActive,
                   ]}>
                     🇫🇷 {t('french')}
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  onPress={() => setLocale('en')}
+                  onPress={() => setLanguage('en')}
                   style={[
                     styles.languageButton,
-                    locale === 'en' && styles.languageButtonActive,
+                    language === 'en' && styles.languageButtonActive,
                   ]}
                 >
                   <Text style={[
                     styles.languageButtonText,
-                    locale === 'en' && styles.languageButtonTextActive,
+                    language === 'en' && styles.languageButtonTextActive,
                   ]}>
                     🇬🇧 {t('english')}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => setLanguage('es')}
+                  style={[
+                    styles.languageButton,
+                    language === 'es' && styles.languageButtonActive,
+                  ]}
+                >
+                  <Text style={[
+                    styles.languageButtonText,
+                    language === 'es' && styles.languageButtonTextActive,
+                  ]}>
+                    🇪🇸 {t('spanish')}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -553,7 +565,7 @@ export default function SettingsScreen() {
             >
               <View style={styles.settingButtonLeft}>
                 <Ionicons name="shield-checkmark" size={24} color="#00C27A" />
-                <Text style={[styles.settingButtonText, { color: colors.text }]}>Confidentialité & Conditions</Text>
+                <Text style={[styles.settingButtonText, { color: colors.text }]}>{t('termsPrivacy')}</Text>
               </View>
               <Ionicons name="chevron-forward" size={24} color="#9CA3AF" />
             </TouchableOpacity>
@@ -568,7 +580,7 @@ export default function SettingsScreen() {
             activeOpacity={0.8}
           >
             <Ionicons name="log-out" size={24} color="#EF4444" />
-            <Text style={styles.logoutText}>Se déconnecter</Text>
+            <Text style={styles.logoutText}>{t('disconnectButton')}</Text>
           </TouchableOpacity>
         </Animated.View>
 

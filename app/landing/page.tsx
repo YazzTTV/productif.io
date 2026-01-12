@@ -6,26 +6,22 @@ import { motion, useInView } from "framer-motion"
 import Image from "next/image"
 import {
   Target,
-  Brain,
   Zap,
   TrendingDown,
   CheckCircle2,
   Timer,
-  Award,
-  Flame,
   BarChart3,
   Users,
   BookOpen,
   Focus,
   Calendar,
   Clock,
-  Send,
-  Mic,
   Play,
   Lightbulb,
   User,
   Star
 } from "lucide-react"
+
 
 // Animation variants
 const containerVariants = {
@@ -94,111 +90,123 @@ function AppInHero() {
             </div>
 
             {/* Content Area */}
-            <div className="px-4 py-4 space-y-4 overflow-y-auto" style={{ maxHeight: '600px' }}>
-              {/* Header with Profile */}
-              <div className="flex items-center gap-3 mb-2">
-                <div className="w-12 h-12 bg-[#16a34a] rounded-full flex items-center justify-center">
-                  <User size={24} strokeWidth={1.5} className="text-white" />
-                </div>
+            <div className="px-6 pt-4 pb-6 space-y-6 overflow-y-auto" style={{ maxHeight: '600px' }}>
+              {/* Header with Settings */}
+              <div className="flex items-start justify-between mb-6">
                 <div>
-                  <h2 className="text-2xl font-bold text-gray-900">Good Morning, Alex</h2>
-                  <p className="text-sm text-gray-600">Let's focus on what matters today</p>
+                  <p className="text-sm text-gray-500 mb-1">Good morning</p>
+                  <h1 className="text-3xl font-semibold text-gray-900 tracking-tight">Alex</h1>
                 </div>
+                <button className="w-12 h-12 rounded-2xl border border-black/[0.05] flex items-center justify-center bg-white shadow-sm">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-gray-900">
+                    <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" />
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                  </svg>
+                </button>
               </div>
 
-              {/* Today's Priority Card */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2, duration: 0.4 }}
-                className="bg-white rounded-3xl overflow-hidden shadow-sm border border-black/[0.03]"
-              >
-                {/* Image Header */}
-                <div className="relative h-32 bg-gradient-to-br from-gray-100 to-gray-200 overflow-hidden">
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="w-full h-full bg-gradient-to-br from-amber-50 via-orange-50 to-amber-100"></div>
-                  </div>
-                  {/* High Focus Badge */}
-                  <div className="absolute bottom-3 left-3 bg-gray-800 rounded-full px-3 py-1.5 flex items-center gap-1.5">
-                    <Zap size={12} strokeWidth={2} className="text-white" />
-                    <span className="text-xs font-medium text-white">High Focus</span>
-                  </div>
-                </div>
-                
-                {/* Priority Content */}
-                <div className="p-4">
-                  <div className="flex items-start gap-3">
-                    <div className="w-1 h-16 bg-[#16a34a] rounded-full"></div>
-                    <div className="flex-1">
-                      <p className="text-xs font-medium text-[#16a34a] uppercase tracking-wide mb-1">
-                        TODAY'S PRIORITY
-                      </p>
-                      <h3 className="text-lg font-bold text-gray-900 mb-2">
-                        Deep Work: Q3 Report
-                      </h3>
-                      <div className="flex items-center gap-2 text-xs text-gray-500">
-                        <Clock size={14} strokeWidth={1.5} />
-                        <span>45 minutes</span>
-                        <span>•</span>
-                        <span>Calendar based</span>
+              {/* Today's Structure Card */}
+              <div>
+                <h2 className="text-base text-gray-600 mb-3">Today's structure</h2>
+                <div className="bg-[#16a34a]/5 rounded-3xl p-8 border-2 border-[#16a34a]/20 shadow-lg">
+                  <div className="space-y-6">
+                    {/* Focus Block */}
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2">
+                        <Clock size={16} strokeWidth={1.5} className="text-[#16a34a]" />
+                        <span className="text-sm font-medium text-[#16a34a]">09:00 - 10:30</span>
+                      </div>
+                      <h3 className="text-2xl font-bold text-gray-900 tracking-tight">Complete Chapter 12 Summary</h3>
+                      <p className="text-base text-gray-600">Organic Chemistry</p>
+                    </div>
+
+                    {/* Tasks Section */}
+                    <div className="pt-4 border-t border-black/10 space-y-2">
+                      <div className="flex items-center gap-3">
+                        <div className="w-1.5 h-1.5 rounded-full bg-gray-600"></div>
+                        <span className="text-sm text-gray-700">Review lecture notes · 30 min</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="w-1.5 h-1.5 rounded-full bg-gray-600"></div>
+                        <span className="text-sm text-gray-700">Practice problems 15-20 · 45 min</span>
                       </div>
                     </div>
-                  </div>
-                  
-                  {/* Start Focus Session Button */}
-                  <button className="w-full mt-4 bg-[#16a34a] text-white rounded-2xl py-3.5 flex items-center justify-center gap-2 font-medium text-sm hover:bg-[#15803d] transition-colors">
-                    <Play size={18} strokeWidth={2} fill="white" />
-                    <span>Start Focus Session</span>
-                  </button>
-                </div>
-              </motion.div>
 
-              {/* Quick Actions */}
-              <div>
-                <h3 className="text-base font-bold text-gray-900 mb-3">Quick Actions</h3>
-                <div className="flex gap-3">
-                  <button className="flex-1 bg-white border border-black/[0.03] rounded-2xl p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
-                    <Focus size={18} strokeWidth={1.5} className="text-gray-600" />
-                    <span className="text-sm font-medium text-gray-700">Suggest a break</span>
-                  </button>
-                  <button className="flex-1 bg-white border border-black/[0.03] rounded-2xl p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
-                    <Calendar size={18} strokeWidth={1.5} className="text-gray-600" />
-                    <span className="text-sm font-medium text-gray-700">Reschedule afternoon</span>
-                  </button>
+                    {/* Habit Section */}
+                    <div className="pt-4 border-t border-black/10">
+                      <div className="flex items-center gap-2">
+                        <div className="w-5 h-5 rounded-full border-2 border-[#16a34a] bg-[#16a34a]/10"></div>
+                        <span className="text-sm text-gray-700">Morning review</span>
+                      </div>
+                    </div>
+
+                    {/* Start Focus Button */}
+                    <button className="w-full mt-8 bg-[#16a34a] text-white rounded-2xl py-4 flex items-center justify-center font-semibold text-lg shadow-lg shadow-[#16a34a]/30">
+                      Start Focus
+                    </button>
+                  </div>
                 </div>
               </div>
 
-              {/* Coach Insight */}
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.4, duration: 0.4 }}
-                className="bg-[#16a34a]/10 rounded-2xl p-4 border border-[#16a34a]/20"
-              >
-                <div className="flex items-start gap-3">
-                  <Lightbulb size={20} strokeWidth={1.5} className="text-[#16a34a] mt-0.5 flex-shrink-0" />
-                  <div>
-                    <p className="text-sm font-bold text-gray-900 mb-1">Coach Insight</p>
-                    <p className="text-xs text-gray-600 leading-relaxed">
-                      You're most productive between 10 AM and 12 PM. Aim to finish the report before lunch.
-                    </p>
-                  </div>
+              {/* Key Moments Timeline */}
+              <div>
+                <h2 className="text-base text-gray-600 mb-3">Key moments today</h2>
+                <div className="space-y-0">
+                  {[
+                    { time: '09:00', label: 'Morning Focus Session', active: true },
+                    { time: '12:00', label: 'Lunch Break', active: false },
+                    { time: '14:00', label: 'Study Group Meeting', active: false }
+                  ].map((moment, i) => (
+                    <div key={i} className="flex gap-4">
+                      <div className="flex flex-col items-center w-6">
+                        <div className={`w-4 h-4 rounded-full ${moment.active ? 'bg-[#16a34a] ring-4 ring-[#16a34a]/20' : 'bg-gray-200'}`}></div>
+                        {i < 2 && <div className={`w-0.5 flex-1 ${moment.active ? 'bg-[#16a34a]' : 'bg-gray-200'}`} style={{ minHeight: '40px' }}></div>}
+                      </div>
+                      <div className={`flex-1 rounded-2xl p-5 mb-3 ${moment.active ? 'bg-white border-2 border-[#16a34a]/20 shadow-sm' : 'bg-gray-50'}`}>
+                        <p className={`text-sm font-semibold mb-1 ${moment.active ? 'text-[#16a34a]' : 'text-gray-500'}`}>{moment.time}</p>
+                        <p className={`text-base ${moment.active ? 'text-gray-900 font-medium' : 'text-gray-600'}`}>{moment.label}</p>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              </motion.div>
-            </div>
+              </div>
 
-            {/* Input Area */}
-            <div className="px-4 py-4 border-t border-black/[0.03] bg-white">
-              <div className="flex items-center gap-2">
-                <button className="w-10 h-10 bg-white border border-black/[0.03] rounded-full flex items-center justify-center">
-                  <Mic size={18} strokeWidth={1.5} className="text-gray-600" />
-                </button>
-                <div className="flex-1 bg-white border border-black/[0.03] rounded-3xl px-4 py-3">
-                  <span className="text-sm text-gray-400">Ask your coach...</span>
+              {/* Community Progress Card */}
+              <div className="bg-white rounded-3xl p-6 border border-black/5">
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h3 className="text-lg font-medium text-gray-900 mb-1">Community Progress</h3>
+                    <p className="text-sm text-gray-500">Your group this week</p>
+                  </div>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-gray-400">
+                    <path d="M9 18l6-6-6-6" />
+                  </svg>
                 </div>
-                <button className="w-10 h-10 bg-[#16a34a] rounded-full flex items-center justify-center hover:bg-[#15803d] transition-colors">
-                  <Send size={18} strokeWidth={1.5} className="text-white" />
-                </button>
+
+                {/* Avatar Group with Progress Bars */}
+                <div className="flex items-end justify-between gap-3 mb-6">
+                  {['M', 'You', 'A', 'E', 'L'].map((initial, i) => (
+                    <div key={i} className="flex-1 flex flex-col items-center gap-2">
+                      <div className={`w-full h-16 rounded-lg ${initial === 'You' ? 'bg-[#16a34a]/10' : 'bg-gray-100'} flex items-end`}>
+                        <div className={`w-full rounded-lg ${initial === 'You' ? 'bg-[#16a34a]' : 'bg-gray-300'}`} style={{ height: `${85 - i * 5}%` }}></div>
+                      </div>
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center ${initial === 'You' ? 'bg-[#16a34a]/10' : 'bg-gray-100'}`}>
+                        <span className={`text-sm font-medium ${initial === 'You' ? 'text-[#16a34a] text-lg' : 'text-gray-600'}`}>
+                          {initial === 'You' ? '✓' : initial}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="pt-4 border-t border-black/5">
+                  <p className="text-sm text-gray-500 text-center">View full leaderboard →</p>
+                </div>
+              </div>
+
+              {/* Microcopy */}
+              <div className="py-6 text-center">
+                <p className="text-sm text-gray-500 italic">Everything else is handled.</p>
               </div>
             </div>
 
@@ -238,7 +246,7 @@ export default function LandingPage() {
           >
             <div className="bg-white rounded-3xl p-4 shadow-sm border border-black/[0.03]">
               <Image
-                src="/icon.png"
+                src="/icon-new.png"
                 alt="Productif.io"
                 width={80}
                 height={80}
@@ -360,62 +368,113 @@ export default function LandingPage() {
 
       {/* The System Section */}
       <section id="the-system" className="py-32 px-6 bg-white">
-        <div className="max-w-6xl mx-auto">
+        <div className="max-w-4xl mx-auto">
           <RevealOnScroll>
-            <h2 className="text-4xl md:text-5xl font-light text-gray-900 tracking-[-0.04em] text-center mb-20">
+            <h2 className="text-4xl md:text-5xl font-light text-gray-900 tracking-[-0.04em] text-center mb-4">
               The System
             </h2>
           </RevealOnScroll>
 
-          <div className="relative">
-            {/* Connecting lines - hidden on mobile */}
-            <div className="hidden lg:block absolute top-1/2 left-0 right-0 h-0.5 border-t border-dashed border-[#16a34a]/20" />
+          <RevealOnScroll delay={0.1}>
+            <p className="text-center text-gray-600 mb-16 text-lg max-w-2xl mx-auto">
+              A clear sequence your day follows, from organizing your work to deep focus to long-term consistency.
+            </p>
+          </RevealOnScroll>
 
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 lg:gap-4 relative">
+          {/* Vertical step-by-step timeline */}
+          <div className="relative max-w-3xl mx-auto">
+            {/* Vertical line */}
+            <div className="absolute left-6 top-0 bottom-0 w-px bg-gradient-to-b from-[#16a34a]/30 via-[#16a34a]/20 via-[#16a34a]/10 to-transparent pointer-events-none" />
+
+            <div className="space-y-10">
               {[
                 {
                   step: "01",
-                  title: "Personalized Onboarding",
-                  subtitle: "Quiz",
-                  description: "We understand your productivity profile, energy patterns, and goals."
+                  title: "Organize by Subjects",
+                  subtitle: "Structure your work",
+                  description: "Your work is organized by subjects. This keeps things clear. Add subjects with coefficients to prioritize what matters most."
                 },
                 {
                   step: "02",
-                  title: "AI Plan Generation",
-                  subtitle: "From intention to concrete action",
-                  description: "Your AI coach structures your day, prioritizes tasks, and creates actionable plans."
+                  title: "Create Tasks",
+                  subtitle: "What you actually work on",
+                  description: "Tasks are what you actually work on. Start simple. One task is enough. Add a name and difficulty level."
                 },
                 {
                   step: "03",
-                  title: "Deep Work & Exam Mode",
-                  subtitle: "Pure focus, zero noise",
-                  description: "Timer-based sessions with distraction blocking. Built for sustained concentration."
+                  title: "Plan My Day",
+                  subtitle: "AI structures your day",
+                  description: "This is where your day becomes clear. Describe your day freely. We'll organize it. Speak or type — whatever feels easier."
                 },
                 {
                   step: "04",
-                  title: "Gamified Consistency",
-                  subtitle: "XP, Levels, Streaks",
-                  description: "Track progress through XP events. Build streaks. Level up your discipline."
+                  title: "Daily Journal",
+                  subtitle: "Unload stress, track feelings",
+                  description: "This helps you unload stress and track how you feel. No judgment. Just awareness. Takes less than 30 seconds."
+                },
+                {
+                  step: "05",
+                  title: "Habits",
+                  subtitle: "Protect your energy",
+                  description: "Habits are small actions that protect your energy. Small habits, big impact. Example: Review plan in the morning."
+                },
+                {
+                  step: "06",
+                  title: "Focus Sessions",
+                  subtitle: "Where real work happens",
+                  description: "This is where real work happens. Select a task and duration. You can stop anytime. Timer-based sessions with distraction blocking."
+                },
+                {
+                  step: "07",
+                  title: "Exam Mode",
+                  subtitle: "Pure focus, zero noise",
+                  description: "Exam Mode removes all distractions and locks you in. Only enter when you're ready. Pressure-proof timer for deep work."
                 }
               ].map((step, index) => (
-                <RevealOnScroll key={step.step} delay={index * 0.15}>
-                  <div className="relative bg-white border border-[#16a34a]/10 rounded-3xl p-8 shadow-sm hover:border-[#16a34a]/20 transition-colors">
-                    <div className="flex items-start gap-4 mb-4">
-                      <span className="text-2xl font-light text-[#16a34a]/40 tracking-tight">
+                <RevealOnScroll key={step.step} delay={0.12 * index}>
+                  <div className="relative pl-14">
+                    {/* Step bullet */}
+                    <motion.div
+                      initial={{ scale: 0, opacity: 0 }}
+                      whileInView={{ scale: 1, opacity: 1 }}
+                      viewport={{ once: true, margin: "-100px" }}
+                      transition={{ 
+                        duration: 0.4, 
+                        delay: 0.12 * index,
+                        type: "spring",
+                        stiffness: 200
+                      }}
+                      className="absolute left-0 top-3 w-12 h-12 rounded-full bg-white border-2 border-[#16a34a]/40 flex items-center justify-center shadow-sm z-10"
+                    >
+                      <span className="text-sm font-semibold text-[#16a34a]">
                         {step.step}
                       </span>
-                      <div className="flex-1">
-                        <h3 className="text-xl font-medium text-gray-900 mb-2 tracking-tight">
-                          {step.title}
-                        </h3>
-                        <p className="text-sm text-[#16a34a] font-medium mb-3">
+                    </motion.div>
+
+                    {/* Card */}
+                    <motion.div
+                      initial={{ opacity: 0, x: -20, y: 20 }}
+                      whileInView={{ opacity: 1, x: 0, y: 0 }}
+                      viewport={{ once: true, margin: "-100px" }}
+                      transition={{ 
+                        duration: 0.6, 
+                        delay: 0.12 * index + 0.1,
+                        ease: [0.16, 1, 0.3, 1]
+                      }}
+                      className="bg-white border border-[#16a34a]/12 rounded-3xl p-8 shadow-sm hover:border-[#16a34a]/25 hover:shadow-md transition-all"
+                    >
+                      <div className="flex flex-col gap-2 mb-4">
+                        <p className="text-sm font-medium text-[#16a34a] tracking-tight uppercase">
                           {step.subtitle}
                         </p>
+                        <h3 className="text-2xl font-semibold text-gray-900 tracking-tight">
+                          {step.title}
+                        </h3>
                       </div>
-                    </div>
-                    <p className="text-gray-600 text-sm leading-relaxed">
-                      {step.description}
-                    </p>
+                      <p className="text-base text-gray-600 leading-relaxed">
+                        {step.description}
+                      </p>
+                    </motion.div>
                   </div>
                 </RevealOnScroll>
               ))}
@@ -424,64 +483,24 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Features Section */}
-      <section className="py-32 px-6 bg-white">
-        <div className="max-w-6xl mx-auto">
+      {/* CTA Section */}
+      <section className="py-8 px-6 bg-white">
+        <div className="max-w-4xl mx-auto text-center">
           <RevealOnScroll>
-            <h2 className="text-4xl md:text-5xl font-light text-gray-900 tracking-[-0.04em] text-center mb-20">
-              Core Features
-            </h2>
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6 }}
+            >
+              <button
+                onClick={handleCTAClick}
+                className="px-12 py-5 bg-[#16a34a] text-white rounded-3xl font-medium text-lg hover:bg-[#15803d] transition-colors duration-200 shadow-lg shadow-[#16a34a]/20 hover:shadow-xl hover:shadow-[#16a34a]/30"
+              >
+                Start for Free
+              </button>
+            </motion.div>
           </RevealOnScroll>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <RevealOnScroll delay={0}>
-              <div className="bg-white border border-black/[0.03] rounded-3xl p-8 shadow-sm hover:border-[#16a34a]/20 transition-colors">
-                <Brain size={32} strokeWidth={1.5} className="text-[#16a34a] mb-4" />
-                <h3 className="text-xl font-medium text-gray-900 mb-3 tracking-tight">
-                  AI Coach Agent
-                </h3>
-                <p className="text-gray-600 text-sm leading-relaxed">
-                  Structures your deep work sessions, starts focus timers, and closes loops automatically.
-                </p>
-              </div>
-            </RevealOnScroll>
-
-            <RevealOnScroll delay={0.1}>
-              <div className="bg-white border border-black/[0.03] rounded-3xl p-8 shadow-sm hover:border-[#16a34a]/20 transition-colors">
-                <Zap size={32} strokeWidth={1.5} className="text-[#16a34a] mb-4" />
-                <h3 className="text-xl font-medium text-gray-900 mb-3 tracking-tight">
-                  Energy-Based Tasking
-                </h3>
-                <p className="text-gray-600 text-sm leading-relaxed">
-                  Prioritize by mental battery, not time. Tasks scheduled based on your energy levels.
-                </p>
-              </div>
-            </RevealOnScroll>
-
-            <RevealOnScroll delay={0.2}>
-              <div className="bg-white border border-black/[0.03] rounded-3xl p-8 shadow-sm hover:border-[#16a34a]/20 transition-colors">
-                <Flame size={32} strokeWidth={1.5} className="text-[#16a34a] mb-4" />
-                <h3 className="text-xl font-medium text-gray-900 mb-3 tracking-tight">
-                  Habit Tracking
-                </h3>
-                <p className="text-gray-600 text-sm leading-relaxed">
-                  Visualize streaks and daily presence. Build consistency through daily check-ins.
-                </p>
-              </div>
-            </RevealOnScroll>
-
-            <RevealOnScroll delay={0.3}>
-              <div className="bg-white border border-black/[0.03] rounded-3xl p-8 shadow-sm hover:border-[#16a34a]/20 transition-colors">
-                <Award size={32} strokeWidth={1.5} className="text-[#16a34a] mb-4" />
-                <h3 className="text-xl font-medium text-gray-900 mb-3 tracking-tight">
-                  XP System
-                </h3>
-                <p className="text-gray-600 text-sm leading-relaxed">
-                  Track progress through XP events. Every action contributes to your level.
-                </p>
-              </div>
-            </RevealOnScroll>
-          </div>
         </div>
       </section>
 
@@ -595,92 +614,15 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Pricing Section */}
-      <section className="py-32 px-6 bg-white">
-        <div className="max-w-4xl mx-auto">
-          <RevealOnScroll>
-            <h2 className="text-4xl md:text-5xl font-light text-gray-900 tracking-[-0.04em] text-center mb-4">
-              Pricing
-            </h2>
-            <p className="text-center text-gray-600 mb-16">
-              Start free. Upgrade when you're ready.
-            </p>
-          </RevealOnScroll>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <RevealOnScroll>
-              <div className="bg-white border border-black/[0.03] rounded-3xl p-8 shadow-sm">
-                <h3 className="text-2xl font-medium text-gray-900 mb-2 tracking-tight">Free</h3>
-                <p className="text-gray-600 text-sm mb-6">Limited access to core features</p>
-                <ul className="space-y-3 mb-8">
-                  <li className="flex items-start gap-3">
-                    <CheckCircle2 size={18} strokeWidth={1.5} className="text-gray-400 mt-0.5 flex-shrink-0" />
-                    <span className="text-sm text-gray-600">Limited focus sessions</span>
-                  </li>
-                  <li className="flex items-start gap-3">
-                    <CheckCircle2 size={18} strokeWidth={1.5} className="text-gray-400 mt-0.5 flex-shrink-0" />
-                    <span className="text-sm text-gray-600">Basic planning</span>
-                  </li>
-                  <li className="flex items-start gap-3">
-                    <CheckCircle2 size={18} strokeWidth={1.5} className="text-gray-400 mt-0.5 flex-shrink-0" />
-                    <span className="text-sm text-gray-600">Habit tracking</span>
-                  </li>
-                </ul>
-                <button
-                  onClick={handleCTAClick}
-                  className="w-full px-6 py-3 bg-transparent text-gray-700 border border-black/[0.08] rounded-3xl font-medium text-sm hover:bg-black/[0.02] transition-colors duration-200"
-                >
-                  Get started
-                </button>
-              </div>
-            </RevealOnScroll>
-
-            <RevealOnScroll delay={0.1}>
-              <div className="bg-white border-2 border-[#16a34a] rounded-3xl p-8 shadow-sm relative">
-                <div className="absolute -top-3 left-6 px-3 py-1 bg-[#16a34a] text-white text-xs font-medium rounded-full">
-                  Recommended
-                </div>
-                <h3 className="text-2xl font-medium text-gray-900 mb-2 tracking-tight">Premium</h3>
-                <p className="text-gray-600 text-sm mb-6">Full access to all features</p>
-                <ul className="space-y-3 mb-8">
-                  <li className="flex items-start gap-3">
-                    <CheckCircle2 size={18} strokeWidth={1.5} className="text-[#16a34a] mt-0.5 flex-shrink-0" />
-                    <span className="text-sm text-gray-600">Full AI coaching</span>
-                  </li>
-                  <li className="flex items-start gap-3">
-                    <CheckCircle2 size={18} strokeWidth={1.5} className="text-[#16a34a] mt-0.5 flex-shrink-0" />
-                    <span className="text-sm text-gray-600">Exam Mode</span>
-                  </li>
-                  <li className="flex items-start gap-3">
-                    <CheckCircle2 size={18} strokeWidth={1.5} className="text-[#16a34a] mt-0.5 flex-shrink-0" />
-                    <span className="text-sm text-gray-600">Advanced insights</span>
-                  </li>
-                  <li className="flex items-start gap-3">
-                    <CheckCircle2 size={18} strokeWidth={1.5} className="text-[#16a34a] mt-0.5 flex-shrink-0" />
-                    <span className="text-sm text-gray-600">Unlimited sessions</span>
-                  </li>
-                </ul>
-                <button
-                  onClick={handleCTAClick}
-                  className="w-full px-6 py-3 bg-black text-white rounded-3xl font-medium text-sm hover:bg-gray-900 transition-colors duration-200"
-                >
-                  Start free trial
-                </button>
-              </div>
-            </RevealOnScroll>
-          </div>
-        </div>
-      </section>
-
       {/* Footer */}
       <footer className="py-16 px-6 border-t border-black/[0.03] bg-white">
         <div className="max-w-6xl mx-auto">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 mb-12">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-12 mb-12">
             {/* Brand */}
             <div>
               <div className="flex items-center gap-3 mb-4">
                 <Image
-                  src="/icon.png"
+                  src="/icon-new.png"
                   alt="Productif.io"
                   width={32}
                   height={32}
@@ -691,60 +633,6 @@ export default function LandingPage() {
               <p className="text-sm text-gray-600 leading-relaxed">
                 The AI coach that helps students stay focused, build consistency, and perform better.
               </p>
-            </div>
-
-            {/* Product */}
-            <div>
-              <h4 className="text-sm font-medium text-gray-900 mb-4">Product</h4>
-              <ul className="space-y-3">
-                <li>
-                  <a href="/dashboard" className="text-sm text-gray-600 hover:text-gray-900 transition-colors">
-                    Dashboard
-                  </a>
-                </li>
-                <li>
-                  <a href="/dashboard/habits" className="text-sm text-gray-600 hover:text-gray-900 transition-colors">
-                    Habits
-                  </a>
-                </li>
-                <li>
-                  <a href="/dashboard/tasks" className="text-sm text-gray-600 hover:text-gray-900 transition-colors">
-                    Tasks
-                  </a>
-                </li>
-                <li>
-                  <a href="/dashboard/analytics" className="text-sm text-gray-600 hover:text-gray-900 transition-colors">
-                    Analytics
-                  </a>
-                </li>
-                <li>
-                  <a href="/dashboard/assistant-ia" className="text-sm text-gray-600 hover:text-gray-900 transition-colors">
-                    AI Coach
-                  </a>
-                </li>
-              </ul>
-            </div>
-
-            {/* Resources */}
-            <div>
-              <h4 className="text-sm font-medium text-gray-900 mb-4">Resources</h4>
-              <ul className="space-y-3">
-                <li>
-                  <a href="/pricing" className="text-sm text-gray-600 hover:text-gray-900 transition-colors">
-                    Pricing
-                  </a>
-                </li>
-                <li>
-                  <a href="/onboarding/welcome" className="text-sm text-gray-600 hover:text-gray-900 transition-colors">
-                    Get Started
-                  </a>
-                </li>
-                <li>
-                  <a href="/landing" className="text-sm text-gray-600 hover:text-gray-900 transition-colors">
-                    Features
-                  </a>
-                </li>
-              </ul>
             </div>
 
             {/* Legal */}

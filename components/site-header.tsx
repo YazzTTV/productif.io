@@ -59,7 +59,7 @@ export default function SiteHeader() {
             </Link>
             <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
               <Link
-                href="/onboarding/welcome"
+                href="/onboarding"
                 className="inline-flex items-center justify-center px-4 py-2 rounded-full bg-gradient-to-r from-[#00C27A] to-[#00D68F] text-sm text-white shadow-md hover:from-[#00B86A] hover:to-[#00C87F] transition-colors"
               >
                 Start Free Trial
