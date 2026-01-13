@@ -99,6 +99,7 @@ export async function selectExamTasks(): Promise<{
 }> {
   try {
     const subjectsData = await subjectsService.getAll();
+    // subjectsService.getAll() retourne maintenant directement un tableau
     const subjects: Subject[] = Array.isArray(subjectsData) ? subjectsData : [];
 
     // Flatten all incomplete tasks with their subject info
