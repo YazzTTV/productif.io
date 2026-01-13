@@ -7,7 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Audio } from 'expo-av';
 import * as FileSystem from 'expo-file-system';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { taskAssociationService, googleCalendarService, dailyPlanningService } from '@/lib/api';
+import { taskAssociationService, googleCalendarService, dailyPlanningService, authService, PlanLimits } from '@/lib/api';
 import { format, addMinutes, setHours, setMinutes, startOfDay, isBefore, getHours, getMinutes } from 'date-fns';
 
 type PlanPhase = 'entry' | 'recording' | 'transcription' | 'processing' | 'association' | 'overview';
@@ -58,6 +58,8 @@ export function PlanMyDay() {
     endDate: string | null;
   }>>([]); // Événements existants du calendrier pour la date cible
   const [isLoadingCalendar, setIsLoadingCalendar] = useState(false); // État de chargement pour confirmAssociations
+  const [planLimits, setPlanLimits] = useState<PlanLimits | null>(null);
+  const [planPreviewLimited, setPlanPreviewLimited] = useState(false);
 
   useEffect(() => {
     return () => {
@@ -67,6 +69,23 @@ export function PlanMyDay() {
       }
     };
   }, [recording]);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const user = await authService.checkAuth();
+        if (!mounted) return;
+        setPlanLimits(user?.planLimits || null);
+      } catch {
+        if (!mounted) return;
+        setPlanLimits(null);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   // Vérifier la connexion Google Calendar quand on arrive sur l'overview
   useEffect(() => {
@@ -194,7 +213,16 @@ export function PlanMyDay() {
         setProcessingStep(3); // Marquer toutes les étapes comme complétées brièvement
 
         if (result.success && result.tasks && result.tasks.length > 0) {
-          setTasks(result.tasks);
+          setPlanPreviewLimited(false);
+          let extractedTasks = result.tasks;
+          let limited = false;
+          const limit = planLimits?.planMyDayMode === 'preview' ? planLimits?.maxPlanMyDayEvents : null;
+          if (limit !== null && limit !== undefined && extractedTasks.length > limit) {
+            extractedTasks = extractedTasks.slice(0, limit);
+            limited = true;
+          }
+          setPlanPreviewLimited(limited);
+          setTasks(extractedTasks);
           setSubjects(result.subjects);
           // Déterminer la date: respecte ce que l'utilisateur a dit ("demain", "lundi", etc.)
           // - Si l'IA a extrait une targetDate valide et non passée: l'utiliser
@@ -503,6 +531,8 @@ export function PlanMyDay() {
         alertMessage = 'Connectez votre Google Calendar dans les paramètres.';
       } else if (errorMessage.includes('pas encore disponible') || errorMessage.includes('à jour')) {
         alertMessage = 'Cette fonctionnalité nécessite une mise à jour du serveur. Elle sera bientôt disponible.';
+      } else if (errorMessage.toLowerCase().includes('plan my day') || errorMessage.toLowerCase().includes('premium') || errorMessage.toLowerCase().includes('limite')) {
+        alertMessage = errorMessage;
       }
       Alert.alert('Erreur', alertMessage);
     } finally {
@@ -518,6 +548,19 @@ export function PlanMyDay() {
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
+          {planLimits?.planMyDayMode === 'preview' && (
+            <View style={styles.planLimitCard}>
+              <View style={styles.planLimitTextContainer}>
+                <Text style={styles.planLimitTitle}>Aperçu Plan My Day</Text>
+                <Text style={styles.planLimitText}>
+                  Accédez à une version limitée (max {planLimits.maxPlanMyDayEvents ?? 3} tâches). Passez en Premium pour tout planifier.
+                </Text>
+              </View>
+              <TouchableOpacity style={styles.planLimitButton} onPress={() => router.push('/paywall')}>
+                <Text style={styles.planLimitButtonText}>Passer en Premium</Text>
+              </TouchableOpacity>
+            </View>
+          )}
           <Animated.View entering={FadeInUp.delay(100).duration(400)} style={styles.entryContent}>
             <View style={styles.iconContainer}>
               <Ionicons name="sparkles" size={40} color="#16A34A" />
@@ -723,6 +766,18 @@ export function PlanMyDay() {
               <Text style={styles.headerSubtitle}>Vérifiez et corrigez si nécessaire</Text>
             </View>
           </Animated.View>
+
+          {planPreviewLimited && (
+            <View style={styles.planLimitNotice}>
+              <Ionicons name="lock-closed" size={18} color="#16A34A" />
+              <Text style={styles.planLimitNoticeText}>
+                Aperçu: seules {planLimits?.maxPlanMyDayEvents ?? 3} tâches sont incluses. Passez en Premium pour le plan complet.
+              </Text>
+              <TouchableOpacity style={styles.planLimitButton} onPress={() => router.push('/paywall')}>
+                <Text style={styles.planLimitButtonText}>Upgrade</Text>
+              </TouchableOpacity>
+            </View>
+          )}
 
           <View style={styles.tasksList}>
             {tasks.map((task, index) => (
@@ -1232,6 +1287,57 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 24,
     paddingTop: 16,
+  },
+  planLimitCard: {
+    backgroundColor: '#ECFDF3',
+    borderColor: '#16A34A',
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  planLimitTextContainer: {
+    flex: 1,
+    gap: 4,
+  },
+  planLimitTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#14532D',
+  },
+  planLimitText: {
+    fontSize: 14,
+    color: '#166534',
+  },
+  planLimitButton: {
+    backgroundColor: '#16A34A',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+  },
+  planLimitButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  planLimitNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#F0FDF4',
+    borderColor: '#BBF7D0',
+    borderWidth: 1,
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 16,
+  },
+  planLimitNoticeText: {
+    flex: 1,
+    color: '#166534',
+    fontSize: 14,
   },
   entryContent: {
     flex: 1,

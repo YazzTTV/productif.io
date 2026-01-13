@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verifyApiToken, hasRequiredScopes } from '@/lib/api-token'
 import { getAuthUserFromRequest, getAuthUser } from '@/lib/auth'
+import { getPlanInfo, buildLockedFeature } from '@/lib/plans'
+import { endOfDay, startOfDay } from 'date-fns'
 
 export async function POST(req: NextRequest) {
   try {
@@ -47,6 +49,67 @@ export async function POST(req: NextRequest) {
 
     if (!plannedDuration || plannedDuration < 1) {
       return NextResponse.json({ error: 'plannedDuration requis (en minutes)' }, { status: 400 })
+    }
+
+    // Charger l'utilisateur pour connaître son plan/limites
+    const userRecord = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, subscriptionStatus: true, subscriptionTier: true, stripeSubscriptionId: true },
+    })
+
+    if (!userRecord) {
+      return NextResponse.json({ error: 'Utilisateur introuvable' }, { status: 404 })
+    }
+
+    const planInfo = getPlanInfo(userRecord)
+    const limits = planInfo.limits
+
+    // Vérifier la limite quotidienne de sessions Focus pour le plan gratuit
+    if (limits.focusPerDay !== null) {
+      const todayStart = startOfDay(new Date())
+      const todayEnd = endOfDay(new Date())
+      const sessionsToday = await prisma.deepWorkSession.count({
+        where: {
+          userId,
+          timeEntry: {
+            startTime: { gte: todayStart, lte: todayEnd },
+          },
+        },
+      })
+
+      if (sessionsToday >= limits.focusPerDay) {
+        return NextResponse.json(
+          {
+            error: "Limite quotidienne de sessions Focus atteinte pour le plan gratuit",
+            ...buildLockedFeature('focus_session'),
+            plan: planInfo.plan,
+            planLimits: limits,
+            usage: {
+              used: sessionsToday,
+              limit: limits.focusPerDay,
+              period: 'day',
+            },
+          },
+          { status: 403 }
+        )
+      }
+    }
+
+    if (limits.focusMaxDurationMinutes !== null && plannedDuration > limits.focusMaxDurationMinutes) {
+      return NextResponse.json(
+        {
+          error: `Durée max pour une session Focus en freemium: ${limits.focusMaxDurationMinutes} minutes`,
+          ...buildLockedFeature('focus_session'),
+          plan: planInfo.plan,
+          planLimits: limits,
+          usage: {
+            requested: plannedDuration,
+            limit: limits.focusMaxDurationMinutes,
+            period: 'per_session',
+          },
+        },
+        { status: 403 }
+      )
     }
 
     // Vérifier que la tâche existe et appartient à l'utilisateur si taskId fourni
@@ -174,5 +237,4 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 })
   }
 }
-
 

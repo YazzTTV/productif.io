@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getAuthUserFromRequest, verifyToken } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { getPlanInfo } from "@/lib/plans"
 
 async function minimalUserFromToken(req: NextRequest) {
   try {
@@ -50,6 +51,8 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Utilisateur non trouvé" }, { status: 404 })
     }
 
+    const planInfo = getPlanInfo(user)
+
     // Récupérer l'entreprise de l'utilisateur
     const userCompany = await prisma.userCompany.findFirst({
       where: { userId: user.id },
@@ -66,7 +69,10 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       user: {
         ...userInfo,
-        companyName: userCompany?.company?.name || null
+        companyName: userCompany?.company?.name || null,
+        plan: planInfo.plan,
+        planLimits: planInfo.limits,
+        isPremium: planInfo.isPremium,
       }
     })
   } catch (error: any) {
@@ -82,4 +88,3 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 })
   }
 }
-

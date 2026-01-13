@@ -18,6 +18,7 @@
     "test:planification-soir-template": "node scripts/test-planification-soir-template.js",
     "test:verification-nuit-template": "node scripts/test-verification-nuit-template.js",
     "test:deepwork-stats": "node scripts/test-deepwork-stats-api.js",
+    "test:freemium": "node scripts/test-freemium.js",
     "build": "npx prisma generate && (npx prisma migrate deploy || (echo 'Migration deploy timeout, verification de l etat...' && npx prisma migrate status && echo 'Migrations deja appliquees')) && next build",
     "prisma:seed": "npx tsx prisma/seed.ts",
     "build:capacitor": "rm -rf app/api && cp next.config.capacitor.mjs next.config.mjs && next build && git checkout next.config.mjs && git checkout app/api",

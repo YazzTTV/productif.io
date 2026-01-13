@@ -35,6 +35,6 @@ EXPOSE $PORT
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
   CMD curl -fsS http://localhost:$PORT/health || exit 1
 
-# Start the scheduler service (run DB migrations first)
-# Utiliser un script shell pour mieux gérer les erreurs
-CMD ["sh", "-c", "set -e && echo '🔄 Application des migrations Prisma...' && npx prisma migrate deploy && echo '✅ Migrations appliquées' && echo '🚀 Démarrage du scheduler...' && npm run start:scheduler"]
+# Start the scheduler service
+# Les migrations sont gérées par Railway via startCommand dans railway.toml
+CMD ["npm", "run", "start:scheduler"]

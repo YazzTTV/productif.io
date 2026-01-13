@@ -1,26 +1,24 @@
 import { prisma } from '@/lib/prisma';
+import { getPlanInfo } from '@/lib/plans';
 
 export class TrialService {
-  private static TRIAL_DURATION_DAYS = 7;
-
   /**
-   * Initialiser le trial à l'inscription
+   * Initialiser le modèle freemium à l'inscription (plus de free trial)
    */
   static async initializeTrial(userId: string): Promise<void> {
-    const now = new Date();
-    const trialEndDate = new Date(now.getTime() + this.TRIAL_DURATION_DAYS * 24 * 60 * 60 * 1000);
-
     await prisma.user.update({
       where: { id: userId },
       data: {
-        trialStartDate: now,
-        trialEndDate,
-        trialStatus: 'active',
-        subscriptionStatus: 'trial'
+        trialStartDate: null,
+        trialEndDate: null,
+        trialStatus: 'disabled',
+        subscriptionStatus: 'free',
+        subscriptionTier: 'free',
+        subscriptionEndDate: null,
       }
     });
 
-    console.log(`✅ Trial initialisé pour user ${userId} jusqu'au ${trialEndDate.toISOString()}`);
+    console.log(`✅ Freemium activé par défaut pour user ${userId}`);
   }
 
   /**
@@ -30,16 +28,15 @@ export class TrialService {
     hasAccess: boolean;
     reason?: string;
     trialDaysLeft?: number;
-    status: 'trial_active' | 'trial_expired' | 'subscribed' | 'cancelled';
+    status: 'trial_active' | 'trial_expired' | 'subscribed' | 'cancelled' | 'freemium';
   }> {
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: {
-        trialStartDate: true,
-        trialEndDate: true,
-        trialStatus: true,
         subscriptionStatus: true,
-        subscriptionEndDate: true
+        subscriptionTier: true,
+        stripeSubscriptionId: true,
+        subscriptionEndDate: true,
       }
     });
 
@@ -51,48 +48,12 @@ export class TrialService {
       };
     }
 
-    const now = new Date();
+    const planInfo = getPlanInfo(user);
+    const status = planInfo.plan === 'premium' ? 'subscribed' : 'freemium';
 
-    // Cas 1 : Subscription active
-    if (user.subscriptionStatus === 'active') {
-      if (user.subscriptionEndDate && user.subscriptionEndDate > now) {
-        return {
-          hasAccess: true,
-          status: 'subscribed'
-        };
-      }
-    }
-
-    // Cas 2 : Trial actif
-    if (user.subscriptionStatus === 'trial') {
-      if (user.trialEndDate && user.trialEndDate > now) {
-        const trialDaysLeft = Math.ceil(
-          (user.trialEndDate.getTime() - now.getTime()) / (24 * 60 * 60 * 1000)
-        );
-
-        return {
-          hasAccess: true,
-          trialDaysLeft,
-          status: 'trial_active'
-        };
-      } else {
-        // Trial expiré
-        await this.expireTrial(userId);
-
-        return {
-          hasAccess: false,
-          reason: 'Période d\'essai expirée',
-          trialDaysLeft: 0,
-          status: 'trial_expired'
-        };
-      }
-    }
-
-    // Cas 3 : Tout le reste = pas d'accès
     return {
-      hasAccess: false,
-      reason: 'Aucun abonnement actif',
-      status: 'trial_expired'
+      hasAccess: true,
+      status
     };
   }
 
@@ -104,7 +65,7 @@ export class TrialService {
       where: { id: userId },
       data: {
         trialStatus: 'expired',
-        subscriptionStatus: 'expired'
+        subscriptionStatus: 'free'
       }
     });
 
@@ -234,4 +195,3 @@ export class TrialService {
     };
   }
 }
-
