@@ -1,12 +1,12 @@
 "use client"
 
-import { Metadata } from "next"
+import { Suspense } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { LoginForm } from "@/components/auth/login-form"
 import { useEffect } from "react"
 
-export default function LoginPage() {
+function LoginContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   
@@ -40,5 +40,24 @@ export default function LoginPage() {
         </p>
       </div>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="w-full max-w-md mx-auto px-4">
+        <div className="flex flex-col space-y-6">
+          <div className="flex flex-col space-y-2 text-center">
+            <h1 className="text-2xl font-semibold tracking-tight">Connexion</h1>
+            <p className="text-sm text-muted-foreground">
+              Chargement...
+            </p>
+          </div>
+        </div>
+      </div>
+    }>
+      <LoginContent />
+    </Suspense>
   )
 } 
