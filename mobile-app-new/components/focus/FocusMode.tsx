@@ -56,17 +56,39 @@ export function FocusMode({
         if (result?.session?.id) {
           setSessionId(result.session.id);
         }
-      } catch (error) {
-        const message = (error as any)?.message || '1 session Focus par jour en freemium. Passez en Premium pour continuer.';
-        Alert.alert(
-          'Focus limité',
-          message,
-          [
-            { text: 'Plus tard', style: 'cancel' },
-            { text: 'Passer en Premium', onPress: () => router.push('/paywall') }
-          ]
-        );
-        setIsRunning(false);
+      } catch (error: any) {
+        const errorMessage = error?.message || '';
+        const errorLower = errorMessage.toLowerCase();
+        
+        // Détecter les erreurs de limite Premium
+        const isPlanLocked = 
+          errorLower.includes('limite') || 
+          errorLower.includes('premium') || 
+          errorLower.includes('plan') ||
+          errorLower.includes('durée max') ||
+          errorLower.includes('freemium') ||
+          error?.status === 403 ||
+          error?.locked === true;
+        
+        if (isPlanLocked) {
+          Alert.alert(
+            'Focus limité',
+            errorMessage || '1 session Focus par jour en freemium. Passez en Premium pour continuer.',
+            [
+              { text: 'Plus tard', style: 'cancel' },
+              { text: 'Passer en Premium', onPress: () => router.push('/paywall') }
+            ]
+          );
+          setIsRunning(false);
+        } else {
+          // Autres erreurs : afficher un message générique
+          Alert.alert(
+            'Erreur',
+            errorMessage || 'Impossible de démarrer la session Focus',
+            [{ text: 'OK' }]
+          );
+          setIsRunning(false);
+        }
       }
     };
     startSession();
