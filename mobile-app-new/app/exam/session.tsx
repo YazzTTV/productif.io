@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle } from 'react-native-svg';
 import { getActiveExamSession, clearExamSession, calculateTimeRemaining, saveExamSession, ExamSession } from '@/utils/examSession';
 import { tasksService, subjectsService } from '@/lib/api';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 const RING_SIZE = 280;
 const RADIUS = 130;
@@ -39,12 +40,12 @@ export default function ExamSessionScreen() {
 
   useEffect(() => {
     loadSession();
-    setupBackHandler();
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', handleBackPress);
     return () => {
       if (timerIntervalRef.current) {
         clearInterval(timerIntervalRef.current);
       }
-      BackHandler.removeEventListener('hardwareBackPress', handleBackPress);
+      backHandler.remove();
     };
   }, []);
 
@@ -62,18 +63,50 @@ export default function ExamSessionScreen() {
       setLoading(true);
       const activeSession = await getActiveExamSession();
       if (!activeSession) {
+        // Si c'est une démo demandée via paramètre, créer une session de démo
+        if (params.demo === 'true' && sessionId) {
+          // La session de démo devrait déjà être créée, mais si elle n'existe pas, rediriger vers preview
+          router.replace('/exam/preview');
+          return;
+        }
         router.replace('/exam/setup');
         return;
       }
+      
+      // Vérifier si c'est une session de démo
+      const isDemo = activeSession.sessionId.startsWith('exam_demo_') || params.demo === 'true';
+      
       setSession(activeSession);
-      setTimeRemaining(calculateTimeRemaining(activeSession));
+      
+      // Pour les sessions de démo, initialiser le timer à exactement 5 minutes
+      // Pour éviter les problèmes de timing entre la création et le chargement
+      if (isDemo) {
+        // Réinitialiser startedAt pour que le timer démarre à 5:00
+        const updatedSession = {
+          ...activeSession,
+          startedAt: Date.now(), // Réinitialiser le temps de départ
+          totalPausedTime: 0, // Réinitialiser le temps de pause
+          pausedAt: undefined, // S'assurer qu'il n'y a pas de pause
+        };
+        await saveExamSession(updatedSession);
+        setSession(updatedSession);
+        setTimeRemaining(5 * 60); // Exactement 5 minutes (300 secondes)
+      } else {
+        setTimeRemaining(calculateTimeRemaining(activeSession));
+      }
+      
       setIsRunning(!activeSession.pausedAt);
 
-      // Load tasks
+      // Load tasks (gère aussi le mode démo)
       await loadTasks(activeSession);
     } catch (error) {
       console.error('Error loading session:', error);
-      router.replace('/exam/setup');
+      // En cas d'erreur, rediriger vers preview si c'était une démo, sinon vers setup
+      if (params.demo === 'true') {
+        router.replace('/exam/preview');
+      } else {
+        router.replace('/exam/setup');
+      }
     } finally {
       setLoading(false);
     }
@@ -81,13 +114,15 @@ export default function ExamSessionScreen() {
 
   const loadTasks = async (activeSession: ExamSession) => {
     try {
+      // Charger les vraies tâches (pour les sessions normales ET les démos)
       const subjectsData = await subjectsService.getAll();
+      // subjectsService.getAll() retourne maintenant directement un tableau
       const subjects = Array.isArray(subjectsData) ? subjectsData : [];
       
       const taskMap = new Map<string, Task>();
-      subjects.forEach(subject => {
+      subjects.forEach((subject: any) => {
         if (subject.tasks && Array.isArray(subject.tasks)) {
-          subject.tasks.forEach(task => {
+          subject.tasks.forEach((task: any) => {
             taskMap.set(task.id, {
               id: task.id,
               title: task.title,
@@ -102,6 +137,14 @@ export default function ExamSessionScreen() {
         const task = taskMap.get(taskId);
         if (task) tasks.push(task);
       });
+
+      // Si aucune tâche trouvée et que c'est une démo, on peut afficher un message
+      if (tasks.length === 0) {
+        const isDemo = activeSession.sessionId.startsWith('exam_demo_') || params.demo === 'true';
+        if (isDemo) {
+          console.warn('No tasks found for demo session');
+        }
+      }
 
       setAllTasks(tasks);
       if (tasks.length > activeSession.currentTaskIndex) {
@@ -121,8 +164,26 @@ export default function ExamSessionScreen() {
     timerIntervalRef.current = setInterval(() => {
       if (!session) return;
       
-      const remaining = calculateTimeRemaining(session);
-      setTimeRemaining(remaining);
+      // Pour les sessions de démo, utiliser un timer simple qui décrémente
+      // Pour les sessions normales, calculer depuis startedAt
+      const isDemo = session.sessionId.startsWith('exam_demo_') || params.demo === 'true';
+      
+      let remaining: number;
+      if (isDemo) {
+        // Pour la démo, décrémenter simplement le timer
+        setTimeRemaining((prev) => {
+          const newTime = prev - 1;
+          if (newTime <= 0) {
+            handleSessionEnd();
+            return 0;
+          }
+          return newTime;
+        });
+        return;
+      } else {
+        remaining = calculateTimeRemaining(session);
+        setTimeRemaining(remaining);
+      }
 
       if (remaining <= 0) {
         handleSessionEnd();
@@ -149,18 +210,22 @@ export default function ExamSessionScreen() {
     return false;
   };
 
-  const setupBackHandler = () => {
-    BackHandler.addEventListener('hardwareBackPress', handleBackPress);
-  };
 
   const handleComplete = async () => {
     if (!session || !currentTask) return;
 
-    // Mark task as completed
-    try {
-      await tasksService.updateTask(currentTask.id, { completed: true });
-    } catch (error) {
-      console.error('Error completing task:', error);
+    // Vérifier si c'est une démo
+    const isDemo = session.sessionId.startsWith('exam_demo_') || params.demo === 'true';
+    
+    // En mode démo, on ne marque pas vraiment les tâches comme complétées
+    // pour ne pas modifier les vraies données
+    if (!isDemo) {
+      // Mark task as completed (seulement pour les sessions normales)
+      try {
+        await tasksService.updateTask(currentTask.id, { completed: true });
+      } catch (error) {
+        console.error('Error completing task:', error);
+      }
     }
 
     const newCompletedIds = [...session.completedTaskIds, currentTask.id];
@@ -246,13 +311,34 @@ export default function ExamSessionScreen() {
   };
 
   const handleEndSession = async () => {
+    const isDemo = session?.sessionId.startsWith('exam_demo_') || params.demo === 'true';
+    
+    if (isDemo) {
+      // Pour la démo, rediriger vers le paywall
+      Alert.alert(
+        t('demoEnded') || 'Démo terminée',
+        t('demoEndedMessage') || 'Vous avez terminé la démo de 5 minutes. Passez en Premium pour accéder à Exam Mode sans limite !',
+        [
+          { text: t('cancel') || 'Annuler', style: 'cancel' },
+          {
+            text: t('unlockExamMode') || 'Débloquer Exam Mode',
+            onPress: async () => {
+              await clearExamSession();
+              router.replace('/paywall');
+            },
+          },
+        ]
+      );
+      return;
+    }
+
     Alert.alert(
-      'End Session',
-      'Are you sure you want to end this session?',
+      t('endSession') || 'Terminer la session',
+      t('endSessionConfirm') || 'Êtes-vous sûr de vouloir terminer cette session ?',
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('cancel') || 'Annuler', style: 'cancel' },
         {
-          text: 'End',
+          text: t('end') || 'Terminer',
           style: 'destructive',
           onPress: async () => {
             await clearExamSession();
@@ -272,7 +358,27 @@ export default function ExamSessionScreen() {
 
   const handleSessionEnd = async () => {
     stopTimer();
+    const isDemo = session?.sessionId.startsWith('exam_demo_') || params.demo === 'true';
+    
     await clearExamSession();
+    
+    if (isDemo) {
+      // Pour la démo, rediriger vers le paywall
+      Alert.alert(
+        t('demoEnded') || 'Démo terminée',
+        t('demoEndedMessage') || 'Vous avez terminé la démo de 5 minutes. Passez en Premium pour accéder à Exam Mode sans limite !',
+        [
+          {
+            text: t('unlockExamMode') || 'Débloquer Exam Mode',
+            onPress: () => {
+              router.replace('/paywall');
+            },
+          },
+        ]
+      );
+      return;
+    }
+    
     const completedCount = session?.completedTaskIds.length || 0;
     router.replace({
       pathname: '/exam/summary',
@@ -302,11 +408,6 @@ export default function ExamSessionScreen() {
     <View style={[styles.container, { paddingTop: insets.top }]}>
       {/* Header */}
       <View style={styles.header}>
-        <View style={styles.timeDisplay}>
-          <Text style={styles.timeText}>
-            {String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}
-          </Text>
-        </View>
         {!session.hardMode && (
           <TouchableOpacity
             style={styles.endButton}
@@ -318,7 +419,7 @@ export default function ExamSessionScreen() {
         )}
       </View>
 
-      {/* Timer Ring */}
+      {/* Timer Ring + centered time */}
       <View style={styles.timerContainer}>
         <Svg width={RING_SIZE} height={RING_SIZE}>
           <Circle
@@ -343,6 +444,11 @@ export default function ExamSessionScreen() {
             origin={`${RING_SIZE / 2}, ${RING_SIZE / 2}`}
           />
         </Svg>
+        <View style={styles.timerOverlay}>
+          <Text style={styles.timerText}>
+            {String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}
+          </Text>
+        </View>
       </View>
 
       {/* Task Card */}
@@ -435,6 +541,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginVertical: 40,
+  },
+  timerOverlay: {
+    position: 'absolute',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  timerText: {
+    fontSize: 48,
+    fontWeight: '300',
+    letterSpacing: -2,
+    color: '#FFFFFF',
   },
   taskCard: {
     marginHorizontal: 24,

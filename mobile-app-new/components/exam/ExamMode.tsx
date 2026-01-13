@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { selectExamTasks, TaskForExam } from '@/utils/taskSelection';
-import { subjectsService } from '@/lib/api';
+import { subjectsService, authService } from '@/lib/api';
+import { checkPremiumStatus } from '@/utils/premium';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 type ExamPhase = 'dashboard' | 'focus' | 'paused' | 'complete';
 
@@ -26,6 +28,7 @@ interface ExamInfo {
 export function ExamMode() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { t } = useLanguage();
   const [phase, setPhase] = useState<ExamPhase>('dashboard');
   const [tasks, setTasks] = useState<Task[]>([]);
   const [upcomingExam, setUpcomingExam] = useState<ExamInfo | null>(null);
@@ -35,8 +38,38 @@ export function ExamMode() {
   const allTasksCompleted = tasks.every(t => t.completed);
 
   useEffect(() => {
-    loadExamData();
+    checkExamModeAccess();
   }, []);
+
+  const checkExamModeAccess = async () => {
+    try {
+      // Vérifier le statut Premium via l'API
+      const user = await authService.checkAuth();
+      
+      if (user && user.planLimits) {
+        // Vérifier si Exam Mode est activé
+        if (!user.planLimits.examModeEnabled) {
+          // Rediriger vers la page preview avec paywall
+          router.replace('/exam/preview');
+          return;
+        }
+      } else {
+        // Fallback : vérifier via checkPremiumStatus
+        const status = await checkPremiumStatus();
+        if (!status.isPremium) {
+          router.replace('/exam/preview');
+          return;
+        }
+      }
+      
+      // Si on arrive ici, l'utilisateur a accès à Exam Mode
+      loadExamData();
+    } catch (error) {
+      console.error('Error checking Exam Mode access:', error);
+      // En cas d'erreur, rediriger vers preview pour sécurité
+      router.replace('/exam/preview');
+    }
+  };
 
   const loadExamData = async () => {
     try {
@@ -250,10 +283,10 @@ export function ExamMode() {
           <Animated.View entering={FadeInDown.delay(500).duration(400)} style={styles.reassuranceCard}>
             <Text style={styles.reassuranceText}>
               {allTasksCompleted
-                ? "This is enough for today."
+                ? t('examEnoughForToday') || "This is enough for today."
                 : completedCount > 0
-                ? "You're covering what matters."
-                : "Consistency beats panic."}
+                ? t('examCoveringWhatMatters') || "You're covering what matters."
+                : t('examConsistencyBeatsPanic') || "Consistency beats panic."}
             </Text>
           </Animated.View>
 
