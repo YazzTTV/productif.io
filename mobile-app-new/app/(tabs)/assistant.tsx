@@ -39,7 +39,7 @@ export default function AssistantScreen() {
       {activeTab === 'assistant' ? (
         <AIConductorNew />
       ) : (
-        <AnalyticsScreen checkInType={checkInType} />
+        <AnalyticsScreen checkInType={checkInType} isActive={activeTab === 'analytics'} />
       )}
     </View>
   );

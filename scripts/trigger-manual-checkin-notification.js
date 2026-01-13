@@ -7,10 +7,9 @@
  */
 
 import { PrismaClient } from '@prisma/client';
-import NotificationService from '../src/services/NotificationService.js';
+import notificationService from '../src/services/NotificationService.js';
 
 const prisma = new PrismaClient();
-const notificationService = new NotificationService();
 
 async function triggerManualCheckInNotification() {
   try {
@@ -80,15 +79,15 @@ async function triggerManualCheckInNotification() {
     switch (type) {
       case 'mood':
         console.log('🙂 Déclenchement notification MOOD_CHECK...');
-        await notificationService.scheduleMoodCheckNotification(userId, scheduledDate);
+        await notificationService.scheduleMoodCheckNotification(user.id, scheduledDate);
         break;
       case 'stress':
         console.log('😌 Déclenchement notification STRESS_CHECK...');
-        await notificationService.scheduleStressCheckNotification(userId, scheduledDate);
+        await notificationService.scheduleStressCheckNotification(user.id, scheduledDate);
         break;
       case 'focus':
         console.log('🎯 Déclenchement notification FOCUS_CHECK...');
-        await notificationService.scheduleFocusCheckNotification(userId, scheduledDate);
+        await notificationService.scheduleFocusCheckNotification(user.id, scheduledDate);
         break;
     }
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -13,7 +13,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LineChart } from 'react-native-chart-kit';
 import { Dimensions } from 'react-native';
-import { behaviorService } from '@/lib/api';
+import { behaviorService, authService, PlanLimits } from '@/lib/api';
 import { format, parseISO, subDays } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
@@ -33,11 +33,13 @@ interface AnalyticsData {
 
 interface AnalyticsScreenProps {
   checkInType?: CheckInType;
+  isActive?: boolean; // Nouvelle prop pour indiquer si l'onglet est actif
 }
 
-export default function AnalyticsScreen({ checkInType: propCheckInType }: AnalyticsScreenProps = {}) {
+export default function AnalyticsScreen({ checkInType: propCheckInType, isActive = true }: AnalyticsScreenProps = {}) {
   const params = useLocalSearchParams();
   const checkInType = (propCheckInType || params.checkInType) as CheckInType | undefined;
+  const hasLoadedRef = useRef(false);
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -47,32 +49,95 @@ export default function AnalyticsScreen({ checkInType: propCheckInType }: Analyt
     stress: number | null;
     focus: number | null;
   }>({ mood: null, stress: null, focus: null });
+  const [planLimits, setPlanLimits] = useState<PlanLimits | null>(null);
+  const [plan, setPlan] = useState<string | null>(null);
   const [showCheckInForm, setShowCheckInForm] = useState(!!checkInType);
   const [checkInValue, setCheckInValue] = useState('');
   const [checkInNote, setCheckInNote] = useState('');
 
+  // Charger les données au montage
   useEffect(() => {
-    loadAnalytics();
+    console.log('🔄 [Analytics] useEffect - Montage du composant, isActive:', isActive);
+    console.log('🔄 [Analytics] hasLoadedRef.current:', hasLoadedRef.current);
+    if (!hasLoadedRef.current) {
+      hasLoadedRef.current = true;
+      console.log('🔄 [Analytics] Premier chargement...');
+      loadPlan();
+      loadAnalytics();
+    } else if (isActive) {
+      console.log('🔄 [Analytics] Composant déjà monté, rechargement...');
+      loadAnalytics();
+    }
   }, []);
+
+  // Recharger les données quand l'onglet devient actif
+  useEffect(() => {
+    console.log('🔄 [Analytics] useEffect - isActive changé:', isActive);
+    if (isActive) {
+      console.log('🔄 [Analytics] Onglet actif, rechargement des données...');
+      loadAnalytics();
+    }
+  }, [isActive]);
 
   const loadAnalytics = async () => {
     try {
       setLoading(true);
+      console.log('📊 [Analytics] ===== DÉBUT DU CHARGEMENT =====');
+      console.log('📊 [Analytics] Appel à behaviorService.getAnalytics()...');
       const response = await behaviorService.getAnalytics();
+      console.log('✅ [Analytics] Données reçues:', JSON.stringify(response, null, 2));
+      console.log('✅ [Analytics] response.data:', response.data);
+      console.log('✅ [Analytics] response.averages:', response.averages);
       setAnalyticsData(response.data || []);
       setAverages(response.averages || { mood: null, stress: null, focus: null });
+      if (response.planLimits) {
+        setPlanLimits(response.planLimits);
+      }
+      if (response.plan) {
+        setPlan(response.plan);
+      }
+      console.log('✅ [Analytics] State mis à jour');
+      console.log('📊 [Analytics] ===== FIN DU CHARGEMENT =====');
     } catch (error: any) {
-      console.error('Erreur lors du chargement des analytics:', error);
+      console.error('❌ [Analytics] Erreur lors du chargement des analytics:', error);
+      console.error('❌ [Analytics] Type d\'erreur:', error?.constructor?.name);
+      console.error('❌ [Analytics] Message:', error?.message);
+      console.error('❌ [Analytics] Stack:', error?.stack);
       
       // Si l'endpoint n'existe pas encore (404), afficher un message plus informatif
-      if (error.message && error.message.includes('Endpoint non trouvé')) {
+      if (error.message && (error.message.includes('Endpoint non trouvé') || error.message.includes('404'))) {
         Alert.alert(
           'Fonctionnalité en cours de déploiement',
           'L\'endpoint analytics est en cours de déploiement. Veuillez réessayer dans quelques instants.',
           [{ text: 'OK' }]
         );
+      } else if (error.message && error.message.toLowerCase().includes('premium')) {
+        Alert.alert(
+          'Analytics Premium',
+          'Analytics détaillés réservés au plan Premium. Débloquez plus de jours d\'historique.',
+          [
+            { text: 'Plus tard' },
+            { text: 'Passer en Premium', onPress: () => router.push('/paywall') }
+          ]
+        );
+      } else if (error.message && error.message.includes('Non authentifié') || error.message.includes('401')) {
+        Alert.alert(
+          'Erreur d\'authentification',
+          'Vous devez être connecté pour voir vos analytics. Veuillez vous reconnecter.',
+          [{ text: 'OK' }]
+        );
+      } else if (error.message && error.message.includes('réseau') || error.message.includes('timeout')) {
+        Alert.alert(
+          'Erreur de connexion',
+          'Vérifiez votre connexion internet et réessayez.',
+          [{ text: 'OK' }]
+        );
       } else {
-        Alert.alert('Erreur', 'Impossible de charger les données analytics. Veuillez réessayer plus tard.');
+        Alert.alert(
+          'Erreur',
+          `Impossible de charger les données analytics. ${error?.message ? `\n\n${error.message}` : ''}`,
+          [{ text: 'OK' }]
+        );
       }
       
       // Initialiser avec des données vides pour éviter les erreurs d'affichage
@@ -80,6 +145,17 @@ export default function AnalyticsScreen({ checkInType: propCheckInType }: Analyt
       setAverages({ mood: null, stress: null, focus: null });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadPlan = async () => {
+    try {
+      const user = await authService.checkAuth();
+      setPlanLimits(user?.planLimits || null);
+      setPlan(user?.plan || null);
+    } catch (error) {
+      setPlanLimits(null);
+      setPlan(null);
     }
   };
 
@@ -97,7 +173,9 @@ export default function AnalyticsScreen({ checkInType: propCheckInType }: Analyt
 
     try {
       setSubmitting(true);
-      await behaviorService.createCheckIn({
+      console.log('💾 [Analytics] Enregistrement du check-in:', { type: checkInType, value, note: checkInNote });
+      
+      const result = await behaviorService.createCheckIn({
         type: checkInType,
         value,
         note: checkInNote || undefined,
@@ -106,6 +184,8 @@ export default function AnalyticsScreen({ checkInType: propCheckInType }: Analyt
           timestamp: new Date().toISOString(),
         },
       });
+
+      console.log('✅ [Analytics] Check-in enregistré avec succès:', result);
 
       Alert.alert('Succès', 'Votre note a été enregistrée !', [
         {
@@ -118,9 +198,24 @@ export default function AnalyticsScreen({ checkInType: propCheckInType }: Analyt
           },
         },
       ]);
-    } catch (error) {
-      console.error('Erreur lors de l\'enregistrement:', error);
-      Alert.alert('Erreur', 'Impossible d\'enregistrer votre note');
+    } catch (error: any) {
+      console.error('❌ [Analytics] Erreur lors de l\'enregistrement:', error);
+      console.error('❌ [Analytics] Type d\'erreur:', error?.constructor?.name);
+      console.error('❌ [Analytics] Message:', error?.message);
+      console.error('❌ [Analytics] Stack:', error?.stack);
+      
+      let errorMessage = 'Impossible d\'enregistrer votre note';
+      if (error?.message) {
+        if (error.message.includes('Non authentifié') || error.message.includes('401')) {
+          errorMessage = 'Vous devez être connecté pour enregistrer une note. Veuillez vous reconnecter.';
+        } else if (error.message.includes('réseau') || error.message.includes('timeout')) {
+          errorMessage = 'Erreur de connexion. Vérifiez votre internet et réessayez.';
+        } else {
+          errorMessage = `Erreur: ${error.message}`;
+        }
+      }
+      
+      Alert.alert('Erreur', errorMessage);
     } finally {
       setSubmitting(false);
     }
@@ -185,6 +280,19 @@ export default function AnalyticsScreen({ checkInType: propCheckInType }: Analyt
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
+        {planLimits?.analyticsRetentionDays !== null && (
+          <View style={styles.planNotice}>
+            <View style={styles.planNoticeLeft}>
+              <Text style={styles.planNoticeTitle}>Analytics en aperçu</Text>
+              <Text style={styles.planNoticeText}>
+                Vous voyez les {planLimits.analyticsRetentionDays} derniers jours. Passez en Premium pour un historique complet.
+              </Text>
+            </View>
+            <TouchableOpacity style={styles.planNoticeButton} onPress={() => router.push('/paywall')}>
+              <Text style={styles.planNoticeButtonText}>Upgrade</Text>
+            </TouchableOpacity>
+          </View>
+        )}
         {/* Formulaire de check-in si arrivé depuis une notification */}
         {showCheckInForm && checkInType && (
           <View style={styles.checkInCard}>
@@ -366,6 +474,41 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 24,
+  },
+  planNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: '#ECFDF3',
+    borderColor: '#16A34A',
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 16,
+  },
+  planNoticeLeft: {
+    flex: 1,
+    gap: 4,
+  },
+  planNoticeTitle: {
+    color: '#14532D',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  planNoticeText: {
+    color: '#166534',
+    fontSize: 13,
+  },
+  planNoticeButton: {
+    backgroundColor: '#16A34A',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  planNoticeButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 13,
   },
   checkInCard: {
     backgroundColor: '#FFFFFF',

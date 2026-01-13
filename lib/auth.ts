@@ -68,22 +68,39 @@ export async function getAuthUserFromRequest(req: NextRequest) {
 
     // 1. Essayer de récupérer le token depuis le header Authorization (mobile)
     // Essayer les deux cas (majuscule et minuscule) pour être sûr
-    const authHeader = req.headers.get("authorization") || req.headers.get("Authorization")
-    if (authHeader && authHeader.startsWith("Bearer ")) {
-      token = authHeader.substring(7) // Enlever "Bearer "
-      console.log("Token found in Authorization header")
+    const authHeaderLower = req.headers.get("authorization")
+    const authHeaderUpper = req.headers.get("Authorization")
+    const authHeader = authHeaderLower || authHeaderUpper
+    
+    // Log tous les headers pour debug
+    const allHeaders = Object.fromEntries(req.headers.entries())
+    console.log("🔍 [getAuthUserFromRequest] Headers reçus:", Object.keys(allHeaders).filter(k => k.toLowerCase().includes('auth')))
+    
+    if (authHeader) {
+      console.log("🔍 [getAuthUserFromRequest] Header Authorization trouvé:", authHeader.substring(0, 20) + "...")
+      if (authHeader.startsWith("Bearer ")) {
+        token = authHeader.substring(7) // Enlever "Bearer "
+        console.log("✅ [getAuthUserFromRequest] Token extrait du header Authorization")
+      } else {
+        console.log("⚠️ [getAuthUserFromRequest] Header Authorization ne commence pas par 'Bearer '")
+      }
+    } else {
+      console.log("⚠️ [getAuthUserFromRequest] Aucun header Authorization trouvé")
     }
 
     // 2. Si pas de token dans le header, essayer les cookies (web)
     if (!token) {
-      token = req.cookies.get("auth_token")?.value
-      if (token) {
-        console.log("Token found in cookies")
+      const cookieToken = req.cookies.get("auth_token")?.value
+      if (cookieToken) {
+        token = cookieToken
+        console.log("✅ [getAuthUserFromRequest] Token trouvé dans les cookies")
+      } else {
+        console.log("⚠️ [getAuthUserFromRequest] Aucun token dans les cookies")
       }
     }
 
     if (!token) {
-      console.log("No token found in header or cookies")
+      console.log("❌ [getAuthUserFromRequest] No token found in header or cookies")
       return null
     }
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthUserFromRequest } from '@/lib/auth';
 import { TrialService } from '@/lib/trial/TrialService';
+import { getPlanInfo } from '@/lib/plans';
 
 export async function GET(req: NextRequest) {
   try {
@@ -12,15 +13,18 @@ export async function GET(req: NextRequest) {
     }
 
     const accessCheck = await TrialService.hasAccess(user.id);
+    const planInfo = getPlanInfo(user);
 
     return NextResponse.json({
       status: accessCheck.status,
       daysLeft: accessCheck.trialDaysLeft,
-      hasAccess: accessCheck.hasAccess
+      hasAccess: accessCheck.hasAccess,
+      plan: planInfo.plan,
+      planLimits: planInfo.limits,
+      isPremium: planInfo.isPremium,
     });
   } catch (error) {
     console.error('Erreur récupération statut trial:', error);
     return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 });
   }
 }
-

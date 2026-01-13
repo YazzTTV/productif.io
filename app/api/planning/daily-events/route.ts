@@ -13,6 +13,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUserFromRequest } from '@/lib/auth'
 import { googleCalendarService } from '@/lib/calendar/GoogleCalendarService'
 import { prisma } from '@/lib/prisma'
+import { getPlanInfo, buildLockedFeature } from '@/lib/plans'
 
 // Configuration pour Vercel/Next.js
 export const dynamic = 'force-dynamic'
@@ -50,6 +51,27 @@ export async function POST(req: NextRequest) {
         { error: 'events array is required' },
         { status: 400 }
       )
+    }
+
+    const planInfo = getPlanInfo(user)
+    const limits = planInfo.limits
+
+    if (limits.planMyDayMode === 'preview') {
+      if (limits.maxPlanMyDayEvents !== null && events.length > limits.maxPlanMyDayEvents) {
+        return NextResponse.json(
+          {
+            error: `Plan My Day limité à ${limits.maxPlanMyDayEvents} événements en mode gratuit`,
+            ...buildLockedFeature('plan_my_day'),
+            plan: planInfo.plan,
+            planLimits: limits,
+            usage: {
+              requested: events.length,
+              limit: limits.maxPlanMyDayEvents,
+            },
+          },
+          { status: 403 }
+        )
+      }
     }
 
     // Valider le format des événements (avec champs optionnels pour créer les tâches)

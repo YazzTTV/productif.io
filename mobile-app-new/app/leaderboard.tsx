@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Dimensions,
   RefreshControl,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -62,9 +63,46 @@ export default function LeaderboardScreen() {
       
       const response = await apiCall(`/gamification/leaderboard?${params}`);
       setData(response);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erreur lors du chargement du leaderboard:', error);
-      setError("Impossible de charger le classement");
+      const message = error instanceof Error ? error.message : "Impossible de charger le classement";
+      const status = error?.status;
+      const isLocked = error?.locked === true;
+      const feature = error?.feature;
+      
+      // Gestion spécifique des erreurs Premium/403
+      if (status === 403 || isLocked || (message && (
+        message.toLowerCase().includes('premium') ||
+        message.toLowerCase().includes('plan premium') ||
+        message.toLowerCase().includes('réservé au plan premium') ||
+        message.toLowerCase().includes('leaderboard global')
+      ))) {
+        Alert.alert(
+          'Leaderboard Premium',
+          'Le classement global est réservé au plan Premium. Débloquez cette fonctionnalité pour comparer votre progression avec la communauté mondiale.',
+          [
+            { text: 'Plus tard', style: 'cancel' },
+            { text: 'Passer en Premium', onPress: () => router.push('/paywall') }
+          ]
+        );
+        setError('Leaderboard Premium - Upgrade requis');
+      } else if (status === 401 || (message && (message.includes('Non authentifié') || message.includes('401')))) {
+        Alert.alert(
+          'Erreur d\'authentification',
+          'Vous devez être connecté pour voir le leaderboard. Veuillez vous reconnecter.',
+          [{ text: 'OK' }]
+        );
+        setError('Authentification requise');
+      } else if (message && (message.includes('réseau') || message.includes('timeout'))) {
+        Alert.alert(
+          'Erreur de connexion',
+          'Vérifiez votre connexion internet et réessayez.',
+          [{ text: 'OK' }]
+        );
+        setError(message);
+      } else {
+        setError(message);
+      }
     } finally {
       setIsLoading(false);
     }
