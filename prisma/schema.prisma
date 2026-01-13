@@ -17,16 +17,21 @@ model User {
   updatedAt        DateTime @updatedAt
   managedCompanyId String?
 
-  // Free Trial
+  // Free Trial (deprecated - migration vers freemium)
   trialStartDate DateTime?
   trialEndDate   DateTime?
   trialStatus    String?   @default("active") // active, expired, converted
 
-  // Subscription
-  subscriptionStatus   String?   @default("trial") // trial, active, cancelled, expired
-  subscriptionTier     String? // starter, pro, enterprise
+  // Subscription & Plan (Freemium model)
+  // Plan déterminé par resolvePlan() dans lib/plans.ts:
+  // - Premium si: subscriptionStatus in ["active", "trialing", "paid"] 
+  //            OR subscriptionTier in ["pro", "premium", "starter", "enterprise", "paid"]
+  //            OR stripeSubscriptionId exists
+  // - Free sinon (default)
+  subscriptionStatus   String? // null = free, "active"|"trialing"|"paid" = premium, "cancelled"|"expired" = free
+  subscriptionTier     String? // "starter"|"pro"|"premium"|"enterprise"|"paid" = premium
   stripeCustomerId     String?   @unique
-  stripeSubscriptionId String?   @unique
+  stripeSubscriptionId String?   @unique // Présence = premium
   subscriptionEndDate  DateTime?
 
   // Historique
@@ -34,40 +39,40 @@ model User {
   cancelledAt DateTime?
   trialEndsAt DateTime? // Keep for backward compatibility
 
-  role                   String                       @default("USER")
-  missions               Mission[]
-  processes              Process[]
-  projects               Project[]
-  sessions               Session[]
-  tasks                  Task[]
-  timeEntries            TimeEntry[]
-  deepWorkSessions       DeepWorkSession[]
-  managedCompany         Company?                     @relation("CompanyAdmin", fields: [managedCompanyId], references: [id])
-  companies              UserCompany[]
-  gamification           UserGamification?
-  warMapEvents           WarMapEvent[]
-  apiTokens              ApiToken[]
-  habits                 Habit[]
-  notificationSettings   NotificationSettings?
-  notificationHistory    NotificationHistory[]
-  whatsappConversations  WhatsAppConversation[]
-  journalEntries         JournalEntry[]
-  dailyInsights          DailyInsight[]
-  behaviorCheckIns       BehaviorCheckIn[]
-  behaviorPatterns       BehaviorPattern[]
-  checkInSchedule        CheckInSchedule?
-  conversationState      UserConversationState?
-  trialNotifications     TrialNotification[]
-  createdGroups          LeaderboardGroup[]           @relation("GroupCreator")
-  groupInvitations       LeaderboardGroupInvitation[] @relation("GroupInviter")
-  LeaderboardGroupMember LeaderboardGroupMember[]
-  agentInteractions      AgentInteraction[]
-  onboardingData         OnboardingData?
-  xpEvents                 XpEvent[]
-  pushTokens               PushToken[]
-  googleCalendarToken      GoogleCalendarToken?
-  appleCalendarConnection  AppleCalendarConnection?
-  subjects                 Subject[]
+  role                    String                       @default("USER")
+  missions                Mission[]
+  processes               Process[]
+  projects                Project[]
+  sessions                Session[]
+  tasks                   Task[]
+  timeEntries             TimeEntry[]
+  deepWorkSessions        DeepWorkSession[]
+  managedCompany          Company?                     @relation("CompanyAdmin", fields: [managedCompanyId], references: [id])
+  companies               UserCompany[]
+  gamification            UserGamification?
+  warMapEvents            WarMapEvent[]
+  apiTokens               ApiToken[]
+  habits                  Habit[]
+  notificationSettings    NotificationSettings?
+  notificationHistory     NotificationHistory[]
+  whatsappConversations   WhatsAppConversation[]
+  journalEntries          JournalEntry[]
+  dailyInsights           DailyInsight[]
+  behaviorCheckIns        BehaviorCheckIn[]
+  behaviorPatterns        BehaviorPattern[]
+  checkInSchedule         CheckInSchedule?
+  conversationState       UserConversationState?
+  trialNotifications      TrialNotification[]
+  createdGroups           LeaderboardGroup[]           @relation("GroupCreator")
+  groupInvitations        LeaderboardGroupInvitation[] @relation("GroupInviter")
+  LeaderboardGroupMember  LeaderboardGroupMember[]
+  agentInteractions       AgentInteraction[]
+  onboardingData          OnboardingData?
+  xpEvents                XpEvent[]
+  pushTokens              PushToken[]
+  googleCalendarToken     GoogleCalendarToken?
+  appleCalendarConnection AppleCalendarConnection?
+  subjects                Subject[]
 }
 
 model Company {
@@ -147,35 +152,35 @@ model ProcessStep {
 }
 
 model Task {
-  id           String      @id @default(cuid())
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
+  id           String    @id @default(cuid())
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
   title        String
   description  String?
   dueDate      DateTime?
   userId       String
   projectId    String?
-  completed    Boolean     @default(false)
-  order        Int         @default(500)
+  completed    Boolean   @default(false)
+  order        Int       @default(500)
   scheduledFor DateTime?
   processId    String?
   priority     Int?
   energyLevel  Int?
-  
+
   // Champs pour Google Calendar scheduling
-  estimatedMinutes      Int?                    // Durée estimée en minutes
-  googleCalendarEventId String?                 // ID de l'événement Google Calendar
-  schedulingStatus      String?     @default("draft") // draft | proposed | scheduled | done | not_done | snoozed
-  proposedSlotStart     DateTime?               // Créneau proposé (début)
-  proposedSlotEnd       DateTime?               // Créneau proposé (fin)
-  
-  process               Process?    @relation("TaskProcess", fields: [processId], references: [id])
-  project               Project?    @relation(fields: [projectId], references: [id])
-  subjectId             String?
-  subject               Subject?    @relation("TaskSubject", fields: [subjectId], references: [id])
-  user                  User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  timeEntries           TimeEntry[]
-  scheduledEvents       ScheduledTaskEvent[]
+  estimatedMinutes      Int? // Durée estimée en minutes
+  googleCalendarEventId String? // ID de l'événement Google Calendar
+  schedulingStatus      String?   @default("draft") // draft | proposed | scheduled | done | not_done | snoozed
+  proposedSlotStart     DateTime? // Créneau proposé (début)
+  proposedSlotEnd       DateTime? // Créneau proposé (fin)
+
+  process         Process?             @relation("TaskProcess", fields: [processId], references: [id])
+  project         Project?             @relation(fields: [projectId], references: [id])
+  subjectId       String?
+  subject         Subject?             @relation("TaskSubject", fields: [subjectId], references: [id])
+  user            User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  timeEntries     TimeEntry[]
+  scheduledEvents ScheduledTaskEvent[]
 
   @@index([userId])
   @@index([projectId])
@@ -185,15 +190,15 @@ model Task {
 }
 
 model Subject {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   name        String
-  coefficient Int      @default(1) // Coefficient de la matière (1, 2, 3, etc.)
+  coefficient Int       @default(1) // Coefficient de la matière (1, 2, 3, etc.)
   deadline    DateTime? // Deadline/date limite pour cette matière
   userId      String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tasks       Task[]   @relation("TaskSubject")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tasks       Task[]    @relation("TaskSubject")
 
   @@index([userId])
   @@map("subjects")
@@ -238,20 +243,20 @@ model DeepWorkSession {
 }
 
 model Habit {
-  id          String       @id @default(cuid())
-  name        String       @db.VarChar(255)
-  description String?
-  color       String?      @db.VarChar(7)
-  frequency   String       @db.VarChar(10)
-  daysOfWeek  String[]
-  inferredCategory     String?   @db.VarChar(20)
-  userCategoryOverride String?   @db.VarChar(20)
-  userId      String
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-  order       Int          @default(0)
-  entries     HabitEntry[]
-  user        User         @relation(fields: [userId], references: [id])
+  id                   String       @id @default(cuid())
+  name                 String       @db.VarChar(255)
+  description          String?
+  color                String?      @db.VarChar(7)
+  frequency            String       @db.VarChar(10)
+  daysOfWeek           String[]
+  inferredCategory     String?      @db.VarChar(20)
+  userCategoryOverride String?      @db.VarChar(20)
+  userId               String
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
+  order                Int          @default(0)
+  entries              HabitEntry[]
+  user                 User         @relation(fields: [userId], references: [id])
 
   @@index([userId])
   @@map("habits")
@@ -381,13 +386,13 @@ model UserGamification {
 }
 
 model XpEvent {
-  id         String   @id @default(cuid())
-  userId     String
-  type       String
-  xpAwarded  Int
-  metadata   Json?
-  createdAt  DateTime @default(now())
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id        String   @id @default(cuid())
+  userId    String
+  type      String
+  xpAwarded Int
+  metadata  Json?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, createdAt])
   @@index([type])
@@ -477,20 +482,20 @@ model StreakHistory {
 }
 
 model NotificationHistory {
-  id           String                @id @default(cuid())
-  userId       String
-  type         String
-  content      String
-  pushTitle    String?
-  pushBody     String?
-  assistantMessage String?           @db.Text
-  scheduledFor DateTime
-  sentAt       DateTime?
-  status       String                @default("pending")
-  error        String?
-  user         User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  settings     NotificationSettings? @relation(fields: [settingsId], references: [id])
-  settingsId   String?
+  id               String                @id @default(cuid())
+  userId           String
+  type             String
+  content          String
+  pushTitle        String?
+  pushBody         String?
+  assistantMessage String?               @db.Text
+  scheduledFor     DateTime
+  sentAt           DateTime?
+  status           String                @default("pending")
+  error            String?
+  user             User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  settings         NotificationSettings? @relation(fields: [settingsId], references: [id])
+  settingsId       String?
 
   @@index([userId])
   @@map("notification_history")
@@ -764,11 +769,11 @@ model OnboardingData {
   // Nouveau design - Identité
   firstName   String? // Prénom de l'utilisateur
   studentType String? // highSchool, university, medLawPrepa, engineeringBusiness, other
-  studyLevel  Int?    // Année d'études (1-9)
+  studyLevel  Int? // Année d'études (1-9)
 
   // Nouveau design - Objectifs & Pression
-  goals         Json?   // Array de strings: succeedExams, reduceStress, stayConsistent, stopOverwhelmed, useTimeBetter
-  pressureLevel Int?    // 1-5
+  goals         Json? // Array de strings: succeedExams, reduceStress, stayConsistent, stopOverwhelmed, useTimeBetter
+  pressureLevel Int? // 1-5
 
   // Nouveau design - Contexte académique
   currentSituation String? // preparingExams, maintainingConsistency, catchingUp, highPerformance, stressManagement
@@ -777,20 +782,20 @@ model OnboardingData {
   dailyStruggles Json? // Array: tooManyTasks, difficultyFocusing, constantStress, guiltyResting, fearFallingBehind
 
   // Nouveau design - Style de travail
-  mentalLoad     Int?     // 1-5
-  focusQuality   Int?     // 1-5
-  satisfaction   Int?     // 1-5
+  mentalLoad     Int? // 1-5
+  focusQuality   Int? // 1-5
+  satisfaction   Int? // 1-5
   overthinkTasks Boolean? // Réfléchit trop à ce qu'il faut faire
   shouldDoMore   Boolean? // Se sent obligé de faire plus
 
   // Nouveau design - Intentions
-  wantToChange Json?   // Array: workWithClarity, feelInControl, beConsistent, stopWastingEnergy
+  wantToChange Json? // Array: workWithClarity, feelInControl, beConsistent, stopWastingEnergy
   timeHorizon  String? // next2Weeks, thisSemester, thisYear
 
   // Nouveau design - Tâches & Journée idéale
   rawTasks       String? // Texte libre saisi par l'utilisateur
-  clarifiedTasks Json?   // Array de tâches clarifiées par l'IA
-  idealDay       Json?   // Structure de journée idéale générée
+  clarifiedTasks Json? // Array de tâches clarifiées par l'IA
+  idealDay       Json? // Structure de journée idéale générée
 
   // WhatsApp (ancien)
   whatsappNumber  String?
@@ -803,7 +808,7 @@ model OnboardingData {
 
   // Métadonnées
   offer         String? // early-access, waitlist, etc.
-  utmParams     Json?   // Paramètres UTM
+  utmParams     Json? // Paramètres UTM
   emailFallback String? // Email utilisé avant connexion
   billingCycle  String? // monthly, yearly
 
@@ -821,8 +826,8 @@ model PushToken {
   id        String   @id @default(cuid())
   userId    String
   token     String   @unique
-  platform  String   // 'ios' | 'android' | 'web'
-  deviceId  String?  // Identifiant unique de l'appareil (optionnel)
+  platform  String // 'ios' | 'android' | 'web'
+  deviceId  String? // Identifiant unique de l'appareil (optionnel)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -834,15 +839,15 @@ model PushToken {
 }
 
 model GoogleCalendarToken {
-  id            String   @id @default(cuid())
-  userId        String   @unique
-  accessToken   String   @db.Text
-  refreshToken  String?  @db.Text
-  expiresAt     DateTime
-  scope         String   // Les scopes accordés (ex: "openid email profile https://www.googleapis.com/auth/calendar")
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id           String   @id @default(cuid())
+  userId       String   @unique
+  accessToken  String   @db.Text
+  refreshToken String?  @db.Text
+  expiresAt    DateTime
+  scope        String // Les scopes accordés (ex: "openid email profile https://www.googleapis.com/auth/calendar")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@map("google_calendar_tokens")
@@ -853,7 +858,7 @@ model AppleCalendarConnection {
   id          String   @id @default(cuid())
   userId      String   @unique
   granted     Boolean  @default(true) // Permission accordée par l'utilisateur iOS
-  calendarIds Json?    // IDs des calendriers sélectionnés (optionnel)
+  calendarIds Json? // IDs des calendriers sélectionnés (optionnel)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -873,7 +878,7 @@ model ScheduledTaskEvent {
   endTime          DateTime
   reminderSentAt   DateTime? // Quand le rappel de début a été envoyé
   postCheckSentAt  DateTime? // Quand le prompt "fait/pas fait" a été envoyé
-  userResponse     String?   // done | not_done | snoozed
+  userResponse     String? // done | not_done | snoozed
   rescheduledCount Int       @default(0)
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt

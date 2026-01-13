@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react';
-import { authService } from '@/lib/api';
+import { authService, PlanLimits } from '@/lib/api';
 
 export interface TrialStatus {
-  status: 'trial_active' | 'trial_expired' | 'subscribed' | 'cancelled';
+  status: 'trial_active' | 'trial_expired' | 'subscribed' | 'cancelled' | 'freemium';
   daysLeft?: number;
   hasAccess: boolean;
+  plan?: string;
+  planLimits?: PlanLimits;
+  isPremium?: boolean;
 }
 
 export function useTrialStatus() {
@@ -22,10 +25,9 @@ export function useTrialStatus() {
       setTrialStatus(status);
     } catch (error) {
       console.error('❌ [TRIAL] Erreur lors de la vérification du statut:', error);
-      // En cas d'erreur, considérer comme expiré pour bloquer l'accès
       setTrialStatus({
-        status: 'trial_expired',
-        hasAccess: false,
+        status: 'freemium',
+        hasAccess: true,
       });
     } finally {
       setIsLoading(false);
@@ -35,8 +37,7 @@ export function useTrialStatus() {
   return {
     trialStatus,
     isLoading,
-    isLocked: trialStatus?.status === 'trial_expired' && !trialStatus?.hasAccess,
+    isLocked: trialStatus ? !trialStatus.hasAccess : false,
     refresh: checkTrialStatus,
   };
 }
-

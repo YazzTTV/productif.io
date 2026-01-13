@@ -29,6 +29,18 @@ export interface SignupRequest {
   };
 }
 
+export interface PlanLimits {
+  focusPerDay: number | null;
+  focusMaxDurationMinutes: number | null;
+  maxHabits: number | null;
+  planMyDayMode: 'preview' | 'full';
+  maxPlanMyDayEvents: number | null;
+  allowGlobalLeaderboard: boolean;
+  analyticsRetentionDays: number | null;
+  historyDepthDays: number | null;
+  examModeEnabled: boolean;
+}
+
 export interface User {
   id: string;
   name: string;
@@ -36,6 +48,9 @@ export interface User {
   role: string;
   createdAt: string;
   updatedAt: string;
+  plan?: string;
+  planLimits?: PlanLimits;
+  isPremium?: boolean;
 }
 
 export interface AuthResponse {
@@ -159,6 +174,14 @@ export async function apiCall<T>(
   const tokenStorage = TokenStorage.getInstance();
   const token = await tokenStorage.getToken();
 
+  // Log détaillé du token
+  if (token) {
+    console.log('🔑 [apiCall] Token présent:', token.substring(0, 20) + '...');
+    console.log('🔑 [apiCall] Longueur du token:', token.length);
+  } else {
+    console.warn('⚠️ [apiCall] Aucun token trouvé dans TokenStorage');
+  }
+
   const config: RequestInit = {
     headers: {
       'Content-Type': 'application/json',
@@ -168,11 +191,19 @@ export async function apiCall<T>(
     ...options,
   };
 
+  // Vérifier que le header Authorization est bien présent
+  const authHeader = (config.headers as any)?.Authorization;
+  if (authHeader) {
+    console.log('✅ [apiCall] Header Authorization configuré:', authHeader.substring(0, 30) + '...');
+  } else {
+    console.warn('⚠️ [apiCall] Header Authorization manquant dans la config');
+  }
+
   try {
     const fullUrl = `${API_BASE_URL}${endpoint}`;
-    console.log('🌐 apiCall - URL complète:', fullUrl);
-    console.log('🔑 apiCall - Token présent:', !!token);
-    console.log('📋 apiCall - Méthode:', options.method || 'GET');
+    console.log('🌐 [apiCall] URL complète:', fullUrl);
+    console.log('🔑 [apiCall] Token présent:', !!token);
+    console.log('📋 [apiCall] Méthode:', options.method || 'GET');
     if (options.body) {
       console.log('📦 apiCall - Body:', options.body.substring(0, 200));
     }
@@ -213,7 +244,22 @@ export async function apiCall<T>(
         const message = errorData?.error || errorData?.message || 'Non authentifié';
         // Ne pas logger comme erreur critique - c'est normal si l'utilisateur n'est pas connecté
         console.log('ℹ️ apiCall - Non authentifié (401), token nettoyé');
-        throw new Error(message);
+        const error = new Error(message);
+        (error as any).status = 401;
+        (error as any).errorData = errorData;
+        throw error;
+      }
+
+      // Gérer les erreurs 403 (Forbidden) - souvent liées aux limitations Premium
+      if (response.status === 403) {
+        console.log('🔒 apiCall - Accès refusé (403), probablement une limitation Premium');
+        const message = errorData?.error || errorData?.message || 'Accès refusé';
+        const error = new Error(message);
+        (error as any).status = 403;
+        (error as any).errorData = errorData;
+        (error as any).locked = errorData?.locked;
+        (error as any).feature = errorData?.feature;
+        throw error;
       }
 
       // Si c'est une 404 avec du HTML, c'est probablement que l'endpoint n'existe pas
@@ -233,7 +279,10 @@ export async function apiCall<T>(
         errorData?.message ||
         (rawText ? `Erreur serveur (${response.status}): ${rawText.substring(0, 100)}` : 'Erreur de réseau');
 
-      throw new Error(message);
+      const error = new Error(message);
+      (error as any).status = response.status;
+      (error as any).errorData = errorData;
+      throw error;
     }
 
     // Vérifier que la réponse est bien du JSON
@@ -396,9 +445,12 @@ export const authService = {
 
   // Récupérer le statut du trial
   async getTrialStatus(): Promise<{ 
-    status: 'trial_active' | 'trial_expired' | 'subscribed' | 'cancelled';
+    status: 'trial_active' | 'trial_expired' | 'subscribed' | 'cancelled' | 'freemium';
     daysLeft?: number;
     hasAccess: boolean;
+    plan?: string;
+    planLimits?: PlanLimits;
+    isPremium?: boolean;
   }> {
     return await apiCall('/user/trial-status');
   },
@@ -1434,6 +1486,9 @@ export const behaviorService = {
       focus: number | null;
     };
     totalCheckIns: number;
+    plan?: string;
+    planLimits?: PlanLimits;
+    days?: number;
   }> {
     return await apiCall('/behavior/analytics');
   },

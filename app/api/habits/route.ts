@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { startOfDay } from "date-fns"
 import { getAuthUser, getAuthUserFromRequest } from "@/lib/auth"
+import { getPlanInfo, buildLockedFeature } from "@/lib/plans"
 
 // Habitudes par défaut
 const DEFAULT_HABITS = [
@@ -210,6 +211,32 @@ export async function POST(req: NextRequest) {
       frequency,
       color
     })
+
+    const planInfo = getPlanInfo(user)
+    const limits = planInfo.limits
+
+    if (limits.maxHabits !== null) {
+      const currentCount = await prisma.habit.count({
+        where: { userId: user.id },
+      })
+
+      if (currentCount >= limits.maxHabits) {
+        return NextResponse.json(
+          {
+            error: `Limite de ${limits.maxHabits} habitudes atteinte avec le plan gratuit`,
+            ...buildLockedFeature("habits"),
+            plan: planInfo.plan,
+            planLimits: limits,
+            usage: {
+              used: currentCount,
+              limit: limits.maxHabits,
+              scope: "total_habits",
+            },
+          },
+          { status: 403 }
+        )
+      }
+    }
 
     // Validation
     if (!name) {

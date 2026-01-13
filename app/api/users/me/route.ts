@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getAuthUser } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { getPlanInfo } from "@/lib/plans"
 
 // GET - Récupérer les informations de l'utilisateur connecté
 export async function GET() {
@@ -19,6 +20,9 @@ export async function GET() {
         name: true,
         createdAt: true,
         updatedAt: true,
+        subscriptionStatus: true,
+        subscriptionTier: true,
+        stripeSubscriptionId: true,
       },
     })
 
@@ -26,7 +30,16 @@ export async function GET() {
       return NextResponse.json({ error: "Utilisateur non trouvé" }, { status: 404 })
     }
 
-    return NextResponse.json({ user: userInfo })
+    const planInfo = getPlanInfo(userInfo)
+
+    return NextResponse.json({ 
+      user: {
+        ...userInfo,
+        plan: planInfo.plan,
+        planLimits: planInfo.limits,
+        isPremium: planInfo.isPremium,
+      }
+    })
   } catch (error) {
     console.error("Erreur lors de la récupération des informations utilisateur:", error)
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 })

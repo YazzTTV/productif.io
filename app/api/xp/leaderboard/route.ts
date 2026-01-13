@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthUserFromRequest } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getPlanInfo, buildLockedFeature } from "@/lib/plans";
 
 export async function GET(req: NextRequest) {
   try {
@@ -12,6 +13,19 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const range = (searchParams.get("range") as "weekly" | "all") || "weekly";
     const limit = Math.min(Number(searchParams.get("limit")) || 10, 50);
+
+    const planInfo = getPlanInfo(user);
+    if (!planInfo.limits.allowGlobalLeaderboard) {
+      return NextResponse.json(
+        {
+          error: "Le classement global est réservé au plan Premium",
+          ...buildLockedFeature("leaderboard_global"),
+          plan: planInfo.plan,
+          planLimits: planInfo.limits,
+        },
+        { status: 403 }
+      );
+    }
 
     if (range === "all") {
       const leaderboard = await prisma.userGamification.findMany({
@@ -74,4 +88,3 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
 }
-

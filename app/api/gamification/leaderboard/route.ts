@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { getAuthUser } from "@/lib/auth"
 import { GamificationService } from "@/services/gamification"
+import { getPlanInfo, buildLockedFeature } from "@/lib/plans"
 
 // Augmenter le timeout pour les requêtes complexes (30 secondes)
 export const maxDuration = 30
@@ -26,6 +27,19 @@ export async function GET(request: Request) {
     const includeUserRank = searchParams.get('includeUserRank') === 'true'
 
     console.log(`${routeName} 📊 Paramètres - limit: ${limit}, includeUserRank: ${includeUserRank}`)
+
+    const planInfo = getPlanInfo(user)
+    if (!planInfo.limits.allowGlobalLeaderboard) {
+      return NextResponse.json(
+        {
+          error: "Le classement global est réservé au plan Premium",
+          ...buildLockedFeature("leaderboard_global"),
+          plan: planInfo.plan,
+          planLimits: planInfo.limits,
+        },
+        { status: 403 }
+      )
+    }
 
     const serviceStartTime = Date.now()
     const gamificationService = new GamificationService()

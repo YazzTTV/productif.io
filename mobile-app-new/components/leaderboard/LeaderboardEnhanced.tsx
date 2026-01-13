@@ -51,6 +51,19 @@ export function LeaderboardEnhanced() {
   const [selectedFriendIds, setSelectedFriendIds] = useState<string[]>([]);
   const [isCreatingGroup, setIsCreatingGroup] = useState(false);
 
+  useEffect(() => {
+    const loadPlan = async () => {
+      try {
+        const currentUserData = await authService.checkAuth();
+        setIsPremium(Boolean(currentUserData?.isPremium || currentUserData?.plan === 'premium'));
+        setCurrentUserId(currentUserData?.id || null);
+      } catch (error) {
+        setIsPremium(false);
+      }
+    };
+    loadPlan();
+  }, []);
+
   // Charger les amis depuis l'API
   const loadFriends = async () => {
     try {
@@ -1439,4 +1452,3 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
-

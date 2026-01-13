@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Dimensions, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import Animated, { 
   useSharedValue, 
@@ -57,7 +57,16 @@ export function FocusMode({
           setSessionId(result.session.id);
         }
       } catch (error) {
-        console.log('Session démarrée localement');
+        const message = (error as any)?.message || '1 session Focus par jour en freemium. Passez en Premium pour continuer.';
+        Alert.alert(
+          'Focus limité',
+          message,
+          [
+            { text: 'Plus tard', style: 'cancel' },
+            { text: 'Passer en Premium', onPress: () => router.push('/paywall') }
+          ]
+        );
+        setIsRunning(false);
       }
     };
     startSession();
@@ -297,4 +306,3 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 });
-
