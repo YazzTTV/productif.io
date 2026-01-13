@@ -565,7 +565,27 @@ export default function FocusScreen() {
     } catch (error: any) {
       // Si l'erreur indique qu'une session est déjà en cours, on continue quand même localement
       const errorMessage = error?.message || '';
-      const isPlanLocked = errorMessage.toLowerCase().includes('limite') || errorMessage.toLowerCase().includes('premium') || errorMessage.toLowerCase().includes('plan');
+      const errorLower = errorMessage.toLowerCase();
+      
+      console.log('🔍 [Focus] Erreur capturée:', {
+        message: errorMessage,
+        status: error?.status,
+        locked: error?.locked,
+        feature: error?.feature
+      });
+      
+      // Détecter les erreurs de limite Premium (doit être vérifié AVANT les autres erreurs)
+      const isPlanLocked = 
+        errorLower.includes('limite') || 
+        errorLower.includes('premium') || 
+        errorLower.includes('plan') ||
+        errorLower.includes('durée max') ||
+        errorLower.includes('freemium') ||
+        error?.status === 403 ||
+        error?.locked === true;
+      
+      console.log('🔍 [Focus] isPlanLocked:', isPlanLocked);
+      
       const startLocally = () => {
         setTimeLeft(selectedDuration * 60);
         setPhase('active');
@@ -573,6 +593,7 @@ export default function FocusScreen() {
         setCurrentTaskIndex(0);
       };
 
+      // Si c'est une erreur de limite Premium, bloquer et afficher l'alerte
       if (isPlanLocked) {
         Alert.alert(
           'Focus limité',
@@ -587,12 +608,13 @@ export default function FocusScreen() {
         return;
       }
 
-      if (errorMessage.includes('session') || errorMessage.includes('déjà') || errorMessage.includes('en cours')) {
+      // Si c'est une session déjà en cours (sans erreur de limite), continuer localement
+      if (errorMessage.includes('déjà en cours') || (errorMessage.includes('session') && errorMessage.includes('déjà'))) {
         console.log('⚠️ [Focus] Session déjà en cours côté serveur, continuation locale');
         startLocally();
       } else {
         console.error('❌ [Focus] Erreur lors du démarrage de la session:', error);
-        // Continuer quand même en mode local
+        // Continuer quand même en mode local pour les autres erreurs
         startLocally();
       }
     }
