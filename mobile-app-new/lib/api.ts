@@ -638,6 +638,14 @@ export const subjectsService = {
     try {
       const result = await apiCall('/subjects');
       console.log('✅ [subjectsService] Matières récupérées:', result);
+      // L'API retourne { subjects: [...] }, retourner directement le tableau pour compatibilité
+      if (result && typeof result === 'object' && 'subjects' in result) {
+        return result.subjects;
+      }
+      // Si c'est déjà un tableau, le retourner tel quel
+      if (Array.isArray(result)) {
+        return result;
+      }
       return result;
     } catch (error) {
       console.error('❌ [subjectsService] Erreur lors de la récupération:', error);

@@ -1,7 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-
-const PREMIUM_KEY = 'premium_status';
-const SELECTED_PLAN_KEY = 'selected_plan';
+import { authService } from '@/lib/api';
 
 export interface PremiumStatus {
   isPremium: boolean;
@@ -10,13 +7,27 @@ export interface PremiumStatus {
 
 export async function checkPremiumStatus(): Promise<PremiumStatus> {
   try {
-    const plan = await AsyncStorage.getItem(SELECTED_PLAN_KEY);
-    const isPremium = plan === 'annual' || plan === 'monthly';
+    // Récupérer le statut depuis l'API (source de vérité)
+    const user = await authService.checkAuth();
     
-    return {
-      isPremium,
-      plan: (plan as 'annual' | 'monthly' | 'free') || 'free',
-    };
+    if (user) {
+      return {
+        isPremium: user.isPremium || false,
+        plan: user.plan === 'premium' ? 'annual' : 'free', // Simplification, on pourrait récupérer le type exact
+      };
+    }
+    
+    // Fallback : essayer avec trial-status
+    try {
+      const trialStatus = await authService.getTrialStatus();
+      return {
+        isPremium: trialStatus.isPremium || false,
+        plan: trialStatus.plan === 'premium' ? 'annual' : 'free',
+      };
+    } catch (error) {
+      console.error('Error checking premium status via trial-status:', error);
+      return { isPremium: false, plan: 'free' };
+    }
   } catch (error) {
     console.error('Error checking premium status:', error);
     return { isPremium: false, plan: 'free' };

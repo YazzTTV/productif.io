@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Modal } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Modal, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
@@ -7,6 +7,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { checkPremiumStatus } from '@/utils/premium';
 import { Paywall } from '@/components/paywall/Paywall';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { saveExamSession } from '@/utils/examSession';
+import { selectExamTasks } from '@/utils/taskSelection';
 
 export default function ExamPreviewScreen() {
   const { t } = useLanguage();
@@ -28,10 +30,55 @@ export default function ExamPreviewScreen() {
     setShowPaywall(true);
   };
 
-  const handleStartDemo = () => {
-    // Demo mode - show limited functionality
-    // For now, just show paywall
-    setShowPaywall(true);
+  const handleStartDemo = async () => {
+    try {
+      // Charger les vraies tâches de l'utilisateur
+      const { primary, next } = await selectExamTasks();
+      
+      // Créer une liste de toutes les tâches (primary + next)
+      const allTasks = [primary, ...next].filter(Boolean);
+      
+      if (allTasks.length === 0) {
+        // Si pas de tâches, afficher un message et proposer le paywall
+        Alert.alert(
+          t('noTasks') || 'Aucune tâche',
+          t('noTasksForDemo') || 'Vous n\'avez pas de tâches à faire. Créez des tâches ou passez en Premium pour accéder à Exam Mode.',
+          [
+            { text: t('cancel') || 'Annuler', style: 'cancel' },
+            { text: t('unlockExamMode') || 'Débloquer Exam Mode', onPress: () => setShowPaywall(true) }
+          ]
+        );
+        return;
+      }
+      
+      // Créer une session de démo de 5 minutes avec les vraies tâches
+      const demoSessionId = `exam_demo_${Date.now()}`;
+      const taskIds = allTasks.map(task => task.id);
+      
+      await saveExamSession({
+        sessionId: demoSessionId,
+        startedAt: Date.now(),
+        plannedDuration: 5, // 5 minutes pour la démo
+        hardMode: false, // Mode démo plus souple
+        breaks: false,
+        currentTaskIndex: 0,
+        plannedTaskIds: taskIds, // Utiliser les vraies tâches
+        completedTaskIds: [],
+      });
+
+      // Rediriger vers la page de session avec le paramètre demo
+      router.push({
+        pathname: '/exam/session',
+        params: { 
+          sessionId: demoSessionId,
+          demo: 'true' // Marquer comme démo
+        },
+      });
+    } catch (error) {
+      console.error('Error starting demo:', error);
+      // En cas d'erreur, afficher le paywall
+      setShowPaywall(true);
+    }
   };
 
   const handlePaywallClose = () => {
