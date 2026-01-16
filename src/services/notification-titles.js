@@ -11,11 +11,17 @@ export const getNotificationTitle = (type) => {
         'TASK_DUE': '⏰ Échéance importante',
         'HABIT_REMINDER': '🎯 Rappel d\'habitude',
         'DAILY_SUMMARY': '📊 Résumé quotidien',
-        'IMPROVEMENT_REMINDER': '🛠️ Amélioration du jour',
-        'RECAP_ANALYSIS': '📊 Récap de ta journée',
-        'MOOD_CHECK': '🙂 Humeur du moment',
-        'STRESS_CHECK': '😌 Stress du moment',
-        'FOCUS_CHECK': '🎯 Focus du moment'
+    'IMPROVEMENT_REMINDER': '🛠️ Amélioration du jour',
+    'RECAP_ANALYSIS': '📊 Récap de ta journée',
+    'MORNING_ANCHOR': '🌅 Ta journée est prête',
+    'FOCUS_WINDOW': '🎯 Tu as du temps pour te concentrer',
+    'FOCUS_END': '⏱️ Session terminée',
+    'LUNCH_BREAK': '🍽️ Temps de faire une pause',
+    'POST_LUNCH_RESTART': '🔁 Prêt à reprendre ?',
+    'STRESS_CHECK_PREMIUM': '🧠 Check-in stress',
+    'MOOD_CHECK_PREMIUM': '🙂 Check-in humeur',
+    'FOCUS_CHECK_PREMIUM': '🎯 Check-in focus',
+    'EVENING_PLAN': '🌙 Planifie demain'
     };
     return titles[type] || type;
 };

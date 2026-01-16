@@ -269,6 +269,9 @@ class NotificationScheduler {
             // Planifier le nettoyage des anciennes notifications
             this.scheduleCleanup();
 
+            // Scanner les fenêtres de focus libres en journée
+            this.scheduleFocusWindowScan();
+
             this.isStarted = true;
             
             // Démarrer le système réactif après la configuration de base
@@ -319,82 +322,135 @@ class NotificationScheduler {
             
             // Notification du matin
             if (settings.morningReminder && this.isValidSchedulingTime(morningTime, currentTime)) {
-                timesToSchedule.push({time: morningTime, type: 'matin', callback: async (date) => await this.notificationService.scheduleMorningNotification(userId, date)});
+                timesToSchedule.push({
+                    time: morningTime,
+                    type: 'matin',
+                    label: 'morning',
+                    callback: async (date) => {
+                        await this.notificationService.scheduleMorningAnchor(userId, date);
+                        await this.notificationService.scheduleMorningNotification(userId, date);
+                    }
+                });
             }
 
             // Notification du midi
             if (settings.noonReminder && this.isValidSchedulingTime(noonTime, currentTime)) {
-                timesToSchedule.push({time: noonTime, type: 'midi', callback: async (date) => await this.notificationService.scheduleNoonNotification(userId, date)});
+                timesToSchedule.push({
+                    time: noonTime,
+                    type: 'midi',
+                    label: 'noon',
+                    callback: async (date) => {
+                        await this.notificationService.scheduleNoonNotification(userId, date);
+                        await this.notificationService.scheduleLunchBreak(userId, date);
+                    }
+                });
             }
 
             // Notification de l'après-midi
             if (settings.afternoonReminder && this.isValidSchedulingTime(afternoonTime, currentTime)) {
-                timesToSchedule.push({time: afternoonTime, type: 'après-midi', callback: async (date) => await this.notificationService.scheduleAfternoonNotification(userId, date)});
+                timesToSchedule.push({
+                    time: afternoonTime,
+                    type: 'après-midi',
+                    label: 'afternoon',
+                    callback: async (date) => await this.notificationService.scheduleAfternoonNotification(userId, date)
+                });
             }
 
             // Notification du soir
             if (settings.eveningReminder && this.isValidSchedulingTime(eveningTime, currentTime)) {
-                timesToSchedule.push({time: eveningTime, type: 'soir', callback: async (date) => await this.notificationService.scheduleEveningNotification(userId, date)});
+                timesToSchedule.push({
+                    time: eveningTime,
+                    type: 'soir',
+                    label: 'evening',
+                    callback: async (date) => {
+                        await this.notificationService.scheduleEveningNotification(userId, date);
+                        await this.notificationService.scheduleEveningPlan(userId, date);
+                    }
+                });
             }
 
             // Notification de nuit
             if (settings.nightReminder && this.isValidSchedulingTime(nightTime, currentTime)) {
-                timesToSchedule.push({time: nightTime, type: 'nuit', callback: async (date) => await this.notificationService.scheduleNightNotification(userId, date)});
+                timesToSchedule.push({
+                    time: nightTime,
+                    type: 'nuit',
+                    label: 'night',
+                    callback: async (date) => await this.notificationService.scheduleNightNotification(userId, date)
+                });
             }
 
             // Notification amélioration
             if (settings.improvementReminder && this.isValidSchedulingTime(improvementTime, currentTime)) {
-                timesToSchedule.push({time: improvementTime, type: 'amelioration', callback: async (date) => await this.notificationService.scheduleImprovementNotification(userId, date)});
+                timesToSchedule.push({
+                    time: improvementTime,
+                    type: 'amelioration',
+                    label: 'improvement',
+                    callback: async (date) => await this.notificationService.scheduleImprovementNotification(userId, date)
+                });
             }
 
             // Notification récap analyse
             if (settings.recapReminder && this.isValidSchedulingTime(recapTime, currentTime)) {
-                timesToSchedule.push({time: recapTime, type: 'recap', callback: async (date) => await this.notificationService.scheduleRecapNotification(userId, date)});
+                timesToSchedule.push({
+                    time: recapTime,
+                    type: 'recap',
+                    label: 'recap',
+                    callback: async (date) => await this.notificationService.scheduleRecapNotification(userId, date)
+                });
+            }
+
+            // Check-ins Premium (timing aléatoire dans les fenêtres configurées)
+            const premiumCheckConfigs = [
+                {
+                    enabled: settings.stressEnabled,
+                    windows: settings.stressWindows || [],
+                    count: settings.stressDailyCount || 1,
+                    label: 'stress-premium',
+                    callback: async (date) => await this.notificationService.scheduleStressCheckPremium(userId, date)
+                },
+                {
+                    enabled: settings.moodEnabled,
+                    windows: settings.moodWindows || [],
+                    count: settings.moodDailyCount || 1,
+                    label: 'mood-premium',
+                    callback: async (date) => await this.notificationService.scheduleMoodCheckPremium(userId, date)
+                },
+                {
+                    enabled: settings.focusEnabled,
+                    windows: settings.focusWindows || [],
+                    count: settings.focusDailyCount || 1,
+                    label: 'focus-premium',
+                    callback: async (date) => await this.notificationService.scheduleFocusCheckPremium(userId, date)
+                }
+            ];
+
+            for (const config of premiumCheckConfigs) {
+                if (!config.enabled || config.count <= 0 || !config.windows?.length) continue;
+                const randomTimes = this.generateRandomTimesFromWindows(config.windows, config.count);
+                for (const time of randomTimes) {
+                    if (this.isValidSchedulingTime(time, currentTime)) {
+                        timesToSchedule.push({
+                            time: time,
+                            type: config.label,
+                            label: config.label,
+                            callback: config.callback
+                        });
+                    }
+                }
             }
 
             // Planifier seulement les horaires valides et uniques
             const uniqueTimesToSchedule = timesToSchedule.filter((item, index, self) => 
-                index === self.findIndex(t => t.time === item.time)
+                index === self.findIndex(t => t.time === item.time && t.label === item.label)
             );
 
             console.log(`   📅 ${uniqueTimesToSchedule.length} horaires uniques seront planifiés`);
 
             for (const item of uniqueTimesToSchedule) {
-                this.scheduleDailyNotification(userId, item.time, item.callback, settings.timezone);
+                this.scheduleDailyNotification(userId, item.time, item.callback, settings.timezone, item.label || item.type);
             }
 
-            // Notifications aléatoires (humeur/stress/focus)
-            const randomConfigs = [
-                {
-                    enabled: settings.moodEnabled,
-                    windows: settings.moodWindows || [],
-                    count: settings.moodDailyCount || 0,
-                    label: 'humeur',
-                    callback: async (date) => await this.notificationService.scheduleMoodCheckNotification(userId, date),
-                },
-                {
-                    enabled: settings.stressEnabled,
-                    windows: settings.stressWindows || [],
-                    count: settings.stressDailyCount || 0,
-                    label: 'stress',
-                    callback: async (date) => await this.notificationService.scheduleStressCheckNotification(userId, date),
-                },
-                {
-                    enabled: settings.focusEnabled,
-                    windows: settings.focusWindows || [],
-                    count: settings.focusDailyCount || 0,
-                    label: 'focus',
-                    callback: async (date) => await this.notificationService.scheduleFocusCheckNotification(userId, date),
-                },
-            ];
-
-            for (const config of randomConfigs) {
-                if (!config.enabled || config.count <= 0 || !config.windows?.length) continue;
-                const randomTimes = this.generateRandomTimesFromWindows(config.windows, config.count);
-                for (const time of randomTimes) {
-                    this.scheduleDailyNotification(userId, time, config.callback, settings.timezone);
-                }
-            }
+            // Les check-ins basiques ont été supprimés, seuls les Premium existent maintenant
 
             console.log(`   ✅ Toutes les notifications planifiées pour l'utilisateur ${userId}`);
         }
@@ -414,9 +470,9 @@ class NotificationScheduler {
         return true;
     }
 
-    scheduleDailyNotification(userId, time, callback, timezone = 'UTC') {
+    scheduleDailyNotification(userId, time, callback, timezone = 'UTC', label = '') {
         const scheduleId = `SCHEDULE_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        const jobId = `${userId}-${time}`;
+        const jobId = `${userId}-${time}${label ? `-${label}` : ''}`;
         
         console.log(`\n🚨🚨🚨 SCHEDULE_TASK_${scheduleId}: CRÉATION DE TÂCHE DÉTECTÉE 🚨🚨🚨`);
         console.log(`⏰ Timestamp précis: ${new Date().toISOString()}`);
@@ -505,6 +561,51 @@ class NotificationScheduler {
         });
         this.jobs.set('processNotifications', job);
         console.log('🔄 Tâche de traitement des notifications planifiée (toutes les minutes)');
+    }
+
+    scheduleFocusWindowScan() {
+        const job = cron.schedule('*/10 9-18 * * *', async () => {
+            const scanStart = new Date();
+            console.log(`\n🔎 [FOCUS_WINDOW_SCAN] Début du scan - ${scanStart.toISOString()}`);
+            try {
+                const users = await this.prisma.user.findMany({
+                    where: {
+                        notificationSettings: {
+                            is: {
+                                isEnabled: true,
+                                pushEnabled: true
+                            }
+                        }
+                    },
+                    select: { id: true }
+                });
+                console.log(`🔎 [FOCUS_WINDOW_SCAN] ${users.length} utilisateur(s) éligible(s) trouvé(s)`);
+                
+                let processed = 0;
+                let notificationsCreated = 0;
+                let skipped = 0;
+                
+                for (const user of users) {
+                    const result = await this.notificationService.scheduleFocusWindow(user.id);
+                    processed++;
+                    if (result?.created) {
+                        notificationsCreated++;
+                    } else if (result?.skipped) {
+                        skipped++;
+                    }
+                }
+                
+                const scanDuration = Date.now() - scanStart.getTime();
+                console.log(`🔎 [FOCUS_WINDOW_SCAN] Scan terminé en ${scanDuration}ms`);
+                console.log(`   ✅ Traités: ${processed} | 📨 Notifications créées: ${notificationsCreated} | ⏭️  Ignorés: ${skipped}`);
+            } catch (error) {
+                const scanDuration = Date.now() - scanStart.getTime();
+                console.error(`🔎 [FOCUS_WINDOW_SCAN] ❌ Erreur après ${scanDuration}ms:`, error.message);
+                NotificationLogger.logError('Scan Focus Window', error);
+            }
+        });
+        this.jobs.set('focusWindowScan', job);
+        console.log('🔎 Tâche de détection des fenêtres de focus planifiée (toutes les 10 min entre 9h et 18h)');
     }
 
     async processNotifications() {

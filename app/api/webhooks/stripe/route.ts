@@ -38,11 +38,13 @@ export async function POST(req: NextRequest) {
             );
 
             // Convertir le trial en subscription
+            // Le tier doit être 'pro', 'premium', etc., pas 'yearly'/'monthly'
+            // billingType est juste pour savoir si c'est mensuel ou annuel, mais le tier reste 'pro'
             await TrialService.convertTrialToSubscription(
               userId,
               session.customer as string,
               subscription.id,
-              billingType === 'yearly' ? 'yearly' : 'monthly'
+              'pro' // Tier par défaut pour toutes les subscriptions
             );
 
             console.log(`✅ Subscription activée pour user ${userId}`);
