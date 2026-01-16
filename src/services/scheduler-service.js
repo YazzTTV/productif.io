@@ -218,9 +218,15 @@ async function startSchedulerService() {
         // 3. Démarrer le serveur pour le healthcheck AVANT le scheduler
         // Railway fournit PORT; local on peut utiliser SCHEDULER_PORT ou 3002
         const port = Number(process.env.PORT || process.env.SCHEDULER_PORT) || 3002;
-        app.listen(port, '0.0.0.0', () => {
-            console.log(`🌐 Serveur de monitoring démarré sur le port ${port}`);
-            console.log(`📊 Status disponible sur http://0.0.0.0:${port}/status`);
+        
+        // Attendre que le serveur soit prêt avant de continuer
+        await new Promise((resolve) => {
+            app.listen(port, '0.0.0.0', () => {
+                console.log(`🌐 Serveur de monitoring démarré sur le port ${port}`);
+                console.log(`📊 Status disponible sur http://0.0.0.0:${port}/status`);
+                console.log(`❤️ Healthcheck disponible sur http://0.0.0.0:${port}/health`);
+                resolve();
+            });
         });
 
         // 2. Attendre que la base de données soit prête (migrations terminées)
