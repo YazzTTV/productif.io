@@ -55,12 +55,17 @@ export async function POST(req: Request) {
         const subscription = event.data.object as any;
         const userId = subscription.metadata.userId;
 
+        // Mettre à jour le statut et le tier (premium si subscription active)
+        const isActive = subscription.status === 'active' || subscription.status === 'trialing';
+        
         await prisma.user.update({
           where: { id: userId },
           data: {
             stripeSubscriptionId: subscription.id,
             subscriptionStatus: subscription.status,
+            subscriptionTier: isActive ? 'pro' : null, // Mettre 'pro' si active, sinon null (freemium)
             trialEndsAt: subscription.trial_end ? new Date(subscription.trial_end * 1000) : null,
+            subscriptionEndDate: subscription.current_period_end ? new Date(subscription.current_period_end * 1000) : null,
           },
         });
         break;
@@ -70,11 +75,15 @@ export async function POST(req: Request) {
         const subscription = event.data.object as any;
         const userId = subscription.metadata.userId;
 
+        // Remettre en freemium quand la subscription est supprimée
         await prisma.user.update({
           where: { id: userId },
           data: {
-            subscriptionStatus: 'canceled',
+            subscriptionStatus: 'free',
+            subscriptionTier: 'free',
+            stripeSubscriptionId: null,
             trialEndsAt: null,
+            subscriptionEndDate: null,
           },
         });
         break;

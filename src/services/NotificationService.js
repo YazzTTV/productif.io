@@ -93,31 +93,35 @@ class NotificationService {
             // Vérifier les canaux de notification disponibles
             const settings = notification.user.notificationSettings;
             const userPhoneNumber = notification.user.whatsappNumber || settings?.whatsappNumber;
+            const canSendWhatsapp = settings?.whatsappEnabled && !!userPhoneNumber;
+            const canSendPush = !!settings?.pushEnabled;
 
-            if (!settings?.whatsappEnabled || !userPhoneNumber) {
-                NotificationLogger.logError('Configuration WhatsApp', new Error('WhatsApp non configuré pour l\'utilisateur'));
+            if (!canSendWhatsapp && !canSendPush) {
+                NotificationLogger.logError('Configuration notification', new Error('Aucun canal disponible pour l\'utilisateur'));
                 await this.prisma.notificationHistory.update({
                     where: { id: notification.id },
                     data: {
                         status: 'failed',
-                        error: 'WhatsApp non configuré'
+                        error: 'Aucun canal disponible'
                     }
                 });
                 return;
             }
             
-            // Système de templates désactivé - tous les messages sont envoyés en texte normal
-            console.log(`🔵 [${processingId}] Envoi WhatsApp pour notification ${notification.id} (type: ${notification.type}, mode: texte normal)`);
-            
-            // Formater le message avec titre
-            const messageContent = this.formatWhatsAppMessage(notification);
-            
-            // Envoyer sans template
-            await this.whatsappService.sendMessage(userPhoneNumber, messageContent, notification.id, null);
-            console.log(`🔵 [${processingId}] WhatsApp envoyé avec succès pour notification ${notification.id}`);
+            if (canSendWhatsapp) {
+                // Système de templates désactivé - tous les messages sont envoyés en texte normal
+                console.log(`🔵 [${processingId}] Envoi WhatsApp pour notification ${notification.id} (type: ${notification.type}, mode: texte normal)`);
+                
+                // Formater le message avec titre
+                const messageContent = this.formatWhatsAppMessage(notification);
+                
+                // Envoyer sans template
+                await this.whatsappService.sendMessage(userPhoneNumber, messageContent, notification.id, null);
+                console.log(`🔵 [${processingId}] WhatsApp envoyé avec succès pour notification ${notification.id}`);
+            }
             
             // Envoyer aussi une notification push si activée
-            if (settings?.pushEnabled) {
+            if (canSendPush) {
                 try {
                     const { sendPushNotification } = await import('../../lib/apns.js');
                     // Utiliser les titres/corps courts si disponibles pour le push,
@@ -129,14 +133,14 @@ class NotificationService {
                     let action = 'open_assistant';
                     let checkInType = null;
                     
-                    // Pour les notifications mood/stress/focus, rediriger vers Analytics
-                    if (notification.type === 'MOOD_CHECK') {
+                    // Pour les notifications mood/stress/focus premium, rediriger vers Analytics
+                    if (notification.type === 'MOOD_CHECK_PREMIUM') {
                         action = 'open_analytics';
                         checkInType = 'mood';
-                    } else if (notification.type === 'STRESS_CHECK') {
+                    } else if (notification.type === 'STRESS_CHECK_PREMIUM') {
                         action = 'open_analytics';
                         checkInType = 'stress';
-                    } else if (notification.type === 'FOCUS_CHECK') {
+                    } else if (notification.type === 'FOCUS_CHECK_PREMIUM') {
                         action = 'open_analytics';
                         checkInType = 'focus';
                     }
@@ -251,6 +255,97 @@ class NotificationService {
         
         message += '\n\n_Envoyé via Productif.io_';
         return message;
+    }
+    getDayRange(date = new Date()) {
+        const start = new Date(date);
+        start.setHours(0, 0, 0, 0);
+        const end = new Date(start);
+        end.setHours(23, 59, 59, 999);
+        return { start, end };
+    }
+    async hasNotificationToday(userId, type) {
+        const { start, end } = this.getDayRange(new Date());
+        const count = await this.prisma.notificationHistory.count({
+            where: {
+                userId,
+                type,
+                scheduledFor: {
+                    gte: start,
+                    lte: end
+                }
+            }
+        });
+        return count > 0;
+    }
+    async getTasksBetween(userId, start, end) {
+        return this.prisma.task.findMany({
+            where: {
+                userId,
+                completed: false,
+                OR: [
+                    { scheduledFor: { gte: start, lte: end } },
+                    { dueDate: { gte: start, lte: end } }
+                ]
+            },
+            orderBy: [
+                { priority: 'desc' },
+                { dueDate: 'asc' }
+            ],
+            take: 5
+        });
+    }
+    async getRecentActivityMinutes(userId, since) {
+        const entries = await this.prisma.timeEntry.findMany({
+            where: {
+                userId,
+                startTime: { gte: since }
+            },
+            select: { startTime: true, endTime: true }
+        });
+        let minutes = 0;
+        for (const entry of entries) {
+            const end = entry.endTime || new Date();
+            minutes += Math.max(0, Math.floor((end.getTime() - entry.startTime.getTime()) / 60000));
+        }
+        return minutes;
+    }
+    async getBusyPeriods(userId, start, end) {
+        const events = await this.prisma.scheduledTaskEvent.findMany({
+            where: {
+                userId,
+                startTime: { lte: end },
+                endTime: { gte: start }
+            },
+            select: { startTime: true, endTime: true }
+        });
+        const periods = events.map(e => ({ start: e.startTime, end: e.endTime }));
+        return periods.sort((a, b) => a.start.getTime() - b.start.getTime());
+    }
+    findFirstFreeBlock(busyPeriods, windowStart, windowEnd, minMinutes) {
+        let cursor = new Date(windowStart);
+        const sorted = [...busyPeriods].sort((a, b) => a.start.getTime() - b.start.getTime());
+        for (const busy of sorted) {
+            if (busy.end <= cursor) {
+                continue;
+            }
+            if (busy.start > cursor) {
+                const diff = (busy.start.getTime() - cursor.getTime()) / 60000;
+                if (diff >= minMinutes) {
+                    return { start: new Date(cursor), end: new Date(busy.start), durationMinutes: Math.floor(diff) };
+                }
+            }
+            if (busy.end > cursor) {
+                cursor = new Date(Math.min(busy.end.getTime(), windowEnd.getTime()));
+            }
+            if (cursor >= windowEnd) break;
+        }
+        if (cursor < windowEnd) {
+            const diff = (windowEnd.getTime() - cursor.getTime()) / 60000;
+            if (diff >= minMinutes) {
+                return { start: new Date(cursor), end: new Date(windowEnd), durationMinutes: Math.floor(diff) };
+            }
+        }
+        return null;
     }
     async createNotification(userId, type, content, scheduledFor, options = {}) {
         const { pushTitle = null, pushBody = null, assistantMessage = null } = options || {};
@@ -574,78 +669,321 @@ class NotificationService {
         }
     }
 
-    async scheduleMoodCheckNotification(userId, date) {
+    // Les fonctions basiques (MOOD_CHECK, STRESS_CHECK, FOCUS_CHECK) ont été supprimées
+    // Seules les versions Premium existent maintenant
+
+    async scheduleMorningAnchor(userId, date) {
         try {
-            // Message complet utilisé pour WhatsApp + assistant IA
-            const content = "🙂 Comment te sens-tu maintenant ?\n\nRéponds en notant ton humeur sur 1-10 et ajoute un mot-clé (ex: \"8, serein\").";
+            const user = await this.prisma.user.findUnique({
+                where: { id: userId },
+                include: { notificationSettings: true }
+            });
+            if (!user?.notificationSettings?.isEnabled) return;
+            if (!this.canSendNotification(user.notificationSettings, date)) return;
 
-            // Version courte pour la push
-            const shortTitle = '🙂 Humeur du moment';
-            const shortBody = 'Note ton humeur sur 10';
+            const { start, end } = this.getDayRange(date);
+            const tasks = await this.getTasksBetween(userId, start, end);
+            const busy = await this.getBusyPeriods(userId, start, end);
+            const activeMinutes = await this.getRecentActivityMinutes(userId, new Date(date.getTime() - 3 * 24 * 60 * 60 * 1000));
 
-            await this.createNotification(
-              userId,
-              'MOOD_CHECK',
-              content,
-              date,
-              {
-                pushTitle: shortTitle,
-                pushBody: shortBody,
-                assistantMessage: content,
-              }
-            );
+            if (tasks.length === 0 && busy.length === 0) return;
+            if (activeMinutes < 30) return;
+
+            const topTasks = tasks.slice(0, 3).map(t => `• ${t.title}`).join('\n');
+            const agendaLine = busy.length > 0 ? 'Cours/événements trouvés dans ton calendrier.' : '';
+            const contentParts = [
+                "Ta journée est prête.",
+                agendaLine,
+                tasks.length ? "Plan du jour :" : '',
+                topTasks,
+                "Commence par le premier bloc."
+            ].filter(Boolean);
+            const content = contentParts.join('\n\n');
+
+            await this.createNotification(userId, 'MORNING_ANCHOR', content, date, {
+                pushTitle: '🌅 Ta journée est prête',
+                pushBody: 'Ta journée est planifiée. Commence par le premier bloc.',
+                assistantMessage: content
+            });
         } catch (error) {
-            NotificationLogger.logError('Planification de la question humeur', error);
+            NotificationLogger.logError('Planification Morning Anchor', error);
         }
     }
 
-    async scheduleStressCheckNotification(userId, date) {
+    async scheduleFocusWindow(userId) {
         try {
-            // Message complet utilisé pour WhatsApp + assistant IA
-            const content = "😌 Ton niveau de stress sur 1-10 ?\n\nQu'est-ce qui aide le plus à réduire la pression ? (respiration, pause, priorisation, déconnexion).";
+            const now = new Date();
+            console.log(`\n🎯 [FOCUS_WINDOW] Analyse pour user ${userId} à ${now.toISOString()}`);
+            
+            const user = await this.prisma.user.findUnique({
+                where: { id: userId },
+                include: { notificationSettings: true }
+            });
+            
+            if (!user?.notificationSettings?.isEnabled) {
+                console.log(`   ⏭️  [FOCUS_WINDOW] Ignoré: notifications désactivées`);
+                return { skipped: true, reason: 'notifications_disabled' };
+            }
+            
+            if (!this.canSendNotification(user.notificationSettings, now)) {
+                console.log(`   ⏭️  [FOCUS_WINDOW] Ignoré: hors des horaires autorisés`);
+                return { skipped: true, reason: 'outside_allowed_hours' };
+            }
 
-            // Version courte pour la push
-            const shortTitle = '😌 Stress du moment';
-            const shortBody = 'Note ton niveau de stress sur 10';
+            const activeSession = await this.prisma.deepWorkSession.findFirst({
+                where: { userId, status: 'active' }
+            });
+            if (activeSession) {
+                console.log(`   ⏭️  [FOCUS_WINDOW] Ignoré: session deep work active (${activeSession.id})`);
+                return { skipped: true, reason: 'active_deep_work_session' };
+            }
+            
+            if (await this.hasNotificationToday(userId, 'FOCUS_WINDOW')) {
+                console.log(`   ⏭️  [FOCUS_WINDOW] Ignoré: notification déjà envoyée aujourd'hui`);
+                return { skipped: true, reason: 'already_sent_today' };
+            }
 
-            await this.createNotification(
-              userId,
-              'STRESS_CHECK',
-              content,
-              date,
-              {
-                pushTitle: shortTitle,
-                pushBody: shortBody,
-                assistantMessage: content,
-              }
-            );
+            const { start, end } = this.getDayRange(now);
+            const tasks = await this.getTasksBetween(userId, start, end);
+            console.log(`   📋 [FOCUS_WINDOW] Tâches trouvées: ${tasks.length}`);
+            if (!tasks.length) {
+                console.log(`   ⏭️  [FOCUS_WINDOW] Ignoré: aucune tâche planifiée`);
+                return { skipped: true, reason: 'no_tasks' };
+            }
+
+            const busy = await this.getBusyPeriods(userId, start, end);
+            console.log(`   📅 [FOCUS_WINDOW] Périodes occupées: ${busy.length}`);
+            
+            const windowStart = new Date(now);
+            const windowEnd = new Date(now.getTime() + 3 * 60 * 60 * 1000);
+            console.log(`   🔍 [FOCUS_WINDOW] Recherche créneau libre entre ${windowStart.toISOString()} et ${windowEnd.toISOString()} (min 25 min)`);
+            
+            const freeBlock = this.findFirstFreeBlock(busy, windowStart, windowEnd, 25);
+            if (!freeBlock) {
+                console.log(`   ⏭️  [FOCUS_WINDOW] Ignoré: aucun créneau libre ≥25 min trouvé`);
+                if (busy.length > 0) {
+                    console.log(`   📊 [FOCUS_WINDOW] Détail périodes occupées:`);
+                    busy.forEach((period, i) => {
+                        console.log(`      ${i + 1}. ${period.start.toISOString()} → ${period.end.toISOString()}`);
+                    });
+                }
+                return { skipped: true, reason: 'no_free_block' };
+            }
+
+            console.log(`   ✅ [FOCUS_WINDOW] Créneau libre trouvé: ${freeBlock.start.toISOString()} → ${freeBlock.end.toISOString()} (${freeBlock.durationMinutes} min)`);
+
+            const content = "Tu as un créneau libre. Moment parfait pour te concentrer sur une tâche planifiée.";
+            const notification = await this.createNotification(userId, 'FOCUS_WINDOW', content, now, {
+                pushTitle: '🎯 Tu as du temps pour te concentrer',
+                pushBody: 'Créneau libre détecté. Moment parfait pour te concentrer.',
+                assistantMessage: content
+            });
+            
+            console.log(`   📨 [FOCUS_WINDOW] ✅ Notification créée: ${notification?.id || 'N/A'}`);
+            return { created: true, notification, freeBlock };
+            
         } catch (error) {
-            NotificationLogger.logError('Planification de la question stress', error);
+            console.error(`   ❌ [FOCUS_WINDOW] Erreur pour user ${userId}:`, error.message);
+            NotificationLogger.logError('Planification Focus Window', error);
+            return { error: error.message };
         }
     }
 
-    async scheduleFocusCheckNotification(userId, date) {
+    async scheduleLunchBreak(userId, date) {
         try {
-            // Message complet utilisé pour WhatsApp + assistant IA
+            const user = await this.prisma.user.findUnique({
+                where: { id: userId },
+                include: { notificationSettings: true }
+            });
+            if (!user?.notificationSettings?.isEnabled) return;
+            if (!this.canSendNotification(user.notificationSettings, date)) return;
+
+            const { start } = this.getDayRange(date);
+            const activityMinutes = await this.getRecentActivityMinutes(userId, start);
+            const busyMorning = await this.getBusyPeriods(userId, start, date);
+            const tasks = await this.getTasksBetween(userId, start, date);
+            const hasWorked = activityMinutes >= 25 || busyMorning.length >= 1;
+            const denseMorning = busyMorning.length >= 2 || tasks.length >= 3 || activityMinutes >= 60;
+            if (!hasWorked || !denseMorning) return;
+
+            const content = "Prends une pause. La récupération fait partie de la performance.";
+            await this.createNotification(userId, 'LUNCH_BREAK', content, date, {
+                pushTitle: '🍽️ Temps de faire une pause',
+                pushBody: 'Prends une pause. La récupération fait partie de la performance.',
+                assistantMessage: content
+            });
+
+            await this.schedulePostLunchRestart(userId, date);
+        } catch (error) {
+            NotificationLogger.logError('Planification Lunch Break', error);
+        }
+    }
+
+    async schedulePostLunchRestart(userId, lunchDate) {
+        try {
+            const delayMinutes = 30 + Math.floor(Math.random() * 61); // 30-90
+            const scheduledFor = new Date(lunchDate.getTime() + delayMinutes * 60000);
+            const user = await this.prisma.user.findUnique({
+                where: { id: userId },
+                include: { notificationSettings: true }
+            });
+            if (!user?.notificationSettings?.isEnabled) return;
+            if (!this.canSendNotification(user.notificationSettings, scheduledFor)) return;
+
+            const { end } = this.getDayRange(lunchDate);
+            const tasks = await this.getTasksBetween(userId, lunchDate, end);
+            if (!tasks.length) return;
+
+            const busy = await this.getBusyPeriods(userId, lunchDate, end);
+            const freeBlock = this.findFirstFreeBlock(busy, scheduledFor, new Date(scheduledFor.getTime() + 2 * 60 * 60 * 1000), 20);
+            if (!freeBlock) return;
+
+            const content = "Un peu de concentration maintenant vaut mieux qu'un stress intense plus tard.";
+            await this.createNotification(userId, 'POST_LUNCH_RESTART', content, scheduledFor, {
+                pushTitle: '🔁 Prêt à reprendre ?',
+                pushBody: 'Un peu de concentration maintenant vaut mieux qu\'un stress intense plus tard.',
+                assistantMessage: content
+            });
+        } catch (error) {
+            NotificationLogger.logError('Planification Post Lunch Restart', error);
+        }
+    }
+
+    async scheduleStressCheckPremium(userId, date) {
+        try {
+            const user = await this.prisma.user.findUnique({
+                where: { id: userId },
+                include: { notificationSettings: true }
+            });
+            if (!user?.notificationSettings?.isEnabled) return;
+            if (!this.canSendNotification(user.notificationSettings, date)) return;
+
+            const premium = (user.subscriptionStatus && ['active', 'trialing', 'paid'].includes(user.subscriptionStatus)) ||
+                (user.subscriptionTier && ['pro', 'premium', 'starter', 'enterprise', 'paid'].includes(user.subscriptionTier?.toLowerCase())) ||
+                !!user.stripeSubscriptionId;
+            if (!premium) return;
+
+            const { start } = this.getDayRange(date);
+            const alreadyChecked = await this.prisma.behaviorCheckIn.count({
+                where: {
+                    userId,
+                    type: 'stress',
+                    timestamp: { gte: start }
+                }
+            });
+            if (alreadyChecked > 0) return;
+
+            const activityMinutes = await this.getRecentActivityMinutes(userId, start);
+            const busy = await this.getBusyPeriods(userId, start, date);
+            const denseDay = activityMinutes >= 60 || busy.length >= 3;
+            if (!denseDay) return;
+
+            const content = "Check-in rapide. À quel point te sens-tu stressé(e) en ce moment ?";
+            await this.createNotification(userId, 'STRESS_CHECK_PREMIUM', content, date, {
+                pushTitle: '🧠 Check-in stress',
+                pushBody: 'Check-in rapide. À quel point te sens-tu stressé(e) en ce moment ?',
+                assistantMessage: content
+            });
+        } catch (error) {
+            NotificationLogger.logError('Planification Stress Check Premium', error);
+        }
+    }
+
+    async scheduleMoodCheckPremium(userId, date) {
+        try {
+            const user = await this.prisma.user.findUnique({
+                where: { id: userId },
+                include: { notificationSettings: true }
+            });
+            if (!user?.notificationSettings?.isEnabled) return;
+            if (!this.canSendNotification(user.notificationSettings, date)) return;
+
+            const premium = (user.subscriptionStatus && ['active', 'trialing', 'paid'].includes(user.subscriptionStatus)) ||
+                (user.subscriptionTier && ['pro', 'premium', 'starter', 'enterprise', 'paid'].includes(user.subscriptionTier?.toLowerCase())) ||
+                !!user.stripeSubscriptionId;
+            if (!premium) return;
+
+            const { start } = this.getDayRange(date);
+            const alreadyChecked = await this.prisma.behaviorCheckIn.count({
+                where: {
+                    userId,
+                    type: 'mood',
+                    timestamp: { gte: start }
+                }
+            });
+            if (alreadyChecked > 0) return;
+
+            const content = "Comment s'est passée ta journée dans l'ensemble ?";
+            await this.createNotification(userId, 'MOOD_CHECK_PREMIUM', content, date, {
+                pushTitle: '🙂 Check-in humeur',
+                pushBody: 'Comment s\'est passée ta journée dans l\'ensemble ?',
+                assistantMessage: content
+            });
+        } catch (error) {
+            NotificationLogger.logError('Planification Mood Check Premium', error);
+        }
+    }
+
+    async scheduleFocusCheckPremium(userId, date) {
+        try {
+            const user = await this.prisma.user.findUnique({
+                where: { id: userId },
+                include: { notificationSettings: true }
+            });
+            if (!user?.notificationSettings?.isEnabled) return;
+            if (!this.canSendNotification(user.notificationSettings, date)) return;
+
+            const premium = (user.subscriptionStatus && ['active', 'trialing', 'paid'].includes(user.subscriptionStatus)) ||
+                (user.subscriptionTier && ['pro', 'premium', 'starter', 'enterprise', 'paid'].includes(user.subscriptionTier?.toLowerCase())) ||
+                !!user.stripeSubscriptionId;
+            if (!premium) return;
+
+            const { start } = this.getDayRange(date);
+            const alreadyChecked = await this.prisma.behaviorCheckIn.count({
+                where: {
+                    userId,
+                    type: 'focus',
+                    timestamp: { gte: start }
+                }
+            });
+            if (alreadyChecked > 0) return;
+
             const content = "🎯 Focus actuel sur 1-10 ?\n\nQuelle est la prochaine tâche à faire en 25 minutes ? (une seule, claire).";
-
-            // Version courte pour la push
-            const shortTitle = '🎯 Check Focus';
-            const shortBody = 'Note ton niveau de focus sur 10';
-
-            await this.createNotification(
-              userId,
-              'FOCUS_CHECK',
-              content,
-              date,
-              {
-                pushTitle: shortTitle,
-                pushBody: shortBody,
-                assistantMessage: content,
-              }
-            );
+            await this.createNotification(userId, 'FOCUS_CHECK_PREMIUM', content, date, {
+                pushTitle: '🎯 Check-in focus',
+                pushBody: 'Focus actuel sur 1-10 ? Quelle est la prochaine tâche à faire en 25 minutes ?',
+                assistantMessage: content
+            });
         } catch (error) {
-            NotificationLogger.logError('Planification de la question focus', error);
+            NotificationLogger.logError('Planification Focus Check Premium', error);
+        }
+    }
+
+    async scheduleEveningPlan(userId, date) {
+        try {
+            const user = await this.prisma.user.findUnique({
+                where: { id: userId },
+                include: { notificationSettings: true }
+            });
+            if (!user?.notificationSettings?.isEnabled) return;
+            if (!this.canSendNotification(user.notificationSettings, date)) return;
+
+            const tomorrow = new Date(date);
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            const { start, end } = this.getDayRange(tomorrow);
+            const tasksTomorrow = await this.getTasksBetween(userId, start, end);
+            if (tasksTomorrow.length > 0) {
+                return;
+            }
+
+            const content = "Planifier demain prend 2 minutes. Ton esprit te remerciera.";
+            await this.createNotification(userId, 'EVENING_PLAN', content, date, {
+                pushTitle: '🌙 Planifie demain',
+                pushBody: 'Planifier demain prend 2 minutes.',
+                assistantMessage: content
+            });
+        } catch (error) {
+            NotificationLogger.logError('Planification Evening Plan', error);
         }
     }
 }
