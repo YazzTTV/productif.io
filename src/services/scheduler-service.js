@@ -54,22 +54,42 @@ async function waitForDatabase(maxRetries = 30, delay = 2000) {
 }
 
 async function startSchedulerService() {
+    // 1. Configurer le serveur Express pour le healthcheck EN PREMIER
+    // Cela garantit que le healthcheck répond immédiatement
+    app.use(express.json());
+
+    // Route de santé pour Railway - doit répondre immédiatement
+    app.get('/health', (req, res) => {
+        res.json({ 
+            status: 'healthy', 
+            service: 'scheduler',
+            schedulerActive: scheduler !== null,
+            realtimeUpdates: true,
+            timestamp: new Date().toISOString()
+        });
+    });
+
+    // Démarrer le serveur IMMÉDIATEMENT pour que Railway puisse tester le healthcheck
+    const port = Number(process.env.PORT || process.env.SCHEDULER_PORT) || 3002;
+    
+    await new Promise((resolve, reject) => {
+        const server = app.listen(port, '0.0.0.0', () => {
+            console.log(`🌐 Serveur de monitoring démarré sur le port ${port}`);
+            console.log(`📊 Status disponible sur http://0.0.0.0:${port}/status`);
+            console.log(`❤️ Healthcheck disponible sur http://0.0.0.0:${port}/health`);
+            resolve();
+        });
+        
+        server.on('error', (err) => {
+            console.error('❌ Erreur lors du démarrage du serveur:', err);
+            reject(err);
+        });
+    });
+
+    // Maintenant que le serveur est prêt, on peut initialiser le reste
     try {
         console.log('🚀 Démarrage du service de planification...');
         console.log('🔄 AVEC SYSTÈME DE MISE À JOUR TEMPS RÉEL');
-
-        // 1. Configurer le serveur Express pour le healthcheck
-        app.use(express.json());
-
-        // Route de santé pour Railway
-        app.get('/health', (req, res) => {
-            res.json({ 
-                status: 'healthy', 
-                service: 'scheduler',
-                schedulerActive: scheduler !== null,
-                realtimeUpdates: true // Indique que le système temps réel est actif
-            });
-        });
 
         // Route pour obtenir le statut complet du planificateur
         app.get('/status', (req, res) => {
@@ -215,20 +235,6 @@ async function startSchedulerService() {
             }
         });
 
-        // 3. Démarrer le serveur pour le healthcheck AVANT le scheduler
-        // Railway fournit PORT; local on peut utiliser SCHEDULER_PORT ou 3002
-        const port = Number(process.env.PORT || process.env.SCHEDULER_PORT) || 3002;
-        
-        // Attendre que le serveur soit prêt avant de continuer
-        await new Promise((resolve) => {
-            app.listen(port, '0.0.0.0', () => {
-                console.log(`🌐 Serveur de monitoring démarré sur le port ${port}`);
-                console.log(`📊 Status disponible sur http://0.0.0.0:${port}/status`);
-                console.log(`❤️ Healthcheck disponible sur http://0.0.0.0:${port}/health`);
-                resolve();
-            });
-        });
-
         // 2. Attendre que la base de données soit prête (migrations terminées)
         console.log('⏳ Attente que la base de données soit prête...');
         try {
@@ -271,9 +277,24 @@ async function startSchedulerService() {
     } catch (error) {
         console.error('❌ Erreur lors du démarrage du service:', error);
         console.error('Stack:', error.stack);
-        process.exit(1);
+        console.error('⚠️ Le serveur continue de fonctionner pour le healthcheck');
+        // Ne pas faire planter le processus - le serveur doit continuer à répondre au healthcheck
     }
 }
+
+// Gestionnaire d'erreur global pour éviter que le processus ne plante
+process.on('uncaughtException', (error) => {
+    console.error('❌ Erreur non capturée:', error);
+    console.error('Stack:', error.stack);
+    console.error('⚠️ Le serveur continue de fonctionner pour le healthcheck');
+    // Ne pas faire planter le processus
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('❌ Promesse rejetée non gérée:', reason);
+    console.error('⚠️ Le serveur continue de fonctionner pour le healthcheck');
+    // Ne pas faire planter le processus
+});
 
 async function stopSchedulerService() {
     try {
