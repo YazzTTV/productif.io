@@ -82,17 +82,17 @@ export default function IdentityScreen() {
 
           {/* First name */}
           <Animated.View entering={FadeInDown.delay(200).duration(400)} style={styles.section}>
-            <Text style={styles.label}>
-              {t('firstName') || 'First name'}
-            </Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Alex"
-              placeholderTextColor="rgba(0, 0, 0, 0.4)"
-              value={firstName}
-              onChangeText={setFirstName}
-              autoCapitalize="words"
-            />
+              <Text style={styles.label}>
+                {t('firstName') || 'First name'}
+              </Text>
+              <TextInput
+                style={styles.input}
+                placeholder={t('firstNamePlaceholder', undefined, 'Alex')}
+                placeholderTextColor="rgba(0, 0, 0, 0.4)"
+                value={firstName}
+                onChangeText={setFirstName}
+                autoCapitalize="words"
+              />
           </Animated.View>
 
           {/* Student type */}
@@ -244,4 +244,3 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
 });
-

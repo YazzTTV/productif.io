@@ -5,6 +5,7 @@ import { router } from 'expo-router';
 import { apiCall } from '@/lib/api';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface TimeEntry {
   id: string;
@@ -18,6 +19,7 @@ interface TimeEntry {
 }
 
 export default function TimeHistoryScreen() {
+  const { t } = useLanguage();
   const [entries, setEntries] = useState<TimeEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -58,7 +60,7 @@ export default function TimeHistoryScreen() {
     return (
       <View style={styles.centered}>
         <ActivityIndicator size="large" color="#10b981" />
-        <Text style={styles.loadingText}>Chargement de l'historique...</Text>
+        <Text style={styles.loadingText}>{t('timeHistoryLoading', undefined, "Chargement de l'historique...")}</Text>
       </View>
     );
   }
@@ -66,8 +68,8 @@ export default function TimeHistoryScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Suivi du temps</Text>
-        <Text style={styles.subtitle}>Timer et historique</Text>
+        <Text style={styles.title}>{t('timeHistoryTitle', undefined, 'Suivi du temps')}</Text>
+        <Text style={styles.subtitle}>{t('timeHistorySubtitle', undefined, 'Timer et historique')}</Text>
       </View>
 
       <ScrollView
@@ -78,8 +80,8 @@ export default function TimeHistoryScreen() {
         {entries.length === 0 ? (
           <View style={styles.emptyState}>
             <Ionicons name="time-outline" size={64} color="#9CA3AF" />
-            <Text style={styles.emptyTitle}>Aucune entrée</Text>
-            <Text style={styles.emptySubtitle}>Lancez un timer pour commencer à suivre votre temps.</Text>
+            <Text style={styles.emptyTitle}>{t('timeHistoryEmpty', undefined, 'Aucune entrée')}</Text>
+            <Text style={styles.emptySubtitle}>{t('timeHistoryEmptySubtitle', undefined, 'Lancez un timer pour commencer à suivre votre temps.')}</Text>
           </View>
         ) : (
           entries.map((e) => {
@@ -89,14 +91,14 @@ export default function TimeHistoryScreen() {
             return (
               <View key={e.id} style={styles.entryCard}>
                 <View style={styles.entryHeader}>
-                  <Text style={styles.entryProject}>{e.projectName || 'Sans projet'}</Text>
+                  <Text style={styles.entryProject}>{e.projectName || t('noProject', undefined, 'Sans projet')}</Text>
                   <Text style={styles.entryDate}>{format(started, "EEE d MMM, HH:mm", { locale: fr })}</Text>
                 </View>
                 {e.description ? <Text style={styles.entryDesc}>{e.description}</Text> : null}
                 <View style={styles.entryFooter}>
                   <View style={styles.durationBadge}>
                     <Ionicons name="timer" size={14} color="#047857" />
-                    <Text style={styles.durationText}>{duration ? `${duration} min` : 'En cours'}</Text>
+                    <Text style={styles.durationText}>{duration ? `${duration} min` : t('inProgress', undefined, 'En cours')}</Text>
                   </View>
                   {ended && (
                     <Text style={styles.rangeText}>
@@ -113,7 +115,7 @@ export default function TimeHistoryScreen() {
 
       <TouchableOpacity style={styles.fab} onPress={() => router.push('/(tabs)/timer')}>
         <Ionicons name="play" size={22} color="#fff" />
-        <Text style={styles.fabText}>Ouvrir le Timer</Text>
+        <Text style={styles.fabText}>{t('openTimer', undefined, 'Ouvrir le Timer')}</Text>
       </TouchableOpacity>
     </View>
   );

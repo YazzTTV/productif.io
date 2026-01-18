@@ -24,24 +24,35 @@ export function Paywall({ onClose, source }: PaywallProps) {
     setIsLoading(true);
     try {
       const billingType = plan === 'annual' ? 'annual' : 'monthly';
+      console.log('💳 [PAYWALL] Création de session checkout pour:', billingType);
+      
       const { url } = await paymentService.createCheckoutSession(billingType);
       
+      console.log('💳 [PAYWALL] URL reçue:', url ? 'URL présente' : 'URL manquante');
+      
       if (url) {
+        // Fermer le modal d'abord
+        onClose?.();
+        
+        // Attendre un peu pour que le modal se ferme
+        await new Promise(resolve => setTimeout(resolve, 300));
+        
         // Rediriger vers la WebView Stripe
+        console.log('💳 [PAYWALL] Navigation vers stripe-webview avec URL:', url.substring(0, 50) + '...');
         router.push({
           pathname: '/(onboarding-new)/stripe-webview',
           params: { checkoutUrl: url, plan }
         });
-        onClose?.();
+      } else {
+        throw new Error('Aucune URL de checkout reçue');
       }
     } catch (error: any) {
-      console.error('Erreur lors de la création de la session Stripe:', error);
+      console.error('❌ [PAYWALL] Erreur lors de la création de la session Stripe:', error);
+      setIsLoading(false);
       Alert.alert(
         t('error'),
         error?.message || t('somethingWentWrong')
       );
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -113,9 +124,9 @@ export function Paywall({ onClose, source }: PaywallProps) {
                 <ActivityIndicator color="#FFFFFF" />
               ) : (
                 <>
-                  <Text style={styles.planPricePrimary}>€3.33 {t('perMonth')}</Text>
+                  <Text style={styles.planPricePrimary}>€3.25 {t('perMonth')}</Text>
                   <Text style={styles.planSubtextPrimary}>
-                    {t('billedPerYear') || 'Billed €39.97 per year (–60%)'}
+                    {t('billedPerYear') || 'Billed €39 per year (–60%)'}
                   </Text>
                 </>
               )}

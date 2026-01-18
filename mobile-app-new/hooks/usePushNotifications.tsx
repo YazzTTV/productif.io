@@ -141,11 +141,60 @@ export function usePushNotifications() {
         hasMessage: !!data?.message,
       });
 
+      const rawType = data?.type || data?.notificationType || data?.scenario || data?.event || data?.kind;
+      const normalizedType = typeof rawType === 'string' ? rawType.toUpperCase() : undefined;
+      const checkInTypeFromNotification =
+        data?.checkInType ||
+        (normalizedType === 'STRESS_CHECK_PREMIUM' || normalizedType === 'STRESS_CHECK'
+          ? 'stress'
+          : normalizedType === 'MOOD_CHECK_PREMIUM' || normalizedType === 'MOOD_CHECK'
+            ? 'mood'
+            : normalizedType === 'FOCUS_CHECK_PREMIUM' || normalizedType === 'FOCUS_CHECK'
+              ? 'focus'
+              : undefined);
+      const shouldOpenFocus =
+        data?.action === 'open_focus' ||
+        normalizedType === 'MORNING_ANCHOR';
+      const shouldOpenAnalytics =
+        data?.action === 'open_analytics' ||
+        normalizedType === 'STRESS_CHECK_PREMIUM' ||
+        normalizedType === 'MOOD_CHECK_PREMIUM' ||
+        normalizedType === 'FOCUS_CHECK_PREMIUM' ||
+        normalizedType === 'STRESS_CHECK' ||
+        normalizedType === 'MOOD_CHECK' ||
+        normalizedType === 'FOCUS_CHECK';
+
+      // Navigation vers Focus pour MORNING_ANCHOR
+      if (shouldOpenFocus) {
+        console.log('✅ Conditions remplies - Navigation vers Focus', {
+          type: data.type || normalizedType,
+        });
+
+        if (navigationTimeoutRef.current) {
+          clearTimeout(navigationTimeoutRef.current);
+        }
+        navigationTimeoutRef.current = setTimeout(() => {
+          if (!isMountedRef.current) {
+            console.log('⚠️ Composant démonté, navigation annulée');
+            return;
+          }
+          try {
+            console.log('🚀 Navigation vers /focus');
+            router.replace('/focus' as any);
+            console.log('✅ Navigation vers Focus déclenchée avec succès');
+          } catch (navError) {
+            console.error('❌ Erreur de navigation vers Focus:', navError);
+          }
+        }, 500);
+
+        return;
+      }
+
       // Navigation vers Analytics pour les notifications mood/stress/focus
-      if (data?.action === 'open_analytics' && data?.checkInType) {
+      if (shouldOpenAnalytics && checkInTypeFromNotification) {
         console.log('✅ Conditions remplies - Navigation vers Analytics', {
-          type: data.type,
-          checkInType: data.checkInType,
+          type: data.type || normalizedType,
+          checkInType: checkInTypeFromNotification,
         });
         
         // Délai pour s'assurer que l'app et le router sont prêts (cold start)
@@ -161,7 +210,7 @@ export function usePushNotifications() {
             console.log('🚀 Navigation vers /(tabs)/assistant avec checkInType pour Analytics');
             router.replace({
               pathname: '/(tabs)/assistant',
-              params: { checkInType: data.checkInType },
+              params: { checkInType: checkInTypeFromNotification },
             } as any);
             console.log('✅ Navigation vers Analytics déclenchée avec succès');
           } catch (navError) {
@@ -391,4 +440,3 @@ async function registerForPushNotificationsAsync(): Promise<string | null> {
 
   return token;
 }
-

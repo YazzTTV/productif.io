@@ -12,6 +12,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 // Stripe Price IDs
 const STRIPE_PRICE_IDS = {
@@ -23,6 +24,7 @@ export default function StripeCheckoutScreen() {
   const params = useLocalSearchParams();
   const plan = params.plan as 'monthly' | 'annual';
   const [isLoading, setIsLoading] = useState(false);
+  const { t } = useLanguage();
 
   const handleCheckout = async () => {
     setIsLoading(true);
@@ -51,11 +53,11 @@ export default function StripeCheckoutScreen() {
           router.replace('/(tabs)');
         }, 1000);
       } else {
-        Alert.alert('Erreur', 'Impossible d\'ouvrir le lien de paiement');
+        Alert.alert(t('error', undefined, 'Erreur'), t('paymentOpenLinkError', undefined, 'Impossible d\'ouvrir le lien de paiement'));
       }
     } catch (error) {
       console.error('Erreur lors de la redirection Stripe:', error);
-      Alert.alert('Erreur', 'Une erreur est survenue lors de la redirection vers le paiement');
+      Alert.alert(t('error', undefined, 'Erreur'), t('paymentRedirectError', undefined, 'Une erreur est survenue lors de la redirection vers le paiement'));
     } finally {
       setIsLoading(false);
     }
@@ -72,9 +74,11 @@ export default function StripeCheckoutScreen() {
         {/* Header */}
         <View style={styles.header}>
           <Ionicons name="card" size={60} color="#00C27A" />
-          <Text style={styles.title}>Finaliser votre abonnement</Text>
+          <Text style={styles.title}>
+            {t('paymentFinalizeTitle', undefined, 'Finaliser votre abonnement')}
+          </Text>
           <Text style={styles.subtitle}>
-            Vous allez être redirigé vers Stripe pour finaliser votre paiement sécurisé
+            {t('paymentSubtitle', undefined, 'Vous allez être redirigé vers Stripe pour finaliser votre paiement sécurisé')}
           </Text>
         </View>
 
@@ -82,32 +86,38 @@ export default function StripeCheckoutScreen() {
         <View style={styles.planBox}>
           <View style={styles.planHeader}>
             <Text style={styles.planName}>
-              {plan === 'annual' ? 'Plan Annuel' : 'Plan Mensuel'}
+              {plan === 'annual' ? t('paymentPlanAnnual', undefined, 'Plan Annuel') : t('paymentPlanMonthly', undefined, 'Plan Mensuel')}
             </Text>
             {plan === 'annual' && (
               <View style={styles.saveBadge}>
-                <Text style={styles.saveText}>Économisez $60</Text>
+                <Text style={styles.saveText}>
+                  {t('paymentSaveAmount', undefined, 'Économisez $60')}
+                </Text>
               </View>
             )}
           </View>
-          <Text style={styles.planPrice}>
-            {plan === 'annual' ? '$9.99/mois' : '$14.99/mois'}
+              <Text style={styles.planPrice}>
+            {plan === 'annual' ? t('paymentPriceAnnual', undefined, '$9.99/mois') : t('paymentPriceMonthly', undefined, '$14.99/mois')}
           </Text>
           {plan === 'annual' && (
-            <Text style={styles.planBilled}>Facturé $119.88 annuellement</Text>
+            <Text style={styles.planBilled}>
+              {t('paymentBilledAnnual', undefined, 'Facturé $119.88 annuellement')}
+            </Text>
           )}
         </View>
 
         {/* Benefits */}
         <View style={styles.benefitsBox}>
-          <Text style={styles.benefitsTitle}>Ce qui est inclus :</Text>
+          <Text style={styles.benefitsTitle}>
+            {t('paymentIncluded', undefined, 'Ce qui est inclus :')}
+          </Text>
           {[
-            'Essai gratuit de 7 jours',
-            'Annulation à tout moment',
-            'Accès complet à toutes les fonctionnalités',
-            'Assistant IA illimité',
-            'Analyses avancées',
-            'Support prioritaire',
+            t('paymentFreeTrial7d', undefined, 'Essai gratuit de 7 jours'),
+            t('cancelAnytime', undefined, 'Annulation à tout moment'),
+            t('paymentFullAccess', undefined, 'Accès complet à toutes les fonctionnalités'),
+            t('paymentUnlimitedAI', undefined, 'Assistant IA illimité'),
+            t('paymentAdvancedAnalytics', undefined, 'Analyses avancées'),
+            t('paymentPrioritySupport', undefined, 'Support prioritaire'),
           ].map((benefit, i) => (
             <View key={i} style={styles.benefitRow}>
               <Ionicons name="checkmark-circle" size={20} color="#00C27A" />
@@ -133,7 +143,9 @@ export default function StripeCheckoutScreen() {
                 <ActivityIndicator color="#FFFFFF" />
               ) : (
                 <>
-                  <Text style={styles.checkoutButtonText}>Continuer vers le paiement</Text>
+                  <Text style={styles.checkoutButtonText}>
+                    {t('paymentCheckoutCta', undefined, 'Continuer vers le paiement')}
+                  </Text>
                   <Ionicons name="arrow-forward" size={20} color="#FFFFFF" />
                 </>
               )}
@@ -141,7 +153,9 @@ export default function StripeCheckoutScreen() {
           </TouchableOpacity>
 
           <TouchableOpacity onPress={handleSkip} style={styles.skipButton}>
-            <Text style={styles.skipText}>Passer pour le moment</Text>
+            <Text style={styles.skipText}>
+              {t('skip', undefined, 'Passer pour le moment')}
+            </Text>
           </TouchableOpacity>
         </View>
 
@@ -149,7 +163,7 @@ export default function StripeCheckoutScreen() {
         <View style={styles.securityNote}>
           <Ionicons name="shield-checkmark" size={16} color="#6B7280" />
           <Text style={styles.securityText}>
-            Paiement sécurisé par Stripe • SSL Crypté
+            {t('paymentSecurityNote', undefined, 'Paiement sécurisé par Stripe • SSL Crypté')}
           </Text>
         </View>
       </View>
@@ -287,5 +301,3 @@ const styles = StyleSheet.create({
     color: '#6B7280',
   },
 });
-
-

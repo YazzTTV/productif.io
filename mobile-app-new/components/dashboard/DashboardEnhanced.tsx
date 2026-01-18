@@ -4,10 +4,12 @@ import { useRouter } from 'expo-router';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { authService, googleCalendarService } from '@/lib/api';
+import { authService, gamificationService, googleCalendarService } from '@/lib/api';
 import { format, parseISO, isBefore, isAfter } from 'date-fns';
 import { checkPremiumStatus } from '@/utils/premium';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { selectExamTasks, TaskForExam } from '@/utils/taskSelection';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface KeyMoment {
   time: string;
@@ -27,6 +29,12 @@ interface CalendarEvent {
   isProductif: boolean;
 }
 
+interface GroupMember {
+  userId: string;
+  userName: string | null;
+  totalPoints: number;
+}
+
 export function DashboardEnhanced() {
   const { t } = useLanguage();
   const router = useRouter();
@@ -39,6 +47,14 @@ export function DashboardEnhanced() {
   const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
   const [isCalendarConnected, setIsCalendarConnected] = useState(false);
   const [isPremium, setIsPremium] = useState(false);
+  const [primaryTask, setPrimaryTask] = useState<TaskForExam | null>(null);
+  const [nextTasks, setNextTasks] = useState<TaskForExam[]>([]);
+  const [groupName, setGroupName] = useState<string | null>(null);
+  const [groupAveragePoints, setGroupAveragePoints] = useState<number | null>(null);
+  const [groupMembers, setGroupMembers] = useState<GroupMember[]>([]);
+  const [favoriteGroupId, setFavoriteGroupId] = useState<string | null>(null);
+
+  const FAVORITE_GROUP_KEY = 'favorite_group_id';
 
   const currentHour = new Date().getHours();
   const greeting = currentHour < 12 ? t('goodMorning') : currentHour < 18 ? t('goodAfternoon') : t('goodEvening');
@@ -114,6 +130,41 @@ export function DashboardEnhanced() {
         setCalendarEvents([]);
         setIsCalendarConnected(false);
       }
+
+      if (user) {
+        const storedFavoriteGroupId = await AsyncStorage.getItem(FAVORITE_GROUP_KEY);
+        setFavoriteGroupId(storedFavoriteGroupId);
+        const { primary, next } = await selectExamTasks();
+        setPrimaryTask(primary);
+        setNextTasks(next);
+        const groups = await gamificationService.getUserGroups();
+        if (groups.length > 0) {
+          const selectedGroup =
+            groups.find((group) => group.id === storedFavoriteGroupId) || groups[0];
+          setGroupName(selectedGroup.name || null);
+          const leaderboard = await gamificationService.getGroupLeaderboard(selectedGroup.id);
+          const members = leaderboard.map((entry) => ({
+            userId: entry.userId,
+            userName: entry.userName,
+            totalPoints: entry.totalPoints || 0,
+          }));
+          const totalPoints = members.reduce((sum, member) => sum + member.totalPoints, 0);
+          const averagePoints = members.length > 0 ? Math.round(totalPoints / members.length) : 0;
+          setGroupAveragePoints(averagePoints);
+          setGroupMembers(members);
+        } else {
+          setGroupName(null);
+          setGroupAveragePoints(null);
+          setGroupMembers([]);
+        }
+      } else {
+        setPrimaryTask(null);
+        setNextTasks([]);
+        setGroupName(null);
+        setGroupAveragePoints(null);
+        setGroupMembers([]);
+        setFavoriteGroupId(null);
+      }
     } catch (error) {
       console.error('Erreur chargement dashboard:', error);
     }
@@ -183,7 +234,7 @@ export function DashboardEnhanced() {
           <View style={styles.headerContent}>
             <View>
               <Text style={styles.greeting}>{greeting}</Text>
-              <Text style={styles.userName}>{userName || 'dwxcw'}</Text>
+              <Text style={styles.userName}>{userName || t('user')}</Text>
             </View>
             <TouchableOpacity
               style={styles.settingsButton}
@@ -202,39 +253,55 @@ export function DashboardEnhanced() {
               <View style={styles.structureContent}>
                 {/* Main Focus Block */}
                 <View style={styles.focusBlock}>
-                  <View style={styles.timeBadge}>
-                    <Ionicons name="time-outline" size={16} color="#16A34A" />
-                    <Text style={styles.timeText}>09:00 - 10:30</Text>
-                  </View>
-                  <Text style={styles.focusTitle}>Complete Chapter 12 Summary</Text>
-                  <Text style={styles.focusSubject}>Organic Chemistry</Text>
+                  {primaryTask?.estimatedTime ? (
+                    <View style={styles.timeBadge}>
+                      <Ionicons name="time-outline" size={16} color="#16A34A" />
+                      <Text style={styles.timeText}>{primaryTask.estimatedTime} min</Text>
+                    </View>
+                  ) : null}
+                  <Text style={styles.focusTitle}>
+                    {primaryTask?.title || t('noTasksAvailable')}
+                  </Text>
+                  <Text style={styles.focusSubject}>
+                    {primaryTask?.subjectName || t('noTasks')}
+                  </Text>
                 </View>
 
                 {/* Key Tasks */}
-                <View style={styles.tasksSection}>
-                  <View style={styles.taskItem}>
-                    <View style={styles.bullet} />
-                    <Text style={styles.taskText}>Review lecture notes · 30 min</Text>
+                {nextTasks.length > 0 ? (
+                  <View style={styles.tasksSection}>
+                    {nextTasks.map((task) => (
+                      <View key={task.id} style={styles.taskItem}>
+                        <View style={styles.bullet} />
+                        <Text style={styles.taskText}>
+                          {task.title}
+                          {task.subjectName ? ` · ${task.subjectName}` : ''}
+                          {task.estimatedTime ? ` · ${task.estimatedTime} min` : ''}
+                        </Text>
+                      </View>
+                    ))}
                   </View>
-                  <View style={styles.taskItem}>
-                    <View style={styles.bullet} />
-                    <Text style={styles.taskText}>Practice problems 15-20 · 45 min</Text>
-                  </View>
-                </View>
-
-                {/* Daily Habit */}
-                <View style={styles.habitSection}>
-                  <View style={styles.habitTag}>
-                    <View style={styles.habitDot} />
-                    <Text style={styles.habitText}>Morning review</Text>
-                  </View>
-                </View>
+                ) : null}
               </View>
 
               {/* Primary CTA */}
               <TouchableOpacity
                 style={styles.startFocusButton}
-                onPress={() => router.push('/focus')}
+                onPress={() => {
+                  if (primaryTask) {
+                    router.push({
+                      pathname: '/focus',
+                      params: {
+                        taskId: primaryTask.id,
+                        title: primaryTask.title,
+                        subject: primaryTask.subjectName,
+                        duration: primaryTask.estimatedTime,
+                      },
+                    });
+                  } else {
+                    router.push('/focus');
+                  }
+                }}
                 activeOpacity={0.8}
               >
                 <Text style={styles.startFocusText}>{t('startFocus')}</Text>
@@ -330,41 +397,47 @@ export function DashboardEnhanced() {
               <View style={styles.communityHeader}>
                 <View>
                   <Text style={styles.communityTitle}>{t('communityProgress') || 'Community Progress'}</Text>
-                  <Text style={styles.communitySubtitle}>{t('yourGroupThisWeek') || 'Your group this week'}</Text>
+                  <Text style={styles.communitySubtitle}>
+                    {groupName || t('yourGroupThisWeek') || 'Your group this week'}
+                  </Text>
                 </View>
                 <Ionicons name="chevron-forward" size={20} color="rgba(0,0,0,0.2)" />
               </View>
 
               <View style={styles.avatarGroup}>
-                {['M', 'You', 'A', 'E', 'L'].map((initial, index) => (
-                  <View key={index} style={styles.avatarContainer}>
-                    <View style={[
-                      styles.progressBar,
-                      initial === 'You' && styles.progressBarActive
-                    ]}>
-                      <View style={[
-                        styles.progressFill,
-                        initial === 'You' && styles.progressFillActive,
-                        { height: `${85 - index * 5}%` }
-                      ]} />
-                    </View>
-                    <View style={[
-                      styles.avatar,
-                      initial === 'You' && styles.avatarActive
-                    ]}>
-                      <Text style={[
-                        styles.avatarText,
-                        initial === 'You' && styles.avatarTextActive
-                      ]}>
-                        {initial === 'You' ? '✓' : initial}
-                      </Text>
-                    </View>
-                  </View>
-                ))}
+                {groupMembers.length > 0 ? (
+                  groupMembers.slice(0, 5).map((member, index) => {
+                    const initial = member.userName?.trim().charAt(0).toUpperCase() || '?';
+                    const maxPoints = Math.max(...groupMembers.map(m => m.totalPoints || 0), 1);
+                    const height = Math.max(25, Math.round((member.totalPoints / maxPoints) * 90));
+                    return (
+                      <View key={member.userId} style={styles.avatarContainer}>
+                        <View style={styles.progressBar}>
+                          <View style={[styles.progressFill, { height: `${height}%` }]} />
+                        </View>
+                        <View style={styles.avatar}>
+                          <Text style={styles.avatarText}>{initial}</Text>
+                        </View>
+                      </View>
+                    );
+                  })
+                ) : (
+                  <Text style={styles.emptyCommunityText}>
+                    {t('noGroupFound', undefined, 'Aucun groupe trouvé')}
+                  </Text>
+                )}
               </View>
 
               <View style={styles.communityFooter}>
-                <Text style={styles.viewLeaderboardText}>{t('viewFullLeaderboard') || 'View full leaderboard →'}</Text>
+                {groupAveragePoints !== null ? (
+                  <Text style={styles.viewLeaderboardText}>
+                    {(t('groupAverage', undefined, 'Moyenne du groupe') || 'Moyenne du groupe') + ` : ${groupAveragePoints}`}
+                  </Text>
+                ) : (
+                  <Text style={styles.viewLeaderboardText}>
+                    {t('viewFullLeaderboard') || 'View full leaderboard →'}
+                  </Text>
+                )}
               </View>
             </TouchableOpacity>
           </Animated.View>
@@ -706,6 +779,10 @@ const styles = StyleSheet.create({
     color: 'rgba(0, 0, 0, 0.4)',
     textAlign: 'center',
   },
+  emptyCommunityText: {
+    fontSize: 14,
+    color: 'rgba(0, 0, 0, 0.5)',
+  },
   microcopy: {
     paddingVertical: 24,
     alignItems: 'center',
@@ -743,4 +820,3 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
-

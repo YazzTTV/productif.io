@@ -6,16 +6,14 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
-  Dimensions,
   RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { format } from 'date-fns';
-import { fr } from 'date-fns/locale';
+import { fr, enUS, es as esLocale } from 'date-fns/locale';
 import { apiCall } from '@/lib/api';
-
-const { width } = Dimensions.get('window');
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface Achievement {
   id: string;
@@ -46,15 +44,6 @@ const TYPE_ICONS = {
   OBJECTIVES: 'ribbon-outline',
 } as const;
 
-const TYPE_NAMES = {
-  STREAK: 'Séries',
-  HABITS: 'Habitudes',
-  PERFECT_DAY: 'Régularité',
-  POINTS: 'Points',
-  TASKS: 'Tâches',
-  OBJECTIVES: 'Objectifs',
-} as const;
-
 const TYPE_COLORS = {
   STREAK: '#3B82F6',
   HABITS: '#10B981',
@@ -65,6 +54,7 @@ const TYPE_COLORS = {
 } as const;
 
 export default function AchievementsScreen() {
+  const { t, language } = useLanguage();
   const [data, setData] = useState<AchievementsData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -103,6 +93,29 @@ export default function AchievementsScreen() {
   const getTypeColor = (type: string) => {
     return TYPE_COLORS[type as keyof typeof TYPE_COLORS] || '#6B7280';
   };
+
+  const getTypeName = (type: TabType | string) => {
+    switch (type) {
+      case 'STREAK':
+        return t('achievementsTypeStreak', undefined, 'Séries');
+      case 'HABITS':
+        return t('achievementsTypeHabits', undefined, 'Habitudes');
+      case 'PERFECT_DAY':
+        return t('achievementsTypePerfectDay', undefined, 'Régularité');
+      case 'POINTS':
+        return t('achievementsTypePoints', undefined, 'Points');
+      case 'TASKS':
+        return t('achievementsTypeTasks', undefined, 'Tâches');
+      case 'OBJECTIVES':
+        return t('achievementsTypeObjectives', undefined, 'Objectifs');
+      case 'all':
+        return t('achievementsTabAll', undefined, 'Tous');
+      default:
+        return type;
+    }
+  };
+
+  const locale = language === 'en' ? enUS : language === 'es' ? esLocale : fr;
 
   const renderTabButton = (tab: TabType, title: string) => (
     <TouchableOpacity
@@ -162,11 +175,11 @@ export default function AchievementsScreen() {
               styles.typeText,
               { color: getTypeColor(achievement.type) }
             ]}>
-              {TYPE_NAMES[achievement.type as keyof typeof TYPE_NAMES]}
+              {getTypeName(achievement.type)}
             </Text>
           </View>
           <Text style={styles.pointsText}>
-            {achievement.points} pts
+            {achievement.points} {t('achievementsPointsLabel', undefined, 'points')}
           </Text>
         </View>
 
@@ -179,13 +192,19 @@ export default function AchievementsScreen() {
 
         {achievement.unlocked && achievement.unlockedAt ? (
           <Text style={styles.unlockedDate}>
-            Débloqué le {format(new Date(achievement.unlockedAt), 'd MMMM yyyy', { locale: fr })}
+            {t(
+              'achievementsUnlockedDate',
+              { date: format(new Date(achievement.unlockedAt), 'd MMMM yyyy', { locale }) },
+              `Débloqué le ${format(new Date(achievement.unlockedAt), 'd MMMM yyyy', { locale })}`
+            )}
           </Text>
         ) : (
           <View style={styles.objectiveContainer}>
-            <Text style={styles.objectiveLabel}>Objectif :</Text>
+            <Text style={styles.objectiveLabel}>
+              {t('achievementsObjectiveLabel', undefined, 'Objectif :')}
+            </Text>
             <Text style={styles.objectiveValue}>
-              {achievement.threshold} {achievement.type === 'POINTS' ? 'points' : ''}
+              {achievement.threshold} {achievement.type === 'POINTS' ? t('achievementsPointsLabel', undefined, 'points') : ''}
             </Text>
           </View>
         )}
@@ -202,13 +221,19 @@ export default function AchievementsScreen() {
       <View style={styles.progressCard}>
         <View style={styles.progressHeader}>
           <Ionicons name="trophy" size={20} color="#10B981" />
-          <Text style={styles.progressTitle}>Progression globale</Text>
+          <Text style={styles.progressTitle}>
+            {t('achievementsProgressTitle', undefined, 'Progression globale')}
+          </Text>
         </View>
         <View style={styles.progressContent}>
           <View style={styles.progressStats}>
             <Text style={styles.progressPercentage}>{completionPercentage}%</Text>
             <Text style={styles.progressSubtitle}>
-              {data.totalUnlocked}/{data.totalAvailable} débloqués
+              {t(
+                'achievementsUnlockedLabel',
+                { unlocked: data.totalUnlocked, total: data.totalAvailable },
+                `${data.totalUnlocked}/${data.totalAvailable} débloqués`
+              )}
             </Text>
           </View>
           <View style={styles.progressBarContainer}>
@@ -229,11 +254,13 @@ export default function AchievementsScreen() {
   const renderEmptyState = () => (
     <View style={styles.emptyState}>
       <Ionicons name="trophy-outline" size={64} color="#9CA3AF" />
-      <Text style={styles.emptyTitle}>Aucun achievement</Text>
+      <Text style={styles.emptyTitle}>
+        {t('achievementsEmptyTitle', undefined, 'Aucun achievement')}
+      </Text>
       <Text style={styles.emptyDescription}>
         {selectedTab === 'all' 
-          ? "Impossible de charger les achievements"
-          : "Aucun achievement dans cette catégorie"
+          ? t('achievementsEmptyAll', undefined, 'Impossible de charger les achievements')
+          : t('achievementsEmptyCategory', undefined, 'Aucun achievement dans cette catégorie')
         }
       </Text>
     </View>
@@ -261,7 +288,9 @@ export default function AchievementsScreen() {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#10B981" />
-        <Text style={styles.loadingText}>Chargement des succès...</Text>
+        <Text style={styles.loadingText}>
+          {t('achievementsLoading', undefined, 'Chargement des succès...')}
+        </Text>
       </View>
     );
   }
@@ -276,7 +305,9 @@ export default function AchievementsScreen() {
         >
           <Ionicons name="arrow-back" size={24} color="#374151" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Succès</Text>
+        <Text style={styles.headerTitle}>
+          {t('achievementsTitle', undefined, 'Succès')}
+        </Text>
         <View style={styles.headerSpacer} />
       </View>
 
@@ -289,16 +320,20 @@ export default function AchievementsScreen() {
       >
         {/* Header Info */}
         <View style={styles.headerInfo}>
-          <Text style={styles.title}>Achievements</Text>
+          <Text style={styles.title}>
+            {t('achievementsTitle', undefined, 'Achievements')}
+          </Text>
           <Text style={styles.subtitle}>
-            Débloquez des récompenses en accomplissant vos objectifs
+            {t('achievementsSubtitle', undefined, 'Débloquez des récompenses en accomplissant vos objectifs')}
           </Text>
           {data && (
             <View style={styles.statsContainer}>
               <Text style={styles.statsNumber}>
                 {data.totalUnlocked}/{data.totalAvailable}
               </Text>
-              <Text style={styles.statsLabel}>Débloqués</Text>
+              <Text style={styles.statsLabel}>
+                {t('achievementsUnlockedShort', undefined, 'Débloqués')}
+              </Text>
             </View>
           )}
         </View>
@@ -313,9 +348,9 @@ export default function AchievementsScreen() {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.tabsContent}
           >
-            {renderTabButton('all', 'Tous')}
-            {Object.entries(TYPE_NAMES).map(([key, name]) =>
-              renderTabButton(key as TabType, name)
+            {renderTabButton('all', getTypeName('all'))}
+            {(['STREAK', 'HABITS', 'PERFECT_DAY', 'POINTS', 'TASKS', 'OBJECTIVES'] as TabType[]).map((type) =>
+              renderTabButton(type, getTypeName(type))
             )}
           </ScrollView>
         </View>

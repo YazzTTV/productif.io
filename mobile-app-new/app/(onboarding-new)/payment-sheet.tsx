@@ -33,7 +33,7 @@ export default function PaymentSheetScreen() {
       const { url } = await paymentService.createCheckoutSession(billingType);
       
       if (!url) {
-        throw new Error('Aucune URL de session retournée');
+        throw new Error(t('paymentNoSessionUrl', undefined, 'Aucune URL de session retournée'));
       }
 
       // Ouvrir Stripe Checkout dans une WebView intégrée
@@ -46,19 +46,20 @@ export default function PaymentSheetScreen() {
       
       if (error?.message?.includes('authenticated') || error?.message?.includes('Non authentifié')) {
         Alert.alert(
-          'Connexion requise',
-          'Vous devez être connecté pour continuer. Veuillez vous connecter ou créer un compte.',
+          t('loginRequiredTitle'),
+          t('loginRequiredMessage'),
           [
-            { text: 'Annuler', style: 'cancel' },
+            { text: t('cancel'), style: 'cancel' },
             { 
-              text: 'Se connecter', 
+              text: t('loginButton'),
               onPress: () => router.push('/login')
             }
           ]
         );
       } else {
-        setError(error?.message || 'Une erreur est survenue');
-        Alert.alert('Erreur', error?.message || 'Une erreur est survenue lors du paiement');
+        const message = error?.message || t('somethingWentWrong');
+        setError(message);
+        Alert.alert(t('error'), message);
       }
     } finally {
       setIsLoading(false);
@@ -80,9 +81,9 @@ export default function PaymentSheetScreen() {
         {/* Header */}
         <View style={styles.header}>
           <Ionicons name="card" size={60} color="#00C27A" />
-          <Text style={styles.title}>Finaliser votre abonnement</Text>
+          <Text style={styles.title}>{t('paymentFinalizeTitle')}</Text>
           <Text style={styles.subtitle}>
-            Paiement sécurisé directement dans l'application
+            {t('paymentSubtitle')}
           </Text>
         </View>
 
@@ -108,14 +109,14 @@ export default function PaymentSheetScreen() {
 
         {/* Benefits */}
         <View style={styles.benefitsBox}>
-          <Text style={styles.benefitsTitle}>Ce qui est inclus :</Text>
+          <Text style={styles.benefitsTitle}>{t('paymentIncluded')}</Text>
           {[
             t('freeTrial'),
             t('cancelAnytime'),
-            'Accès complet à toutes les fonctionnalités',
-            'Assistant IA illimité',
-            'Analyses avancées',
-            'Support prioritaire',
+            t('paymentFullAccess'),
+            t('paymentUnlimitedAI'),
+            t('paymentAdvancedAnalytics'),
+            t('paymentPrioritySupport'),
           ].map((benefit, i) => (
             <View key={i} style={styles.benefitRow}>
               <Ionicons name="checkmark-circle" size={20} color="#00C27A" />
@@ -162,14 +163,14 @@ export default function PaymentSheetScreen() {
 
         {/* Security Note */}
         <View style={styles.securityNote}>
-          <Ionicons name="shield-checkmark" size={16} color="#6B7280" />
-          <Text style={styles.securityText}>
-            Paiement sécurisé par Stripe • SSL Crypté
-          </Text>
-        </View>
-      </ScrollView>
-    </View>
-  );
+            <Ionicons name="shield-checkmark" size={16} color="#6B7280" />
+            <Text style={styles.securityText}>
+              {t('paymentSecurityNote')}
+            </Text>
+          </View>
+        </ScrollView>
+      </View>
+    );
 }
 
 const styles = StyleSheet.create({
@@ -323,4 +324,3 @@ const styles = StyleSheet.create({
     color: '#6B7280',
   },
 });
-

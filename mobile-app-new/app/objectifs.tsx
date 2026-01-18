@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { apiCall } from '@/lib/api';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface Objective {
   id: string;
@@ -15,6 +16,7 @@ interface Objective {
 }
 
 export default function ObjectivesScreen() {
+  const { t } = useLanguage();
   const [objectives, setObjectives] = useState<Objective[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -33,24 +35,24 @@ export default function ObjectivesScreen() {
   useEffect(() => { fetchObjectives(); }, []);
 
   const handleCreate = async () => {
-    Alert.alert('À implémenter', 'Création d\'objectif à venir.');
+    Alert.alert(t('comingSoon', undefined, 'À implémenter'), t('objectivesCreateSoon', undefined, 'Création d\'objectif à venir.'));
   };
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Objectifs</Text>
-        <Text style={styles.subtitle}>Définir et suivre vos objectifs</Text>
+        <Text style={styles.title}>{t('objectivesTitle', undefined, 'Objectifs')}</Text>
+        <Text style={styles.subtitle}>{t('objectivesSubtitle', undefined, 'Définir et suivre vos objectifs')}</Text>
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {loading ? (
-          <Text style={styles.loading}>Chargement...</Text>
+          <Text style={styles.loading}>{t('loading')}</Text>
         ) : objectives.length === 0 ? (
           <View style={styles.emptyState}>
             <Ionicons name="flag-outline" size={64} color="#9CA3AF" />
-            <Text style={styles.emptyTitle}>Aucun objectif</Text>
-            <Text style={styles.emptySubtitle}>Ajoutez votre premier objectif pour suivre votre progression.</Text>
+            <Text style={styles.emptyTitle}>{t('objectivesEmptyTitle', undefined, 'Aucun objectif')}</Text>
+            <Text style={styles.emptySubtitle}>{t('objectivesEmptySubtitle', undefined, 'Ajoutez votre premier objectif pour suivre votre progression.')}</Text>
           </View>
         ) : (
           objectives.map((o) => (
@@ -60,7 +62,7 @@ export default function ObjectivesScreen() {
                 <Text style={styles.cardMeta}>{o.missionTitle}</Text>
               ) : null}
               {(o.current !== undefined && o.target !== undefined) ? (
-                <Text style={styles.cardDesc}>Progression: {o.current}/{o.target} {o.progress ? `(${o.progress}%)` : ''}</Text>
+                <Text style={styles.cardDesc}>{t('objectivesProgress', { current: o.current, target: o.target, progress: o.progress ?? '' }, `Progression: ${o.current}/${o.target} ${o.progress ? `(${o.progress}%)` : ''}`)}</Text>
               ) : null}
             </View>
           ))
@@ -70,7 +72,7 @@ export default function ObjectivesScreen() {
 
       <TouchableOpacity style={styles.fab} onPress={handleCreate}>
         <Ionicons name="add" size={22} color="#fff" />
-        <Text style={styles.fabText}>Nouvel objectif</Text>
+        <Text style={styles.fabText}>{t('objectivesNew', undefined, 'Nouvel objectif')}</Text>
       </TouchableOpacity>
     </View>
   );

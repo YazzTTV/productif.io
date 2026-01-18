@@ -1,41 +1,43 @@
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Linking, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 const APP_VERSION = '1.0.0';
 
 export default function AboutScreen() {
+  const { t } = useLanguage();
   const openTerms = async () => {
-    try { await Linking.openURL('https://www.productif.io/terms'); } catch { Alert.alert('Erreur', 'Impossible d\'ouvrir la page'); }
+    try { await Linking.openURL('https://www.productif.io/terms'); } catch { Alert.alert(t('legacyOpenPageErrorTitle'), t('legacyOpenPageErrorMessage')); }
   };
   const openPrivacy = async () => {
-    try { await Linking.openURL('https://www.productif.io/privacy-policy'); } catch { Alert.alert('Erreur', 'Impossible d\'ouvrir la page'); }
+    try { await Linking.openURL('https://www.productif.io/privacy-policy'); } catch { Alert.alert(t('legacyOpenPageErrorTitle'), t('legacyOpenPageErrorMessage')); }
   };
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>À propos</Text>
-        <Text style={styles.subtitle}>Version et informations</Text>
+        <Text style={styles.title}>{t('legacyAboutTitle')}</Text>
+        <Text style={styles.subtitle}>{t('legacyAboutSubtitle')}</Text>
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Productif.io</Text>
-          <Text style={styles.cardSubtitle}>Version {APP_VERSION}</Text>
-          <Text style={styles.paragraph}>Productif.io vous aide à structurer vos journées avec des tâches, habitudes, timer et gamification pour rester motivé.</Text>
+          <Text style={styles.cardSubtitle}>{t('legacyVersionLabel', { version: APP_VERSION })}</Text>
+          <Text style={styles.paragraph}>{t('legacyAboutDescription')}</Text>
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Liens utiles</Text>
+          <Text style={styles.cardTitle}>{t('legacyUsefulLinks')}</Text>
           <TouchableOpacity style={styles.linkRow} onPress={openTerms}>
             <Ionicons name="document-text" size={18} color="#6b7280" />
-            <Text style={styles.linkText}>Conditions d'utilisation</Text>
+            <Text style={styles.linkText}>{t('legacyTerms')}</Text>
             <Ionicons name="chevron-forward" size={16} color="#9ca3af" style={{ marginLeft: 'auto' }} />
           </TouchableOpacity>
           <TouchableOpacity style={styles.linkRow} onPress={openPrivacy}>
             <Ionicons name="shield-checkmark" size={18} color="#6b7280" />
-            <Text style={styles.linkText}>Politique de confidentialité</Text>
+            <Text style={styles.linkText}>{t('legacyPrivacy')}</Text>
             <Ionicons name="chevron-forward" size={16} color="#9ca3af" style={{ marginLeft: 'auto' }} />
           </TouchableOpacity>
         </View>
