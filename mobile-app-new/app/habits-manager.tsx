@@ -111,7 +111,7 @@ export default function HabitsManagerScreen() {
       console.log('✅ [HABITS_MANAGER] Habitudes définies dans le state:', sortedHabits.length);
     } catch (error) {
       console.error('❌ Erreur lors du chargement des habitudes:', error);
-      Alert.alert('Erreur', 'Impossible de charger les habitudes');
+      Alert.alert(t('error'), t('habitsLoadError', undefined, 'Impossible de charger les habitudes'));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -160,18 +160,18 @@ export default function HabitsManagerScreen() {
       dashboardEvents.emit(DASHBOARD_DATA_CHANGED);
     } catch (error) {
       console.error('Erreur lors de la mise à jour:', error);
-      Alert.alert('Erreur', 'Impossible de mettre à jour l\'habitude');
+      Alert.alert(t('error'), t('habitsUpdateError', undefined, 'Impossible de mettre à jour l\'habitude'));
     }
   };
 
   const handleCreateHabit = async () => {
     if (!newHabit.name.trim()) {
-      Alert.alert('Erreur', 'Le nom de l\'habitude est requis');
+      Alert.alert(t('error'), t('habitsNameRequired', undefined, "Le nom de l'habitude est requis"));
       return;
     }
 
     if (newHabit.frequency === 'weekly' && newHabit.daysOfWeek.length === 0) {
-      Alert.alert('Erreur', 'Veuillez sélectionner au moins un jour de la semaine');
+      Alert.alert(t('error'), t('habitsDayRequired', undefined, 'Veuillez sélectionner au moins un jour de la semaine'));
       return;
     }
 
@@ -203,7 +203,7 @@ export default function HabitsManagerScreen() {
       console.log('✅ [HABITS_MANAGER] Habitudes rechargées, événement émis');
     } catch (error) {
       console.error('❌ [HABITS_MANAGER] Erreur lors de la création:', error);
-      Alert.alert('Erreur', 'Impossible de créer l\'habitude');
+      Alert.alert(t('error'), t('habitsCreateError', undefined, "Impossible de créer l'habitude"));
     } finally {
       setCreating(false);
     }
@@ -211,12 +211,12 @@ export default function HabitsManagerScreen() {
 
   const handleDeleteHabit = async (habitId: string) => {
     Alert.alert(
-      'Supprimer l\'habitude',
-      'Êtes-vous sûr de vouloir supprimer cette habitude ?',
+      t('habitsDeleteTitle', undefined, "Supprimer l'habitude"),
+      t('habitsDeleteConfirm', undefined, 'Êtes-vous sûr de vouloir supprimer cette habitude ?'),
       [
-        { text: 'Annuler', style: 'cancel' },
+        { text: t('cancel'), style: 'cancel' },
         {
-          text: 'Supprimer',
+          text: t('delete'),
           style: 'destructive',
           onPress: async () => {
             try {
@@ -225,7 +225,7 @@ export default function HabitsManagerScreen() {
               dashboardEvents.emit(DASHBOARD_DATA_CHANGED);
             } catch (error) {
               console.error('Erreur lors de la suppression:', error);
-              Alert.alert('Erreur', 'Impossible de supprimer l\'habitude');
+              Alert.alert(t('error'), t('habitsDeleteError', undefined, "Impossible de supprimer l'habitude"));
             }
           },
         },
@@ -841,4 +841,3 @@ const styles = StyleSheet.create({
     height: 40,
   },
 });
-

@@ -51,7 +51,7 @@ export default function ProfileRevealScreen() {
       const { url } = await paymentService.createCheckoutSession(billingType);
       
       if (!url) {
-        throw new Error('Aucune URL de session retournée');
+        throw new Error(t('paymentNoSessionUrl', undefined, 'Aucune URL de session retournée'));
       }
 
       // Rediriger directement vers la WebView Stripe
@@ -64,20 +64,20 @@ export default function ProfileRevealScreen() {
       
       if (error?.message?.includes('authenticated') || error?.message?.includes('Non authentifié')) {
         Alert.alert(
-          'Connexion requise',
-          'Vous devez être connecté pour continuer. Veuillez vous connecter ou créer un compte.',
+          t('loginRequiredTitle', undefined, 'Connexion requise'),
+          t('loginRequiredMessage', undefined, 'Vous devez être connecté pour continuer. Veuillez vous connecter ou créer un compte.'),
           [
-            { text: 'Annuler', style: 'cancel' },
+            { text: t('cancel', undefined, 'Annuler'), style: 'cancel' },
             { 
-              text: 'Se connecter', 
+              text: t('loginButton', undefined, 'Se connecter'), 
               onPress: () => router.push('/login')
             }
           ]
         );
       } else {
         Alert.alert(
-          'Erreur',
-          error?.message || 'Une erreur est survenue lors de la création de la session de paiement. Veuillez réessayer.'
+          t('error', undefined, 'Erreur'),
+          error?.message || t('paymentSessionError', undefined, 'Une erreur est survenue lors de la création de la session de paiement. Veuillez réessayer.')
         );
       }
     } finally {

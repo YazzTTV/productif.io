@@ -15,7 +15,8 @@ import { LineChart } from 'react-native-chart-kit';
 import { Dimensions } from 'react-native';
 import { behaviorService, authService, PlanLimits } from '@/lib/api';
 import { format, parseISO, subDays } from 'date-fns';
-import { fr } from 'date-fns/locale';
+import { fr, enUS, es as esLocale } from 'date-fns/locale';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 const { width } = Dimensions.get('window');
 
@@ -40,6 +41,8 @@ export default function AnalyticsScreen({ checkInType: propCheckInType, isActive
   const params = useLocalSearchParams();
   const checkInType = (propCheckInType || params.checkInType) as CheckInType | undefined;
   const hasLoadedRef = useRef(false);
+  const { t, language } = useLanguage();
+  const locale = language === 'en' ? enUS : language === 'es' ? esLocale : fr;
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -107,36 +110,36 @@ export default function AnalyticsScreen({ checkInType: propCheckInType, isActive
       // Si l'endpoint n'existe pas encore (404), afficher un message plus informatif
       if (error.message && (error.message.includes('Endpoint non trouvé') || error.message.includes('404'))) {
         Alert.alert(
-          'Fonctionnalité en cours de déploiement',
-          'L\'endpoint analytics est en cours de déploiement. Veuillez réessayer dans quelques instants.',
-          [{ text: 'OK' }]
+          t('analyticsDeployingTitle', undefined, 'Fonctionnalité en cours de déploiement'),
+          t('analyticsDeployingMessage', undefined, 'L\'endpoint analytics est en cours de déploiement. Veuillez réessayer dans quelques instants.'),
+          [{ text: t('ok', undefined, 'OK') }]
         );
       } else if (error.message && error.message.toLowerCase().includes('premium')) {
         Alert.alert(
-          'Analytics Premium',
-          'Analytics détaillés réservés au plan Premium. Débloquez plus de jours d\'historique.',
+          t('analyticsPremiumTitle', undefined, 'Analytics Premium'),
+          t('analyticsPremiumMessage', undefined, 'Analytics détaillés réservés au plan Premium. Débloquez plus de jours d\'historique.'),
           [
-            { text: 'Plus tard' },
-            { text: 'Passer en Premium', onPress: () => router.push('/paywall') }
+            { text: t('later', undefined, 'Plus tard') },
+            { text: t('upgrade', undefined, 'Passer en Premium'), onPress: () => router.push('/paywall') }
           ]
         );
-      } else if (error.message && error.message.includes('Non authentifié') || error.message.includes('401')) {
+      } else if ((error.message && error.message.includes('Non authentifié')) || error.message.includes('401')) {
         Alert.alert(
-          'Erreur d\'authentification',
-          'Vous devez être connecté pour voir vos analytics. Veuillez vous reconnecter.',
-          [{ text: 'OK' }]
+          t('analyticsAuthErrorTitle', undefined, 'Erreur d\'authentification'),
+          t('analyticsAuthErrorMessage', undefined, 'Vous devez être connecté pour voir vos analytics. Veuillez vous reconnecter.'),
+          [{ text: t('ok', undefined, 'OK') }]
         );
-      } else if (error.message && error.message.includes('réseau') || error.message.includes('timeout')) {
+      } else if ((error.message && error.message.includes('réseau')) || error.message.includes('timeout')) {
         Alert.alert(
-          'Erreur de connexion',
-          'Vérifiez votre connexion internet et réessayez.',
-          [{ text: 'OK' }]
+          t('analyticsConnectionErrorTitle', undefined, 'Erreur de connexion'),
+          t('analyticsConnectionErrorMessage', undefined, 'Vérifiez votre connexion internet et réessayez.'),
+          [{ text: t('ok', undefined, 'OK') }]
         );
       } else {
         Alert.alert(
-          'Erreur',
-          `Impossible de charger les données analytics. ${error?.message ? `\n\n${error.message}` : ''}`,
-          [{ text: 'OK' }]
+          t('error', undefined, 'Erreur'),
+          t('analyticsGenericError', { message: error?.message || '' }, `Impossible de charger les données analytics. ${error?.message ? `\n\n${error.message}` : ''}`),
+          [{ text: t('ok', undefined, 'OK') }]
         );
       }
       
@@ -161,13 +164,19 @@ export default function AnalyticsScreen({ checkInType: propCheckInType, isActive
 
   const handleSubmitCheckIn = async () => {
     if (!checkInType || !checkInValue) {
-      Alert.alert('Erreur', 'Veuillez entrer une note entre 1 et 10');
+      Alert.alert(
+        t('error', undefined, 'Erreur'),
+        t('analyticsNoteRequired', undefined, 'Veuillez entrer une note entre 1 et 10')
+      );
       return;
     }
 
     const value = parseInt(checkInValue, 10);
     if (isNaN(value) || value < 1 || value > 10) {
-      Alert.alert('Erreur', 'La note doit être entre 1 et 10');
+      Alert.alert(
+        t('error', undefined, 'Erreur'),
+        t('analyticsNoteInvalid', undefined, 'La note doit être entre 1 et 10')
+      );
       return;
     }
 
@@ -187,9 +196,9 @@ export default function AnalyticsScreen({ checkInType: propCheckInType, isActive
 
       console.log('✅ [Analytics] Check-in enregistré avec succès:', result);
 
-      Alert.alert('Succès', 'Votre note a été enregistrée !', [
+      Alert.alert(t('success', undefined, 'Succès'), t('analyticsNoteSaved', undefined, 'Votre note a été enregistrée !'), [
         {
-          text: 'OK',
+          text: t('ok', undefined, 'OK'),
           onPress: () => {
             setShowCheckInForm(false);
             setCheckInValue('');
@@ -204,18 +213,18 @@ export default function AnalyticsScreen({ checkInType: propCheckInType, isActive
       console.error('❌ [Analytics] Message:', error?.message);
       console.error('❌ [Analytics] Stack:', error?.stack);
       
-      let errorMessage = 'Impossible d\'enregistrer votre note';
+      let errorMessage = t('analyticsSaveError', undefined, 'Impossible d\'enregistrer votre note');
       if (error?.message) {
         if (error.message.includes('Non authentifié') || error.message.includes('401')) {
-          errorMessage = 'Vous devez être connecté pour enregistrer une note. Veuillez vous reconnecter.';
+          errorMessage = t('analyticsSaveAuthError', undefined, 'Vous devez être connecté pour enregistrer une note. Veuillez vous reconnecter.');
         } else if (error.message.includes('réseau') || error.message.includes('timeout')) {
-          errorMessage = 'Erreur de connexion. Vérifiez votre internet et réessayez.';
+          errorMessage = t('analyticsSaveConnectionError', undefined, 'Erreur de connexion. Vérifiez votre internet et réessayez.');
         } else {
-          errorMessage = `Erreur: ${error.message}`;
+          errorMessage = t('analyticsSaveErrorWithMessage', { message: error.message }, `Erreur: ${error.message}`);
         }
       }
       
-      Alert.alert('Erreur', errorMessage);
+      Alert.alert(t('error', undefined, 'Erreur'), errorMessage);
     } finally {
       setSubmitting(false);
     }
@@ -223,9 +232,9 @@ export default function AnalyticsScreen({ checkInType: propCheckInType, isActive
 
   const getTypeLabel = (type: CheckInType) => {
     const labels = {
-      mood: 'Humeur',
-      stress: 'Stress',
-      focus: 'Focus',
+      mood: t('analyticsTypeMood', undefined, 'Humeur'),
+      stress: t('analyticsTypeStress', undefined, 'Stress'),
+      focus: t('analyticsTypeFocus', undefined, 'Focus'),
     };
     return labels[type];
   };
@@ -251,7 +260,7 @@ export default function AnalyticsScreen({ checkInType: propCheckInType, isActive
   const prepareChartData = (type: CheckInType) => {
     const labels = analyticsData.map((d) => {
       const date = parseISO(d.date);
-      return format(date, 'EEE', { locale: fr }).substring(0, 3);
+      return format(date, 'EEE', { locale }).substring(0, 3);
     });
 
     const data = analyticsData.map((d) => {
@@ -267,7 +276,9 @@ export default function AnalyticsScreen({ checkInType: propCheckInType, isActive
       <View style={styles.container}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#10B981" />
-          <Text style={styles.loadingText}>Chargement des données...</Text>
+          <Text style={styles.loadingText}>
+            {t('analyticsLoading', undefined, 'Chargement des données...')}
+          </Text>
         </View>
       </View>
     );
@@ -283,13 +294,21 @@ export default function AnalyticsScreen({ checkInType: propCheckInType, isActive
         {planLimits?.analyticsRetentionDays !== null && (
           <View style={styles.planNotice}>
             <View style={styles.planNoticeLeft}>
-              <Text style={styles.planNoticeTitle}>Analytics en aperçu</Text>
+              <Text style={styles.planNoticeTitle}>
+                {t('analyticsPlanNoticeTitle', undefined, 'Analytics en aperçu')}
+              </Text>
               <Text style={styles.planNoticeText}>
-                Vous voyez les {planLimits.analyticsRetentionDays} derniers jours. Passez en Premium pour un historique complet.
+                {t(
+                  'analyticsPlanNoticeText',
+                  { days: planLimits.analyticsRetentionDays ?? 0 },
+                  `Vous voyez les ${planLimits.analyticsRetentionDays} derniers jours. Passez en Premium pour un historique complet.`
+                )}
               </Text>
             </View>
             <TouchableOpacity style={styles.planNoticeButton} onPress={() => router.push('/paywall')}>
-              <Text style={styles.planNoticeButtonText}>Upgrade</Text>
+              <Text style={styles.planNoticeButtonText}>
+                {t('upgrade', undefined, 'Upgrade')}
+              </Text>
             </TouchableOpacity>
           </View>
         )}
@@ -299,15 +318,21 @@ export default function AnalyticsScreen({ checkInType: propCheckInType, isActive
             <View style={styles.checkInHeader}>
               <Text style={styles.checkInEmoji}>{getTypeEmoji(checkInType)}</Text>
               <Text style={styles.checkInTitle}>
-                Notez votre {getTypeLabel(checkInType).toLowerCase()}
+                {t(
+                  'analyticsCheckinTitle',
+                  { type: getTypeLabel(checkInType).toLowerCase() },
+                  `Notez votre ${getTypeLabel(checkInType).toLowerCase()}`
+                )}
               </Text>
             </View>
             <Text style={styles.checkInSubtitle}>
-              Sur une échelle de 1 à 10, comment vous sentez-vous ?
+              {t('analyticsCheckinSubtitle', undefined, 'Sur une échelle de 1 à 10, comment vous sentez-vous ?')}
             </Text>
 
             <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Note (1-10)</Text>
+              <Text style={styles.inputLabel}>
+                {t('analyticsNoteLabel', undefined, 'Note (1-10)')}
+              </Text>
               <TextInput
                 style={styles.numberInput}
                 value={checkInValue}
@@ -320,12 +345,14 @@ export default function AnalyticsScreen({ checkInType: propCheckInType, isActive
             </View>
 
             <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Note (optionnel)</Text>
+              <Text style={styles.inputLabel}>
+                {t('analyticsOptionalNoteLabel', undefined, 'Note (optionnel)')}
+              </Text>
               <TextInput
                 style={styles.noteInput}
                 value={checkInNote}
                 onChangeText={setCheckInNote}
-                placeholder="Ajoutez une note si vous le souhaitez..."
+                placeholder={t('analyticsNotePlaceholder', undefined, 'Ajoutez une note si vous le souhaitez...')}
                 multiline
                 numberOfLines={3}
               />
@@ -344,7 +371,9 @@ export default function AnalyticsScreen({ checkInType: propCheckInType, isActive
               ) : (
                 <>
                   <Ionicons name="checkmark-circle" size={20} color="#fff" />
-                  <Text style={styles.submitButtonText}>Enregistrer</Text>
+                  <Text style={styles.submitButtonText}>
+                    {t('save', undefined, 'Enregistrer')}
+                  </Text>
                 </>
               )}
             </TouchableOpacity>
@@ -353,32 +382,36 @@ export default function AnalyticsScreen({ checkInType: propCheckInType, isActive
               style={styles.skipButton}
               onPress={() => setShowCheckInForm(false)}
             >
-              <Text style={styles.skipButtonText}>Passer</Text>
+              <Text style={styles.skipButtonText}>
+                {t('skip', undefined, 'Passer')}
+              </Text>
             </TouchableOpacity>
           </View>
         )}
 
         {/* Résumé des moyennes */}
         <View style={styles.summaryCard}>
-          <Text style={styles.sectionTitle}>Moyennes sur 7 jours</Text>
+          <Text style={styles.sectionTitle}>
+            {t('analyticsSummaryTitle', undefined, 'Moyennes sur 7 jours')}
+          </Text>
           <View style={styles.summaryGrid}>
             <View style={styles.summaryItem}>
               <Text style={styles.summaryEmoji}>🙂</Text>
-              <Text style={styles.summaryLabel}>Humeur</Text>
+              <Text style={styles.summaryLabel}>{getTypeLabel('mood')}</Text>
               <Text style={styles.summaryValue}>
                 {averages.mood !== null ? averages.mood.toFixed(1) : '—'}
               </Text>
             </View>
             <View style={styles.summaryItem}>
               <Text style={styles.summaryEmoji}>😌</Text>
-              <Text style={styles.summaryLabel}>Stress</Text>
+              <Text style={styles.summaryLabel}>{getTypeLabel('stress')}</Text>
               <Text style={styles.summaryValue}>
                 {averages.stress !== null ? averages.stress.toFixed(1) : '—'}
               </Text>
             </View>
             <View style={styles.summaryItem}>
               <Text style={styles.summaryEmoji}>🎯</Text>
-              <Text style={styles.summaryLabel}>Focus</Text>
+              <Text style={styles.summaryLabel}>{getTypeLabel('focus')}</Text>
               <Text style={styles.summaryValue}>
                 {averages.focus !== null ? averages.focus.toFixed(1) : '—'}
               </Text>

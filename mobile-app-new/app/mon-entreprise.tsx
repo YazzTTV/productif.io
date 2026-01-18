@@ -5,12 +5,14 @@ import { router } from 'expo-router'
 import { apiCall } from '@/lib/api'
 import { Select } from '@/components/ui/Select'
 import { DatePicker } from '@/components/ui/DatePicker'
+import { useLanguage } from '@/contexts/LanguageContext'
 
 type User = { id: string; name: string; email: string; role: string }
 type Task = { id: string; title: string; completed: boolean; userId: string; userName?: string }
 type CompanyTask = Task & { priority?: number | null; energyLevel?: number | null; dueDate?: string | null }
 
 export default function CompanyPage() {
+  const { t } = useLanguage()
   const [loading, setLoading] = useState(true)
   const [role, setRole] = useState<'ADMIN' | 'SUPER_ADMIN' | 'USER' | 'MEMBER' | string>('USER')
   const [users, setUsers] = useState<User[]>([])
@@ -60,7 +62,7 @@ export default function CompanyPage() {
         }
       }
     } catch (e) {
-      Alert.alert('Erreur', "Impossible de charger les données d'entreprise")
+      Alert.alert(t('error'), t('companyLoadError', undefined, "Impossible de charger les données d'entreprise"))
     } finally {
       setLoading(false)
     }
@@ -76,13 +78,19 @@ export default function CompanyPage() {
 
   const priorityLabel = (p?: number | null) => {
     if (p === null || p === undefined) return 'P?'
-    const map: any = { 0: 'P0 Optionnel', 1: 'P1 À faire', 2: 'P2 Important', 3: 'P3 Urgent', 4: 'P4 Quick Win' }
+    const map: any = {
+      0: t('companyPriority0', undefined, 'P0 Optionnel'),
+      1: t('companyPriority1', undefined, 'P1 À faire'),
+      2: t('companyPriority2', undefined, 'P2 Important'),
+      3: t('companyPriority3', undefined, 'P3 Urgent'),
+      4: t('companyPriority4', undefined, 'P4 Quick Win'),
+    }
     return map[p] || `P${p}`
   }
 
   const createCompanyTask = async () => {
     if (!newTask.title.trim() || !newTask.userId) {
-      Alert.alert('Erreur', 'Titre et destinataire requis')
+      Alert.alert(t('error'), t('companyCreateRequired', undefined, 'Titre et destinataire requis'))
       return
     }
     setSubmitting(true)
@@ -101,9 +109,9 @@ export default function CompanyPage() {
       setCreateOpen(false)
       setNewTask({ title: '', description: '', priority: '3', energyLevel: '2', userId: '', dueDate: undefined })
       await load()
-      Alert.alert('Succès', 'Tâche créée et assignée')
+      Alert.alert(t('success'), t('companyTaskCreated', undefined, 'Tâche créée et assignée'))
     } catch (e: any) {
-      Alert.alert('Erreur', e?.message || 'Impossible de créer la tâche')
+      Alert.alert(t('error'), e?.message || t('companyCreateError', undefined, 'Impossible de créer la tâche'))
     } finally {
       setSubmitting(false)
     }
@@ -122,14 +130,14 @@ export default function CompanyPage() {
         <TouchableOpacity onPress={() => router.back()} style={{ padding: 4 }}>
           <Ionicons name="arrow-back" size={24} color="#111827" />
         </TouchableOpacity>
-        <Text style={styles.title}>Mon Entreprise</Text>
+        <Text style={styles.title}>{t('companyTitle', undefined, 'Mon Entreprise')}</Text>
         <View style={{ width: 24 }} />
       </View>
 
       <View style={styles.tabs}>
-        <TabButton id="tasks" label="Tâches membres" icon="list" />
-        {isAdmin && <TabButton id="users" label="Utilisateurs" icon="people" />}
-        {isAdmin && <TabButton id="performance" label="Performance" icon="trending-up" />}
+        <TabButton id="tasks" label={t('companyTabTasks', undefined, 'Tâches membres')} icon="list" />
+        {isAdmin && <TabButton id="users" label={t('companyTabUsers', undefined, 'Utilisateurs')} icon="people" />}
+        {isAdmin && <TabButton id="performance" label={t('companyTabPerformance', undefined, 'Performance')} icon="trending-up" />}
       </View>
 
       {loading ? (
@@ -139,7 +147,7 @@ export default function CompanyPage() {
           {tab === 'tasks' && (
             <View style={styles.card}>
               {tasks.length === 0 ? (
-                <Text style={styles.empty}>Aucune tâche trouvée.</Text>
+                <Text style={styles.empty}>{t('companyNoTasks', undefined, 'Aucune tâche trouvée.')}</Text>
               ) : (
                 tasks.map((t) => (
                   <View key={t.id} style={styles.rowBetween}>
@@ -149,14 +157,14 @@ export default function CompanyPage() {
                         {priorityLabel(t.priority)}{t.userName ? ` • ${t.userName}` : ''}
                       </Text>
                     </View>
-                    <Text style={[styles.badge, { marginRight: 8 }]}>{t.completed ? 'Terminé' : 'À faire'}</Text>
+                      <Text style={[styles.badge, { marginRight: 8 }]}>{t.completed ? t('completed', undefined, 'Terminé') : t('todo', undefined, 'À faire')}</Text>
                   </View>
                 ))
               )}
               {isAdmin && (
                 <TouchableOpacity style={styles.primaryBtn} onPress={() => setCreateOpen(true)}>
                   <Ionicons name="add" size={18} color="#fff" />
-                  <Text style={styles.primaryBtnText}>Assigner une tâche</Text>
+                  <Text style={styles.primaryBtnText}>{t('companyAssignTask', undefined, 'Assigner une tâche')}</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -164,9 +172,9 @@ export default function CompanyPage() {
 
           {tab === 'users' && isAdmin && (
             <View style={styles.card}>
-              <Text style={styles.itemTitle}>Utilisateurs</Text>
+              <Text style={styles.itemTitle}>{t('companyUsers', undefined, 'Utilisateurs')}</Text>
               {users.length === 0 ? (
-                <Text style={styles.empty}>Aucun utilisateur.</Text>
+                <Text style={styles.empty}>{t('companyNoUsers', undefined, 'Aucun utilisateur.')}</Text>
               ) : (
                 users.map((u) => (
                   <View key={u.id} style={styles.rowBetween}>
@@ -177,11 +185,11 @@ export default function CompanyPage() {
               )}
               {/* Ajout utilisateur par email (flux simple) */}
               <View style={{ marginTop: 12 }}>
-                <Text style={{ color: '#6B7280', marginBottom: 6 }}>Ajouter un utilisateur (ID ou Email converti côté back)</Text>
+                <Text style={{ color: '#6B7280', marginBottom: 6 }}>{t('companyAddUser', undefined, 'Ajouter un utilisateur (ID ou Email converti côté back)')}</Text>
                 <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
                   <View style={{ flex: 1, borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, paddingHorizontal: 12 }}>
                     <TextInput
-                      placeholder="ID utilisateur"
+                      placeholder={t('companyUserIdPlaceholder', undefined, 'ID utilisateur')}
                       value={inviteEmail}
                       onChangeText={setInviteEmail}
                       style={{ paddingVertical: 10 }}
@@ -193,16 +201,16 @@ export default function CompanyPage() {
                       if (!companyId || !inviteEmail) return
                       try {
                         await apiCall(`/companies/${companyId}/users`, { method: 'POST', body: JSON.stringify({ userId: inviteEmail }) })
-                        Alert.alert('Succès', "Utilisateur ajouté (si ID valide)")
+                        Alert.alert(t('success'), t('companyUserAdded', undefined, 'Utilisateur ajouté (si ID valide)'))
                         const u = await apiCall<any>(`/companies/${companyId}/users`)
                         setUsers(u?.users || [])
                         setInviteEmail('')
                       } catch (e) {
-                        Alert.alert('Erreur', "Impossible d'ajouter l'utilisateur")
+                        Alert.alert(t('error'), t('companyAddUserError', undefined, "Impossible d'ajouter l'utilisateur"))
                       }
                     }}
                   >
-                    <Text style={{ color: '#fff', fontWeight: '600' }}>Ajouter</Text>
+                    <Text style={{ color: '#fff', fontWeight: '600' }}>{t('add', undefined, 'Ajouter')}</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -211,7 +219,7 @@ export default function CompanyPage() {
 
           {tab === 'performance' && isAdmin && (
             <View style={styles.card}>
-              <Text style={styles.itemTitle}>Performance d'équipe</Text>
+              <Text style={styles.itemTitle}>{t('companyPerformance', undefined, "Performance d'équipe")}</Text>
               <View style={{ marginTop: 8 }}>
                 {
                   (() => {
@@ -226,16 +234,16 @@ export default function CompanyPage() {
                     const activeEmployees = new Set(tasks.map(t => t.userId)).size
                     return (
                       <>
-                        <View style={styles.rowBetween}><Text style={styles.metricLabel}>Taux de complétion</Text><Text style={styles.metricValue}>{rate}%</Text></View>
-                        <View style={styles.rowBetween}><Text style={styles.metricLabel}>Complétion P3/P4</Text><Text style={styles.metricValue}>{pHighRate}%</Text></View>
-                        <View style={styles.rowBetween}><Text style={styles.metricLabel}>Tâches en retard</Text><Text style={[styles.metricValue, { color: '#EF4444' }]}>{overdue}</Text></View>
-                        <View style={styles.rowBetween}><Text style={styles.metricLabel}>Employés actifs</Text><Text style={styles.metricValue}>{activeEmployees}</Text></View>
+                        <View style={styles.rowBetween}><Text style={styles.metricLabel}>{t('companyCompletionRate', undefined, 'Taux de complétion')}</Text><Text style={styles.metricValue}>{rate}%</Text></View>
+                        <View style={styles.rowBetween}><Text style={styles.metricLabel}>{t('companyHighPriorityRate', undefined, 'Complétion P3/P4')}</Text><Text style={styles.metricValue}>{pHighRate}%</Text></View>
+                        <View style={styles.rowBetween}><Text style={styles.metricLabel}>{t('companyOverdueTasks', undefined, 'Tâches en retard')}</Text><Text style={[styles.metricValue, { color: '#EF4444' }]}>{overdue}</Text></View>
+                        <View style={styles.rowBetween}><Text style={styles.metricLabel}>{t('companyActiveEmployees', undefined, 'Employés actifs')}</Text><Text style={styles.metricValue}>{activeEmployees}</Text></View>
                       </>
                     )
                   })()
                 }
               </View>
-              <Text style={{ color: '#6B7280', marginTop: 8 }}>Calculs locaux basés sur les tâches d'équipe. On peut brancher des KPIs serveur si désiré.</Text>
+              <Text style={{ color: '#6B7280', marginTop: 8 }}>{t('companyLocalMetrics', undefined, "Calculs locaux basés sur les tâches d'équipe. On peut brancher des KPIs serveur si désiré.")}</Text>
             </View>
           )}
 
@@ -246,58 +254,58 @@ export default function CompanyPage() {
             <TouchableOpacity onPress={() => setCreateOpen(false)} style={{ padding: 4 }}>
               <Ionicons name="close" size={24} color="#6B7280" />
             </TouchableOpacity>
-            <Text style={styles.title}>Assigner une tâche</Text>
+            <Text style={styles.title}>{t('companyAssignTask', undefined, 'Assigner une tâche')}</Text>
             <View style={{ width: 24 }} />
           </View>
 
           <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16 }}>
             <View style={styles.formGroup}>
-              <Text style={styles.formLabel}>Titre *</Text>
+              <Text style={styles.formLabel}>{t('title', undefined, 'Titre')} *</Text>
               <View style={styles.inputShell}>
-                <TextInput value={newTask.title} onChangeText={(v) => setNewTask(p => ({ ...p, title: v }))} placeholder="Titre de la tâche" style={styles.input} />
+                <TextInput value={newTask.title} onChangeText={(v) => setNewTask(p => ({ ...p, title: v }))} placeholder={t('companyTaskTitlePlaceholder', undefined, 'Titre de la tâche')} style={styles.input} />
               </View>
             </View>
             <View style={styles.formGroup}>
-              <Text style={styles.formLabel}>Description</Text>
+              <Text style={styles.formLabel}>{t('description', undefined, 'Description')}</Text>
               <View style={styles.inputShell}>
-                <TextInput value={newTask.description} onChangeText={(v) => setNewTask(p => ({ ...p, description: v }))} placeholder="Description" style={[styles.input, { height: 90 }]} multiline />
+                <TextInput value={newTask.description} onChangeText={(v) => setNewTask(p => ({ ...p, description: v }))} placeholder={t('companyTaskDescriptionPlaceholder', undefined, 'Description')} style={[styles.input, { height: 90 }]} multiline />
               </View>
             </View>
             <View style={{ flexDirection: 'row', gap: 12 }}>
               <View style={[styles.formGroup, { flex: 1 }]}>
-                <Text style={styles.formLabel}>Priorité</Text>
+                <Text style={styles.formLabel}>{t('companyPriority', undefined, 'Priorité')}</Text>
                 <Select value={newTask.priority} onValueChange={(v) => setNewTask(p => ({ ...p, priority: v }))} options={[
-                  { value: '4', label: 'P4 - Quick Win' },
-                  { value: '3', label: 'P3 - Urgent' },
-                  { value: '2', label: 'P2 - Important' },
-                  { value: '1', label: 'P1 - À faire' },
-                  { value: '0', label: 'P0 - Optionnel' },
+                  { value: '4', label: t('companyPriority4', undefined, 'P4 - Quick Win') },
+                  { value: '3', label: t('companyPriority3', undefined, 'P3 - Urgent') },
+                  { value: '2', label: t('companyPriority2', undefined, 'P2 - Important') },
+                  { value: '1', label: t('companyPriority1', undefined, 'P1 - À faire') },
+                  { value: '0', label: t('companyPriority0', undefined, 'P0 - Optionnel') },
                 ]} />
               </View>
               <View style={[styles.formGroup, { flex: 1 }]}>
-                <Text style={styles.formLabel}>Énergie</Text>
+                <Text style={styles.formLabel}>{t('companyEnergy', undefined, 'Énergie')}</Text>
                 <Select value={newTask.energyLevel} onValueChange={(v) => setNewTask(p => ({ ...p, energyLevel: v }))} options={[
-                  { value: '3', label: 'Extrême' },
-                  { value: '2', label: 'Élevé' },
-                  { value: '1', label: 'Moyen' },
-                  { value: '0', label: 'Faible' },
+                  { value: '3', label: t('companyEnergy3', undefined, 'Extrême') },
+                  { value: '2', label: t('companyEnergy2', undefined, 'Élevé') },
+                  { value: '1', label: t('companyEnergy1', undefined, 'Moyen') },
+                  { value: '0', label: t('companyEnergy0', undefined, 'Faible') },
                 ]} />
               </View>
             </View>
             <View style={styles.formGroup}>
-              <Text style={styles.formLabel}>Assigner à *</Text>
-              <Select value={newTask.userId} onValueChange={(v) => setNewTask(p => ({ ...p, userId: v }))} options={userOptions} placeholder="Sélectionner" />
+              <Text style={styles.formLabel}>{t('companyAssignTo', undefined, 'Assigner à')} *</Text>
+              <Select value={newTask.userId} onValueChange={(v) => setNewTask(p => ({ ...p, userId: v }))} options={userOptions} placeholder={t('select', undefined, 'Sélectionner')} />
             </View>
             <View style={styles.formGroup}>
-              <Text style={styles.formLabel}>Date d'échéance</Text>
-              <DatePicker value={newTask.dueDate} onValueChange={(d) => setNewTask(p => ({ ...p, dueDate: d }))} placeholder="Choisir une date" />
+              <Text style={styles.formLabel}>{t('companyDueDate', undefined, "Date d'échéance")}</Text>
+              <DatePicker value={newTask.dueDate} onValueChange={(d) => setNewTask(p => ({ ...p, dueDate: d }))} placeholder={t('selectTime', undefined, 'Choisir une date')} />
             </View>
           </ScrollView>
           <View style={{ padding: 16 }}>
             <TouchableOpacity style={[styles.primaryBtn, submitting && { opacity: 0.7 }]} onPress={createCompanyTask} disabled={submitting}>
               {submitting ? <ActivityIndicator size="small" color="#fff" /> : <>
                 <Ionicons name="checkmark" size={18} color="#fff" />
-                <Text style={styles.primaryBtnText}>Créer la tâche</Text>
+                <Text style={styles.primaryBtnText}>{t('companyCreateTask', undefined, 'Créer la tâche')}</Text>
               </>}
             </TouchableOpacity>
           </View>
@@ -325,5 +333,3 @@ const styles = StyleSheet.create({
   badge: { color: '#10B981', fontWeight: '700' },
   empty: { color: '#6B7280' },
 })
-
-

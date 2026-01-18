@@ -17,6 +17,12 @@ export default function OnboardingNewLayout() {
       return false;
     }
     
+    // Ne pas rediriger si on est sur la page stripe-webview (pour permettre les paiements)
+    const currentRoute = segments[segments.length - 1];
+    if (currentRoute === 'stripe-webview') {
+      return false;
+    }
+    
     try {
       const flag = await AsyncStorage.getItem('onboarding_completed');
       if (flag === 'true' && isMountedRef.current && !isNavigatingRef.current) {
@@ -32,7 +38,7 @@ export default function OnboardingNewLayout() {
       console.error('Error checking onboarding status:', error);
       return false;
     }
-  }, []);
+  }, [segments]);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -53,10 +59,16 @@ export default function OnboardingNewLayout() {
   // Vérifier à chaque fois que l'écran est focus (mais pas si on est déjà en train de naviguer)
   useFocusEffect(
     useCallback(() => {
+      // Ne pas vérifier l'onboarding si on est sur stripe-webview
+      const currentRoute = segments[segments.length - 1];
+      if (currentRoute === 'stripe-webview') {
+        return;
+      }
+      
       // Réinitialiser le flag de navigation quand on revient sur cet écran
       isNavigatingRef.current = false;
       checkOnboardingStatus();
-    }, [checkOnboardingStatus])
+    }, [checkOnboardingStatus, segments])
   );
 
   // Afficher un loader pendant la vérification

@@ -158,8 +158,8 @@ export default function CalendarSyncScreen() {
     } catch (error: any) {
       console.error('❌ [CalendarSync] Erreur lors de la connexion Google Calendar:', error);
       Alert.alert(
-        'Erreur',
-        error.message || 'Une erreur est survenue lors de la connexion à Google Calendar'
+        t('error'),
+        error.message || t('calendarConnectError')
       );
     } finally {
       setIsConnecting(false);
@@ -169,8 +169,8 @@ export default function CalendarSyncScreen() {
   const handleConnectApple = async () => {
     if (Platform.OS !== 'ios') {
       Alert.alert(
-        'Non disponible',
-        'Apple Calendar est uniquement disponible sur iOS'
+        t('error'),
+        t('calendarAppleOnlyIOS')
       );
       return;
     }
@@ -208,8 +208,8 @@ export default function CalendarSyncScreen() {
     } catch (error: any) {
       console.error('❌ [CalendarSync] Erreur lors de la connexion Apple Calendar:', error);
       Alert.alert(
-        'Erreur',
-        error.message || 'Une erreur est survenue lors de la connexion à Apple Calendar'
+        t('error'),
+        error.message || t('calendarGenericError')
       );
     } finally {
       setIsConnecting(false);
@@ -436,4 +436,3 @@ const styles = StyleSheet.create({
     color: 'rgba(0, 0, 0, 0.6)',
   },
 });
-

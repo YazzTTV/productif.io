@@ -2,8 +2,10 @@ import React from 'react';
 import { SafeAreaView, View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { router } from 'expo-router';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 export default function SocialProofScreen() {
+  const { t } = useLanguage();
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar style="dark" />
@@ -14,11 +16,11 @@ export default function SocialProofScreen() {
               <Image source={require('../../assets/images/productif-logo.png')} style={styles.logoImg} />
             </View>
           </View>
-          <Text style={styles.big}>Rejoignez Productif.io</Text>
-          <Text style={styles.desc}>Comme des milliers d'étudiants et de pros, structurez vos journées, progressez chaque jour et gardez le cap.</Text>
+          <Text style={styles.big}>{t('legacySocialTitle')}</Text>
+          <Text style={styles.desc}>{t('legacySocialDescription')}</Text>
         </View>
         <TouchableOpacity style={styles.cta} onPress={() => router.replace('/onboarding/survey')}>
-          <Text style={styles.ctaText}>Continuer</Text>
+          <Text style={styles.ctaText}>{t('continue')}</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>

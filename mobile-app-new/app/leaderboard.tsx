@@ -13,6 +13,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { apiCall } from '@/lib/api';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 const { width } = Dimensions.get('window');
 
@@ -45,6 +46,7 @@ const LEVEL_COLORS = {
 } as const;
 
 export default function LeaderboardScreen() {
+  const { t } = useLanguage();
   const [data, setData] = useState<LeaderboardData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -78,26 +80,26 @@ export default function LeaderboardScreen() {
         message.toLowerCase().includes('leaderboard global')
       ))) {
         Alert.alert(
-          'Leaderboard Premium',
-          'Le classement global est réservé au plan Premium. Débloquez cette fonctionnalité pour comparer votre progression avec la communauté mondiale.',
+          t('leaderboardPremiumTitle', undefined, 'Leaderboard Premium'),
+          t('leaderboardPremiumMessage', undefined, 'Le classement global est réservé au plan Premium. Débloquez cette fonctionnalité pour comparer votre progression avec la communauté mondiale.'),
           [
-            { text: 'Plus tard', style: 'cancel' },
-            { text: 'Passer en Premium', onPress: () => router.push('/paywall') }
+            { text: t('later', undefined, 'Plus tard'), style: 'cancel' },
+            { text: t('upgrade', undefined, 'Passer en Premium'), onPress: () => router.push('/paywall') }
           ]
         );
         setError('Leaderboard Premium - Upgrade requis');
       } else if (status === 401 || (message && (message.includes('Non authentifié') || message.includes('401')))) {
         Alert.alert(
-          'Erreur d\'authentification',
-          'Vous devez être connecté pour voir le leaderboard. Veuillez vous reconnecter.',
-          [{ text: 'OK' }]
+          t('authErrorTitle', undefined, "Erreur d'authentification"),
+          t('leaderboardAuthError', undefined, 'Vous devez être connecté pour voir le leaderboard. Veuillez vous reconnecter.'),
+          [{ text: t('ok', undefined, 'OK') }]
         );
         setError('Authentification requise');
       } else if (message && (message.includes('réseau') || message.includes('timeout'))) {
         Alert.alert(
-          'Erreur de connexion',
-          'Vérifiez votre connexion internet et réessayez.',
-          [{ text: 'OK' }]
+          t('connectionError', undefined, 'Erreur de connexion'),
+          t('checkConnection', undefined, 'Vérifiez votre connexion internet et réessayez.'),
+          [{ text: t('ok', undefined, 'OK') }]
         );
         setError(message);
       } else {
@@ -158,12 +160,12 @@ export default function LeaderboardScreen() {
       <View style={styles.userRankCard}>
         <View style={styles.userRankHeader}>
           <Ionicons name="person" size={20} color="#10B981" />
-          <Text style={styles.userRankTitle}>Votre position</Text>
+          <Text style={styles.userRankTitle}>{t('leaderboardYourPosition', undefined, 'Votre position')}</Text>
         </View>
         <View style={styles.userRankContent}>
           <View style={styles.userRankStats}>
             <Text style={styles.userRankPosition}>#{data.userRank}</Text>
-            <Text style={styles.userRankTotal}>sur {data.totalUsers} utilisateurs</Text>
+            <Text style={styles.userRankTotal}>{t('leaderboardTotalUsers', { total: data.totalUsers }, `sur ${data.totalUsers} utilisateurs`)}</Text>
           </View>
           <View style={styles.userRankBadge}>
             <Ionicons name="trending-up" size={16} color="#10B981" />
@@ -243,7 +245,7 @@ export default function LeaderboardScreen() {
           <Text style={styles.errorMessage}>{error}</Text>
           <TouchableOpacity style={styles.retryButton} onPress={fetchData}>
             <Ionicons name="refresh" size={20} color="white" />
-            <Text style={styles.retryButtonText}>Réessayer</Text>
+            <Text style={styles.retryButtonText}>{t('retry')}</Text>
           </TouchableOpacity>
         </View>
       );
@@ -253,9 +255,9 @@ export default function LeaderboardScreen() {
       return (
         <View style={styles.emptyContainer}>
           <Ionicons name="people-outline" size={64} color="#9CA3AF" />
-          <Text style={styles.emptyTitle}>Aucun classement</Text>
+          <Text style={styles.emptyTitle}>{t('leaderboardEmptyTitle', undefined, 'Aucun classement')}</Text>
           <Text style={styles.emptyMessage}>
-            Le classement sera disponible une fois que des utilisateurs auront commencé à utiliser l'application
+            {t('leaderboardEmptyMessage', undefined, "Le classement sera disponible une fois que des utilisateurs auront commencé à utiliser l'application")}
           </Text>
         </View>
       );
@@ -270,22 +272,22 @@ export default function LeaderboardScreen() {
         <View style={styles.statsCard}>
           <View style={styles.statsHeader}>
             <Ionicons name="people" size={20} color="#3B82F6" />
-            <Text style={styles.statsTitle}>Communauté</Text>
+            <Text style={styles.statsTitle}>{t('leaderboardCommunity', undefined, 'Communauté')}</Text>
           </View>
           <View style={styles.statsGrid}>
             <View style={styles.statBox}>
               <Text style={styles.statBoxNumber}>{data.totalUsers}</Text>
-              <Text style={styles.statBoxLabel}>Utilisateurs</Text>
+              <Text style={styles.statBoxLabel}>{t('users', undefined, 'Utilisateurs')}</Text>
             </View>
             <View style={styles.statBox}>
               <Text style={styles.statBoxNumber}>{data.leaderboard.length}</Text>
-              <Text style={styles.statBoxLabel}>Actifs</Text>
+              <Text style={styles.statBoxLabel}>{t('leaderboardActive', undefined, 'Actifs')}</Text>
             </View>
             <View style={styles.statBox}>
               <Text style={styles.statBoxNumber}>
                 {data.leaderboard[0]?.points || 0}
               </Text>
-              <Text style={styles.statBoxLabel}>Record</Text>
+              <Text style={styles.statBoxLabel}>{t('leaderboardRecord', undefined, 'Record')}</Text>
             </View>
           </View>
         </View>
@@ -294,7 +296,7 @@ export default function LeaderboardScreen() {
         <View style={styles.leaderboardContainer}>
           <View style={styles.leaderboardHeader}>
             <Text style={styles.leaderboardTitle}>
-              Top {displayLimit}
+              {t('leaderboardTop', { count: displayLimit }, `Top ${displayLimit}`)}
             </Text>
             {data.leaderboard.length > 10 && (
               <TouchableOpacity
@@ -302,7 +304,7 @@ export default function LeaderboardScreen() {
                 onPress={() => setShowAll(!showAll)}
               >
                 <Text style={styles.toggleButtonText}>
-                  {showAll ? 'Voir moins' : `Voir tout (${data.leaderboard.length})`}
+                  {showAll ? t('seeLess', undefined, 'Voir moins') : t('seeAllWithCount', { count: data.leaderboard.length }, `Voir tout (${data.leaderboard.length})`)}
                 </Text>
                 <Ionicons 
                   name={showAll ? 'chevron-up' : 'chevron-down'} 
@@ -325,7 +327,7 @@ export default function LeaderboardScreen() {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#10B981" />
-        <Text style={styles.loadingText}>Chargement du classement...</Text>
+        <Text style={styles.loadingText}>{t('leaderboardLoading', undefined, 'Chargement du classement...')}</Text>
       </View>
     );
   }
@@ -340,7 +342,7 @@ export default function LeaderboardScreen() {
         >
           <Ionicons name="arrow-back" size={24} color="#374151" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Classement</Text>
+        <Text style={styles.headerTitle}>{t('leaderboardTitle', undefined, 'Classement')}</Text>
         <View style={styles.headerSpacer} />
       </View>
 
@@ -353,9 +355,9 @@ export default function LeaderboardScreen() {
       >
         {/* Header Info */}
         <View style={styles.headerInfo}>
-          <Text style={styles.title}>Classement</Text>
+          <Text style={styles.title}>{t('leaderboardTitle', undefined, 'Classement')}</Text>
           <Text style={styles.subtitle}>
-            Découvrez les utilisateurs les plus performants et comparez votre progression avec la communauté
+            {t('leaderboardSubtitle', undefined, 'Découvrez les utilisateurs les plus performants et comparez votre progression avec la communauté')}
           </Text>
         </View>
 

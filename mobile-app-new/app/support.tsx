@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Linking, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface FaqItem {
   question: string;
@@ -23,6 +24,7 @@ const FAQ: FaqItem[] = [
 ];
 
 export default function SupportScreen() {
+  const { t } = useLanguage();
   const [openIndex, setOpenIndex] = useState<number | null>(null);
 
   const openMail = async () => {
@@ -30,9 +32,9 @@ export default function SupportScreen() {
     try {
       const supported = await Linking.canOpenURL(url);
       if (supported) await Linking.openURL(url);
-      else Alert.alert('Info', "Impossible d'ouvrir l'e-mail. Écrivez à support@productif.io");
+      else Alert.alert(t('info', undefined, 'Info'), t('supportEmailOpenError', undefined, "Impossible d'ouvrir l'e-mail. Écrivez à support@productif.io"));
     } catch (e) {
-      Alert.alert('Erreur', "Impossible d'ouvrir l'e-mail");
+      Alert.alert(t('error'), t('supportEmailError', undefined, "Impossible d'ouvrir l'e-mail"));
     }
   };
 
@@ -41,9 +43,9 @@ export default function SupportScreen() {
     try {
       const supported = await Linking.canOpenURL(url);
       if (supported) await Linking.openURL(url);
-      else Alert.alert('Info', "Impossible d'ouvrir WhatsApp. Écrivez-nous sur support@productif.io");
+      else Alert.alert(t('info', undefined, 'Info'), t('supportWhatsAppOpenError', undefined, "Impossible d'ouvrir WhatsApp. Écrivez-nous sur support@productif.io"));
     } catch (e) {
-      Alert.alert('Erreur', "Impossible d'ouvrir WhatsApp");
+      Alert.alert(t('error'), t('supportWhatsAppError', undefined, "Impossible d'ouvrir WhatsApp"));
     }
   };
 
@@ -52,15 +54,15 @@ export default function SupportScreen() {
     try {
       await Linking.openURL(url);
     } catch (e) {
-      Alert.alert('Erreur', "Impossible d'ouvrir le site");
+      Alert.alert(t('error'), t('supportSiteError', undefined, "Impossible d'ouvrir le site"));
     }
   };
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Aide & Support</Text>
-        <Text style={styles.subtitle}>FAQ et contact</Text>
+        <Text style={styles.title}>{t('supportTitle', undefined, 'Aide & Support')}</Text>
+        <Text style={styles.subtitle}>{t('supportSubtitle', undefined, 'FAQ et contact')}</Text>
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
@@ -82,11 +84,11 @@ export default function SupportScreen() {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Contact</Text>
+          <Text style={styles.sectionTitle}>{t('contact', undefined, 'Contact')}</Text>
           <View style={styles.actionsRow}>
             <TouchableOpacity style={[styles.actionButton, { backgroundColor: '#10b981' }]} onPress={openMail}>
               <Ionicons name="mail" size={18} color="#fff" />
-              <Text style={styles.actionText}>Email</Text>
+              <Text style={styles.actionText}>{t('emailPlaceholder', undefined, 'Email')}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.actionButton, { backgroundColor: '#25D366' }]} onPress={openWhatsApp}>
               <Ionicons name="logo-whatsapp" size={18} color="#fff" />
@@ -94,7 +96,7 @@ export default function SupportScreen() {
             </TouchableOpacity>
             <TouchableOpacity style={[styles.actionButton, { backgroundColor: '#3b82f6' }]} onPress={openDocs}>
               <Ionicons name="globe" size={18} color="#fff" />
-              <Text style={styles.actionText}>Site</Text>
+              <Text style={styles.actionText}>{t('supportSite', undefined, 'Site')}</Text>
             </TouchableOpacity>
           </View>
         </View>

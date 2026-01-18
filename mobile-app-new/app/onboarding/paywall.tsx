@@ -3,9 +3,11 @@ import { SafeAreaView, View, Text, StyleSheet, TouchableOpacity } from 'react-na
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StatusBar } from 'expo-status-bar';
 import { router } from 'expo-router';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 export default function PaywallScreen() {
   const [selected, setSelected] = useState<'annual' | 'monthly'>('annual');
+  const { t } = useLanguage();
 
   const handleStart = async () => {
     await AsyncStorage.setItem('onboarding_completed', 'true');
@@ -25,32 +27,32 @@ export default function PaywallScreen() {
       <StatusBar style="dark" />
       <View style={styles.inner}>
         <View style={{ alignItems: 'center' }}>
-          <Text style={styles.title}>Passez au niveau supérieur</Text>
-          <Text style={styles.subtitle}>Débloquez le meilleur de Productif.io</Text>
+          <Text style={styles.title}>{t('legacyPaywallTitle')}</Text>
+          <Text style={styles.subtitle}>{t('legacyPaywallSubtitle')}</Text>
         </View>
 
         <View style={styles.plans}>
           <TouchableOpacity style={[styles.planCard, selected === 'annual' && styles.planSelected]} onPress={() => setSelected('annual')}>
             <View style={styles.planHeaderRow}>
-              <Text style={styles.planTitle}>119 € / an</Text>
-              <View style={styles.badge}><Text style={styles.badgeText}>Recommandé</Text></View>
+              <Text style={styles.planTitle}>{t('legacyPlanAnnual')}</Text>
+              <View style={styles.badge}><Text style={styles.badgeText}>{t('legacyPlanRecommended')}</Text></View>
             </View>
-            <Text style={styles.saving}>Économie 60,88 € ✅</Text>
-            <Text style={styles.planHint}>Facturation annuelle</Text>
+            <Text style={styles.saving}>{t('legacyPlanSaving')}</Text>
+            <Text style={styles.planHint}>{t('legacyPlanHintAnnual')}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={[styles.planCard, selected === 'monthly' && styles.planSelected]} onPress={() => setSelected('monthly')}>
-            <Text style={styles.planTitle}>14,99 € / mois</Text>
-            <Text style={styles.planHint}>Facturation mensuelle</Text>
+            <Text style={styles.planTitle}>{t('legacyPlanMonthly')}</Text>
+            <Text style={styles.planHint}>{t('legacyPlanHintMonthly')}</Text>
           </TouchableOpacity>
         </View>
 
         <View style={styles.actions}>
           <TouchableOpacity style={styles.cta} onPress={handleStart}>
-            <Text style={styles.ctaText}>Démarrer</Text>
+            <Text style={styles.ctaText}>{t('legacyPaywallStart')}</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={ignore}>
-            <Text style={styles.link}>Ignorer</Text>
+            <Text style={styles.link}>{t('legacyPaywallSkip')}</Text>
           </TouchableOpacity>
         </View>
       </View>

@@ -139,7 +139,7 @@ export default function SuccessScreen() {
             </Text>
             {firstName && (
               <Text style={styles.greeting}>
-                Welcome, {firstName} 👋
+                {t('welcomeUser', { name: firstName }, `Welcome, ${firstName} 👋`)}
               </Text>
             )}
             <Text style={styles.description}>
@@ -325,4 +325,3 @@ const styles = StyleSheet.create({
     color: 'rgba(0, 0, 0, 0.6)',
   },
 });
-

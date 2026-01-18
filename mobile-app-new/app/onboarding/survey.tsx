@@ -3,17 +3,18 @@ import { SafeAreaView, View, Text, StyleSheet, TouchableOpacity, Image } from 'r
 import { StatusBar } from 'expo-status-bar';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-
-const QUESTIONS = [
-  { q: "Qu'est-ce qui vous amène sur l'app ?", a: ["Je veux mieux m'organiser", 'Je me sens débordé', "Je veux mieux suivre mon temps"] },
-  { q: 'Depuis combien de temps remettez-vous vos tâches ?', a: ["Je débute", '1-3 mois', '6+ mois', "Plus d'1 an"] },
-  { q: 'À quelle fréquence perdez-vous votre focus ?', a: ['Rarement', 'Parfois', 'Souvent', 'Très souvent'] },
-  { q: 'Avez-vous un système clair chaque jour ?', a: ['Oui', 'Plus ou moins', 'Non'] },
-  { q: "Combien d'heures par semaine perdez-vous en distractions ?", a: ['< 2h', '2-5h', '5-10h', '10h+'] },
-  { q: 'Si rien ne change, quelles conséquences dans 3 mois ?', a: ['Je stagne', 'J’accumule du retard', 'Je me démotive', 'Je perds des opportunités'] },
-];
+import { useLanguage } from '@/contexts/LanguageContext';
 
 export default function SurveyScreen() {
+  const { t } = useLanguage();
+  const QUESTIONS = [
+    { q: t('legacySurveyQ1', undefined, "Qu'est-ce qui vous amène sur l'app ?"), a: [t('legacySurveyQ1A1', undefined, 'Je veux mieux m\'organiser'), t('legacySurveyQ1A2', undefined, 'Je me sens débordé'), t('legacySurveyQ1A3', undefined, 'Je veux mieux suivre mon temps')] },
+    { q: t('legacySurveyQ2', undefined, 'Depuis combien de temps remettez-vous vos tâches ?'), a: [t('legacySurveyQ2A1', undefined, 'Je débute'), t('legacySurveyQ2A2', undefined, '1-3 mois'), t('legacySurveyQ2A3', undefined, '6+ mois'), t('legacySurveyQ2A4', undefined, "Plus d'1 an")] },
+    { q: t('legacySurveyQ3', undefined, 'À quelle fréquence perdez-vous votre focus ?'), a: [t('legacySurveyQ3A1', undefined, 'Rarement'), t('legacySurveyQ3A2', undefined, 'Parfois'), t('legacySurveyQ3A3', undefined, 'Souvent'), t('legacySurveyQ3A4', undefined, 'Très souvent')] },
+    { q: t('legacySurveyQ4', undefined, 'Avez-vous un système clair chaque jour ?'), a: [t('legacySurveyQ4A1', undefined, 'Oui'), t('legacySurveyQ4A2', undefined, 'Plus ou moins'), t('legacySurveyQ4A3', undefined, 'Non')] },
+    { q: t('legacySurveyQ5', undefined, "Combien d'heures par semaine perdez-vous en distractions ?"), a: [t('legacySurveyQ5A1', undefined, '< 2h'), t('legacySurveyQ5A2', undefined, '2-5h'), t('legacySurveyQ5A3', undefined, '5-10h'), t('legacySurveyQ5A4', undefined, '10h+')] },
+    { q: t('legacySurveyQ6', undefined, 'Si rien ne change, quelles conséquences dans 3 mois ?'), a: [t('legacySurveyQ6A1', undefined, 'Je stagne'), t('legacySurveyQ6A2', undefined, 'J’accumule du retard'), t('legacySurveyQ6A3', undefined, 'Je me démotive'), t('legacySurveyQ6A4', undefined, 'Je perds des opportunités')] },
+  ];
   const [intro, setIntro] = useState(true);
   const [index, setIndex] = useState(0);
   const [score, setScore] = useState(0);
@@ -34,7 +35,7 @@ export default function SurveyScreen() {
       <SafeAreaView style={styles.container}>
         <StatusBar style="dark" />
         <View style={styles.introRoot}>
-          <Text style={styles.introTitle}>Réponds au questionnaire pour obtenir ton plan personnalisé pour arrêter de procrastiner.</Text>
+          <Text style={styles.introTitle}>{t('legacySurveyIntroTitle', undefined, 'Réponds au questionnaire pour obtenir ton plan personnalisé pour arrêter de procrastiner.')}</Text>
 
           <View style={styles.spacerLarge} />
 
@@ -43,23 +44,23 @@ export default function SurveyScreen() {
               <View style={styles.logoWrapperBig}>
                 <Image source={require('../../assets/images/productif-logo.png')} style={styles.logoImgBig} />
               </View>
+              </View>
+              <Text style={styles.bubbleTitleCenter}>{t('legacySurveyBubbleTitle', undefined, 'Quelques questions rapides pour comprendre tes habitudes')}</Text>
+              <View style={styles.metaRowCenterInside}>
+                <Ionicons name="time-outline" size={18} color="#10B981" />
+                <Text style={styles.metaText}>{t('legacySurveyBubbleMeta', undefined, 'Temps estimé: 1 minute')}</Text>
+              </View>
             </View>
-            <Text style={styles.bubbleTitleCenter}>Quelques questions rapides pour comprendre tes habitudes</Text>
-            <View style={styles.metaRowCenterInside}>
-              <Ionicons name="time-outline" size={18} color="#10B981" />
-              <Text style={styles.metaText}>Temps estimé: 1 minute</Text>
-            </View>
+
+            <View style={{ flex: 1 }} />
+
+            <TouchableOpacity style={styles.cta} onPress={startSurvey}>
+              <Text style={styles.ctaText}>{t('legacySurveyStart', undefined, 'Commencer le test')}</Text>
+            </TouchableOpacity>
           </View>
-
-          <View style={{ flex: 1 }} />
-
-          <TouchableOpacity style={styles.cta} onPress={startSurvey}>
-            <Text style={styles.ctaText}>Commencer le test</Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
-    );
-  }
+        </SafeAreaView>
+      );
+    }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -69,7 +70,7 @@ export default function SurveyScreen() {
           <View style={[styles.progressBarFill, { width: `${Math.round(progress * 100)}%` }]} />
         </View>
         <View style={styles.cardCenter}>
-          <Text style={styles.step}>Étape {index + 1}/{QUESTIONS.length}</Text>
+          <Text style={styles.step}>{t('legacySurveyStep', { current: index + 1, total: QUESTIONS.length }, `Étape ${index + 1}/${QUESTIONS.length}`)}</Text>
           <Text style={styles.title}>{current.q}</Text>
           <View style={{ width: '100%', marginTop: 12 }}>
             {current.a.map((label, i) => (
@@ -78,7 +79,7 @@ export default function SurveyScreen() {
               </TouchableOpacity>
             ))}
           </View>
-          <Text style={styles.helper}>Ce questionnaire va te permettre d’identifier où tu perds le plus de temps et comment Productif.io peut t’aider à reprendre le contrôle.</Text>
+          <Text style={styles.helper}>{t('legacySurveyHelper', undefined, 'Ce questionnaire va te permettre d’identifier où tu perds le plus de temps et comment Productif.io peut t’aider à reprendre le contrôle.')}</Text>
         </View>
       </View>
     </SafeAreaView>

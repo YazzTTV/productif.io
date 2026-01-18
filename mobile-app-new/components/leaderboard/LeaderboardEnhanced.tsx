@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import { gamificationService, authService } from '@/lib/api';
 import { useLanguage } from '@/contexts/LanguageContext';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type LeaderboardTab = 'friends' | 'class' | 'global';
 
@@ -50,6 +51,11 @@ export function LeaderboardEnhanced() {
   const [availableFriends, setAvailableFriends] = useState<LeaderboardUser[]>([]);
   const [selectedFriendIds, setSelectedFriendIds] = useState<string[]>([]);
   const [isCreatingGroup, setIsCreatingGroup] = useState(false);
+  const [favoriteGroupId, setFavoriteGroupId] = useState<string | null>(null);
+  const [globalData, setGlobalData] = useState<LeaderboardUser[]>([]);
+  const [loadingGlobal, setLoadingGlobal] = useState(false);
+
+  const FAVORITE_GROUP_KEY = 'favorite_group_id';
 
   useEffect(() => {
     const loadPlan = async () => {
@@ -57,6 +63,8 @@ export function LeaderboardEnhanced() {
         const currentUserData = await authService.checkAuth();
         setIsPremium(Boolean(currentUserData?.isPremium || currentUserData?.plan === 'premium'));
         setCurrentUserId(currentUserData?.id || null);
+        const storedFavoriteGroupId = await AsyncStorage.getItem(FAVORITE_GROUP_KEY);
+        setFavoriteGroupId(storedFavoriteGroupId);
       } catch (error) {
         setIsPremium(false);
       }
@@ -103,12 +111,14 @@ export function LeaderboardEnhanced() {
   // Charger les données au focus de l'écran
   useFocusEffect(
     useCallback(() => {
-      if (activeTab === 'friends') {
-        loadFriends();
-      } else if (activeTab === 'class') {
-        loadGroups();
-      }
-    }, [activeTab])
+    if (activeTab === 'friends') {
+      loadFriends();
+    } else if (activeTab === 'class') {
+      loadGroups();
+    } else if (activeTab === 'global') {
+      loadGlobal();
+    }
+  }, [activeTab])
   );
 
   // Charger les groupes de l'utilisateur
@@ -119,8 +129,10 @@ export function LeaderboardEnhanced() {
       setGroups(userGroups);
       // Si un groupe est sélectionné, charger son classement
       if (userGroups.length > 0 && !selectedGroup) {
-        setSelectedGroup(userGroups[0]);
-        await loadGroupLeaderboard(userGroups[0].id);
+        const preferredGroup =
+          userGroups.find((group) => group.id === favoriteGroupId) || userGroups[0];
+        setSelectedGroup(preferredGroup);
+        await loadGroupLeaderboard(preferredGroup.id);
       }
     } catch (error) {
       console.error('❌ Erreur chargement groupes:', error);
@@ -165,14 +177,32 @@ export function LeaderboardEnhanced() {
     }
   };
 
-  // Mock data - Global (Premium only)
-  const globalData: LeaderboardUser[] = [
-    { id: '1', rank: 1, name: 'Marie D.', xp: 2847, maxXP: 3000, streak: 12, focusSessions: 18 },
-    { id: '2', rank: 2, name: 'Sofia K.', xp: 2776, maxXP: 3000, streak: 14, focusSessions: 17 },
-    { id: '3', rank: 3, name: 'You', xp: 2654, maxXP: 3000, streak: 9, focusSessions: 15, isCurrentUser: true },
-    { id: '4', rank: 4, name: 'Alex T.', xp: 2531, maxXP: 3000, streak: 7, focusSessions: 14 },
-    { id: '5', rank: 5, name: 'Emma R.', xp: 2408, maxXP: 3000, streak: 11, focusSessions: 16 },
-  ];
+  const loadGlobal = async () => {
+    try {
+      setLoadingGlobal(true);
+      const globalLeaderboard = await gamificationService.getLeaderboard(20, true);
+      const leaderboardData = Array.isArray(globalLeaderboard)
+        ? globalLeaderboard
+        : globalLeaderboard?.leaderboard || [];
+      const transformedGlobal: LeaderboardUser[] = leaderboardData.map((entry: any, index: number) => ({
+        id: entry.userId,
+        rank: entry.rank || index + 1,
+        name: entry.userName || entry.userEmail?.split('@')[0] || 'User',
+        xp: entry.totalPoints || 0,
+        maxXP: 3000,
+        streak: entry.currentStreak || 0,
+        focusSessions: entry.totalHabitsCompleted || 0,
+        isCurrentUser: entry.userId === currentUserId,
+      }));
+      transformedGlobal.sort((a, b) => a.rank - b.rank);
+      setGlobalData(transformedGlobal);
+    } catch (error) {
+      console.error('❌ Erreur chargement global:', error);
+      setGlobalData([]);
+    } finally {
+      setLoadingGlobal(false);
+    }
+  };
 
   const getCurrentData = () => {
     switch (activeTab) {
@@ -197,12 +227,19 @@ export function LeaderboardEnhanced() {
       loadFriends();
     } else if (tab === 'class') {
       loadGroups();
+    } else if (tab === 'global') {
+      loadGlobal();
     }
   };
 
   const handleGroupSelect = async (group: Group) => {
     setSelectedGroup(group);
     await loadGroupLeaderboard(group.id);
+  };
+
+  const handleFavoriteGroup = async (group: Group) => {
+    setFavoriteGroupId(group.id);
+    await AsyncStorage.setItem(FAVORITE_GROUP_KEY, group.id);
   };
 
   // Charger les amis disponibles pour inviter
@@ -452,12 +489,25 @@ export function LeaderboardEnhanced() {
                     onPress={() => handleGroupSelect(group)}
                     activeOpacity={0.7}
                   >
-                    <Text style={[
-                      styles.groupCardTitle,
-                      selectedGroup?.id === group.id && styles.groupCardTitleSelected
-                    ]}>
-                      {group.name}
-                    </Text>
+                    <View style={styles.groupCardHeader}>
+                      <Text style={[
+                        styles.groupCardTitle,
+                        selectedGroup?.id === group.id && styles.groupCardTitleSelected
+                      ]}>
+                        {group.name}
+                      </Text>
+                      <TouchableOpacity
+                        style={styles.favoriteButton}
+                        onPress={() => handleFavoriteGroup(group)}
+                        activeOpacity={0.7}
+                      >
+                        <Ionicons
+                          name={favoriteGroupId === group.id ? 'star' : 'star-outline'}
+                          size={16}
+                          color={favoriteGroupId === group.id ? '#16A34A' : 'rgba(0, 0, 0, 0.4)'}
+                        />
+                      </TouchableOpacity>
+                    </View>
                     {group.memberCount && (
                       <Text style={styles.groupCardSubtitle}>
                         {group.memberCount} membres
@@ -482,6 +532,11 @@ export function LeaderboardEnhanced() {
               <ActivityIndicator size="small" color="#16A34A" />
                 <Text style={styles.loadingText}>{t('loadingLeaderboard')}</Text>
             </View>
+          ) : activeTab === 'global' && loadingGlobal ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="small" color="#16A34A" />
+                <Text style={styles.loadingText}>{t('loadingLeaderboard')}</Text>
+            </View>
           ) : data.length === 0 && activeTab === 'friends' ? (
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyText}>Aucun ami trouvé</Text>
@@ -491,6 +546,11 @@ export function LeaderboardEnhanced() {
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyText}>Aucun classement disponible</Text>
               <Text style={styles.emptySubtext}>Sélectionnez un groupe ci-dessus</Text>
+            </View>
+          ) : data.length === 0 && activeTab === 'global' ? (
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>Aucun classement disponible</Text>
+              <Text style={styles.emptySubtext}>Réessayez dans quelques instants</Text>
             </View>
           ) : (
             data.map((user, index) => {
@@ -1315,6 +1375,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     marginRight: 12,
     minWidth: 120,
+  },
+  groupCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  favoriteButton: {
+    padding: 4,
   },
   groupCardSelected: {
     borderColor: '#16A34A',

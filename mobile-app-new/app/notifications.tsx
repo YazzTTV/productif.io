@@ -17,6 +17,7 @@ import { useRouter } from 'expo-router';
 import { apiCall } from '@/lib/api';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { Platform, Linking } from 'react-native';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 type TimeWindow = {
   start: string;
@@ -109,26 +110,9 @@ const defaultPreferences: NotificationPreferences = {
   focusDailyCount: 1,
 };
 
-const daysOfWeek = [
-  { value: 1, label: 'Lundi' },
-  { value: 2, label: 'Mardi' },
-  { value: 3, label: 'Mercredi' },
-  { value: 4, label: 'Jeudi' },
-  { value: 5, label: 'Vendredi' },
-  { value: 6, label: 'Samedi' },
-  { value: 0, label: 'Dimanche' },
-];
-
-const notificationTypeLabels: Record<string, string> = {
-  'TASK_DUE': 'Échéances de tâches',
-  'HABIT_REMINDER': 'Rappels d\'habitudes',
-  'DAILY_SUMMARY': 'Résumé quotidien',
-  'MOTIVATION': 'Messages de motivation',
-  'MORNING_REMINDER': 'Rappel matinal'
-};
-
 export default function NotificationsPage() {
   const router = useRouter();
+  const { t } = useLanguage();
   const { permissionStatus, requestPermissions, expoPushToken } = usePushNotifications();
   const [preferences, setPreferences] = useState<NotificationPreferences>(defaultPreferences);
   const [originalPreferences, setOriginalPreferences] = useState<NotificationPreferences>(defaultPreferences);
@@ -137,6 +121,23 @@ export default function NotificationsPage() {
   const [userId, setUserId] = useState<string>('');
   const [hasChanges, setHasChanges] = useState(false);
   const [isRequestingPermissions, setIsRequestingPermissions] = useState(false);
+  const daysOfWeek = [
+    { value: 1, label: t('monday', undefined, 'Lundi') },
+    { value: 2, label: t('tuesday', undefined, 'Mardi') },
+    { value: 3, label: t('wednesday', undefined, 'Mercredi') },
+    { value: 4, label: t('thursday', undefined, 'Jeudi') },
+    { value: 5, label: t('friday', undefined, 'Vendredi') },
+    { value: 6, label: t('saturday', undefined, 'Samedi') },
+    { value: 0, label: t('sunday', undefined, 'Dimanche') },
+  ];
+
+  const notificationTypeLabels: Record<string, string> = {
+    'TASK_DUE': t('notifTaskDue', undefined, 'Échéances de tâches'),
+    'HABIT_REMINDER': t('notifHabitReminder', undefined, "Rappels d'habitudes"),
+    'DAILY_SUMMARY': t('notifDailySummary', undefined, 'Résumé quotidien'),
+    'MOTIVATION': t('notifMotivation', undefined, 'Messages de motivation'),
+    'MORNING_REMINDER': t('notifMorning', undefined, 'Rappel matinal'),
+  };
 
   useEffect(() => {
     loadPreferences();
@@ -180,9 +181,9 @@ export default function NotificationsPage() {
       // En cas d'erreur, utiliser les préférences par défaut
       setPreferences(defaultPreferences);
       Alert.alert(
-        'Avertissement',
-        'Impossible de charger vos préférences existantes. Les valeurs par défaut seront utilisées.',
-        [{ text: 'OK' }]
+        t('warning', undefined, 'Avertissement'),
+        t('notifLoadError', undefined, 'Impossible de charger vos préférences existantes. Les valeurs par défaut seront utilisées.'),
+        [{ text: t('ok', undefined, 'OK') }]
       );
     } finally {
       setIsLoading(false);
@@ -194,7 +195,7 @@ export default function NotificationsPage() {
 
     if (!hasChanges) {
       console.log('ℹ️ Pas de changements à sauvegarder');
-      Alert.alert('Info', 'Aucune modification à sauvegarder.');
+      Alert.alert(t('info', undefined, 'Info'), t('notifNoChanges', undefined, 'Aucune modification à sauvegarder.'));
       return;
     }
 
@@ -206,9 +207,9 @@ export default function NotificationsPage() {
       // Si les permissions n'ont pas été accordées, désactiver pushEnabled ou annuler la sauvegarde
       if (!granted) {
         Alert.alert(
-          'Permissions requises',
-          'Les notifications push nécessitent des permissions. Les notifications push ont été désactivées.',
-          [{ text: 'OK' }]
+          t('notifPermissionsRequired', undefined, 'Permissions requises'),
+          t('notifPermissionsMessage', undefined, 'Les notifications push nécessitent des permissions. Les notifications push ont été désactivées.'),
+          [{ text: t('ok', undefined, 'OK') }]
         );
         // Désactiver pushEnabled si les permissions ne sont pas accordées
         setPreferences(prev => ({ ...prev, pushEnabled: false }));
@@ -237,16 +238,16 @@ export default function NotificationsPage() {
       setHasChanges(false);
 
       Alert.alert(
-        'Succès',
-        'Vos préférences de notification ont été sauvegardées avec succès !',
-        [{ text: 'OK' }]
+        t('success'),
+        t('notifSaveSuccess', undefined, 'Vos préférences de notification ont été sauvegardées avec succès !'),
+        [{ text: t('ok', undefined, 'OK') }]
       );
     } catch (error) {
       console.error('❌ Erreur lors de la sauvegarde:', error);
       Alert.alert(
-        'Erreur',
-        'Impossible de sauvegarder vos préférences. Veuillez réessayer.',
-        [{ text: 'OK' }]
+        t('error'),
+        t('notifSaveError', undefined, 'Impossible de sauvegarder vos préférences. Veuillez réessayer.'),
+        [{ text: t('ok', undefined, 'OK') }]
       );
     } finally {
       setIsSaving(false);
@@ -255,7 +256,7 @@ export default function NotificationsPage() {
 
   const handleRequestPermissions = async (): Promise<boolean> => {
     if (Platform.OS !== 'ios' && Platform.OS !== 'android') {
-      Alert.alert('Information', 'Les notifications push ne sont disponibles que sur iOS et Android.');
+      Alert.alert(t('info', undefined, 'Information'), t('notifPlatformUnsupported', undefined, 'Les notifications push ne sont disponibles que sur iOS et Android.'));
       return false;
     }
 
@@ -265,20 +266,20 @@ export default function NotificationsPage() {
       
       if (granted) {
         Alert.alert(
-          'Succès',
-          'Les permissions de notification ont été accordées ! Vous recevrez maintenant les notifications push.',
-          [{ text: 'OK' }]
+          t('success'),
+          t('notifPermissionsGranted', undefined, 'Les permissions de notification ont été accordées ! Vous recevrez maintenant les notifications push.'),
+          [{ text: t('ok', undefined, 'OK') }]
         );
         return true;
       } else {
         if (permissionStatus === 'denied') {
           Alert.alert(
-            'Permissions refusées',
-            'Les permissions de notification ont été refusées. Pour les activer, allez dans Réglages > Productif.io > Notifications.',
+            t('notifPermissionsDenied', undefined, 'Permissions refusées'),
+            t('notifPermissionsDeniedMessage', undefined, 'Les permissions de notification ont été refusées. Pour les activer, allez dans Réglages > Productif.io > Notifications.'),
             [
-              { text: 'Annuler', style: 'cancel' },
+              { text: t('cancel'), style: 'cancel' },
               {
-                text: 'Ouvrir les réglages',
+                text: t('notifOpenSettings', undefined, 'Ouvrir les réglages'),
                 onPress: () => {
                   if (Platform.OS === 'ios') {
                     Linking.openURL('app-settings:');
@@ -291,9 +292,9 @@ export default function NotificationsPage() {
           );
         } else {
           Alert.alert(
-            'Permissions requises',
-            'Les permissions de notification sont nécessaires pour recevoir des notifications push.',
-            [{ text: 'OK' }]
+            t('notifPermissionsRequired', undefined, 'Permissions requises'),
+            t('notifPermissionsNeeded', undefined, 'Les permissions de notification sont nécessaires pour recevoir des notifications push.'),
+            [{ text: t('ok', undefined, 'OK') }]
           );
         }
         return false;
@@ -301,9 +302,9 @@ export default function NotificationsPage() {
     } catch (error) {
       console.error('❌ Erreur lors de la demande de permissions:', error);
       Alert.alert(
-        'Erreur',
-        'Une erreur est survenue lors de la demande de permissions.',
-        [{ text: 'OK' }]
+        t('error'),
+        t('notifPermissionsError', undefined, 'Une erreur est survenue lors de la demande de permissions.'),
+        [{ text: t('ok', undefined, 'OK') }]
       );
       return false;
     } finally {
@@ -313,12 +314,12 @@ export default function NotificationsPage() {
 
   const resetPreferences = () => {
     Alert.alert(
-      'Réinitialiser',
-      'Voulez-vous annuler tous vos changements non sauvegardés ?',
+      t('reset', undefined, 'Réinitialiser'),
+      t('notifResetConfirm', undefined, 'Voulez-vous annuler tous vos changements non sauvegardés ?'),
       [
-        { text: 'Annuler', style: 'cancel' },
+        { text: t('cancel'), style: 'cancel' },
         {
-          text: 'Réinitialiser',
+          text: t('reset', undefined, 'Réinitialiser'),
           style: 'destructive',
           onPress: () => {
             console.log('🔄 Réinitialisation des préférences');

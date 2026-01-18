@@ -8,7 +8,6 @@ import {
   ActivityIndicator,
   Alert,
   RefreshControl,
-  Dimensions,
   Modal,
   TextInput,
   KeyboardAvoidingView,
@@ -19,7 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { dashboardService, tasksService, projectsService, authService } from '@/lib/api';
 import { format, isToday, isTomorrow, isThisWeek, startOfToday, isBefore, parseISO } from 'date-fns';
-import { fr } from 'date-fns/locale';
+import { fr, enUS, es as esLocale } from 'date-fns/locale';
 import { useRouter } from 'expo-router';
 import { Select } from '@/components/ui/Select';
 import { DatePicker } from '@/components/ui/DatePicker';
@@ -31,8 +30,7 @@ import Animated, {
   FadeInDown,
   FadeIn,
 } from 'react-native-reanimated';
-
-const { width } = Dimensions.get('window');
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface Task {
   id: string;
@@ -43,6 +41,7 @@ interface Task {
   energyLevel: number | null;
   dueDate?: string;
   userId?: string;
+  projectId?: string;
   project?: {
     id: string;
     name: string;
@@ -50,6 +49,8 @@ interface Task {
   };
   createdAt: string;
 }
+
+type EnergyLevelKey = 'LOW' | 'MEDIUM' | 'HIGH' | 'EXTREME';
 
 interface TaskGroup {
   overdue: Task[];
@@ -69,6 +70,8 @@ interface TaskCardProps {
 }
 
 const TaskCard: React.FC<TaskCardProps & { index?: number }> = ({ task, onToggle, onPress, onDelete, onStartTimer, index = 0 }) => {
+  const { t, language } = useLanguage();
+  const locale = language === 'en' ? enUS : language === 'es' ? esLocale : fr;
   const checkmarkScale = useSharedValue(0);
   const pressScale = useSharedValue(1);
   const [isCelebrating, setIsCelebrating] = useState(false);
@@ -110,11 +113,11 @@ const TaskCard: React.FC<TaskCardProps & { index?: number }> = ({ task, onToggle
   const getPriorityLabel = (priority: number | null) => {
     if (priority === null) return null;
     switch (priority) {
-      case 0: return { label: 'Optionnel', color: '#6b7280' };
-      case 1: return { label: 'À faire', color: '#3b82f6' };
-      case 2: return { label: 'Important', color: '#f59e0b' };
-      case 3: return { label: 'Urgent', color: '#ef4444' };
-      case 4: return { label: 'Quick Win', color: '#10b981' };
+      case 0: return { label: t('tasksPriority0', undefined, 'Optionnel'), color: '#6b7280' };
+      case 1: return { label: t('tasksPriority1', undefined, 'À faire'), color: '#3b82f6' };
+      case 2: return { label: t('tasksPriority2', undefined, 'Important'), color: '#f59e0b' };
+      case 3: return { label: t('tasksPriority3', undefined, 'Urgent'), color: '#ef4444' };
+      case 4: return { label: t('tasksPriority4', undefined, 'Quick Win'), color: '#10b981' };
       default: return null;
     }
   };
@@ -124,9 +127,9 @@ const TaskCard: React.FC<TaskCardProps & { index?: number }> = ({ task, onToggle
     try {
       const date = typeof dateString === 'string' ? parseISO(dateString) : new Date(dateString);
       if (isNaN(date.getTime())) return null;
-      if (isToday(date)) return "Aujourd'hui";
-      if (isTomorrow(date)) return "Demain";
-      return format(date, 'dd/MM', { locale: fr });
+      if (isToday(date)) return t('todayLabel', undefined, "Aujourd'hui");
+      if (isTomorrow(date)) return t('tomorrowLabel', undefined, 'Demain');
+      return format(date, 'dd/MM', { locale });
     } catch (error) {
       return null;
     }
@@ -217,6 +220,7 @@ const TaskCard: React.FC<TaskCardProps & { index?: number }> = ({ task, onToggle
 
 export default function TasksScreen() {
   const router = useRouter();
+  const { t } = useLanguage();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -236,11 +240,18 @@ export default function TasksScreen() {
   }, []);
   
   // États du formulaire
-  const [newTask, setNewTask] = useState({
+  const [newTask, setNewTask] = useState<{
+    title: string;
+    description: string;
+    priority: string;
+    energyLevel: EnergyLevelKey;
+    dueDate: Date | undefined;
+    projectId: string;
+  }>({
     title: '',
     description: '',
     priority: 'P1', // P1 = 1 → À faire (par défaut)
-    energyLevel: 'Moyen',
+    energyLevel: 'MEDIUM',
     dueDate: undefined as Date | undefined,
     projectId: '',
   });
@@ -250,23 +261,23 @@ export default function TasksScreen() {
 
   // Options pour les selects (mapping correct)
   const priorityOptions = [
-    { value: 'P4', label: 'Quick Win' },    // P4 = 4 → Quick Win ✅
-    { value: 'P3', label: 'Urgent' },       // P3 = 3 → Urgent ✅
-    { value: 'P2', label: 'Important' },    // P2 = 2 → Important ✅
-    { value: 'P1', label: 'À faire' },      // P1 = 1 → À faire ✅
-    { value: 'P0', label: 'Optionnel' },    // P0 = 0 → Optionnel ✅
+    { value: 'P4', label: t('tasksPriority4', undefined, 'Quick Win') },    // P4 = 4 → Quick Win ✅
+    { value: 'P3', label: t('tasksPriority3', undefined, 'Urgent') },       // P3 = 3 → Urgent ✅
+    { value: 'P2', label: t('tasksPriority2', undefined, 'Important') },    // P2 = 2 → Important ✅
+    { value: 'P1', label: t('tasksPriority1', undefined, 'À faire') },      // P1 = 1 → À faire ✅
+    { value: 'P0', label: t('tasksPriority0', undefined, 'Optionnel') },    // P0 = 0 → Optionnel ✅
   ];
 
   const energyOptions = [
-    { value: 'Extrême', label: 'Extrême' },
-    { value: 'Élevé', label: 'Élevé' },
-    { value: 'Moyen', label: 'Moyen' },
-    { value: 'Faible', label: 'Faible' },
+    { value: 'EXTREME', label: t('tasksEnergyExtreme', undefined, 'Extrême') },
+    { value: 'HIGH', label: t('tasksEnergyHigh', undefined, 'Élevé') },
+    { value: 'MEDIUM', label: t('tasksEnergyMedium', undefined, 'Moyen') },
+    { value: 'LOW', label: t('tasksEnergyLow', undefined, 'Faible') },
   ];
 
   // Options pour les projets
   const projectOptions = [
-    { value: '', label: 'Aucun projet' },
+    { value: '', label: t('tasksFormProjectPlaceholder', undefined, 'Aucun projet') },
     ...projects.map(project => ({
       value: project.id,
       label: project.name
@@ -344,7 +355,10 @@ export default function TasksScreen() {
       setTasks(filtered);
     } catch (error) {
       console.error('Erreur lors du chargement des tâches:', error);
-      Alert.alert('Erreur', 'Impossible de charger les tâches');
+      Alert.alert(
+        t('error', undefined, 'Erreur'),
+        t('tasksLoadError', undefined, 'Impossible de charger les tâches')
+      );
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -376,7 +390,10 @@ export default function TasksScreen() {
       console.error('❌ Pas authentifié:', error);
       // Ne pas afficher d'Alert si le composant est démonté ou si c'est juste une 401 normale
       if (isMountedRef.current && error instanceof Error && error.message !== 'Non authentifié') {
-        Alert.alert('Erreur', 'Vous devez vous reconnecter');
+        Alert.alert(
+          t('error', undefined, 'Erreur'),
+          t('loginRequiredMessage', undefined, 'Vous devez vous reconnecter')
+        );
       }
     }
   };
@@ -404,29 +421,32 @@ export default function TasksScreen() {
       dashboardEvents.emit(DASHBOARD_DATA_CHANGED);
     } catch (error) {
       console.error('Erreur lors de la mise à jour:', error);
-      Alert.alert('Erreur', 'Impossible de mettre à jour la tâche');
+      Alert.alert(
+        t('error', undefined, 'Erreur'),
+        t('tasksUpdateError', undefined, 'Impossible de mettre à jour la tâche')
+      );
     }
   };
 
   // Fonction utilitaire pour convertir le niveau d'énergie numérique en string
-  const getEnergyStringFromNumber = (energyLevel: number | null) => {
-    if (energyLevel === null) return 'Moyen';
+  const getEnergyKeyFromNumber = (energyLevel: number | null): EnergyLevelKey => {
+    if (energyLevel === null) return 'MEDIUM';
     switch (energyLevel) {
-      case 0: return 'Faible';
-      case 1: return 'Moyen';
-      case 2: return 'Élevé';
-      case 3: return 'Extrême';
-      default: return 'Moyen';
+      case 0: return 'LOW';
+      case 1: return 'MEDIUM';
+      case 2: return 'HIGH';
+      case 3: return 'EXTREME';
+      default: return 'MEDIUM';
     }
   };
 
   // Fonction utilitaire pour convertir le niveau d'énergie string en numérique
-  const getEnergyNumberFromString = (energyString: string) => {
-    switch (energyString) {
-      case 'Faible': return 0;
-      case 'Moyen': return 1;
-      case 'Élevé': return 2;
-      case 'Extrême': return 3;
+  const getEnergyNumberFromKey = (energyKey: EnergyLevelKey) => {
+    switch (energyKey) {
+      case 'LOW': return 0;
+      case 'MEDIUM': return 1;
+      case 'HIGH': return 2;
+      case 'EXTREME': return 3;
       default: return 1; // Moyen par défaut
     }
   };
@@ -434,7 +454,7 @@ export default function TasksScreen() {
   const handleTaskPress = (task: Task) => {
     // Convertir les valeurs pour le formulaire d'édition
     const priorityValue = task.priority !== null ? `P${task.priority}` : 'P1';
-    const energyValue = getEnergyStringFromNumber(task.energyLevel);
+    const energyValue = getEnergyKeyFromNumber(task.energyLevel);
     
     setEditingTask(task);
     setNewTask({
@@ -450,21 +470,27 @@ export default function TasksScreen() {
 
   const handleDeleteTask = async (taskId: string) => {
     Alert.alert(
-      'Supprimer la tâche',
-      'Êtes-vous sûr de vouloir supprimer cette tâche ?',
+      t('tasksDeleteTitle', undefined, 'Supprimer la tâche'),
+      t('tasksDeleteConfirm', undefined, 'Êtes-vous sûr de vouloir supprimer cette tâche ?'),
       [
-        { text: 'Annuler', style: 'cancel' },
+        { text: t('cancel', undefined, 'Annuler'), style: 'cancel' },
         { 
-          text: 'Supprimer', 
+          text: t('delete', undefined, 'Supprimer'), 
           style: 'destructive',
           onPress: async () => {
             try {
               await tasksService.deleteTask(taskId);
               setTasks(prev => prev.filter(task => task.id !== taskId));
-              Alert.alert('Succès', 'Tâche supprimée avec succès !');
+              Alert.alert(
+                t('success', undefined, 'Succès'),
+                t('tasksDeleteSuccess', undefined, 'Tâche supprimée avec succès !')
+              );
             } catch (error) {
               console.error('Erreur lors de la suppression:', error);
-              Alert.alert('Erreur', 'Impossible de supprimer la tâche');
+              Alert.alert(
+                t('error', undefined, 'Erreur'),
+                t('tasksDeleteError', undefined, 'Impossible de supprimer la tâche')
+              );
             }
           }
         }
@@ -474,7 +500,10 @@ export default function TasksScreen() {
 
   const handleCreateTask = async () => {
     if (!newTask.title.trim()) {
-      Alert.alert('Erreur', 'Veuillez saisir un titre pour la tâche');
+      Alert.alert(
+        t('error', undefined, 'Erreur'),
+        t('tasksRequiredTitleError', undefined, 'Veuillez saisir un titre pour la tâche')
+      );
       return;
     }
 
@@ -485,7 +514,7 @@ export default function TasksScreen() {
         title: newTask.title.trim(),
         description: newTask.description.trim() || null,
         priority: newTask.priority ? parseInt(newTask.priority.replace('P', '')) : null,
-        energyLevel: newTask.energyLevel ? getEnergyNumberFromString(newTask.energyLevel) : null,
+        energyLevel: newTask.energyLevel ? getEnergyNumberFromKey(newTask.energyLevel) : null,
         dueDate: newTask.dueDate || null,
         projectId: newTask.projectId || null,
       };
@@ -500,7 +529,7 @@ export default function TasksScreen() {
         title: '',
         description: '',
         priority: 'P1', // P1 = 1 → À faire (par défaut)
-        energyLevel: 'Moyen',
+        energyLevel: 'MEDIUM',
         dueDate: undefined,
         projectId: '',
       });
@@ -510,10 +539,16 @@ export default function TasksScreen() {
       // Notifier le dashboard
       dashboardEvents.emit(DASHBOARD_DATA_CHANGED);
       
-      Alert.alert('Succès', 'Tâche créée avec succès !');
+      Alert.alert(
+        t('success', undefined, 'Succès'),
+        t('tasksCreateSuccess', undefined, 'Tâche créée avec succès !')
+      );
     } catch (error) {
       console.error('Erreur lors de la création:', error);
-      Alert.alert('Erreur', 'Impossible de créer la tâche');
+      Alert.alert(
+        t('error', undefined, 'Erreur'),
+        t('tasksCreateError', undefined, 'Impossible de créer la tâche')
+      );
     } finally {
       setCreating(false);
     }
@@ -521,12 +556,18 @@ export default function TasksScreen() {
 
   const handleUpdateTask = async () => {
     if (!newTask.title.trim()) {
-      Alert.alert('Erreur', 'Veuillez saisir un titre pour la tâche');
+      Alert.alert(
+        t('error', undefined, 'Erreur'),
+        t('tasksRequiredTitleError', undefined, 'Veuillez saisir un titre pour la tâche')
+      );
       return;
     }
 
     if (!editingTask) {
-      Alert.alert('Erreur', 'Aucune tâche à modifier');
+      Alert.alert(
+        t('error', undefined, 'Erreur'),
+        t('tasksNoTaskToEdit', undefined, 'Aucune tâche à modifier')
+      );
       return;
     }
 
@@ -535,7 +576,7 @@ export default function TasksScreen() {
     try {
       // Convertir les données comme pour la création
       const priorityNumber = parseInt(newTask.priority.replace('P', ''));
-      const energyNumber = getEnergyNumberFromString(newTask.energyLevel);
+      const energyNumber = getEnergyNumberFromKey(newTask.energyLevel);
 
       const taskData = {
         title: newTask.title.trim(),
@@ -561,13 +602,19 @@ export default function TasksScreen() {
       setEditingTask(null);
       setShowEditModal(false);
       
-      Alert.alert('Succès', 'Tâche modifiée avec succès !');
+      Alert.alert(
+        t('success', undefined, 'Succès'),
+        t('tasksUpdateSuccess', undefined, 'Tâche modifiée avec succès !')
+      );
       // Notifier le dashboard
       dashboardEvents.emit(DASHBOARD_DATA_CHANGED);
       
     } catch (error) {
       console.error('Erreur lors de la modification:', error);
-      Alert.alert('Erreur', error instanceof Error ? error.message : 'Une erreur est survenue lors de la modification');
+      Alert.alert(
+        t('error', undefined, 'Erreur'),
+        error instanceof Error ? error.message : t('tasksUpdateError', undefined, 'Une erreur est survenue lors de la modification')
+      );
     } finally {
       setUpdating(false);
     }
@@ -576,12 +623,16 @@ export default function TasksScreen() {
   const handleStartTimer = (task: Task) => {
     // Naviguer vers la page timer avec les paramètres de la tâche
     Alert.alert(
-      'Démarrer le timer',
-      `Voulez-vous démarrer le timer pour la tâche "${task.title}" ?`,
+      t('tasksStartTimerTitle', undefined, 'Démarrer le timer'),
+      t(
+        'tasksStartTimerConfirm',
+        { title: task.title },
+        `Voulez-vous démarrer le timer pour la tâche "${task.title}" ?`
+      ),
       [
-        { text: 'Annuler', style: 'cancel' },
+        { text: t('cancel', undefined, 'Annuler'), style: 'cancel' },
         { 
-          text: 'Démarrer', 
+          text: t('tasksStartAction', undefined, 'Démarrer'), 
           onPress: () => {
             console.log('🎯 Démarrer timer pour tâche:', task.id, task.title);
             // Naviguer vers l'onglet timer avec les paramètres de la tâche
@@ -603,7 +654,7 @@ export default function TasksScreen() {
       title: '',
       description: '',
       priority: 'P1', // P1 = 1 → À faire (par défaut)
-      energyLevel: 'Moyen',
+      energyLevel: 'MEDIUM',
       dueDate: undefined,
       projectId: '',
     });
@@ -611,8 +662,6 @@ export default function TasksScreen() {
 
   // Grouper les tâches
   const groupedTasks = groupTasks(tasks);
-  const pendingCount = tasks.filter(task => !task.completed).length;
-  const completedCount = tasks.filter(task => task.completed).length;
 
   // Composant pour rendre un groupe de tâches
   const renderTaskGroup = (title: string, tasks: Task[], showDate = true) => {
@@ -642,7 +691,9 @@ export default function TasksScreen() {
     return (
       <View style={styles.centered}>
         <ActivityIndicator size="large" color="#3b82f6" />
-        <Text style={styles.loadingText}>Chargement des tâches...</Text>
+        <Text style={styles.loadingText}>
+          {t('tasksLoading', undefined, 'Chargement des tâches...')}
+        </Text>
       </View>
     );
   }
@@ -651,9 +702,11 @@ export default function TasksScreen() {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.title}>Tâches</Text>
+        <Text style={styles.title}>
+          {t('tasksHeaderTitle', undefined, 'Tâches')}
+        </Text>
         <Text style={styles.subtitle}>
-          Gérez et organisez vos tâches efficacement
+          {t('tasksSubtitle', undefined, 'Gérez et organisez vos tâches efficacement')}
         </Text>
         
         <TouchableOpacity 
@@ -661,7 +714,9 @@ export default function TasksScreen() {
           onPress={() => setShowCreateModal(true)}
         >
           <Ionicons name="add" size={20} color="#fff" />
-          <Text style={styles.addButtonText}>Nouvelle tâche</Text>
+          <Text style={styles.addButtonText}>
+            {t('tasksNewButton', undefined, 'Nouvelle tâche')}
+          </Text>
         </TouchableOpacity>
       </View>
 
@@ -676,26 +731,30 @@ export default function TasksScreen() {
         {tasks.length === 0 ? (
           <View style={styles.emptyState}>
             <Ionicons name="checkmark-circle-outline" size={64} color="#d1d5db" />
-            <Text style={styles.emptyTitle}>Aucune tâche trouvée</Text>
+            <Text style={styles.emptyTitle}>
+              {t('tasksEmptyTitle', undefined, 'Aucune tâche trouvée')}
+            </Text>
             <Text style={styles.emptySubtitle}>
-              Créez votre première tâche !
+              {t('tasksEmptySubtitle', undefined, 'Créez votre première tâche !')}
             </Text>
             <TouchableOpacity 
               style={styles.emptyButton}
               onPress={() => setShowCreateModal(true)}
             >
               <Ionicons name="add" size={20} color="#fff" />
-              <Text style={styles.emptyButtonText}>Nouvelle tâche</Text>
+              <Text style={styles.emptyButtonText}>
+                {t('tasksNewButton', undefined, 'Nouvelle tâche')}
+              </Text>
             </TouchableOpacity>
           </View>
         ) : (
           <>
-            {renderTaskGroup("En retard", groupedTasks.overdue)}
-            {renderTaskGroup("Aujourd'hui", groupedTasks.today)}
-            {renderTaskGroup("Demain", groupedTasks.tomorrow)}
-            {renderTaskGroup("Cette semaine", groupedTasks.thisWeek)}
-            {renderTaskGroup("Plus tard", groupedTasks.later)}
-            {renderTaskGroup("Sans date", groupedTasks.noDueDate, false)}
+            {renderTaskGroup(t('tasksGroupOverdue', undefined, 'En retard'), groupedTasks.overdue)}
+            {renderTaskGroup(t('todayLabel', undefined, "Aujourd'hui"), groupedTasks.today)}
+            {renderTaskGroup(t('tomorrowLabel', undefined, 'Demain'), groupedTasks.tomorrow)}
+            {renderTaskGroup(t('tasksGroupThisWeek', undefined, 'Cette semaine'), groupedTasks.thisWeek)}
+            {renderTaskGroup(t('tasksGroupLater', undefined, 'Plus tard'), groupedTasks.later)}
+            {renderTaskGroup(t('tasksGroupNoDate', undefined, 'Sans date'), groupedTasks.noDueDate, false)}
           </>
         )}
         
@@ -723,10 +782,14 @@ export default function TasksScreen() {
                 resetForm();
               }}
             >
-              <Text style={styles.modalCancelButton}>Annuler</Text>
+              <Text style={styles.modalCancelButton}>
+                {t('cancel', undefined, 'Annuler')}
+              </Text>
             </TouchableOpacity>
             
-            <Text style={styles.modalTitle}>Nouvelle tâche</Text>
+            <Text style={styles.modalTitle}>
+              {t('tasksModalCreateTitle', undefined, 'Nouvelle tâche')}
+            </Text>
             
             <TouchableOpacity
               onPress={handleCreateTask}
@@ -739,7 +802,9 @@ export default function TasksScreen() {
               {creating ? (
                 <ActivityIndicator size="small" color="#fff" />
               ) : (
-                <Text style={styles.modalSaveButtonText}>Créer</Text>
+                <Text style={styles.modalSaveButtonText}>
+                  {t('create', undefined, 'Créer')}
+                </Text>
               )}
             </TouchableOpacity>
           </View>
@@ -747,12 +812,14 @@ export default function TasksScreen() {
           <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
             {/* Titre */}
             <View style={styles.formGroup}>
-              <Text style={styles.formLabel}>Titre *</Text>
+              <Text style={styles.formLabel}>
+                {t('tasksFormTitleLabel', undefined, 'Titre *')}
+              </Text>
               <TextInput
                 style={styles.formInput}
                 value={newTask.title}
                 onChangeText={(text) => setNewTask(prev => ({ ...prev, title: text }))}
-                placeholder="Titre de la tâche"
+                placeholder={t('tasksFormTitlePlaceholder', undefined, 'Titre de la tâche')}
                 placeholderTextColor="#9ca3af"
                 multiline={false}
                 maxLength={100}
@@ -761,12 +828,14 @@ export default function TasksScreen() {
 
             {/* Description */}
             <View style={styles.formGroup}>
-              <Text style={styles.formLabel}>Description</Text>
+              <Text style={styles.formLabel}>
+                {t('tasksFormDescriptionLabel', undefined, 'Description')}
+              </Text>
               <TextInput
                 style={[styles.formInput, styles.formTextArea]}
                 value={newTask.description}
                 onChangeText={(text) => setNewTask(prev => ({ ...prev, description: text }))}
-                placeholder="Description de la tâche"
+                placeholder={t('tasksFormDescriptionPlaceholder', undefined, 'Description de la tâche')}
                 placeholderTextColor="#9ca3af"
                 multiline={true}
                 numberOfLines={3}
@@ -776,50 +845,52 @@ export default function TasksScreen() {
 
             {/* Priorité */}
             <View style={styles.formGroup}>
-              <Text style={styles.formLabel}>Priorité</Text>
+              <Text style={styles.formLabel}>
+                {t('tasksFormPriorityLabel', undefined, 'Priorité')}
+              </Text>
               <Select
                 value={newTask.priority}
                 onValueChange={(value) => setNewTask(prev => ({ ...prev, priority: value }))}
-                placeholder="Sélectionnez une priorité"
+                placeholder={t('tasksFormPriorityPlaceholder', undefined, 'Sélectionnez une priorité')}
                 options={priorityOptions}
               />
             </View>
 
             {/* Niveau d'énergie */}
             <View style={styles.formGroup}>
-              <Text style={styles.formLabel}>Niveau d'énergie requis</Text>
+              <Text style={styles.formLabel}>
+                {t('tasksFormEnergyLabel', undefined, "Niveau d'énergie requis")}
+              </Text>
               <Select
                 value={newTask.energyLevel}
-                onValueChange={(value) => setNewTask(prev => ({ ...prev, energyLevel: value }))}
-                placeholder="Sélectionnez un niveau d'énergie"
+                onValueChange={(value) => setNewTask(prev => ({ ...prev, energyLevel: value as EnergyLevelKey }))}
+                placeholder={t('tasksFormEnergyPlaceholder', undefined, "Sélectionnez un niveau d'énergie")}
                 options={energyOptions}
               />
             </View>
 
             {/* Date d'échéance */}
             <View style={styles.formGroup}>
-              <Text style={styles.formLabel}>Date d'échéance</Text>
+              <Text style={styles.formLabel}>
+                {t('tasksFormDueDateLabel', undefined, "Date d'échéance")}
+              </Text>
               <DatePicker
                 value={newTask.dueDate}
                 onValueChange={(date) => setNewTask(prev => ({ ...prev, dueDate: date }))}
-                placeholder="Choisir une date"
+                placeholder={t('tasksFormDueDatePlaceholder', undefined, 'Choisir une date')}
               />
             </View>
 
             {/* Projet */}
             <View style={styles.formGroup}>
-              <Text style={styles.formLabel}>Projet</Text>
+              <Text style={styles.formLabel}>
+                {t('tasksFormProjectLabel', undefined, 'Projet')}
+              </Text>
               <Select
                 value={newTask.projectId}
                 onValueChange={(value) => setNewTask(prev => ({ ...prev, projectId: value }))}
-                placeholder="Aucun projet"
-                options={[
-                  { value: '', label: 'Aucun projet' },
-                  ...projects.map(project => ({
-                    value: project.id,
-                    label: project.name
-                  }))
-                ]}
+                placeholder={t('tasksFormProjectPlaceholder', undefined, 'Aucun projet')}
+                options={projectOptions}
               />
             </View>
 
@@ -854,7 +925,9 @@ export default function TasksScreen() {
             >
               <Ionicons name="close" size={24} color="#6b7280" />
             </TouchableOpacity>
-            <Text style={styles.modalTitle}>Modifier la tâche</Text>
+            <Text style={styles.modalTitle}>
+              {t('tasksModalEditTitle', undefined, 'Modifier la tâche')}
+            </Text>
             <TouchableOpacity
               onPress={handleUpdateTask}
               disabled={updating}
@@ -863,7 +936,9 @@ export default function TasksScreen() {
               {updating ? (
                 <ActivityIndicator size="small" color="#fff" />
               ) : (
-                <Text style={styles.modalSaveButtonText}>Modifier</Text>
+                <Text style={styles.modalSaveButtonText}>
+                  {t('edit', undefined, 'Modifier')}
+                </Text>
               )}
             </TouchableOpacity>
           </View>
@@ -871,12 +946,14 @@ export default function TasksScreen() {
           <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
             {/* Titre */}
             <View style={styles.formGroup}>
-              <Text style={styles.formLabel}>Titre de la tâche *</Text>
+              <Text style={styles.formLabel}>
+                {t('tasksFormTitleLabel', undefined, 'Titre *')}
+              </Text>
               <TextInput
                 style={styles.formInput}
                 value={newTask.title}
                 onChangeText={(text) => setNewTask(prev => ({ ...prev, title: text }))}
-                placeholder="Titre de la tâche"
+                placeholder={t('tasksFormTitlePlaceholder', undefined, 'Titre de la tâche')}
                 placeholderTextColor="#9ca3af"
                 maxLength={100}
               />
@@ -884,12 +961,14 @@ export default function TasksScreen() {
 
             {/* Description */}
             <View style={styles.formGroup}>
-              <Text style={styles.formLabel}>Description</Text>
+              <Text style={styles.formLabel}>
+                {t('tasksFormDescriptionLabel', undefined, 'Description')}
+              </Text>
               <TextInput
                 style={[styles.formInput, styles.formTextArea]}
                 value={newTask.description}
                 onChangeText={(text) => setNewTask(prev => ({ ...prev, description: text }))}
-                placeholder="Description de la tâche"
+                placeholder={t('tasksFormDescriptionPlaceholder', undefined, 'Description de la tâche')}
                 placeholderTextColor="#9ca3af"
                 multiline={true}
                 numberOfLines={3}
@@ -899,43 +978,51 @@ export default function TasksScreen() {
 
             {/* Priorité */}
             <View style={styles.formGroup}>
-              <Text style={styles.formLabel}>Priorité</Text>
+              <Text style={styles.formLabel}>
+                {t('tasksFormPriorityLabel', undefined, 'Priorité')}
+              </Text>
               <Select
                 value={newTask.priority}
                 onValueChange={(value) => setNewTask(prev => ({ ...prev, priority: value }))}
-                placeholder="Sélectionnez une priorité"
+                placeholder={t('tasksFormPriorityPlaceholder', undefined, 'Sélectionnez une priorité')}
                 options={priorityOptions}
               />
             </View>
 
             {/* Niveau d'énergie */}
             <View style={styles.formGroup}>
-              <Text style={styles.formLabel}>Niveau d'énergie requis</Text>
+              <Text style={styles.formLabel}>
+                {t('tasksFormEnergyLabel', undefined, "Niveau d'énergie requis")}
+              </Text>
               <Select
                 value={newTask.energyLevel}
-                onValueChange={(value) => setNewTask(prev => ({ ...prev, energyLevel: value }))}
-                placeholder="Sélectionnez un niveau d'énergie"
+                onValueChange={(value) => setNewTask(prev => ({ ...prev, energyLevel: value as EnergyLevelKey }))}
+                placeholder={t('tasksFormEnergyPlaceholder', undefined, "Sélectionnez un niveau d'énergie")}
                 options={energyOptions}
               />
             </View>
 
             {/* Date d'échéance */}
             <View style={styles.formGroup}>
-              <Text style={styles.formLabel}>Date d'échéance</Text>
+              <Text style={styles.formLabel}>
+                {t('tasksFormDueDateLabel', undefined, "Date d'échéance")}
+              </Text>
               <DatePicker
                 value={newTask.dueDate}
                 onValueChange={(date) => setNewTask(prev => ({ ...prev, dueDate: date }))}
-                placeholder="Sélectionner une date"
+                placeholder={t('tasksFormDueDatePlaceholderSelect', undefined, 'Sélectionner une date')}
               />
             </View>
 
             {/* Projet */}
             <View style={styles.formGroup}>
-              <Text style={styles.formLabel}>Projet</Text>
+              <Text style={styles.formLabel}>
+                {t('tasksFormProjectLabel', undefined, 'Projet')}
+              </Text>
               <Select
                 value={newTask.projectId}
                 onValueChange={(value) => setNewTask(prev => ({ ...prev, projectId: value }))}
-                placeholder="Sélectionnez un projet (optionnel)"
+                placeholder={t('tasksFormProjectOptionalPlaceholder', undefined, 'Sélectionnez un projet (optionnel)')}
                 options={projectOptions}
               />
             </View>

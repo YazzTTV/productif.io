@@ -57,7 +57,7 @@ export default function ConnectionScreen() {
       if (response.success) {
         router.replace('/(onboarding-new)/value-awareness');
       } else {
-        Alert.alert('Erreur', 'Échec de la connexion avec Google');
+        Alert.alert(t('error', undefined, 'Erreur'), t('connectionGoogleError', undefined, 'Échec de la connexion avec Google'));
       }
       
     } catch (error) {
@@ -66,7 +66,7 @@ export default function ConnectionScreen() {
         return;
       }
       if (isMountedRef.current) {
-        Alert.alert('Erreur', error instanceof Error ? error.message : 'Une erreur est survenue');
+        Alert.alert(t('error', undefined, 'Erreur'), error instanceof Error ? error.message : t('connectionGenericError', undefined, 'Une erreur est survenue'));
       }
     } finally {
       if (isMountedRef.current) {
@@ -95,7 +95,7 @@ export default function ConnectionScreen() {
       if (response.success) {
         router.replace('/(onboarding-new)/value-awareness');
       } else {
-        Alert.alert('Erreur', 'Échec de la connexion avec Apple');
+        Alert.alert(t('error', undefined, 'Erreur'), t('connectionAppleError', undefined, 'Échec de la connexion avec Apple'));
       }
       
     } catch (error) {
@@ -104,7 +104,7 @@ export default function ConnectionScreen() {
         return;
       }
       if (isMountedRef.current) {
-        Alert.alert('Erreur', error instanceof Error ? error.message : 'Une erreur est survenue');
+        Alert.alert(t('error', undefined, 'Erreur'), error instanceof Error ? error.message : t('connectionGenericError', undefined, 'Une erreur est survenue'));
       }
     } finally {
       if (isMountedRef.current) {
@@ -115,7 +115,10 @@ export default function ConnectionScreen() {
 
   const handleEmailAuth = async () => {
     if (!email || !password) {
-      Alert.alert('Erreur', 'Veuillez remplir tous les champs');
+      Alert.alert(
+        t('error', undefined, 'Erreur'),
+        t('connectionFillAllFields', undefined, 'Veuillez remplir tous les champs')
+      );
       return;
     }
     
@@ -127,7 +130,7 @@ export default function ConnectionScreen() {
         if (response.success) {
           router.replace('/(tabs)');
         } else {
-          Alert.alert('Erreur', response.message || 'Email ou mot de passe incorrect');
+          Alert.alert(t('error', undefined, 'Erreur'), response.message || t('connectionInvalidCredentials', undefined, 'Email ou mot de passe incorrect'));
         }
       } else {
         // Pour l'inscription, on utilise l'email comme nom par défaut
@@ -136,12 +139,12 @@ export default function ConnectionScreen() {
         if (response.success) {
           router.replace('/(onboarding-new)/value-awareness');
     } else {
-          Alert.alert('Erreur', response.message || 'Échec de la création du compte');
+          Alert.alert(t('error', undefined, 'Erreur'), response.message || t('connectionSignupFailed', undefined, 'Échec de la création du compte'));
     }
       }
     } catch (error) {
       console.error('Erreur lors de l\'authentification:', error);
-      Alert.alert('Erreur', error instanceof Error ? error.message : 'Une erreur est survenue');
+      Alert.alert(t('error', undefined, 'Erreur'), error instanceof Error ? error.message : t('connectionGenericError', undefined, 'Une erreur est survenue'));
     } finally {
       setIsLoadingEmail(false);
     }

@@ -3,52 +3,53 @@ import { SafeAreaView, View, Text, StyleSheet, TouchableOpacity } from 'react-na
 import { StatusBar } from 'expo-status-bar';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-
-const slides = [
-  {
-    emoji: '⏱️',
-    title: 'Suivi du temps',
-    headline: 'Gagnez 2h par jour avec le Pomodoro',
-    points: [
-      'Sessions focalisées avec pauses intelligentes',
-      'Historique clair de vos journées',
-      'Pilotez vos process pas à pas',
-    ],
-  },
-  {
-    emoji: '✅',
-    title: 'Tâches & Projets',
-    headline: 'Priorités limpides, exécution rapide',
-    points: [
-      'Capture rapide, priorisation et échéances',
-      'Regroupez par projets, assignez, suivez',
-      'Un bouton: “Faire la tâche” → focus immédiat',
-    ],
-  },
-  {
-    emoji: '🌿',
-    title: 'Habitudes',
-    headline: 'Construisez une discipline durable',
-    points: [
-      'Streaks motivants et retour visuel',
-      'Habitude “Apprentissage” avec notes',
-      'Gestes rapides et feedback instantané',
-    ],
-  },
-  {
-    emoji: '🤖',
-    title: 'Assistant IA',
-    headline: 'Votre copilote de productivité',
-    points: [
-      'Plan de journée, priorités, relances',
-      'Conseils personnalisés selon vos données',
-      'Intégration WhatsApp pour agir partout',
-    ],
-  },
-];
+import { useLanguage } from '@/contexts/LanguageContext';
 
 export default function ValueScreen() {
+  const { t } = useLanguage();
   const [index, setIndex] = useState(0);
+  const slides = [
+    {
+      emoji: '⏱️',
+      title: t('legacyValueTimeTitle', undefined, 'Suivi du temps'),
+      headline: t('legacyValueTimeHeadline', undefined, 'Gagnez 2h par jour avec le Pomodoro'),
+      points: [
+        t('legacyValueTimePoint1', undefined, 'Sessions focalisées avec pauses intelligentes'),
+        t('legacyValueTimePoint2', undefined, 'Historique clair de vos journées'),
+        t('legacyValueTimePoint3', undefined, 'Pilotez vos process pas à pas'),
+      ],
+    },
+    {
+      emoji: '✅',
+      title: t('legacyValueTasksTitle', undefined, 'Tâches & Projets'),
+      headline: t('legacyValueTasksHeadline', undefined, 'Priorités limpides, exécution rapide'),
+      points: [
+        t('legacyValueTasksPoint1', undefined, 'Capture rapide, priorisation et échéances'),
+        t('legacyValueTasksPoint2', undefined, 'Regroupez par projets, assignez, suivez'),
+        t('legacyValueTasksPoint3', undefined, 'Un bouton: “Faire la tâche” → focus immédiat'),
+      ],
+    },
+    {
+      emoji: '🌿',
+      title: t('legacyValueHabitsTitle', undefined, 'Habitudes'),
+      headline: t('legacyValueHabitsHeadline', undefined, 'Construisez une discipline durable'),
+      points: [
+        t('legacyValueHabitsPoint1', undefined, 'Streaks motivants et retour visuel'),
+        t('legacyValueHabitsPoint2', undefined, 'Habitude “Apprentissage” avec notes'),
+        t('legacyValueHabitsPoint3', undefined, 'Gestes rapides et feedback instantané'),
+      ],
+    },
+    {
+      emoji: '🤖',
+      title: t('legacyValueAiTitle', undefined, 'Assistant IA'),
+      headline: t('legacyValueAiHeadline', undefined, 'Votre copilote de productivité'),
+      points: [
+        t('legacyValueAiPoint1', undefined, 'Plan de journée, priorités, relances'),
+        t('legacyValueAiPoint2', undefined, 'Conseils personnalisés selon vos données'),
+        t('legacyValueAiPoint3', undefined, 'Intégration WhatsApp pour agir partout'),
+      ],
+    },
+  ];
 
   const next = () => {
     if (index < slides.length - 1) setIndex(index + 1);
@@ -75,7 +76,11 @@ export default function ValueScreen() {
             </View>
           </View>
         </View>
-        <TouchableOpacity style={styles.cta} onPress={next}><Text style={styles.ctaText}>{index < slides.length - 1 ? 'Suivant' : 'Continuer'}</Text></TouchableOpacity>
+        <TouchableOpacity style={styles.cta} onPress={next}>
+          <Text style={styles.ctaText}>
+            {index < slides.length - 1 ? t('next') : t('continue')}
+          </Text>
+        </TouchableOpacity>
       </View>
     </SafeAreaView>
   );
