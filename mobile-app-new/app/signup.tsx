@@ -15,8 +15,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { authService, onboardingService, getAuthToken } from '@/lib/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 export default function SignupScreen() {
+  const { t } = useLanguage();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -27,17 +29,26 @@ export default function SignupScreen() {
 
   const handleSignup = async () => {
     if (!name || !email || !password || !confirmPassword) {
-      Alert.alert('Erreur', 'Veuillez remplir tous les champs');
+      Alert.alert(
+        t('error', undefined, 'Erreur'),
+        t('signupFillAllFields', undefined, 'Veuillez remplir tous les champs')
+      );
       return;
     }
 
     if (password !== confirmPassword) {
-      Alert.alert('Erreur', 'Les mots de passe ne correspondent pas');
+      Alert.alert(
+        t('error', undefined, 'Erreur'),
+        t('signupPasswordsMismatch', undefined, 'Les mots de passe ne correspondent pas')
+      );
       return;
     }
 
     if (password.length < 6) {
-      Alert.alert('Erreur', 'Le mot de passe doit contenir au moins 6 caractères');
+      Alert.alert(
+        t('error', undefined, 'Erreur'),
+        t('signupPasswordTooShort', undefined, 'Le mot de passe doit contenir au moins 6 caractères')
+      );
       return;
     }
 
@@ -99,12 +110,18 @@ export default function SignupScreen() {
         });
       } else {
         console.error('❌ [SIGNUP] Réponse d\'inscription invalide:', response);
-        Alert.alert('Erreur', response.message || 'Impossible de créer le compte');
+        Alert.alert(
+          t('error', undefined, 'Erreur'),
+          response.message || t('signupInvalidResponse', undefined, 'Impossible de créer le compte')
+        );
       }
       
     } catch (error) {
       console.error('Erreur d\'inscription:', error);
-      Alert.alert('Erreur', error instanceof Error ? error.message : 'Impossible de créer le compte. Veuillez réessayer.');
+      Alert.alert(
+        t('error', undefined, 'Erreur'),
+        error instanceof Error ? error.message : t('signupCreateAccountError', undefined, 'Impossible de créer le compte. Veuillez réessayer.')
+      );
     } finally {
       setIsLoading(false);
     }
@@ -122,23 +139,29 @@ export default function SignupScreen() {
             <Ionicons name="checkmark-circle" size={60} color="#10B981" />
           </View>
           <Text style={styles.title}>Productif.io</Text>
-          <Text style={styles.subtitle}>Rejoignez notre communauté</Text>
+          <Text style={styles.subtitle}>
+            {t('signupHeroSubtitle', undefined, 'Rejoignez notre communauté')}
+          </Text>
         </View>
 
         {/* Formulaire */}
         <View style={styles.formContainer}>
-          <Text style={styles.formTitle}>Inscription</Text>
+          <Text style={styles.formTitle}>
+            {t('signupFormTitle', undefined, 'Inscription')}
+          </Text>
           <Text style={styles.formSubtitle}>
-            Créez votre compte pour commencer
+            {t('signupFormSubtitle', undefined, 'Créez votre compte pour commencer')}
           </Text>
 
           <View style={styles.inputContainer}>
-            <Text style={styles.label}>Nom complet</Text>
+            <Text style={styles.label}>
+              {t('signupFullNameLabel', undefined, 'Nom complet')}
+            </Text>
             <View style={styles.inputWrapper}>
               <Ionicons name="person" size={20} color="#9CA3AF" style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
-                placeholder="Votre nom"
+                placeholder={t('signupFullNamePlaceholder', undefined, 'Votre nom')}
                 value={name}
                 onChangeText={setName}
                 autoCapitalize="words"
@@ -148,12 +171,14 @@ export default function SignupScreen() {
           </View>
 
           <View style={styles.inputContainer}>
-            <Text style={styles.label}>Email</Text>
+            <Text style={styles.label}>
+              {t('signupEmailLabel', undefined, 'Email')}
+            </Text>
             <View style={styles.inputWrapper}>
               <Ionicons name="mail" size={20} color="#9CA3AF" style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
-                placeholder="exemple@email.com"
+                placeholder={t('signupEmailPlaceholder', undefined, 'exemple@email.com')}
                 value={email}
                 onChangeText={setEmail}
                 keyboardType="email-address"
@@ -164,7 +189,9 @@ export default function SignupScreen() {
           </View>
 
           <View style={styles.inputContainer}>
-            <Text style={styles.label}>Mot de passe</Text>
+            <Text style={styles.label}>
+              {t('signupPasswordLabel', undefined, 'Mot de passe')}
+            </Text>
             <View style={styles.inputWrapper}>
               <Ionicons name="lock-closed" size={20} color="#9CA3AF" style={styles.inputIcon} />
               <TextInput
@@ -190,7 +217,9 @@ export default function SignupScreen() {
           </View>
 
           <View style={styles.inputContainer}>
-            <Text style={styles.label}>Confirmer le mot de passe</Text>
+            <Text style={styles.label}>
+              {t('signupConfirmPasswordLabel', undefined, 'Confirmer le mot de passe')}
+            </Text>
             <View style={styles.inputWrapper}>
               <Ionicons name="lock-closed" size={20} color="#9CA3AF" style={styles.inputIcon} />
               <TextInput
@@ -223,7 +252,9 @@ export default function SignupScreen() {
             {isLoading ? (
               <ActivityIndicator color="white" />
             ) : (
-              <Text style={styles.signupButtonText}>Créer mon compte</Text>
+              <Text style={styles.signupButtonText}>
+                {t('signupCreateAccountCta', undefined, 'Créer mon compte')}
+              </Text>
             )}
           </TouchableOpacity>
 
@@ -232,7 +263,10 @@ export default function SignupScreen() {
             onPress={() => router.replace('/login')}
           >
             <Text style={styles.loginText}>
-              Déjà un compte ? <Text style={styles.loginLinkText}>Se connecter</Text>
+              {t('signupAlreadyHaveAccount', undefined, 'Déjà un compte ?')}{' '}
+              <Text style={styles.loginLinkText}>
+                {t('signupLoginLink', undefined, 'Se connecter')}
+              </Text>
             </Text>
           </TouchableOpacity>
         </View>
@@ -240,7 +274,7 @@ export default function SignupScreen() {
         {/* Footer */}
         <View style={styles.footer}>
           <Text style={styles.footerText}>
-            En créant un compte, vous acceptez nos conditions d'utilisation
+            {t('signupTermsNotice', undefined, 'En créant un compte, vous acceptez nos conditions d\'utilisation')}
           </Text>
         </View>
       </ScrollView>

@@ -5,7 +5,7 @@ import { translations, Language, TranslationKey } from '@/constants/translations
 interface LanguageContextType {
   language: Language;
   setLanguage: (language: Language) => void;
-  t: (key: TranslationKey, params?: Record<string, string | number>) => string;
+  t: (key: TranslationKey | string, params?: Record<string, string | number>, fallback?: string) => string;
   isLoading: boolean;
 }
 
@@ -45,8 +45,9 @@ export function LanguageProvider({ children, initialLanguage = 'fr' }: { childre
   }, []);
 
   // Fonction de traduction avec support des paramètres
-  const t = useCallback((key: TranslationKey, params?: Record<string, string | number>): string => {
-    let text = translations[language]?.[key] || translations.en?.[key] || key;
+  const t = useCallback((key: TranslationKey | string, params?: Record<string, string | number>, fallback?: string): string => {
+    const safeKey = key as TranslationKey;
+    let text = translations[language]?.[safeKey] || translations.en?.[safeKey] || fallback || key as string;
     
     // Remplacer les paramètres {param} par leurs valeurs
     if (params) {
@@ -73,7 +74,7 @@ export function useLanguage(): LanguageContextType {
     return {
       language: 'fr',
       setLanguage: () => {},
-      t: (key: TranslationKey) => key,
+      t: (key: TranslationKey | string, _params?: Record<string, string | number>, fallback?: string) => (fallback || (key as string)),
       isLoading: false,
     };
   }

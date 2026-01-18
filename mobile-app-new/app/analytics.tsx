@@ -124,6 +124,15 @@ export default function AnalyticsScreen() {
   );
 
   const timePeriods: TimePeriod[] = ['week', 'month', 'trimester', 'year'];
+  const heatmapDays = [
+    t('mondayShort', undefined, 'M'),
+    t('tuesdayShort', undefined, 'T'),
+    t('wednesdayShort', undefined, 'W'),
+    t('thursdayShort', undefined, 'T'),
+    t('fridayShort', undefined, 'F'),
+    t('saturdayShort', undefined, 'S'),
+    t('sundayShort', undefined, 'S'),
+  ];
 
   return (
     <View style={styles.container}>
@@ -378,7 +387,7 @@ export default function AnalyticsScreen() {
         >
           <Text style={styles.chartTitle}>{t('weeklyConsistency')}</Text>
           <View style={styles.heatmap}>
-            {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((day, index) => (
+            {heatmapDays.map((day, index) => (
               <View key={index} style={styles.heatmapDay}>
                 <Text style={styles.heatmapDayLabel}>{day}</Text>
                 <View

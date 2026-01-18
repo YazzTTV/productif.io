@@ -17,8 +17,10 @@ import { authService } from '@/lib/api';
 import { signInWithGoogle } from '@/lib/googleAuth';
 import { signInWithApple, isAppleSignInAvailable } from '@/lib/appleAuth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 export default function LoginScreen() {
+  const { t } = useLanguage();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -52,7 +54,7 @@ export default function LoginScreen() {
         // Connexion réussie, redirection vers le dashboard
         router.replace('/(tabs)');
       } else {
-        Alert.alert('Erreur', 'Échec de la connexion avec Apple');
+        Alert.alert(t('error'), t('appleLoginFailed', undefined, 'Échec de la connexion avec Apple'));
       }
       
     } catch (error) {
@@ -61,7 +63,7 @@ export default function LoginScreen() {
         // Ne pas afficher d'alerte si l'utilisateur a annulé
         return;
       }
-      Alert.alert('Erreur', error instanceof Error ? error.message : 'Une erreur est survenue lors de la connexion avec Apple');
+      Alert.alert(t('error'), error instanceof Error ? error.message : t('appleLoginError', undefined, 'Une erreur est survenue lors de la connexion avec Apple'));
     } finally {
       setIsLoadingApple(false);
     }
@@ -69,7 +71,7 @@ export default function LoginScreen() {
 
   const handleLogin = async () => {
     if (!email || !password) {
-      Alert.alert('Erreur', 'Veuillez remplir tous les champs');
+      Alert.alert(t('error'), t('loginFieldsRequired', undefined, 'Veuillez remplir tous les champs'));
       return;
     }
 
@@ -84,12 +86,12 @@ export default function LoginScreen() {
         // Connexion réussie, redirection vers le dashboard
         router.replace('/(tabs)');
       } else {
-        Alert.alert('Erreur', 'Email ou mot de passe incorrect');
+        Alert.alert(t('error'), t('loginIncorrect', undefined, 'Email ou mot de passe incorrect'));
       }
       
     } catch (error) {
       console.error('Erreur de connexion:', error);
-      Alert.alert('Erreur', error instanceof Error ? error.message : 'Une erreur est survenue lors de la connexion');
+      Alert.alert(t('error'), error instanceof Error ? error.message : t('somethingWentWrong'));
     } finally {
       setIsLoading(false);
     }
@@ -111,7 +113,7 @@ export default function LoginScreen() {
         // Connexion réussie, redirection vers le dashboard
         router.replace('/(tabs)');
       } else {
-        Alert.alert('Erreur', 'Échec de la connexion avec Google');
+        Alert.alert(t('error'), t('googleLoginFailed', undefined, 'Échec de la connexion avec Google'));
       }
       
     } catch (error) {
@@ -120,7 +122,7 @@ export default function LoginScreen() {
         // Ne pas afficher d'alerte si l'utilisateur a annulé
         return;
       }
-      Alert.alert('Erreur', error instanceof Error ? error.message : 'Une erreur est survenue lors de la connexion avec Google');
+      Alert.alert(t('error'), error instanceof Error ? error.message : t('somethingWentWrong'));
     } finally {
       setIsLoadingGoogle(false);
     }
@@ -138,23 +140,23 @@ export default function LoginScreen() {
             <Ionicons name="checkmark-circle" size={60} color="#10B981" />
           </View>
           <Text style={styles.title}>Productif.io</Text>
-          <Text style={styles.subtitle}>Votre compagnon de productivité</Text>
+          <Text style={styles.subtitle}>{t('loginSubtitle', undefined, 'Votre compagnon de productivité')}</Text>
         </View>
 
         {/* Formulaire */}
         <View style={styles.formContainer}>
-          <Text style={styles.formTitle}>Connexion</Text>
+          <Text style={styles.formTitle}>{t('welcomeBack', undefined, 'Connexion')}</Text>
           <Text style={styles.formSubtitle}>
-            Saisissez vos identifiants pour vous connecter
+            {t('loginPrompt', undefined, 'Saisissez vos identifiants pour vous connecter')}
           </Text>
 
           <View style={styles.inputContainer}>
-            <Text style={styles.label}>Email</Text>
+            <Text style={styles.label}>{t('emailPlaceholder', undefined, 'Email')}</Text>
             <View style={styles.inputWrapper}>
               <Ionicons name="mail" size={20} color="#9CA3AF" style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
-                placeholder="exemple@email.com"
+                placeholder={t('emailPlaceholder', undefined, 'exemple@email.com')}
                 value={email}
                 onChangeText={setEmail}
                 keyboardType="email-address"
@@ -165,7 +167,7 @@ export default function LoginScreen() {
           </View>
 
           <View style={styles.inputContainer}>
-            <Text style={styles.label}>Mot de passe</Text>
+            <Text style={styles.label}>{t('passwordPlaceholder', undefined, 'Mot de passe')}</Text>
             <View style={styles.inputWrapper}>
               <Ionicons name="lock-closed" size={20} color="#9CA3AF" style={styles.inputIcon} />
               <TextInput
@@ -203,7 +205,7 @@ export default function LoginScreen() {
               ) : (
                 <>
                   <Ionicons name="logo-apple" size={20} color="#FFFFFF" />
-                  <Text style={styles.appleButtonText}>Continuer avec Apple</Text>
+                  <Text style={styles.appleButtonText}>{t('continueWithApple')}</Text>
                 </>
               )}
             </TouchableOpacity>
@@ -221,7 +223,7 @@ export default function LoginScreen() {
             ) : (
               <>
                 <Ionicons name="logo-google" size={20} color="#4285F4" />
-                <Text style={styles.googleButtonText}>Continuer avec Google</Text>
+                <Text style={styles.googleButtonText}>{t('continueWithGoogle')}</Text>
               </>
             )}
           </TouchableOpacity>
@@ -229,7 +231,7 @@ export default function LoginScreen() {
           {/* Séparateur */}
           <View style={styles.separatorContainer}>
             <View style={styles.separatorLine} />
-            <Text style={styles.separatorText}>OU</Text>
+            <Text style={styles.separatorText}>{t('or', undefined, 'OU')}</Text>
             <View style={styles.separatorLine} />
           </View>
 
@@ -241,7 +243,7 @@ export default function LoginScreen() {
             {isLoading ? (
               <ActivityIndicator color="white" />
             ) : (
-              <Text style={styles.loginButtonText}>Se connecter</Text>
+              <Text style={styles.loginButtonText}>{t('loginButton', undefined, 'Se connecter')}</Text>
             )}
           </TouchableOpacity>
 
@@ -250,7 +252,7 @@ export default function LoginScreen() {
             onPress={() => router.push('/signup' as any)}
           >
             <Text style={styles.signupText}>
-              Pas encore de compte ? <Text style={styles.signupLinkText}>Inscrivez-vous</Text>
+              {t('legacyNoAccount', undefined, 'Pas encore de compte ?')} <Text style={styles.signupLinkText}>{t('legacySignup', undefined, 'Inscrivez-vous')}</Text>
             </Text>
           </TouchableOpacity>
         </View>
@@ -258,7 +260,7 @@ export default function LoginScreen() {
         {/* Footer */}
         <View style={styles.footer}>
           <Text style={styles.footerText}>
-            En vous connectant, vous acceptez nos conditions d'utilisation
+            {t('loginTerms', undefined, "En vous connectant, vous acceptez nos conditions d'utilisation")}
           </Text>
         </View>
       </ScrollView>

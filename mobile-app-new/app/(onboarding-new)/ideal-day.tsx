@@ -98,7 +98,7 @@ export default function IdealDayScreen() {
             blocksWithBreaks.push({
               time: breakTimeStr,
               duration: 15,
-              activity: 'Break',
+              activity: t('breakLabel'),
               priority: false,
             });
           }
@@ -633,4 +633,3 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
 });
-

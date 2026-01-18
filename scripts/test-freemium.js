@@ -58,9 +58,9 @@ async function apiCall(endpoint, options = {}) {
   if (!token) return null;
 
   const url = new URL(`${API_BASE_URL}${endpoint}`);
-  const http = require('http');
-  const https = require('https');
-  const client = url.protocol === 'https:' ? https : http;
+  const http = await import('http');
+  const https = await import('https');
+  const client = url.protocol === 'https:' ? https.default : http.default;
 
   return new Promise((resolve) => {
     const requestOptions = {

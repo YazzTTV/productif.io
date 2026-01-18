@@ -18,6 +18,7 @@ import { apiCall } from '@/lib/api';
 import { LockedCard } from '@/components/LockedCard';
 import { UpgradeModal } from '@/components/UpgradeModal';
 import { useTrialStatus } from '@/hooks/useTrialStatus';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface Step {
   id: number;
@@ -43,6 +44,7 @@ interface ApiToken {
 export default function AssistantIAPage() {
   const router = useRouter();
   const { isLocked } = useTrialStatus();
+  const { t } = useLanguage();
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [apiToken, setApiToken] = useState<string>('');
   const [isGeneratingToken, setIsGeneratingToken] = useState(false);
@@ -50,16 +52,16 @@ export default function AssistantIAPage() {
   const [steps, setSteps] = useState<Step[]>([
     {
       id: 1,
-      title: 'Générer un token API',
-      description: 'Créez un token API pour connecter l\'agent IA à votre compte',
+      title: t('aiGenerateTokenTitle', undefined, 'Générer un token API'),
+      description: t('aiGenerateTokenDescription', undefined, 'Créez un token API pour connecter l\'agent IA à votre compte'),
       icon: 'key',
       isCompleted: false,
       action: 'generate'
     },
     {
       id: 2,
-      title: 'Configurer l\'agent IA',
-      description: 'Connectez-vous à l\'agent IA WhatsApp',
+      title: t('aiConfigureAgentTitle', undefined, 'Configurer l\'agent IA'),
+      description: t('aiConfigureAgentDescription', undefined, 'Connectez-vous à l\'agent IA WhatsApp'),
       icon: 'chatbubbles',
       isCompleted: false,
       action: 'link',
@@ -67,8 +69,8 @@ export default function AssistantIAPage() {
     },
     {
       id: 3,
-      title: 'Configurer les notifications',
-      description: 'Personnalisez vos préférences de notification',
+      title: t('aiConfigureNotificationsTitle', undefined, 'Configurer les notifications'),
+      description: t('aiConfigureNotificationsDescription', undefined, 'Personnalisez vos préférences de notification'),
       icon: 'notifications',
       isCompleted: false,
       action: 'internal',
@@ -116,7 +118,7 @@ export default function AssistantIAPage() {
       // Vérifier si c'est un tableau (erreur de l'API)
       if (Array.isArray(response)) {
         console.log('❌ API a retourné un tableau au lieu d\'un objet');
-        throw new Error('Réponse inattendue de l\'API (tableau au lieu d\'objet)');
+        throw new Error(t('aiUnexpectedResponse', undefined, 'Réponse inattendue de l\'API (tableau au lieu d\'objet)'));
       }
 
       if (response && response.token) {
@@ -127,20 +129,20 @@ export default function AssistantIAPage() {
         ));
         
         Alert.alert(
-          'Token généré avec succès',
-          'Votre token API est maintenant visible ci-dessous. Copiez-le pour configurer l\'agent WhatsApp.',
-          [{ text: 'OK' }]
+          t('aiTokenGeneratedTitle', undefined, 'Token généré avec succès'),
+          t('aiTokenGeneratedMessage', undefined, 'Votre token API est maintenant visible ci-dessous. Copiez-le pour configurer l\'agent WhatsApp.'),
+          [{ text: t('ok', undefined, 'OK') }]
         );
       } else {
         console.log('❌ Propriété token manquante:', response);
-        throw new Error('Token non reçu dans la réponse');
+        throw new Error(t('aiTokenMissing', undefined, 'Token non reçu dans la réponse'));
       }
     } catch (error) {
       console.error('❌ Erreur génération token:', error);
       Alert.alert(
-        'Erreur',
-        'Impossible de générer le token. Veuillez réessayer.',
-        [{ text: 'OK' }]
+        t('error'),
+        t('aiTokenGenerateError', undefined, 'Impossible de générer le token. Veuillez réessayer.'),
+        [{ text: t('ok', undefined, 'OK') }]
       );
     } finally {
       setIsGeneratingToken(false);
@@ -149,7 +151,7 @@ export default function AssistantIAPage() {
 
   const copyToClipboard = (text: string) => {
     Clipboard.setString(text);
-    Alert.alert('Copié', 'Token copié dans le presse-papiers');
+    Alert.alert(t('copied', undefined, 'Copié'), t('aiTokenCopied', undefined, 'Token copié dans le presse-papiers'));
   };
 
   const handleStepPress = (step: Step) => {
@@ -157,11 +159,11 @@ export default function AssistantIAPage() {
       // Si un token existe déjà, demander confirmation
       if (step.isCompleted && !apiToken) {
         Alert.alert(
-          'Générer un nouveau token',
-          'Un token existe déjà. Voulez-vous en générer un nouveau ? L\'ancien sera toujours valide.',
+          t('aiGenerateNewTitle', undefined, 'Générer un nouveau token'),
+          t('aiGenerateNewMessage', undefined, "Un token existe déjà. Voulez-vous en générer un nouveau ? L'ancien sera toujours valide."),
           [
-            { text: 'Annuler', style: 'cancel' },
-            { text: 'Générer', onPress: generateToken }
+            { text: t('cancel'), style: 'cancel' },
+            { text: t('aiGenerate', undefined, 'Générer'), onPress: generateToken }
           ]
         );
       } else {
@@ -169,42 +171,42 @@ export default function AssistantIAPage() {
       }
     } else if (step.action === 'link' && step.link) {
       // Pour WhatsApp, on ouvre directement le lien
-      const openWhatsAppLink = async () => {
-        try {
-          const supported = await Linking.canOpenURL(step.link!);
-          if (supported) {
-            await Linking.openURL(step.link!);
-            // Marquer comme complété après l'ouverture
-            setSteps(prev => prev.map(s => 
-              s.id === step.id ? { ...s, isCompleted: true } : s
-            ));
-          } else {
-            // Si le lien ne peut pas être ouvert, le copier dans le presse-papiers
-            copyToClipboard(step.link!);
-            Alert.alert(
-              'Lien copié',
-              'Le lien a été copié dans le presse-papiers. Ouvrez votre navigateur et collez le lien.',
-              [{ text: 'OK' }]
-            );
-          }
-        } catch (error) {
-          console.error('Erreur lors de l\'ouverture du lien:', error);
-          // En cas d'erreur, copier le lien
-          copyToClipboard(step.link!);
-          Alert.alert(
-            'Lien copié',
-            'Impossible d\'ouvrir automatiquement le lien. Il a été copié dans le presse-papiers.',
-            [{ text: 'OK' }]
-          );
-        }
-      };
+          const openWhatsAppLink = async () => {
+            try {
+              const supported = await Linking.canOpenURL(step.link!);
+              if (supported) {
+                await Linking.openURL(step.link!);
+                // Marquer comme complété après l'ouverture
+                setSteps(prev => prev.map(s => 
+                  s.id === step.id ? { ...s, isCompleted: true } : s
+                ));
+              } else {
+                // Si le lien ne peut pas être ouvert, le copier dans le presse-papiers
+                copyToClipboard(step.link!);
+                Alert.alert(
+                  t('aiLinkCopiedTitle', undefined, 'Lien copié'),
+                  t('aiLinkCopiedMessage', undefined, 'Le lien a été copié dans le presse-papiers. Ouvrez votre navigateur et collez le lien.'),
+                  [{ text: t('ok', undefined, 'OK') }]
+                );
+              }
+            } catch (error) {
+              console.error('Erreur lors de l\'ouverture du lien:', error);
+              // En cas d'erreur, copier le lien
+              copyToClipboard(step.link!);
+              Alert.alert(
+                t('aiLinkCopiedTitle', undefined, 'Lien copié'),
+                t('aiLinkOpenError', undefined, "Impossible d'ouvrir automatiquement le lien. Il a été copié dans le presse-papiers."),
+                [{ text: t('ok', undefined, 'OK') }]
+              );
+            }
+          };
 
       Alert.alert(
-        'Configurer l\'agent WhatsApp',
-        'Voulez-vous ouvrir le lien pour configurer l\'agent IA WhatsApp ?',
+        t('aiConfigureWhatsAppTitle', undefined, "Configurer l'agent WhatsApp"),
+        t('aiConfigureWhatsAppMessage', undefined, "Voulez-vous ouvrir le lien pour configurer l'agent IA WhatsApp ?"),
         [
-          { text: 'Annuler', style: 'cancel' },
-          { text: 'Ouvrir', onPress: openWhatsAppLink }
+          { text: t('cancel'), style: 'cancel' },
+          { text: t('open', undefined, 'Ouvrir'), onPress: openWhatsAppLink }
         ]
       );
     } else if (step.action === 'internal') {
@@ -264,7 +266,7 @@ export default function AssistantIAPage() {
 
       {step.id === 1 && apiToken && (
         <View style={styles.tokenContainer}>
-          <Text style={styles.tokenLabel}>🔑 Votre token API :</Text>
+          <Text style={styles.tokenLabel}>🔑 {t('aiTokenLabel', undefined, 'Votre token API :')}</Text>
           <View style={styles.tokenBox}>
             <Text style={styles.tokenText} numberOfLines={2} ellipsizeMode="middle">
               {apiToken}
@@ -277,7 +279,7 @@ export default function AssistantIAPage() {
             </TouchableOpacity>
           </View>
           <Text style={styles.tokenHint}>
-            💡 Appuyez sur l'icône pour copier le token
+            💡 {t('aiTokenHint', undefined, "Appuyez sur l'icône pour copier le token")}
           </Text>
         </View>
       )}
@@ -291,7 +293,7 @@ export default function AssistantIAPage() {
         <StatusBar barStyle="dark-content" />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#10B981" />
-          <Text style={styles.loadingText}>Chargement...</Text>
+          <Text style={styles.loadingText}>{t('loading')}</Text>
         </View>
       </SafeAreaView>
     );
@@ -309,16 +311,16 @@ export default function AssistantIAPage() {
         >
           <Ionicons name="arrow-back" size={24} color="#1F2937" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Assistant IA</Text>
+        <Text style={styles.headerTitle}>{t('aiAssistant', undefined, 'Assistant IA')}</Text>
         <View style={{ width: 24 }} />
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Title Section */}
         <View style={styles.titleSection}>
-          <Text style={styles.mainTitle}>Configuration de l'assistant IA</Text>
+          <Text style={styles.mainTitle}>{t('aiSetupTitle', undefined, "Configuration de l'assistant IA")}</Text>
           <Text style={styles.subtitle}>
-            Suivez ces étapes pour configurer votre assistant IA personnel
+            {t('aiSetupSubtitle', undefined, 'Suivez ces étapes pour configurer votre assistant IA personnel')}
           </Text>
         </View>
 
@@ -332,10 +334,9 @@ export default function AssistantIAPage() {
           <View style={styles.infoCard}>
             <Ionicons name="information-circle" size={24} color="#3B82F6" />
             <View style={styles.infoContent}>
-              <Text style={styles.infoTitle}>À propos de l'assistant IA</Text>
+              <Text style={styles.infoTitle}>{t('aiAboutTitle', undefined, "À propos de l'assistant IA")}</Text>
               <Text style={styles.infoDescription}>
-                L'assistant IA vous permet de gérer vos tâches, habitudes et projets 
-                directement via WhatsApp. Configurez votre token pour commencer.
+                {t('aiAboutDescription', undefined, "L'assistant IA vous permet de gérer vos tâches, habitudes et projets directement via WhatsApp. Configurez votre token pour commencer.")}
               </Text>
             </View>
           </View>

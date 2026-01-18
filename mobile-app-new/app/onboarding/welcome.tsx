@@ -9,8 +9,10 @@ import { authService } from '@/lib/api';
 import { signInWithGoogle } from '@/lib/googleAuth';
 import productifLogo from '../../assets/images/icon.png';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 export default function WelcomeScreen() {
+  const { t } = useLanguage();
   const [step, setStep] = useState<0 | 1 | 2 | 3>(0);
 
   // Connexion
@@ -29,7 +31,7 @@ export default function WelcomeScreen() {
     try {
       const available = await AppleAuthentication.isAvailableAsync();
       if (!available) {
-        Alert.alert('Non disponible', "Apple Sign-In n'est pas disponible dans Expo Go. Utilisez un build de développement.");
+        Alert.alert(t('legacyAppleUnavailableTitle', undefined, 'Non disponible'), t('legacyAppleUnavailableMessage', undefined, "Apple Sign-In n'est pas disponible dans Expo Go. Utilisez un build de développement."));
         return;
       }
       const credential = await AppleAuthentication.signInAsync({
@@ -38,20 +40,20 @@ export default function WelcomeScreen() {
       const identityToken = credential.identityToken;
       const email = credential.email || undefined;
       const name = credential.fullName ? `${credential.fullName.givenName ?? ''} ${credential.fullName.familyName ?? ''}`.trim() : undefined;
-      if (!identityToken) throw new Error("Token Apple manquant");
+      if (!identityToken) throw new Error(t('legacyAppleTokenMissing', undefined, 'Token Apple manquant'));
       const res = await fetch('https://www.productif.io/api/auth/oauth/apple', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ identityToken, email, name }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || 'Erreur OAuth Apple');
+      if (!res.ok) throw new Error(data?.error || t('legacyAppleOauthError', undefined, 'Erreur OAuth Apple'));
       if (data?.token) await authService.setToken(data.token);
       await AsyncStorage.setItem('onboarding_completed', 'true');
       router.replace('/(tabs)');
     } catch (e: any) {
       if (e?.code === 'ERR_CANCELED') return;
-      Alert.alert('Erreur Apple', e?.message || 'Une erreur est survenue');
+      Alert.alert(t('legacyAppleErrorTitle', undefined, 'Erreur Apple'), e?.message || t('somethingWentWrong'));
     }
   };
 
@@ -72,11 +74,11 @@ export default function WelcomeScreen() {
           router.replace('/onboarding/value');
         }
       } else {
-        Alert.alert('Erreur', 'Échec de la connexion avec Google');
+        Alert.alert(t('legacyGoogleErrorTitle', undefined, 'Erreur'), t('legacyGoogleLoginFailed', undefined, 'Échec de la connexion avec Google'));
       }
     } catch (e: any) {
       if (e?.message?.includes('annulée')) return;
-      Alert.alert('Erreur Google', e?.message || 'Une erreur est survenue');
+      Alert.alert(t('legacyGoogleErrorTitle', undefined, 'Erreur Google'), e?.message || t('somethingWentWrong'));
     } finally {
       setLoadingGoogle(false);
     }
@@ -86,7 +88,7 @@ export default function WelcomeScreen() {
     const email = loginEmail.trim().toLowerCase();
     const password = loginPassword;
     if (!email || !password) {
-      Alert.alert('Champs requis', 'Veuillez renseigner email et mot de passe.');
+      Alert.alert(t('legacyRequiredFieldsTitle', undefined, 'Champs requis'), t('legacyLoginFields', undefined, 'Veuillez renseigner email et mot de passe.'));
       return;
     }
     try {
@@ -96,7 +98,7 @@ export default function WelcomeScreen() {
       await AsyncStorage.setItem('onboarding_completed', 'true');
       router.replace('/(tabs)');
     } catch (e: any) {
-      Alert.alert('Connexion échouée', e?.message || 'Vérifiez vos identifiants.');
+      Alert.alert(t('legacyLoginFailedTitle', undefined, 'Connexion échouée'), e?.message || t('legacyLoginFailedMessage', undefined, 'Vérifiez vos identifiants.'));
     } finally {
       setLoadingLogin(false);
     }
@@ -107,7 +109,7 @@ export default function WelcomeScreen() {
     const email = signupEmail.trim().toLowerCase();
     const password = signupPassword;
     if (!name || !email || !password) {
-      Alert.alert('Champs requis', 'Nom, email et mot de passe sont requis.');
+      Alert.alert(t('legacyRequiredFieldsTitle', undefined, 'Champs requis'), t('legacySignupFields', undefined, 'Nom, email et mot de passe sont requis.'));
       return;
     }
     try {
@@ -118,11 +120,11 @@ export default function WelcomeScreen() {
     } catch (e: any) {
       const msg = e?.message || '';
       if (msg.includes('déjà utilisé') || msg.includes('already')) {
-        Alert.alert('Email déjà utilisé', "Cet email est déjà associé à un compte. Connectez-vous.");
+        Alert.alert(t('legacyEmailUsedTitle', undefined, 'Email déjà utilisé'), t('legacyEmailUsedMessage', undefined, 'Cet email est déjà associé à un compte. Connectez-vous.'));
         setLoginEmail(email);
         setStep(2);
       } else {
-        Alert.alert("Inscription échouée", msg || "Réessayez plus tard.");
+        Alert.alert(t('legacySignupFailedTitle', undefined, 'Inscription échouée'), msg || t('legacySignupFailedMessage', undefined, 'Réessayez plus tard.'));
       }
     } finally {
       setLoadingSignup(false);
@@ -149,12 +151,12 @@ export default function WelcomeScreen() {
                   <Image source={productifLogo} style={styles.logoImg} />
                 </View>
               </View>
-              <Text style={[styles.title, styles.titleOnGreen]}>Félicitations</Text>
-              <Text style={[styles.subtitle, styles.subtitleOnGreen]}>Vous êtes sur la voie d'une vie plus productive</Text>
+              <Text style={[styles.title, styles.titleOnGreen]}>{t('legacyCongratsTitle', undefined, 'Félicitations')}</Text>
+              <Text style={[styles.subtitle, styles.subtitleOnGreen]}>{t('legacyCongratsSubtitle', undefined, 'Vous êtes sur la voie d\'une vie plus productive')}</Text>
             </View>
             <View style={styles.footerBlock}>
               <TouchableOpacity style={[styles.cta, styles.ctaWhiteOnGreen]} onPress={() => setStep(1)}>
-                <Text style={[styles.ctaTextGreen]}>Commencer</Text>
+                <Text style={[styles.ctaTextGreen]}>{t('start', undefined, 'Commencer')}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -171,8 +173,8 @@ export default function WelcomeScreen() {
                     <Image source={productifLogo} style={[styles.logoImg, { width: 120, height: 120 }]} />
                   </View>
                 </View>
-                <Text style={styles.title}>Bienvenue</Text>
-                <Text style={styles.subtitle}>Accédez à toutes les fonctionnalités de Productif.io</Text>
+                <Text style={styles.title}>{t('legacyWelcomeTitle', undefined, 'Bienvenue')}</Text>
+                <Text style={styles.subtitle}>{t('legacyWelcomeSubtitle', undefined, 'Accédez à toutes les fonctionnalités de Productif.io')}</Text>
               </View>
             )}
 
@@ -189,30 +191,30 @@ export default function WelcomeScreen() {
                   </View>
 
                   <View style={styles.centerBlockAlt}>
-                    <Text style={styles.formTitle}>Connexion</Text>
-                    <TextInput placeholder="Email" keyboardType="email-address" style={styles.input} value={loginEmail} onChangeText={setLoginEmail} />
-                    <TextInput placeholder="Mot de passe" secureTextEntry style={styles.input} value={loginPassword} onChangeText={setLoginPassword} />
-                    <TouchableOpacity onPress={() => Alert.alert('Mot de passe', 'Flux de réinitialisation à implémenter')}
+                    <Text style={styles.formTitle}>{t('welcomeBack')}</Text>
+                    <TextInput placeholder={t('emailPlaceholder')} keyboardType="email-address" style={styles.input} value={loginEmail} onChangeText={setLoginEmail} />
+                    <TextInput placeholder={t('passwordPlaceholder')} secureTextEntry style={styles.input} value={loginPassword} onChangeText={setLoginPassword} />
+                    <TouchableOpacity onPress={() => Alert.alert(t('forgotPassword'), t('legacyResetFlow', undefined, 'Flux de réinitialisation à implémenter'))}
                       style={{ alignSelf: 'center', marginBottom: 8 }}>
-                      <Text style={styles.forgot}>Mot de passe oublié ?</Text>
+                      <Text style={styles.forgot}>{t('forgotPassword')}</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
 
                 <View style={styles.footerBlock}>
                   <TouchableOpacity style={styles.cta} onPress={onLogin} disabled={loadingLogin}>
-                    {loadingLogin ? <ActivityIndicator color="#fff" /> : <Text style={styles.ctaText}>Se connecter</Text>}
+                    {loadingLogin ? <ActivityIndicator color="#fff" /> : <Text style={styles.ctaText}>{t('loginButton', undefined, 'Se connecter')}</Text>}
                   </TouchableOpacity>
 
                   <View style={styles.separatorRow}>
                     <View style={styles.sepLine} />
-                    <Text style={styles.sepText}>ou continuer avec</Text>
+                    <Text style={styles.sepText}>{t('legacyOrContinueWith', undefined, 'ou continuer avec')}</Text>
                     <View style={styles.sepLine} />
                   </View>
 
                   <TouchableOpacity style={styles.oauthBtn} onPress={handleApple}>
                     <Ionicons name="logo-apple" size={18} color="#111827" />
-                    <Text style={styles.oauthText}>Continuer avec Apple</Text>
+                    <Text style={styles.oauthText}>{t('continueWithApple')}</Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity style={styles.oauthBtn} onPress={() => handleGoogle(true)} disabled={loadingGoogle}>
@@ -221,13 +223,13 @@ export default function WelcomeScreen() {
                     ) : (
                       <>
                         <Ionicons name="logo-google" size={18} color="#4285F4" />
-                        <Text style={styles.oauthText}>Continuer avec Google</Text>
+                        <Text style={styles.oauthText}>{t('continueWithGoogle')}</Text>
                       </>
                     )}
                   </TouchableOpacity>
 
                   <TouchableOpacity onPress={() => setStep(3)}>
-                    <Text style={styles.link}>Pas de compte ? Inscription</Text>
+                    <Text style={styles.link}>{t('legacyNoAccount', undefined, 'Pas de compte ? Inscription')}</Text>
                   </TouchableOpacity>
                 </View>
               </ScrollView>
@@ -245,25 +247,25 @@ export default function WelcomeScreen() {
                 </View>
 
                 <View style={styles.centerBlockAlt}>
-                  <Text style={styles.formTitle}>Créer un compte</Text>
-                  <TextInput placeholder="Nom" style={styles.input} value={signupName} onChangeText={setSignupName} />
-                  <TextInput placeholder="Email" keyboardType="email-address" style={styles.input} value={signupEmail} onChangeText={setSignupEmail} />
-                  <TextInput placeholder="Mot de passe" secureTextEntry style={styles.input} value={signupPassword} onChangeText={setSignupPassword} />
+                  <Text style={styles.formTitle}>{t('createAccount')}</Text>
+                  <TextInput placeholder={t('firstName', undefined, 'Nom')} style={styles.input} value={signupName} onChangeText={setSignupName} />
+                  <TextInput placeholder={t('emailPlaceholder')} keyboardType="email-address" style={styles.input} value={signupEmail} onChangeText={setSignupEmail} />
+                  <TextInput placeholder={t('passwordPlaceholder')} secureTextEntry style={styles.input} value={signupPassword} onChangeText={setSignupPassword} />
                 </View>
                 <View style={styles.footerBlock}>
                   <TouchableOpacity style={styles.cta} onPress={onSignup} disabled={loadingSignup}>
-                    {loadingSignup ? <ActivityIndicator color="#fff" /> : <Text style={styles.ctaText}>Créer mon compte</Text>}
+                    {loadingSignup ? <ActivityIndicator color="#fff" /> : <Text style={styles.ctaText}>{t('legacyCreateMyAccount', undefined, 'Créer mon compte')}</Text>}
                   </TouchableOpacity>
 
                   <View style={styles.separatorRow}>
                     <View style={styles.sepLine} />
-                    <Text style={styles.sepText}>ou créer avec</Text>
+                    <Text style={styles.sepText}>{t('legacyOrCreateWith', undefined, 'ou créer avec')}</Text>
                     <View style={styles.sepLine} />
                   </View>
 
                   <TouchableOpacity style={styles.oauthBtn} onPress={handleApple}>
                     <Ionicons name="logo-apple" size={18} color="#111827" />
-                    <Text style={styles.oauthText}>Continuer avec Apple</Text>
+                    <Text style={styles.oauthText}>{t('continueWithApple')}</Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity style={styles.oauthBtn} onPress={() => handleGoogle(false)} disabled={loadingGoogle}>
@@ -272,13 +274,13 @@ export default function WelcomeScreen() {
                     ) : (
                       <>
                         <Ionicons name="logo-google" size={18} color="#4285F4" />
-                        <Text style={styles.oauthText}>Continuer avec Google</Text>
+                        <Text style={styles.oauthText}>{t('continueWithGoogle')}</Text>
                       </>
                     )}
                   </TouchableOpacity>
 
                   <TouchableOpacity onPress={() => setStep(2)}>
-                    <Text style={styles.link}>Déjà un compte ? Connexion</Text>
+                    <Text style={styles.link}>{t('legacyAlreadyHaveAccount', undefined, 'Déjà un compte ? Connexion')}</Text>
                   </TouchableOpacity>
                 </View>
               </ScrollView>
@@ -287,18 +289,18 @@ export default function WelcomeScreen() {
             {step === 1 && (
               <View style={styles.footerBlock}>
                 <TouchableOpacity style={styles.cta} onPress={() => setStep(2)}>
-                  <Text style={styles.ctaText}>Continuer avec e-mail</Text>
+                  <Text style={styles.ctaText}>{t('continueWithEmail')}</Text>
                 </TouchableOpacity>
 
                 <View style={styles.separatorRow}>
                   <View style={styles.sepLine} />
-                  <Text style={styles.sepText}>ou</Text>
+                  <Text style={styles.sepText}>{t('or')}</Text>
                   <View style={styles.sepLine} />
                 </View>
 
                 <TouchableOpacity style={styles.oauthBtn} onPress={handleApple}>
                   <Ionicons name="logo-apple" size={18} color="#111827" />
-                  <Text style={styles.oauthText}>Continuer avec Apple</Text>
+                  <Text style={styles.oauthText}>{t('continueWithApple')}</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity style={styles.oauthBtn} onPress={() => handleGoogle(false)} disabled={loadingGoogle}>
@@ -307,7 +309,7 @@ export default function WelcomeScreen() {
                   ) : (
                     <>
                       <Ionicons name="logo-google" size={18} color="#4285F4" />
-                      <Text style={styles.oauthText}>Continuer avec Google</Text>
+                      <Text style={styles.oauthText}>{t('continueWithGoogle')}</Text>
                     </>
                   )}
                 </TouchableOpacity>

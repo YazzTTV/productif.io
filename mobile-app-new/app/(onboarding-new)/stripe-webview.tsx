@@ -9,11 +9,13 @@ import { WebView } from 'react-native-webview';
 import { router, useLocalSearchParams } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { onboardingService } from '@/lib/api';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 export default function StripeWebViewScreen() {
   const params = useLocalSearchParams();
   const checkoutUrl = params.checkoutUrl as string;
   const [isLoading, setIsLoading] = useState(true);
+  const { t } = useLanguage();
 
   const handleNavigationStateChange = (navState: any) => {
     const { url } = navState;
@@ -43,11 +45,11 @@ export default function StripeWebViewScreen() {
     
     await AsyncStorage.setItem('onboarding_completed', 'true');
     Alert.alert(
-      'Paiement réussi !',
-      'Votre abonnement a été activé avec succès.',
+      t('paymentSuccessTitle', undefined, 'Paiement réussi !'),
+      t('paymentSuccessMessage', undefined, 'Votre abonnement a été activé avec succès.'),
       [
         {
-          text: 'Continuer',
+          text: t('paymentSuccessContinue', undefined, 'Continuer'),
           onPress: () => router.replace('/(tabs)'),
         },
       ]
@@ -56,11 +58,11 @@ export default function StripeWebViewScreen() {
 
   const handlePaymentCanceled = () => {
     Alert.alert(
-      'Paiement annulé',
-      'Vous pouvez réessayer plus tard.',
+      t('paymentCanceledTitle', undefined, 'Paiement annulé'),
+      t('paymentCanceledMessage', undefined, 'Vous pouvez réessayer plus tard.'),
       [
         {
-          text: 'Retour',
+          text: t('paymentCanceledReturn', undefined, 'Retour'),
           onPress: () => router.back(),
         },
       ]
@@ -91,7 +93,7 @@ export default function StripeWebViewScreen() {
         onError={(syntheticEvent) => {
           const { nativeEvent } = syntheticEvent;
           console.error('WebView error:', nativeEvent);
-          Alert.alert('Erreur', 'Impossible de charger la page de paiement');
+          Alert.alert(t('error', undefined, 'Erreur'), t('paymentPageLoadError', undefined, 'Impossible de charger la page de paiement'));
         }}
       />
     </View>
@@ -118,4 +120,3 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
 });
-

@@ -15,6 +15,7 @@ import { router } from 'expo-router';
 import { format, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { apiCall } from '@/lib/api';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 const { width } = Dimensions.get('window');
 
@@ -59,6 +60,7 @@ interface CompletedTask {
 type TabType = 'learning' | 'ratings' | 'processes' | 'tasks';
 
 export default function MonEspaceScreen() {
+  const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState<TabType>('learning');
   const [learningEntries, setLearningEntries] = useState<HabitEntry[]>([]);
   const [ratingEntries, setRatingEntries] = useState<HabitEntry[]>([]);
@@ -99,7 +101,7 @@ export default function MonEspaceScreen() {
       
     } catch (error) {
       console.error('❌ Erreur lors du chargement:', error);
-      Alert.alert('Erreur', 'Impossible de charger les données');
+      Alert.alert(t('error'), t('mySpaceLoadError', undefined, 'Impossible de charger les données'));
     } finally {
       setIsLoading(false);
       setRefreshing(false);
@@ -149,10 +151,10 @@ export default function MonEspaceScreen() {
     <View key={entry.id} style={styles.card}>
       <View style={styles.cardHeader}>
         <Text style={styles.cardTitle}>
-          Apprentissage du {format(parseISO(entry.date), "d MMMM yyyy", { locale: fr })}
+          {t('mySpaceLearningTitle', { date: format(parseISO(entry.date), "d MMMM yyyy", { locale: fr }) }, `Apprentissage du ${format(parseISO(entry.date), "d MMMM yyyy", { locale: fr })}`)}
         </Text>
         <Text style={styles.cardSubtitle}>
-          Ajouté le {format(parseISO(entry.createdAt), "d MMMM yyyy à HH:mm", { locale: fr })}
+          {t('mySpaceAddedOn', { date: format(parseISO(entry.createdAt), "d MMMM yyyy à HH:mm", { locale: fr }) }, `Ajouté le ${format(parseISO(entry.createdAt), "d MMMM yyyy à HH:mm", { locale: fr })}`)}
         </Text>
       </View>
       <View style={styles.cardContent}>
@@ -165,16 +167,16 @@ export default function MonEspaceScreen() {
     <View key={entry.id} style={styles.card}>
       <View style={styles.cardHeader}>
         <Text style={styles.cardTitle}>
-          Note de journée du {format(parseISO(entry.date), "d MMMM yyyy", { locale: fr })}
+          {t('mySpaceDayRatingTitle', { date: format(parseISO(entry.date), "d MMMM yyyy", { locale: fr }) }, `Note de journée du ${format(parseISO(entry.date), "d MMMM yyyy", { locale: fr })}`)}
         </Text>
         <Text style={styles.cardSubtitle}>
-          Ajouté le {format(parseISO(entry.createdAt), "d MMMM yyyy à HH:mm", { locale: fr })}
+          {t('mySpaceAddedOn', { date: format(parseISO(entry.createdAt), "d MMMM yyyy à HH:mm", { locale: fr }) }, `Ajouté le ${format(parseISO(entry.createdAt), "d MMMM yyyy à HH:mm", { locale: fr })}`)}
         </Text>
       </View>
       <View style={styles.cardContent}>
         {entry.rating && (
           <View style={styles.ratingContainer}>
-            <Text style={styles.ratingLabel}>Note: </Text>
+            <Text style={styles.ratingLabel}>{t('mySpaceRating', undefined, 'Note: ')} </Text>
             <View style={[
               styles.ratingBadge,
               { backgroundColor: entry.rating >= 8 ? '#10B981' : entry.rating >= 5 ? '#F59E0B' : '#EF4444' }
@@ -206,23 +208,23 @@ export default function MonEspaceScreen() {
         <View style={styles.cardHeader}>
           <Text style={styles.cardTitle}>{process.name}</Text>
           <Text style={styles.cardSubtitle}>
-            Créé le {format(parseISO(process.createdAt), "d MMMM yyyy à HH:mm", { locale: fr })}
+            {t('mySpaceCreatedOn', { date: format(parseISO(process.createdAt), "d MMMM yyyy à HH:mm", { locale: fr }) }, `Créé le ${format(parseISO(process.createdAt), "d MMMM yyyy à HH:mm", { locale: fr })}`)}
           </Text>
         </View>
         <View style={styles.cardContent}>
           {/* Affichage des étapes du processus */}
           {steps.length > 0 ? (
             <View style={styles.processSteps}>
-              <Text style={styles.stepsTitle}>Étapes :</Text>
+              <Text style={styles.stepsTitle}>{t('mySpaceSteps', undefined, 'Étapes :')}</Text>
               {steps.slice(0, 3).map((step: any, index: number) => (
                 <View key={index} style={styles.stepItem}>
                   <Text style={styles.stepNumber}>{index + 1}.</Text>
-                  <Text style={styles.stepTitle}>{step.title || `Étape ${index + 1}`}</Text>
+                  <Text style={styles.stepTitle}>{step.title || t('mySpaceStepLabel', { index: index + 1 }, `Étape ${index + 1}`)}</Text>
                 </View>
               ))}
               {steps.length > 3 ? (
                 <Text style={styles.moreSteps}>
-                  ... et {steps.length - 3} autres étapes
+                  {t('mySpaceMoreSteps', { count: steps.length - 3 }, `... et ${steps.length - 3} autres étapes`)}
                 </Text>
               ) : null}
             </View>
@@ -230,7 +232,7 @@ export default function MonEspaceScreen() {
             <Text style={styles.noteText}>
               {process.description && !process.description.startsWith('[') 
                 ? process.description 
-                : 'Processus sans description'
+                : t('mySpaceNoDescription', undefined, 'Processus sans description')
               }
             </Text>
           )}
@@ -244,7 +246,7 @@ export default function MonEspaceScreen() {
       <View style={styles.cardHeader}>
         <Text style={styles.cardTitle}>{task.title}</Text>
         <Text style={styles.cardSubtitle}>
-          Terminée le {format(parseISO(task.completedAt || task.updatedAt), "d MMMM yyyy à HH:mm", { locale: fr })}
+          {t('mySpaceTaskCompletedOn', { date: format(parseISO(task.completedAt || task.updatedAt), "d MMMM yyyy à HH:mm", { locale: fr }) }, `Terminée le ${format(parseISO(task.completedAt || task.updatedAt), "d MMMM yyyy à HH:mm", { locale: fr })}`)}
         </Text>
       </View>
       <View style={styles.cardContent}>
@@ -270,7 +272,7 @@ export default function MonEspaceScreen() {
   const renderEmptyState = (message: string, icon: string) => (
     <View style={styles.emptyState}>
       <Ionicons name={icon as any} size={64} color="#9CA3AF" />
-      <Text style={styles.emptyTitle}>Aucun élément</Text>
+      <Text style={styles.emptyTitle}>{t('mySpaceEmpty', undefined, 'Aucun élément')}</Text>
       <Text style={styles.emptyDescription}>{message}</Text>
     </View>
   );
@@ -280,22 +282,22 @@ export default function MonEspaceScreen() {
       case 'learning':
         return learningEntries.length > 0 
           ? learningEntries.map(renderLearningCard)
-          : renderEmptyState("Vous n'avez pas encore enregistré d'apprentissages", "book-outline");
+          : renderEmptyState(t('mySpaceNoLearning', undefined, "Vous n'avez pas encore enregistré d'apprentissages"), "book-outline");
       
       case 'ratings':
         return ratingEntries.length > 0 
           ? ratingEntries.map(renderRatingCard)
-          : renderEmptyState("Vous n'avez pas encore noté de journées", "calendar-outline");
+          : renderEmptyState(t('mySpaceNoRatings', undefined, "Vous n'avez pas encore noté de journées"), "calendar-outline");
       
       case 'processes':
         return processes.length > 0 
           ? processes.map(renderProcessCard)
-          : renderEmptyState("Vous n'avez pas encore créé de processus", "layers-outline");
+          : renderEmptyState(t('mySpaceNoProcesses', undefined, "Vous n'avez pas encore créé de processus"), "layers-outline");
       
       case 'tasks':
         return completedTasks.length > 0 
           ? completedTasks.map(renderTaskCard)
-          : renderEmptyState("Vous n'avez pas encore terminé de tâches", "checkmark-circle-outline");
+          : renderEmptyState(t('mySpaceNoTasks', undefined, "Vous n'avez pas encore terminé de tâches"), "checkmark-circle-outline");
       
       default:
         return null;
@@ -306,7 +308,7 @@ export default function MonEspaceScreen() {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#10B981" />
-        <Text style={styles.loadingText}>Chargement de votre espace...</Text>
+        <Text style={styles.loadingText}>{t('mySpaceLoading', undefined, 'Chargement de votre espace...')}</Text>
       </View>
     );
   }
@@ -321,7 +323,7 @@ export default function MonEspaceScreen() {
         >
           <Ionicons name="arrow-back" size={24} color="#374151" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Mon Espace</Text>
+        <Text style={styles.headerTitle}>{t('mySpaceTitle', undefined, 'Mon Espace')}</Text>
         <View style={styles.headerSpacer} />
       </View>
 
@@ -333,9 +335,9 @@ export default function MonEspaceScreen() {
           contentContainerStyle={styles.tabsContent}
         >
           {renderTabButton('learning', 'Apprentissages', 'book-outline', learningEntries.length)}
-          {renderTabButton('ratings', 'Notes de journée', 'calendar-outline', ratingEntries.length)}
-          {renderTabButton('processes', 'Mes processus', 'layers-outline', processes.length)}
-          {renderTabButton('tasks', 'Tâches terminées', 'checkmark-circle-outline', completedTasks.length)}
+          {renderTabButton('ratings', t('mySpaceTabRatings', undefined, 'Notes de journée'), 'calendar-outline', ratingEntries.length)}
+          {renderTabButton('processes', t('mySpaceTabProcesses', undefined, 'Mes processus'), 'layers-outline', processes.length)}
+          {renderTabButton('tasks', t('mySpaceTabTasks', undefined, 'Tâches terminées'), 'checkmark-circle-outline', completedTasks.length)}
         </ScrollView>
       </View>
 

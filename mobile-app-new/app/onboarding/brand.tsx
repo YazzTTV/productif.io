@@ -3,9 +3,11 @@ import { SafeAreaView, View, Text, StyleSheet, ActivityIndicator, TouchableOpaci
 import { StatusBar } from 'expo-status-bar';
 import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 export default function BrandLoadingScreen() {
   const [ready, setReady] = useState(false);
+  const { t } = useLanguage();
 
   useEffect(() => {
     const t = setTimeout(() => setReady(true), 3000);
@@ -28,12 +30,12 @@ export default function BrandLoadingScreen() {
             </View>
           </View>
           <Text style={styles.title}>Productif.io</Text>
-          <Text style={styles.subtitle}>Une communauté qui agit</Text>
+          <Text style={styles.subtitle}>{t('legacyBrandSubtitle')}</Text>
           <View style={{ height: 24 }} />
           {!ready && (
             <>
               <ActivityIndicator size="large" color="#10B981" />
-              <Text style={styles.loadingText}>Un instant, nous analysons vos réponses…</Text>
+              <Text style={styles.loadingText}>{t('legacyAnalyzingResponses')}</Text>
             </>
           )}
         </View>
@@ -43,7 +45,7 @@ export default function BrandLoadingScreen() {
           disabled={!ready} 
           onPress={handleContinue}
         >
-          <Text style={styles.ctaText}>Continuer</Text>
+          <Text style={styles.ctaText}>{t('continue')}</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
