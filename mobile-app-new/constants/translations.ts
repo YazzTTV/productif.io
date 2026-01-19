@@ -153,6 +153,11 @@ export const translations = {
     appleCalendar: 'Calendrier Apple',
     createEvents: 'Nous créons des événements pour votre plan.',
     connectCalendar: 'Connecter le calendrier',
+    calendarConnected: 'Calendrier connecté avec succès',
+    calendarConnectionError: 'Impossible de connecter le calendrier. Veuillez réessayer.',
+    disconnectCalendar: 'Déconnecter le calendrier',
+    disconnectCalendarConfirm: 'Voulez-vous vraiment déconnecter le calendrier ?',
+    calendarDisconnectionError: 'Impossible de déconnecter le calendrier.',
     skip: 'Passer pour le moment',
     
     // ─── Success ───────────────────────────────────────────────────────────────

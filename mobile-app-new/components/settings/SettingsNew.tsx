@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { authService, onboardingService } from '@/lib/api';
+import { connectGoogleCalendar, isGoogleCalendarConnected } from '@/lib/calendarAuth';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useOnboardingData } from '@/hooks/useOnboardingData';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
@@ -51,7 +52,8 @@ export function SettingsNew() {
   const [endOfDayRecap, setEndOfDayRecap] = useState(true);
 
   // Connection status
-  const [calendarConnected, setCalendarConnected] = useState(true);
+  const [calendarConnected, setCalendarConnected] = useState(false);
+  const [calendarLoading, setCalendarLoading] = useState(false);
 
   useEffect(() => {
     const loadUserData = async () => {
@@ -60,7 +62,7 @@ export function SettingsNew() {
         if (user?.name) {
           setName(user.name);
         }
-        
+
         // Charger les données de l'onboarding depuis le backend
         try {
           const { data: onboardingData } = await onboardingService.getOnboardingData();
@@ -77,7 +79,7 @@ export function SettingsNew() {
           // Fallback sur AsyncStorage si le backend échoue
           const savedStudentType = getResponse('studentType');
           const savedStudyLevel = getResponse('studyLevel');
-          
+
           if (savedStudentType) {
             setAcademicField(savedStudentType);
           }
@@ -85,6 +87,10 @@ export function SettingsNew() {
             setStudyLevel(typeof savedStudyLevel === 'number' ? savedStudyLevel : 1);
           }
         }
+
+        // Vérifier l'état de connexion Google Calendar
+        const connected = await isGoogleCalendarConnected();
+        setCalendarConnected(connected);
       } catch (error) {
         console.log('User not loaded');
       }
@@ -159,6 +165,53 @@ export function SettingsNew() {
   const showSavedFeedback = () => {
     setSavedFeedback(true);
     setTimeout(() => setSavedFeedback(false), 2000);
+  };
+
+  const handleConnectCalendar = async () => {
+    setCalendarLoading(true);
+    try {
+      const success = await connectGoogleCalendar();
+      if (success) {
+        setCalendarConnected(true);
+        showSavedFeedback();
+        Alert.alert(t('success') || 'Succès', t('calendarConnected') || 'Google Calendar connecté avec succès');
+      }
+    } catch (error) {
+      console.error('Erreur connexion Google Calendar:', error);
+      Alert.alert(
+        t('error') || 'Erreur',
+        t('calendarConnectionError') || 'Impossible de connecter Google Calendar. Veuillez réessayer.'
+      );
+    } finally {
+      setCalendarLoading(false);
+    }
+  };
+
+  const handleDisconnectCalendar = async () => {
+    Alert.alert(
+      t('disconnectCalendar') || 'Déconnecter Google Calendar',
+      t('disconnectCalendarConfirm') || 'Voulez-vous vraiment déconnecter Google Calendar ?',
+      [
+        { text: t('cancel') || 'Annuler', style: 'cancel' },
+        {
+          text: t('disconnect') || 'Déconnecter',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              // TODO: Implémenter la déconnexion côté backend si nécessaire
+              setCalendarConnected(false);
+              showSavedFeedback();
+            } catch (error) {
+              console.error('Erreur déconnexion Google Calendar:', error);
+              Alert.alert(
+                t('error') || 'Erreur',
+                t('calendarDisconnectionError') || 'Impossible de déconnecter Google Calendar.'
+              );
+            }
+          },
+        },
+      ]
+    );
   };
 
   const resetOnboarding = async () => {
@@ -693,16 +746,25 @@ export function SettingsNew() {
                   ]}
                 />
               </View>
-              {calendarConnected && (
+              {calendarConnected ? (
                 <TouchableOpacity
                   style={styles.disconnectButton}
-                  onPress={() => {
-                    setCalendarConnected(false);
-                    showSavedFeedback();
-                  }}
+                  onPress={handleDisconnectCalendar}
                   activeOpacity={0.7}
+                  disabled={calendarLoading}
                 >
-                  <Text style={styles.disconnectButtonText}>{t('disconnect') || 'Disconnect'}</Text>
+                  <Text style={styles.disconnectButtonText}>{t('disconnectButton') || 'Se déconnecter'}</Text>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity
+                  style={styles.connectButton}
+                  onPress={handleConnectCalendar}
+                  activeOpacity={0.7}
+                  disabled={calendarLoading}
+                >
+                  <Text style={styles.connectButtonText}>
+                    {calendarLoading ? (t('connecting') || 'Connexion...') : (t('connectCalendar') || 'Connecter')}
+                  </Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -1055,6 +1117,18 @@ const styles = StyleSheet.create({
   disconnectButtonText: {
     fontSize: 14,
     color: 'rgba(0, 0, 0, 0.6)',
+  },
+  connectButton: {
+    marginTop: 16,
+    paddingVertical: 12,
+    borderRadius: 16,
+    backgroundColor: '#16A34A',
+    alignItems: 'center',
+  },
+  connectButtonText: {
+    fontSize: 14,
+    color: '#FFFFFF',
+    fontWeight: '500',
   },
   deleteCard: {
     padding: 24,
