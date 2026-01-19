@@ -4,7 +4,7 @@ import { Habit, HabitEntry } from '../types';
 import '../styles/components/HabitsTracker.css';
 
 export const HabitsTracker: React.FC = () => {
-  const [todaysHabits, setTodaysHabits] = useState<Array<Habit & { isCompletedToday: boolean; todayEntry?: HabitEntry }>>([]);
+  const [todaysHabits, setTodaysHabits] = useState<(Habit & { isCompletedToday: boolean; todayEntry?: HabitEntry })[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 

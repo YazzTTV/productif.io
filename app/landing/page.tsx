@@ -175,8 +175,8 @@ function AppInHero() {
               <div className="bg-white rounded-3xl p-6 border border-black/5">
                 <div className="flex items-center justify-between mb-6">
                   <div>
-                    <h3 className="text-lg font-medium text-gray-900 mb-1">Community Progress</h3>
-                    <p className="text-sm text-gray-500">Your group this week</p>
+                    <h3 className="text-lg font-medium text-gray-900 mb-1">Progrès de la communauté</h3>
+                    <p className="text-sm text-gray-500">Votre groupe cette semaine</p>
                   </div>
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-gray-400">
                     <path d="M9 18l6-6-6-6" />
@@ -200,7 +200,7 @@ function AppInHero() {
                 </div>
 
                 <div className="pt-4 border-t border-black/5">
-                  <p className="text-sm text-gray-500 text-center">View full leaderboard →</p>
+                  <p className="text-sm text-gray-500 text-center">Voir le classement complet →</p>
                 </div>
               </div>
 

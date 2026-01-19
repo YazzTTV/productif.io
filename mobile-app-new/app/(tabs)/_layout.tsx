@@ -48,7 +48,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Home',
+          title: t('home'),
           tabBarIcon: ({ color, focused }) => (
             <Ionicons 
               name={focused ? "home" : "home-outline"} 
@@ -63,7 +63,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="assistant"
         options={{
-          title: 'AI',
+          title: t('ai'),
           tabBarIcon: ({ color, focused }) => (
             <Ionicons 
               name="flash" 
@@ -78,7 +78,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="leaderboard"
         options={{
-          title: 'Community',
+          title: t('community'),
           tabBarIcon: ({ color, focused }) => (
             <Ionicons 
               name={focused ? "people" : "people-outline"} 

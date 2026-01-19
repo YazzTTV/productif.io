@@ -294,14 +294,14 @@ export function SettingsNew() {
 
           <View style={styles.settingsContainer}>
             <Text style={styles.settingsHint}>
-              These settings help the system adapt to you.
+              Ces paramètres aident le système à s'adapter à vous.
             </Text>
 
             {/* Preferred focus duration */}
             <View style={styles.settingCard}>
               <View style={styles.settingCardHeader}>
-                <Text style={styles.settingCardTitle}>Preferred focus duration</Text>
-                <Text style={styles.settingCardSubtitle}>Default session length</Text>
+                <Text style={styles.settingCardTitle}>Durée de concentration préférée</Text>
+                <Text style={styles.settingCardSubtitle}>Durée de session par défaut</Text>
               </View>
               <View style={styles.durationButtons}>
                 {([25, 45, 60, 90] as const).map((duration) => (
@@ -334,8 +334,8 @@ export function SettingsNew() {
             {/* Max sessions per day */}
             <View style={styles.settingCard}>
               <View style={styles.settingCardHeader}>
-                <Text style={styles.settingCardTitle}>Maximum focus sessions per day</Text>
-                <Text style={styles.settingCardSubtitle}>Daily capacity limit</Text>
+                <Text style={styles.settingCardTitle}>Sessions de concentration maximum par jour</Text>
+                <Text style={styles.settingCardSubtitle}>Limite de capacité quotidienne</Text>
               </View>
               <View style={styles.sliderContainer}>
                 <View style={styles.sliderTrack}>
@@ -383,8 +383,8 @@ export function SettingsNew() {
             {/* Workload intensity */}
             <View style={styles.settingCard}>
               <View style={styles.settingCardHeader}>
-                <Text style={styles.settingCardTitle}>Daily workload intensity</Text>
-                <Text style={styles.settingCardSubtitle}>Pace and session frequency</Text>
+                <Text style={styles.settingCardTitle}>Intensité de charge de travail quotidienne</Text>
+                <Text style={styles.settingCardSubtitle}>Rythme et fréquence des sessions</Text>
               </View>
               <View style={styles.intensityButtons}>
                 {(['light', 'balanced', 'intensive'] as const).map((intensity) => (
@@ -451,8 +451,8 @@ export function SettingsNew() {
             <View style={styles.settingCard}>
               <View style={styles.settingCardRow}>
                 <View style={styles.settingCardContent}>
-                  <Text style={styles.settingCardTitle}>Enable notifications</Text>
-                  <Text style={styles.settingCardSubtitle}>Receive reminders and updates</Text>
+                  <Text style={styles.settingCardTitle}>Activer les notifications</Text>
+                  <Text style={styles.settingCardSubtitle}>Recevoir des rappels et mises à jour</Text>
                 </View>
                 <Switch
                   value={notificationsEnabled}
@@ -471,8 +471,8 @@ export function SettingsNew() {
                 <View style={styles.settingCard}>
                   <View style={styles.settingCardRow}>
                     <View style={styles.settingCardContent}>
-                      <Text style={styles.settingCardTitle}>Start of day reminder</Text>
-                      <Text style={styles.settingCardSubtitle}>8:00 AM</Text>
+                      <Text style={styles.settingCardTitle}>Rappel début de journée</Text>
+                      <Text style={styles.settingCardSubtitle}>8:00</Text>
                     </View>
                     <Switch
                       value={startOfDayReminder}
@@ -489,8 +489,8 @@ export function SettingsNew() {
                 <View style={styles.settingCard}>
                   <View style={styles.settingCardRow}>
                     <View style={styles.settingCardContent}>
-                      <Text style={styles.settingCardTitle}>Focus session reminder</Text>
-                      <Text style={styles.settingCardSubtitle}>Before scheduled blocks</Text>
+                      <Text style={styles.settingCardTitle}>Rappel de session de concentration</Text>
+                      <Text style={styles.settingCardSubtitle}>Avant les blocs planifiés</Text>
                     </View>
                     <Switch
                       value={focusReminder}
@@ -507,8 +507,8 @@ export function SettingsNew() {
                 <View style={styles.settingCard}>
                   <View style={styles.settingCardRow}>
                     <View style={styles.settingCardContent}>
-                      <Text style={styles.settingCardTitle}>Break reminder</Text>
-                      <Text style={styles.settingCardSubtitle}>When break starts</Text>
+                      <Text style={styles.settingCardTitle}>Rappel de pause</Text>
+                      <Text style={styles.settingCardSubtitle}>Quand la pause commence</Text>
                     </View>
                     <Switch
                       value={breakReminder}
@@ -525,8 +525,8 @@ export function SettingsNew() {
                 <View style={styles.settingCard}>
                   <View style={styles.settingCardRow}>
                     <View style={styles.settingCardContent}>
-                      <Text style={styles.settingCardTitle}>End-of-day recap</Text>
-                      <Text style={styles.settingCardSubtitle}>9:00 PM</Text>
+                      <Text style={styles.settingCardTitle}>Récapitulatif de fin de journée</Text>
+                      <Text style={styles.settingCardSubtitle}>21:00</Text>
                     </View>
                     <Switch
                       value={endOfDayRecap}
@@ -708,7 +708,7 @@ export function SettingsNew() {
             </View>
 
             <TouchableOpacity style={styles.deleteCard} activeOpacity={0.7}>
-              <Text style={styles.deleteText}>Delete my account</Text>
+              <Text style={styles.deleteText}>Supprimer mon compte</Text>
             </TouchableOpacity>
           </View>
         </Animated.View>
@@ -797,7 +797,7 @@ export function SettingsNew() {
 
         {/* SECTION 7 — DEVELOPMENT */}
         <Animated.View entering={FadeInDown.delay(750).duration(400)} style={styles.section}>
-          <Text style={styles.sectionLabel}>Development</Text>
+          <Text style={styles.sectionLabel}>Développement</Text>
           <TouchableOpacity 
             style={styles.settingCard} 
             activeOpacity={0.7}
@@ -805,8 +805,8 @@ export function SettingsNew() {
           >
             <View style={styles.settingCardRow}>
               <View style={styles.settingCardContent}>
-                <Text style={styles.settingCardTitle}>Reset onboarding</Text>
-                <Text style={styles.settingCardSubtitle}>Test the onboarding flow again</Text>
+                <Text style={styles.settingCardTitle}>Réinitialiser l'onboarding</Text>
+                <Text style={styles.settingCardSubtitle}>Tester à nouveau le flux d'onboarding</Text>
               </View>
               <Ionicons name="refresh-outline" size={20} color="#16A34A" />
             </View>

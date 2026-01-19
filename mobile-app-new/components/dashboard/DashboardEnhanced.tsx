@@ -248,7 +248,7 @@ export function DashboardEnhanced() {
         <View style={styles.content}>
           {/* Today's Structure Card */}
           <Animated.View entering={FadeInDown.delay(200).duration(400)} style={styles.section}>
-            <Text style={styles.sectionLabel}>{t('todaysStructure') || 'Today\'s structure'}</Text>
+            <Text style={styles.sectionLabel}>{t('todaysStructure')}</Text>
             <View style={styles.structureCard}>
               <View style={styles.structureContent}>
                 {/* Main Focus Block */}
@@ -311,7 +311,7 @@ export function DashboardEnhanced() {
 
           {/* Key Moments Timeline */}
           <Animated.View entering={FadeInDown.delay(250).duration(400)} style={styles.section}>
-            <Text style={styles.sectionLabel}>{t('keyMomentsToday') || 'Key moments today'}</Text>
+            <Text style={styles.sectionLabel}>{t('keyMomentsToday')}</Text>
             {keyMoments.length > 0 ? (
               <ScrollView
                 ref={timelineScrollRef}
@@ -370,16 +370,16 @@ export function DashboardEnhanced() {
             ) : (
               <View style={styles.emptyCalendarContainer}>
                 {isCalendarConnected ? (
-                  <Text style={styles.emptyCalendarText}>{t('noEventsToday') || 'Aucun événement aujourd\'hui'}</Text>
+                  <Text style={styles.emptyCalendarText}>{t('noEventsToday')}</Text>
                 ) : (
                   <View style={styles.connectCalendarContainer}>
-                    <Text style={styles.emptyCalendarText}>{t('connectCalendarDescription') || 'Connectez votre Google Calendar pour voir vos événements'}</Text>
+                    <Text style={styles.emptyCalendarText}>{t('connectCalendarDescription')}</Text>
                     <TouchableOpacity
                       style={styles.connectCalendarButton}
                       onPress={() => router.push('/parametres')}
                       activeOpacity={0.8}
                     >
-                      <Text style={styles.connectCalendarButtonText}>{t('connect') || 'Connecter'}</Text>
+                      <Text style={styles.connectCalendarButtonText}>{t('connect')}</Text>
                     </TouchableOpacity>
                   </View>
                 )}
@@ -396,9 +396,9 @@ export function DashboardEnhanced() {
             >
               <View style={styles.communityHeader}>
                 <View>
-                  <Text style={styles.communityTitle}>{t('communityProgress') || 'Community Progress'}</Text>
+                  <Text style={styles.communityTitle}>{t('communityProgress')}</Text>
                   <Text style={styles.communitySubtitle}>
-                    {groupName || t('yourGroupThisWeek') || 'Your group this week'}
+                    {groupName || t('yourGroupThisWeek')}
                   </Text>
                 </View>
                 <Ionicons name="chevron-forward" size={20} color="rgba(0,0,0,0.2)" />
@@ -431,7 +431,7 @@ export function DashboardEnhanced() {
               <View style={styles.communityFooter}>
                 {groupAveragePoints !== null ? (
                   <Text style={styles.viewLeaderboardText}>
-                    {(t('groupAverage', undefined, 'Moyenne du groupe') || 'Moyenne du groupe') + ` : ${groupAveragePoints}`}
+                    {t('groupAverage') + ` : ${groupAveragePoints}`}
                   </Text>
                 ) : (
                   <Text style={styles.viewLeaderboardText}>

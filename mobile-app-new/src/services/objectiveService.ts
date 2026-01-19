@@ -110,8 +110,8 @@ export class ObjectiveService {
     overdue: number;
     onTrack: number;
     behindSchedule: number;
-    byType: Array<{ type: string; count: number }>;
-    byPriority: Array<{ priority: string; count: number }>;
+    byType: { type: string; count: number }[];
+    byPriority: { priority: string; count: number }[];
   }> {
     return apiService.get<{
       total: number;
@@ -122,8 +122,8 @@ export class ObjectiveService {
       overdue: number;
       onTrack: number;
       behindSchedule: number;
-      byType: Array<{ type: string; count: number }>;
-      byPriority: Array<{ priority: string; count: number }>;
+      byType: { type: string; count: number }[];
+      byPriority: { priority: string; count: number }[];
     }>(`${this.basePath}/stats`);
   }
 
@@ -136,12 +136,12 @@ export class ObjectiveService {
     totalInitiatives: number;
     completedActions: number;
     totalActions: number;
-    milestones: Array<{
+    milestones: {
       title: string;
       targetDate: string;
       completed: boolean;
       completedDate?: string;
-    }>;
+    }[];
   }> {
     return apiService.get<{
       currentProgress: number;
@@ -152,12 +152,12 @@ export class ObjectiveService {
       totalInitiatives: number;
       completedActions: number;
       totalActions: number;
-      milestones: Array<{
+      milestones: {
         title: string;
         targetDate: string;
         completed: boolean;
         completedDate?: string;
-      }>;
+      }[];
     }>(`${this.basePath}/${id}/progress`);
   }
 
@@ -169,7 +169,7 @@ export class ObjectiveService {
     return apiService.get<Objective[]>(`${this.basePath}/overdue`);
   }
 
-  async getUpcomingDeadlines(): Promise<Array<{
+  async getUpcomingDeadlines(): Promise<{
     objectiveId: string;
     objectiveTitle: string;
     type: 'objective' | 'initiative' | 'action';
@@ -178,8 +178,8 @@ export class ObjectiveService {
     dueDate: string;
     daysUntilDue: number;
     priority: 'LOW' | 'MEDIUM' | 'HIGH';
-  }>> {
-    return apiService.get<Array<{
+  }[]> {
+    return apiService.get<{
       objectiveId: string;
       objectiveTitle: string;
       type: 'objective' | 'initiative' | 'action';
@@ -188,7 +188,7 @@ export class ObjectiveService {
       dueDate: string;
       daysUntilDue: number;
       priority: 'LOW' | 'MEDIUM' | 'HIGH';
-    }>>(`${this.basePath}/deadlines`);
+    }[]>(`${this.basePath}/deadlines`);
   }
 
   async duplicateObjective(id: string, newTitle: string): Promise<Objective> {
@@ -207,24 +207,24 @@ export class ObjectiveService {
     completionTrend: 'ahead' | 'on_track' | 'behind' | 'at_risk';
     estimatedCompletionDate: string;
     recommendedActions: string[];
-    blockers: Array<{
+    blockers: {
       type: 'initiative' | 'action';
       id: string;
       title: string;
       issue: string;
-    }>;
+    }[];
     successFactors: string[];
   }> {
     return apiService.get<{
       completionTrend: 'ahead' | 'on_track' | 'behind' | 'at_risk';
       estimatedCompletionDate: string;
       recommendedActions: string[];
-      blockers: Array<{
+      blockers: {
         type: 'initiative' | 'action';
         id: string;
         title: string;
         issue: string;
-      }>;
+      }[];
       successFactors: string[];
     }>(`${this.basePath}/${id}/insights`);
   }

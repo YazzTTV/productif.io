@@ -33,13 +33,13 @@ const features = [
   {
     icon: Trophy,
     title: "Gamification",
-    description: "Stay motivated with streaks, achievements, and friendly competition on leaderboards.",
+    description: "Restez motivé avec des séries, des succès, et une compétition amicale sur les classements.",
     color: "from-amber-400 to-orange-500"
   },
   {
     icon: Users,
-    title: "Community Driven",
-    description: "Join thousands of productive individuals and share your journey to success.",
+    title: "Communauté Active",
+    description: "Rejoignez des milliers d'individus productifs et partagez votre parcours vers le succès.",
     color: "from-pink-400 to-rose-500"
   }
 ];

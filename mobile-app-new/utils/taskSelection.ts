@@ -1,4 +1,4 @@
-import { subjectsService } from '@/lib/api';
+import { subjectsService, getAuthToken } from '@/lib/api';
 
 export interface TaskForExam {
   id: string;
@@ -98,6 +98,13 @@ export async function selectExamTasks(): Promise<{
   next: TaskForExam[];
 }> {
   try {
+    // Vérifier l'authentification avant d'appeler l'API
+    const token = await getAuthToken();
+    if (!token) {
+      console.warn('⚠️ [taskSelection] Utilisateur non authentifié, impossible de récupérer les tâches');
+      return { primary: null, next: [] };
+    }
+
     const subjectsData = await subjectsService.getAll();
     // subjectsService.getAll() retourne maintenant directement un tableau
     const subjects: Subject[] = Array.isArray(subjectsData) ? subjectsData : [];
@@ -153,8 +160,13 @@ export async function selectExamTasks(): Promise<{
     const next = allTasks.slice(1, 4);
 
     return { primary, next };
-  } catch (error) {
-    console.error('Error selecting exam tasks:', error);
+  } catch (error: any) {
+    // Ne pas logger les erreurs d'authentification comme des erreurs critiques
+    if (error?.message?.includes('Non authentifié') || error?.status === 401) {
+      console.warn('⚠️ [taskSelection] Utilisateur non authentifié, impossible de récupérer les tâches');
+    } else {
+      console.error('❌ [taskSelection] Erreur lors de la sélection des tâches d\'examen:', error);
+    }
     return { primary: null, next: [] };
   }
 }

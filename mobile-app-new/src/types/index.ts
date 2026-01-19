@@ -202,12 +202,12 @@ export interface DashboardStats {
 }
 
 export interface Analytics {
-  timeByProject: Array<{ projectName: string; time: number; color: string }>;
-  timeByDay: Array<{ date: string; time: number }>;
+  timeByProject: { projectName: string; time: number; color: string }[];
+  timeByDay: { date: string; time: number }[];
   taskCompletionRate: number;
   habitCompletionRate: number;
   productivityScore: number;
-  weeklyProgress: Array<{ day: string; tasks: number; time: number }>;
+  weeklyProgress: { day: string; tasks: number; time: number }[];
 }
 
 // Types pour les formulaires

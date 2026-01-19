@@ -38,22 +38,22 @@ interface Habit {
   createdAt: string;
   daysOfWeek: string[];
   order?: number;
-  completions?: Array<{
+  completions?: {
     id: string;
     date: string;
     completed: boolean;
     count: number;
     rating?: number;
     note?: string;
-  }>;
-  entries?: Array<{
+  }[];
+  entries?: {
     id: string;
     date: string;
     completed: boolean;
     count: number;
     rating?: number;
     note?: string;
-  }>;
+  }[];
 }
 
 interface HabitCardProps {

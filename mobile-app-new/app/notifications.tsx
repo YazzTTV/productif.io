@@ -11,12 +11,11 @@ import {
   StatusBar,
   Switch,
   TextInput,
-} from 'react-native';
+ Platform, Linking } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { apiCall } from '@/lib/api';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
-import { Platform, Linking } from 'react-native';
 import { useLanguage } from '@/contexts/LanguageContext';
 
 type TimeWindow = {

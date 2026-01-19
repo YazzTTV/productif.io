@@ -8,11 +8,10 @@ import {
   ActivityIndicator,
   TextInput,
   Alert,
-} from 'react-native';
+ Dimensions } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LineChart } from 'react-native-chart-kit';
-import { Dimensions } from 'react-native';
 import { behaviorService, authService, PlanLimits } from '@/lib/api';
 import { format, parseISO, subDays } from 'date-fns';
 import { fr, enUS, es as esLocale } from 'date-fns/locale';
@@ -46,6 +45,7 @@ export default function AnalyticsScreen({ checkInType: propCheckInType, isActive
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [analyticsData, setAnalyticsData] = useState<AnalyticsData[]>([]);
   const [averages, setAverages] = useState<{
     mood: number | null;
@@ -86,6 +86,19 @@ export default function AnalyticsScreen({ checkInType: propCheckInType, isActive
     try {
       setLoading(true);
       console.log('📊 [Analytics] ===== DÉBUT DU CHARGEMENT =====');
+
+      // Vérifier d'abord si l'utilisateur est authentifié
+      const user = await authService.checkAuth();
+      setIsAuthenticated(!!user);
+
+      if (!user) {
+        console.log('ℹ️ [Analytics] Utilisateur non authentifié, affichage d\'un état approprié');
+        setAnalyticsData([]);
+        setAverages({ mood: null, stress: null, focus: null });
+        setLoading(false);
+        return;
+      }
+
       console.log('📊 [Analytics] Appel à behaviorService.getAnalytics()...');
       const response = await behaviorService.getAnalytics();
       console.log('✅ [Analytics] Données reçues:', JSON.stringify(response, null, 2));
@@ -122,12 +135,6 @@ export default function AnalyticsScreen({ checkInType: propCheckInType, isActive
             { text: t('later', undefined, 'Plus tard') },
             { text: t('upgrade', undefined, 'Passer en Premium'), onPress: () => router.push('/paywall') }
           ]
-        );
-      } else if ((error.message && error.message.includes('Non authentifié')) || error.message.includes('401')) {
-        Alert.alert(
-          t('analyticsAuthErrorTitle', undefined, 'Erreur d\'authentification'),
-          t('analyticsAuthErrorMessage', undefined, 'Vous devez être connecté pour voir vos analytics. Veuillez vous reconnecter.'),
-          [{ text: t('ok', undefined, 'OK') }]
         );
       } else if ((error.message && error.message.includes('réseau')) || error.message.includes('timeout')) {
         Alert.alert(
@@ -215,9 +222,7 @@ export default function AnalyticsScreen({ checkInType: propCheckInType, isActive
       
       let errorMessage = t('analyticsSaveError', undefined, 'Impossible d\'enregistrer votre note');
       if (error?.message) {
-        if (error.message.includes('Non authentifié') || error.message.includes('401')) {
-          errorMessage = t('analyticsSaveAuthError', undefined, 'Vous devez être connecté pour enregistrer une note. Veuillez vous reconnecter.');
-        } else if (error.message.includes('réseau') || error.message.includes('timeout')) {
+        if (error.message.includes('réseau') || error.message.includes('timeout')) {
           errorMessage = t('analyticsSaveConnectionError', undefined, 'Erreur de connexion. Vérifiez votre internet et réessayez.');
         } else {
           errorMessage = t('analyticsSaveErrorWithMessage', { message: error.message }, `Erreur: ${error.message}`);
@@ -279,6 +284,45 @@ export default function AnalyticsScreen({ checkInType: propCheckInType, isActive
           <Text style={styles.loadingText}>
             {t('analyticsLoading', undefined, 'Chargement des données...')}
           </Text>
+        </View>
+      </View>
+    );
+  }
+
+  // Si on est encore en train de vérifier l'authentification, afficher un loader
+  if (isAuthenticated === null) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#16a34a" />
+          <Text style={styles.loadingText}>
+            {t('loading', undefined, 'Chargement...')}
+          </Text>
+        </View>
+      </View>
+    );
+  }
+
+  // Si l'utilisateur n'est pas authentifié, afficher un message approprié
+  if (isAuthenticated === false) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.authRequiredContainer}>
+          <Ionicons name="lock-closed-outline" size={64} color="#9ca3af" />
+          <Text style={styles.authRequiredTitle}>
+            {t('analyticsAuthRequiredTitle', undefined, 'Connexion requise')}
+          </Text>
+          <Text style={styles.authRequiredText}>
+            {t('analyticsAuthRequiredText', undefined, 'Connectez-vous pour accéder à vos analytics et suivre vos progrès personnels.')}
+          </Text>
+          <TouchableOpacity
+            style={styles.authButton}
+            onPress={() => router.push('/login')}
+          >
+            <Text style={styles.authButtonText}>
+              {t('login', undefined, 'Se connecter')}
+            </Text>
+          </TouchableOpacity>
         </View>
       </View>
     );
@@ -694,5 +738,49 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     color: '#111827',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#6B7280',
+  },
+  authRequiredContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 32,
+  },
+  authRequiredTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#111827',
+    marginTop: 24,
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  authRequiredText: {
+    fontSize: 16,
+    color: '#6B7280',
+    textAlign: 'center',
+    lineHeight: 24,
+    marginBottom: 32,
+  },
+  authButton: {
+    backgroundColor: '#16a34a',
+    paddingHorizontal: 32,
+    paddingVertical: 16,
+    borderRadius: 12,
+    minWidth: 160,
+  },
+  authButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+    textAlign: 'center',
   },
 });

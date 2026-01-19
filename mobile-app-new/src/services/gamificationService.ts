@@ -38,7 +38,7 @@ export class GamificationService {
     }>(`${this.basePath}/achievements/${id}/claim`);
   }
 
-  async getLeaderboard(timeframe: 'daily' | 'weekly' | 'monthly' | 'all-time' = 'weekly'): Promise<Array<{
+  async getLeaderboard(timeframe: 'daily' | 'weekly' | 'monthly' | 'all-time' = 'weekly'): Promise<{
     rank: number;
     userId: string;
     userName: string;
@@ -47,8 +47,8 @@ export class GamificationService {
     level: number;
     experience: number;
     isCurrentUser: boolean;
-  }>> {
-    return apiService.get<Array<{
+  }[]> {
+    return apiService.get<{
       rank: number;
       userId: string;
       userName: string;
@@ -57,7 +57,7 @@ export class GamificationService {
       level: number;
       experience: number;
       isCurrentUser: boolean;
-    }>>(`${this.basePath}/leaderboard?timeframe=${timeframe}`);
+    }[]>(`${this.basePath}/leaderboard?timeframe=${timeframe}`);
   }
 
   async getCurrentUserRank(timeframe: 'daily' | 'weekly' | 'monthly' | 'all-time' = 'weekly'): Promise<{
@@ -74,18 +74,18 @@ export class GamificationService {
     }>(`${this.basePath}/rank?timeframe=${timeframe}`);
   }
 
-  async getPointsHistory(period: 'week' | 'month' | 'year' = 'week'): Promise<Array<{
+  async getPointsHistory(period: 'week' | 'month' | 'year' = 'week'): Promise<{
     date: string;
     points: number;
     source: 'task' | 'habit' | 'achievement' | 'bonus';
     description: string;
-  }>> {
-    return apiService.get<Array<{
+  }[]> {
+    return apiService.get<{
       date: string;
       points: number;
       source: 'task' | 'habit' | 'achievement' | 'bonus';
       description: string;
-    }>>(`${this.basePath}/points/history?period=${period}`);
+    }[]>(`${this.basePath}/points/history?period=${period}`);
   }
 
   async getLevelInfo(): Promise<{
@@ -158,7 +158,7 @@ export class GamificationService {
     }>(`${this.basePath}/streaks`);
   }
 
-  async getBadges(): Promise<Array<{
+  async getBadges(): Promise<{
     id: string;
     name: string;
     description: string;
@@ -169,8 +169,8 @@ export class GamificationService {
     isEarned: boolean;
     progress?: number;
     maxProgress?: number;
-  }>> {
-    return apiService.get<Array<{
+  }[]> {
+    return apiService.get<{
       id: string;
       name: string;
       description: string;
@@ -181,10 +181,10 @@ export class GamificationService {
       isEarned: boolean;
       progress?: number;
       maxProgress?: number;
-    }>>(`${this.basePath}/badges`);
+    }[]>(`${this.basePath}/badges`);
   }
 
-  async getChallenges(): Promise<Array<{
+  async getChallenges(): Promise<{
     id: string;
     name: string;
     description: string;
@@ -201,8 +201,8 @@ export class GamificationService {
       badge?: string;
     };
     participants: number;
-  }>> {
-    return apiService.get<Array<{
+  }[]> {
+    return apiService.get<{
       id: string;
       name: string;
       description: string;
@@ -219,7 +219,7 @@ export class GamificationService {
         badge?: string;
       };
       participants: number;
-    }>>(`${this.basePath}/challenges`);
+    }[]>(`${this.basePath}/challenges`);
   }
 
   async joinChallenge(challengeId: string): Promise<{
@@ -232,7 +232,7 @@ export class GamificationService {
     }>(`${this.basePath}/challenges/${challengeId}/join`);
   }
 
-  async getActiveChallenges(): Promise<Array<{
+  async getActiveChallenges(): Promise<{
     id: string;
     name: string;
     description: string;
@@ -241,8 +241,8 @@ export class GamificationService {
     maxProgress: number;
     endDate: string;
     timeRemaining: string;
-  }>> {
-    return apiService.get<Array<{
+  }[]> {
+    return apiService.get<{
       id: string;
       name: string;
       description: string;
@@ -251,7 +251,7 @@ export class GamificationService {
       maxProgress: number;
       endDate: string;
       timeRemaining: string;
-    }>>(`${this.basePath}/challenges/active`);
+    }[]>(`${this.basePath}/challenges/active`);
   }
 
   async getGamificationInsights(): Promise<{
@@ -282,7 +282,7 @@ export class GamificationService {
     }>(`${this.basePath}/insights`);
   }
 
-  async getRecentRewards(): Promise<Array<{
+  async getRecentRewards(): Promise<{
     id: string;
     type: 'points' | 'experience' | 'achievement' | 'badge' | 'level_up';
     amount?: number;
@@ -290,8 +290,8 @@ export class GamificationService {
     description: string;
     earnedAt: string;
     source: string;
-  }>> {
-    return apiService.get<Array<{
+  }[]> {
+    return apiService.get<{
       id: string;
       type: 'points' | 'experience' | 'achievement' | 'badge' | 'level_up';
       amount?: number;
@@ -299,14 +299,14 @@ export class GamificationService {
       description: string;
       earnedAt: string;
       source: string;
-    }>>(`${this.basePath}/rewards/recent`);
+    }[]>(`${this.basePath}/rewards/recent`);
   }
 
   async markRewardAsSeen(rewardId: string): Promise<{ success: boolean }> {
     return apiService.put<{ success: boolean }>(`${this.basePath}/rewards/${rewardId}/seen`);
   }
 
-  async getCompanyLeaderboard(): Promise<Array<{
+  async getCompanyLeaderboard(): Promise<{
     rank: number;
     userId: string;
     userName: string;
@@ -315,8 +315,8 @@ export class GamificationService {
     level: number;
     department?: string;
     isCurrentUser: boolean;
-  }>> {
-    return apiService.get<Array<{
+  }[]> {
+    return apiService.get<{
       rank: number;
       userId: string;
       userName: string;
@@ -325,7 +325,7 @@ export class GamificationService {
       level: number;
       department?: string;
       isCurrentUser: boolean;
-    }>>(`${this.basePath}/company/leaderboard`);
+    }[]>(`${this.basePath}/company/leaderboard`);
   }
 }
 

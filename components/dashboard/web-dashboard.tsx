@@ -137,9 +137,9 @@ export function WebDashboard({ userName, isPremium }: WebDashboardProps) {
         {/* Leaderboard compact horizontal */}
         <div>
           <div className="flex items-center justify-between mb-4">
-            <p className="text-black/60">Community</p>
+            <p className="text-black/60">Communauté</p>
             <Link href="/dashboard/leaderboard" className="text-sm text-[#16A34A] hover:underline">
-              View all →
+              Voir tout →
             </Link>
           </div>
           <div className="border border-black/5 rounded-2xl p-6 bg-white">

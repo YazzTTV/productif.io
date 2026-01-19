@@ -49,14 +49,14 @@ export function PlanMyDay() {
   const [eventStartTimes, setEventStartTimes] = useState<Date[]>([]); // Heure de début de chaque événement
   const [isCreatingEvents, setIsCreatingEvents] = useState(false);
   const [targetDate, setTargetDate] = useState(new Date()); // Date cible pour le plan
-  const [existingCalendarEvents, setExistingCalendarEvents] = useState<Array<{
+  const [existingCalendarEvents, setExistingCalendarEvents] = useState<{
     id: string;
     title: string;
     start: string;
     end: string;
     startDate: string | null;
     endDate: string | null;
-  }>>([]); // Événements existants du calendrier pour la date cible
+  }[]>([]); // Événements existants du calendrier pour la date cible
   const [isLoadingCalendar, setIsLoadingCalendar] = useState(false); // État de chargement pour confirmAssociations
   const [planLimits, setPlanLimits] = useState<PlanLimits | null>(null);
   const [planPreviewLimited, setPlanPreviewLimited] = useState(false);
@@ -279,7 +279,7 @@ export function PlanMyDay() {
       const dateStr = format(targetDate, 'yyyy-MM-dd');
       console.log('📅 [PlanMyDay] Date cible:', dateStr);
       
-      let existingBusyPeriods: Array<{ start: Date; end: Date }> = [];
+      let existingBusyPeriods: { start: Date; end: Date }[] = [];
 
       try {
         // Récupérer les événements existants du calendrier pour cette date (si connecté)
@@ -1015,14 +1015,14 @@ const END_HOUR = 24; // Heure de fin de la timeline (24h)
 // Composant Timeline Calendar pour afficher les événements et tâches sur une timeline
 interface TimelineCalendarProps {
   targetDate: Date;
-  existingEvents: Array<{
+  existingEvents: {
     id: string;
     title: string;
     start: string;
     end: string;
     startDate: string | null;
     endDate: string | null;
-  }>;
+  }[];
   tasks: TaskWithSubject[];
   eventStartTimes: Date[];
   onTimeChange: (taskIndex: number, newTime: Date) => void;
