@@ -9,6 +9,7 @@ import * as FileSystem from 'expo-file-system';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { taskAssociationService, googleCalendarService, dailyPlanningService, authService, PlanLimits } from '@/lib/api';
 import { format, addMinutes, setHours, setMinutes, startOfDay, isBefore, getHours, getMinutes } from 'date-fns';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 type PlanPhase = 'entry' | 'recording' | 'transcription' | 'processing' | 'association' | 'overview';
 
@@ -32,6 +33,7 @@ interface Subject {
 export function PlanMyDay() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { t } = useLanguage();
   const [phase, setPhase] = useState<PlanPhase>('entry');
   const [transcription, setTranscription] = useState('');
   const [processingStep, setProcessingStep] = useState(0);
@@ -566,8 +568,8 @@ export function PlanMyDay() {
               <Ionicons name="sparkles" size={40} color="#16A34A" />
             </View>
 
-            <Text style={styles.entryTitle}>Plan your day in 60 seconds</Text>
-            <Text style={styles.entrySubtitle}>Speak. We'll structure it.</Text>
+            <Text style={styles.entryTitle}>{t('planYourDayIn60Seconds')}</Text>
+            <Text style={styles.entrySubtitle}>{t('speakWeStructure')}</Text>
 
             <View style={styles.ctaContainer}>
               <TouchableOpacity

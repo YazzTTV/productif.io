@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { habitsService } from '@/lib/api';
 import { format, startOfDay } from 'date-fns';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface Habit {
   id: string;
@@ -35,6 +36,7 @@ interface Habit {
 export function ReviewHabits() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { t } = useLanguage();
   const [habits, setHabits] = useState<Habit[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDate] = useState(() => startOfDay(new Date()));
@@ -423,8 +425,8 @@ export function ReviewHabits() {
           </TouchableOpacity>
 
           <View style={styles.headerContent}>
-            <Text style={styles.headerTitle}>Habits</Text>
-            <Text style={styles.headerSubtitle}>Consistency matters more than intensity.</Text>
+            <Text style={styles.headerTitle}>{t('habitsTitle')}</Text>
+            <Text style={styles.headerSubtitle}>{t('consistencyMatters')}</Text>
           </View>
         </Animated.View>
 
@@ -436,7 +438,7 @@ export function ReviewHabits() {
             activeOpacity={0.7}
           >
             <Ionicons name="add" size={20} color="#FFFFFF" />
-            <Text style={styles.addHabitText}>Add Habit</Text>
+            <Text style={styles.addHabitText}>{t('addHabit')}</Text>
           </TouchableOpacity>
         </Animated.View>
 
@@ -501,7 +503,7 @@ export function ReviewHabits() {
       <Modal visible={showCreateModal} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Add Habit</Text>
+            <Text style={styles.modalTitle}>{t('addHabit')}</Text>
             
             <Text style={styles.modalLabel}>Nom</Text>
             <TextInput 

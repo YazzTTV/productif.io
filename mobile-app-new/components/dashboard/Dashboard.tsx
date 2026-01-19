@@ -244,7 +244,7 @@ export function Dashboard() {
             <View style={styles.addHabitIconContainer}>
               <Ionicons name="add" size={16} color="rgba(0, 0, 0, 0.4)" />
             </View>
-            <Text style={styles.addHabitText}>Add a habit</Text>
+            <Text style={styles.addHabitText}>{t('addHabit')}</Text>
           </TouchableOpacity>
         </Animated.View>
 

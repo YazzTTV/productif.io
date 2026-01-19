@@ -414,9 +414,9 @@ export default function LandingPage() {
                 },
                 {
                   step: "05",
-                  title: "Habits",
-                  subtitle: "Protect your energy",
-                  description: "Habits are small actions that protect your energy. Small habits, big impact. Example: Review plan in the morning."
+                  title: "Habitudes",
+                  subtitle: "Protégez votre énergie",
+                  description: "Les habitudes sont de petites actions qui protègent votre énergie. Petites habitudes, grand impact. Exemple : Examiner le planning le matin."
                 },
                 {
                   step: "06",

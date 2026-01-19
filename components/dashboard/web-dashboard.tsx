@@ -196,7 +196,7 @@ export function WebDashboard({ userName, isPremium }: WebDashboardProps) {
       <div className="grid grid-cols-2 gap-6">
         {/* Habits quick view */}
         <div>
-          <p className="text-black/60 mb-3">Today's habits</p>
+          <p className="text-black/60 mb-3">Habitudes du jour</p>
           <div className="border border-black/5 rounded-2xl p-6 bg-white space-y-3">
             {habits.length > 0 ? (
               habits.map((habit, index) => (
@@ -206,17 +206,17 @@ export function WebDashboard({ userName, isPremium }: WebDashboardProps) {
                 </div>
               ))
             ) : (
-              <p className="text-black/40 text-sm">No habits today</p>
+              <p className="text-black/40 text-sm">Aucune habitude aujourd'hui</p>
             )}
             <Link href="/dashboard/habits" className="block text-sm text-[#16A34A] hover:underline mt-4">
-              Manage habits →
+              Gérer les habitudes →
             </Link>
           </div>
         </div>
 
         {/* Stress / mood quick check-in */}
         <div>
-          <p className="text-black/60 mb-3">How do you feel?</p>
+          <p className="text-black/60 mb-3">Comment vous sentez-vous ?</p>
           <div className="border border-black/5 rounded-2xl p-6 bg-white">
             <div className="space-y-4">
               <div className="flex items-center justify-between">
