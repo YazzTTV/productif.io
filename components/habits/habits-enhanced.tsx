@@ -269,10 +269,10 @@ export function HabitsEnhanced() {
   };
 
   const categoryConfig = {
-    morning: { label: 'Morning', description: 'Start the day' },
-    day: { label: 'Day', description: 'During work' },
-    evening: { label: 'Evening', description: 'Wind down' },
-    'anti-habit': { label: 'Anti-habits', description: 'Did you avoid these today?' },
+    morning: { label: 'Matin', description: 'Commencer la journée' },
+    day: { label: 'Journée', description: 'Pendant le travail' },
+    evening: { label: 'Soir', description: 'Se détendre' },
+    'anti-habit': { label: 'Anti-habitudes', description: 'Les avez-vous évitées aujourd\'hui ?' },
   };
 
   // État de chargement
@@ -325,14 +325,14 @@ export function HabitsEnhanced() {
               <div className="w-16 h-16 rounded-full bg-black/5 flex items-center justify-center mx-auto">
                 <Check className="w-8 h-8 text-black/40" />
               </div>
-              <p className="text-xl text-black/60">No habits yet.</p>
+              <p className="text-xl text-black/60">Aucune habitude pour le moment.</p>
             </div>
 
             <button
               onClick={() => router.push('/dashboard/habits/new')}
               className="w-full px-6 py-3 bg-[#16A34A] hover:bg-[#16A34A]/90 text-white rounded-3xl"
             >
-              Create your first habit
+              Créer votre première habitude
             </button>
           </motion.div>
         </div>
@@ -345,7 +345,7 @@ export function HabitsEnhanced() {
       {/* Header */}
       <div className="px-6 pt-8 pb-6 border-b border-black/5">
         <h1 className="tracking-tight" style={{ letterSpacing: '-0.04em', fontSize: '2rem' }}>
-          Habits
+          Habitudes
         </h1>
         <p className="text-black/40 mt-1">Small actions. Repeated.</p>
 

@@ -982,7 +982,7 @@ export function TasksNew() {
                       <View style={styles.addTaskIconContainer}>
                         <Ionicons name="add" size={16} color="rgba(0, 0, 0, 0.4)" />
                       </View>
-                      <Text style={styles.addTaskText}>Add task</Text>
+                      <Text style={styles.addTaskText}>{t('addTask')}</Text>
                     </TouchableOpacity>
                   </View>
                 )}
@@ -1185,11 +1185,11 @@ export function TasksNew() {
           <View style={[styles.modalContent, { paddingBottom: insets.bottom + 24 }]}>
             <View style={styles.modalHeader}>
               <View style={styles.modalHeaderContent}>
-                <Text style={styles.modalTitle}>Add a task</Text>
-                <Text style={styles.modalSubtitle}>One clear task is enough.</Text>
+                <Text style={styles.modalTitle}>{t('addTaskTitle')}</Text>
+                <Text style={styles.modalSubtitle}>{t('oneClearTaskEnough')}</Text>
                 {selectedSubjectForTask && (
                   <Text style={styles.modalSubjectName}>
-                    For <Text style={styles.modalSubjectNameBold}>{subjects.find(s => s.id === selectedSubjectForTask)?.name}</Text>
+                    {t('forSubject')} <Text style={styles.modalSubjectNameBold}>{subjects.find(s => s.id === selectedSubjectForTask)?.name}</Text>
                   </Text>
                 )}
               </View>
@@ -1206,18 +1206,18 @@ export function TasksNew() {
               <View style={styles.formGroup}>
                 <TextInput
                   style={styles.formInput}
-                  placeholder="e.g. Review chapter 3 / Finish problem set"
+                  placeholder={t('taskExample')}
                   value={newTaskTitle}
                   onChangeText={setNewTaskTitle}
                   autoFocus
                   multiline={false}
                 />
-                <Text style={styles.formHint}>Keep it specific and doable.</Text>
+                <Text style={styles.formHint}>{t('keepSpecific')}</Text>
               </View>
 
               {/* Estimated effort */}
               <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Estimated effort</Text>
+                <Text style={styles.formLabel}>{t('estimatedEffort')}</Text>
                 <View style={styles.effortContainer}>
                   {[15, 30, 45, 60].map((minutes) => (
                     <TouchableOpacity
@@ -1243,7 +1243,7 @@ export function TasksNew() {
 
               {/* Priority */}
               <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Priority</Text>
+                <Text style={styles.formLabel}>{t('priority')}</Text>
                 <View style={styles.priorityContainer}>
                   <TouchableOpacity
                     style={[
@@ -1258,7 +1258,7 @@ export function TasksNew() {
                         newTaskPriority === 'medium' && styles.priorityButtonTextActive,
                       ]}
                     >
-                      Normal
+                      {t('priorityNormal')}
                     </Text>
                   </TouchableOpacity>
                   <TouchableOpacity
@@ -1274,7 +1274,7 @@ export function TasksNew() {
                         newTaskPriority === 'high' && styles.priorityButtonTextActive,
                       ]}
                     >
-                      Important
+                      {t('priorityImportant')}
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -1293,7 +1293,7 @@ export function TasksNew() {
                 {creatingTask ? (
                   <ActivityIndicator size="small" color="#FFFFFF" />
                 ) : (
-                  <Text style={styles.submitButtonText}>Add task</Text>
+                  <Text style={styles.submitButtonText}>{t('addTask')}</Text>
                 )}
               </TouchableOpacity>
 

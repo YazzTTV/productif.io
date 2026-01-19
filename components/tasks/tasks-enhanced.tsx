@@ -266,7 +266,7 @@ export function TasksEnhanced() {
               onClick={() => router.push('/dashboard/assistant-ia')}
               className="w-full bg-[#16A34A] hover:bg-[#16A34A]/90 text-white rounded-3xl h-14"
             >
-              Plan my day
+              Planifier ma journée
             </Button>
           </motion.div>
         </div>
