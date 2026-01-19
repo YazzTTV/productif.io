@@ -78,15 +78,15 @@ export class TimeService {
   // Statistiques et rapports
   async getTimeStats(period: 'today' | 'week' | 'month' | 'year' = 'week'): Promise<{
     totalTime: number;
-    byProject: Array<{ projectId: string; projectName: string; time: number; color: string }>;
-    byTask: Array<{ taskId: string; taskTitle: string; time: number }>;
-    byDay: Array<{ date: string; time: number }>;
+    byProject: { projectId: string; projectName: string; time: number; color: string }[];
+    byTask: { taskId: string; taskTitle: string; time: number }[];
+    byDay: { date: string; time: number }[];
   }> {
     return apiService.get<{
       totalTime: number;
-      byProject: Array<{ projectId: string; projectName: string; time: number; color: string }>;
-      byTask: Array<{ taskId: string; taskTitle: string; time: number }>;
-      byDay: Array<{ date: string; time: number }>;
+      byProject: { projectId: string; projectName: string; time: number; color: string }[];
+      byTask: { taskId: string; taskTitle: string; time: number }[];
+      byDay: { date: string; time: number }[];
     }>(`${this.basePath}/stats?period=${period}`);
   }
 
@@ -94,16 +94,16 @@ export class TimeService {
     weekStart: string;
     weekEnd: string;
     totalTime: number;
-    dailyBreakdown: Array<{ date: string; time: number; entries: number }>;
-    topProjects: Array<{ projectId: string; projectName: string; time: number; percentage: number }>;
+    dailyBreakdown: { date: string; time: number; entries: number }[];
+    topProjects: { projectId: string; projectName: string; time: number; percentage: number }[];
     completedTasks: number;
   }> {
     return apiService.get<{
       weekStart: string;
       weekEnd: string;
       totalTime: number;
-      dailyBreakdown: Array<{ date: string; time: number; entries: number }>;
-      topProjects: Array<{ projectId: string; projectName: string; time: number; percentage: number }>;
+      dailyBreakdown: { date: string; time: number; entries: number }[];
+      topProjects: { projectId: string; projectName: string; time: number; percentage: number }[];
       completedTasks: number;
     }>(`${this.basePath}/reports/weekly`);
   }
@@ -114,8 +114,8 @@ export class TimeService {
     totalTime: number;
     averagePerDay: number;
     workingDays: number;
-    projectBreakdown: Array<{ projectId: string; projectName: string; time: number; percentage: number }>;
-    weeklyBreakdown: Array<{ week: number; time: number }>;
+    projectBreakdown: { projectId: string; projectName: string; time: number; percentage: number }[];
+    weeklyBreakdown: { week: number; time: number }[];
   }> {
     const params = new URLSearchParams();
     if (month) params.append('month', month);
@@ -127,8 +127,8 @@ export class TimeService {
       totalTime: number;
       averagePerDay: number;
       workingDays: number;
-      projectBreakdown: Array<{ projectId: string; projectName: string; time: number; percentage: number }>;
-      weeklyBreakdown: Array<{ week: number; time: number }>;
+      projectBreakdown: { projectId: string; projectName: string; time: number; percentage: number }[];
+      weeklyBreakdown: { week: number; time: number }[];
     }>(`${this.basePath}/reports/monthly?${params.toString()}`);
   }
 

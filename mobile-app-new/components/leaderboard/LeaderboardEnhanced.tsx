@@ -1,10 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Modal, ActivityIndicator, TextInput, Alert, KeyboardAvoidingView, Platform } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter , useFocusEffect } from 'expo-router';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useFocusEffect } from 'expo-router';
 import { gamificationService, authService } from '@/lib/api';
 import { useLanguage } from '@/contexts/LanguageContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -354,8 +353,8 @@ export function LeaderboardEnhanced() {
           </TouchableOpacity>
 
           <View style={styles.headerContent}>
-            <Text style={styles.headerTitle}>Community</Text>
-            <Text style={styles.headerSubtitle}>Others are showing up too.</Text>
+            <Text style={styles.headerTitle}>{t('community')}</Text>
+            <Text style={styles.headerSubtitle}>{t('othersShowingUp')}</Text>
           </View>
         </Animated.View>
 
@@ -433,7 +432,7 @@ export function LeaderboardEnhanced() {
 
         {/* Motivational Quote */}
         <Animated.View entering={FadeInDown.delay(400).duration(400)} style={styles.quoteSection}>
-          <Text style={styles.quoteText}>You're aligned with this group. Keep showing up.</Text>
+          <Text style={styles.quoteText}>{t('alignedWithGroup')}</Text>
         </Animated.View>
 
         {/* Invite CTA */}
@@ -443,8 +442,8 @@ export function LeaderboardEnhanced() {
             activeOpacity={0.7}
             onPress={() => router.push('/invite')}
           >
-            <Text style={styles.inviteText}>Invite someone to stay consistent with you</Text>
-            <Text style={styles.inviteCTA}>Invite a friend →</Text>
+            <Text style={styles.inviteText}>{t('inviteStayConsistent')}</Text>
+            <Text style={styles.inviteCTA}>{t('inviteFriend')} →</Text>
           </TouchableOpacity>
         </Animated.View>
 

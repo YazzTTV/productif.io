@@ -14,47 +14,47 @@ export class DashboardService {
 
   async getProductivityScore(): Promise<{
     score: number;
-    factors: Array<{
+    factors: {
       name: string;
       score: number;
       impact: 'positive' | 'negative' | 'neutral';
       description: string;
-    }>;
+    }[];
     recommendations: string[];
     trend: 'up' | 'down' | 'stable';
   }> {
     return apiService.get<{
       score: number;
-      factors: Array<{
+      factors: {
         name: string;
         score: number;
         impact: 'positive' | 'negative' | 'neutral';
         description: string;
-      }>;
+      }[];
       recommendations: string[];
       trend: 'up' | 'down' | 'stable';
     }>(`${this.basePath}/productivity`);
   }
 
-  async getRecentActivity(): Promise<Array<{
+  async getRecentActivity(): Promise<{
     id: string;
     type: 'task_completed' | 'habit_completed' | 'time_tracked' | 'project_created' | 'achievement_unlocked';
     title: string;
     description: string;
     timestamp: string;
     metadata?: any;
-  }>> {
-    return apiService.get<Array<{
+  }[]> {
+    return apiService.get<{
       id: string;
       type: 'task_completed' | 'habit_completed' | 'time_tracked' | 'project_created' | 'achievement_unlocked';
       title: string;
       description: string;
       timestamp: string;
       metadata?: any;
-    }>>(`${this.basePath}/activity`);
+    }[]>(`${this.basePath}/activity`);
   }
 
-  async getUpcomingDeadlines(): Promise<Array<{
+  async getUpcomingDeadlines(): Promise<{
     id: string;
     title: string;
     type: 'task' | 'objective' | 'project';
@@ -62,8 +62,8 @@ export class DashboardService {
     priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
     status: string;
     daysUntilDue: number;
-  }>> {
-    return apiService.get<Array<{
+  }[]> {
+    return apiService.get<{
       id: string;
       title: string;
       type: 'task' | 'objective' | 'project';
@@ -71,7 +71,7 @@ export class DashboardService {
       priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
       status: string;
       daysUntilDue: number;
-    }>>(`${this.basePath}/deadlines`);
+    }[]>(`${this.basePath}/deadlines`);
   }
 
   async getTodayGoals(): Promise<{
@@ -117,18 +117,18 @@ export class DashboardService {
   }
 
   async getWeeklyProgress(): Promise<{
-    tasksCompleted: Array<{ date: string; count: number }>;
-    habitsCompleted: Array<{ date: string; count: number }>;
-    timeTracked: Array<{ date: string; time: number }>;
-    productivityScore: Array<{ date: string; score: number }>;
+    tasksCompleted: { date: string; count: number }[];
+    habitsCompleted: { date: string; count: number }[];
+    timeTracked: { date: string; time: number }[];
+    productivityScore: { date: string; score: number }[];
     weekStart: string;
     weekEnd: string;
   }> {
     return apiService.get<{
-      tasksCompleted: Array<{ date: string; count: number }>;
-      habitsCompleted: Array<{ date: string; count: number }>;
-      timeTracked: Array<{ date: string; time: number }>;
-      productivityScore: Array<{ date: string; score: number }>;
+      tasksCompleted: { date: string; count: number }[];
+      habitsCompleted: { date: string; count: number }[];
+      timeTracked: { date: string; time: number }[];
+      productivityScore: { date: string; score: number }[];
       weekStart: string;
       weekEnd: string;
     }>(`${this.basePath}/weekly-progress`);
@@ -153,50 +153,50 @@ export class DashboardService {
   }
 
   async getMotivationalInsights(): Promise<{
-    streaks: Array<{
+    streaks: {
       type: 'task' | 'habit' | 'time';
       name: string;
       current: number;
       best: number;
-    }>;
-    achievements: Array<{
+    }[];
+    achievements: {
       id: string;
       name: string;
       description: string;
       progress: number;
       maxProgress: number;
       isClose: boolean;
-    }>;
-    milestones: Array<{
+    }[];
+    milestones: {
       name: string;
       achieved: boolean;
       achievedAt?: string;
       progress: number;
       target: number;
-    }>;
+    }[];
   }> {
     return apiService.get<{
-      streaks: Array<{
+      streaks: {
         type: 'task' | 'habit' | 'time';
         name: string;
         current: number;
         best: number;
-      }>;
-      achievements: Array<{
+      }[];
+      achievements: {
         id: string;
         name: string;
         description: string;
         progress: number;
         maxProgress: number;
         isClose: boolean;
-      }>;
-      milestones: Array<{
+      }[];
+      milestones: {
         name: string;
         achieved: boolean;
         achievedAt?: string;
         progress: number;
         target: number;
-      }>;
+      }[];
     }>(`${this.basePath}/motivation`);
   }
 
@@ -206,7 +206,7 @@ export class DashboardService {
     averageSessionLength: number;
     distractionCount: number;
     bestFocusTime: string;
-    weeklyFocusTrend: Array<{ date: string; score: number }>;
+    weeklyFocusTrend: { date: string; score: number }[];
   }> {
     return apiService.get<{
       focusScore: number;
@@ -214,11 +214,11 @@ export class DashboardService {
       averageSessionLength: number;
       distractionCount: number;
       bestFocusTime: string;
-      weeklyFocusTrend: Array<{ date: string; score: number }>;
+      weeklyFocusTrend: { date: string; score: number }[];
     }>(`${this.basePath}/focus`);
   }
 
-  async getPersonalizedRecommendations(): Promise<Array<{
+  async getPersonalizedRecommendations(): Promise<{
     id: string;
     type: 'habit' | 'productivity' | 'time_management' | 'goal_setting';
     title: string;
@@ -226,8 +226,8 @@ export class DashboardService {
     actionText: string;
     priority: 'high' | 'medium' | 'low';
     basedOn: string[];
-  }>> {
-    return apiService.get<Array<{
+  }[]> {
+    return apiService.get<{
       id: string;
       type: 'habit' | 'productivity' | 'time_management' | 'goal_setting';
       title: string;
@@ -235,7 +235,7 @@ export class DashboardService {
       actionText: string;
       priority: 'high' | 'medium' | 'low';
       basedOn: string[];
-    }>>(`${this.basePath}/recommendations`);
+    }[]>(`${this.basePath}/recommendations`);
   }
 
   async markRecommendationAsRead(id: string): Promise<{ success: boolean }> {

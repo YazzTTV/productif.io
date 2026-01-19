@@ -493,8 +493,8 @@ export function DailyJournal() {
             </TouchableOpacity>
 
             <View style={styles.entryHeaderContent}>
-              <Text style={styles.entryTitle}>Daily journal</Text>
-              <Text style={styles.entrySubtitle}>A moment to unload your thoughts.</Text>
+              <Text style={styles.entryTitle}>{t('dailyJournal')}</Text>
+              <Text style={styles.entrySubtitle}>{t('momentToUnloadThoughts')}</Text>
             </View>
           </Animated.View>
 
@@ -625,7 +625,7 @@ export function DailyJournal() {
               onPress={() => setStep('emotional')}
               activeOpacity={0.8}
             >
-              <Text style={styles.beginButtonText}>{t('beginTodayEntry') || 'Begin today\'s entry'}</Text>
+              <Text style={styles.beginButtonText}>{t('beginTodayEntry')}</Text>
             </TouchableOpacity>
           </Animated.View>
         </ScrollView>
@@ -667,7 +667,7 @@ export function DailyJournal() {
             {/* Current feeling label */}
             <View style={styles.sliderLabelContainer}>
           <Text style={styles.sliderValue}>{getEmotionalLabel(emotionalLevel)}</Text>
-          <Text style={styles.sliderHint}>{t('noRightOrWrong') || 'No right or wrong answer'}</Text>
+          <Text style={styles.sliderHint}>{t('noRightOrWrong')}</Text>
             </View>
 
             {/* Slider */}
@@ -795,7 +795,7 @@ export function DailyJournal() {
 
         <View style={styles.stepHeaderContent}>
           <Text style={styles.stepTitle}>{t('offload')}</Text>
-          <Text style={styles.stepSubtitle}>{t('completelyOptional') || 'Completely optional'}</Text>
+          <Text style={styles.stepSubtitle}>{t('completelyOptional')}</Text>
         </View>
 
         <View style={styles.offloadContent}>
@@ -807,7 +807,7 @@ export function DailyJournal() {
               style={styles.textArea}
               value={note}
               onChangeText={setNote}
-              placeholder={t('writeFreely') || 'Write freely. No one will analyze this.'}
+              placeholder={t('writeFreely')}
               placeholderTextColor="rgba(0, 0, 0, 0.4)"
               multiline
               textAlignVertical="top"
@@ -899,11 +899,11 @@ export function DailyJournal() {
             onPress={handleOffloadContinue}
             activeOpacity={0.8}
           >
-            <Text style={styles.closeButtonText}>{t('closeJournal') || 'Close journal'}</Text>
+            <Text style={styles.closeButtonText}>{t('closeJournal')}</Text>
           </TouchableOpacity>
           {note.trim() && (
             <Text style={styles.characterCount}>
-              {note.trim().length} {t('charactersWritten') || 'characters written'}
+              {note.trim().length} {t('charactersWritten')}
             </Text>
           )}
         </Animated.View>
@@ -929,8 +929,8 @@ export function DailyJournal() {
             entering={FadeInDown.delay(400).duration(400)}
             style={styles.completionText}
           >
-          <Text style={styles.completionTitle}>{t('noted') || 'Noted.'}</Text>
-          <Text style={styles.completionSubtitle}>{t('noActionRequired') || 'No action required.'}</Text>
+          <Text style={styles.completionTitle}>{t('noted')}</Text>
+          <Text style={styles.completionSubtitle}>{t('noActionRequired')}</Text>
           </Animated.View>
 
           <Animated.View
@@ -942,9 +942,9 @@ export function DailyJournal() {
             onPress={() => router.back()}
             activeOpacity={0.8}
           >
-            <Text style={styles.doneButtonText}>Close journal</Text>
+            <Text style={styles.doneButtonText}>{t('closeJournal')}</Text>
           </TouchableOpacity>
-          <Text style={styles.completionHint}>{t('dayClosed') || 'The day is closed.'}</Text>
+          <Text style={styles.completionHint}>{t('dayClosed')}</Text>
           </Animated.View>
         </Animated.View>
       </View>

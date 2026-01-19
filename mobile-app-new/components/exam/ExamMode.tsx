@@ -204,8 +204,8 @@ export function ExamMode() {
             </TouchableOpacity>
 
             <View style={styles.headerContent}>
-              <Text style={styles.headerTitle}>Exam Mode</Text>
-              <Text style={styles.headerSubtitle}>Focus on what truly matters.</Text>
+              <Text style={styles.headerTitle}>{t('examMode')}</Text>
+              <Text style={styles.headerSubtitle}>{t('focusOnWhatMatters')}</Text>
             </View>
 
             <TouchableOpacity
@@ -302,7 +302,7 @@ export function ExamMode() {
               onPress={handleStartFocus}
               activeOpacity={0.8}
             >
-              <Text style={styles.startFocusText}>Start Focus</Text>
+              <Text style={styles.startFocusText}>{t('startFocus')}</Text>
             </TouchableOpacity>
           )}
           <TouchableOpacity
@@ -310,7 +310,7 @@ export function ExamMode() {
             onPress={() => router.back()}
             activeOpacity={0.7}
           >
-            <Text style={styles.exitButtonText}>Exit Exam Mode</Text>
+            <Text style={styles.exitButtonText}>{t('exitExamMode')}</Text>
           </TouchableOpacity>
         </View>
       </View>

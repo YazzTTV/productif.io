@@ -98,8 +98,8 @@ export class HabitService {
     completionRate: number;
     totalEntries: number;
     averageValue: number;
-    weeklyProgress: Array<{ date: string; completed: boolean; value: number }>;
-    monthlyProgress: Array<{ date: string; completed: boolean; value: number }>;
+    weeklyProgress: { date: string; completed: boolean; value: number }[];
+    monthlyProgress: { date: string; completed: boolean; value: number }[];
   }> {
     return apiService.get<{
       streak: number;
@@ -107,8 +107,8 @@ export class HabitService {
       completionRate: number;
       totalEntries: number;
       averageValue: number;
-      weeklyProgress: Array<{ date: string; completed: boolean; value: number }>;
-      monthlyProgress: Array<{ date: string; completed: boolean; value: number }>;
+      weeklyProgress: { date: string; completed: boolean; value: number }[];
+      monthlyProgress: { date: string; completed: boolean; value: number }[];
     }>(`${this.basePath}/${habitId}/stats`);
   }
 
@@ -120,7 +120,7 @@ export class HabitService {
     bestStreak: number;
     totalCompletedThisWeek: number;
     totalCompletedThisMonth: number;
-    habitsByCategory: Array<{ category: string; count: number }>;
+    habitsByCategory: { category: string; count: number }[];
   }> {
     return apiService.get<{
       totalHabits: number;
@@ -130,26 +130,26 @@ export class HabitService {
       bestStreak: number;
       totalCompletedThisWeek: number;
       totalCompletedThisMonth: number;
-      habitsByCategory: Array<{ category: string; count: number }>;
+      habitsByCategory: { category: string; count: number }[];
     }>(`${this.basePath}/stats`);
   }
 
-  async getTodaysHabits(): Promise<Array<Habit & { todayEntry?: HabitEntry; isCompletedToday: boolean }>> {
-    return apiService.get<Array<Habit & { todayEntry?: HabitEntry; isCompletedToday: boolean }>>(`${this.basePath}/today`);
+  async getTodaysHabits(): Promise<(Habit & { todayEntry?: HabitEntry; isCompletedToday: boolean })[]> {
+    return apiService.get<(Habit & { todayEntry?: HabitEntry; isCompletedToday: boolean })[]>(`${this.basePath}/today`);
   }
 
-  async getHabitCalendar(habitId: string, month: string, year: string): Promise<Array<{
+  async getHabitCalendar(habitId: string, month: string, year: string): Promise<{
     date: string;
     completed: boolean;
     value: number;
     notes?: string;
-  }>> {
-    return apiService.get<Array<{
+  }[]> {
+    return apiService.get<{
       date: string;
       completed: boolean;
       value: number;
       notes?: string;
-    }>>(`${this.basePath}/${habitId}/calendar?month=${month}&year=${year}`);
+    }[]>(`${this.basePath}/${habitId}/calendar?month=${month}&year=${year}`);
   }
 
   async getHabitCategories(): Promise<string[]> {

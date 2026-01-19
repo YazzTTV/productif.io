@@ -201,9 +201,9 @@ export default function ExamSessionScreen() {
   const handleBackPress = () => {
     if (session?.hardMode && isRunning) {
       Alert.alert(
-        'Hard Mode Active',
-        'You cannot exit during an active session. Pause first or wait until the session ends.',
-        [{ text: 'OK' }]
+        t('hardModeActive'),
+        t('hardModeWarning'),
+        [{ text: t('ok') }]
       );
       return true;
     }
@@ -259,18 +259,18 @@ export default function ExamSessionScreen() {
 
   const handleNoMoreTasks = () => {
     Alert.alert(
-      'All Tasks Complete',
-      'You\'ve completed all planned tasks. Would you like to add more or finish the session?',
+      t('allTasksComplete'),
+      t('allTasksCompleteMessage'),
       [
         {
-          text: 'Add Task',
+          text: t('addTask'),
           onPress: () => {
             // Could open task picker modal
             router.push('/(tabs)/tasks');
           },
         },
         {
-          text: 'Finish Session',
+          text: t('finishSession'),
           onPress: handleEndSession,
           style: 'default',
         },
@@ -316,12 +316,12 @@ export default function ExamSessionScreen() {
     if (isDemo) {
       // Pour la démo, rediriger vers le paywall
       Alert.alert(
-        t('demoEnded') || 'Démo terminée',
-        t('demoEndedMessage') || 'Vous avez terminé la démo de 5 minutes. Passez en Premium pour accéder à Exam Mode sans limite !',
+        t('demoEnded'),
+        t('demoEndedMessage'),
         [
-          { text: t('cancel') || 'Annuler', style: 'cancel' },
+          { text: t('cancel'), style: 'cancel' },
           {
-            text: t('unlockExamMode') || 'Débloquer Exam Mode',
+            text: t('unlockExamMode'),
             onPress: async () => {
               await clearExamSession();
               router.replace('/paywall');
@@ -365,11 +365,11 @@ export default function ExamSessionScreen() {
     if (isDemo) {
       // Pour la démo, rediriger vers le paywall
       Alert.alert(
-        t('demoEnded') || 'Démo terminée',
-        t('demoEndedMessage') || 'Vous avez terminé la démo de 5 minutes. Passez en Premium pour accéder à Exam Mode sans limite !',
+        t('demoEnded'),
+        t('demoEndedMessage'),
         [
           {
-            text: t('unlockExamMode') || 'Débloquer Exam Mode',
+            text: t('unlockExamMode'),
             onPress: () => {
               router.replace('/paywall');
             },

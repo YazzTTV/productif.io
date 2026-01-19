@@ -1,7 +1,6 @@
-import React from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { View, Text, TouchableOpacity, StyleSheet, Dimensions, ScrollView, PanResponder, Modal, Alert } from 'react-native';
-import { useState, useEffect, useCallback, useRef } from 'react';
 import Animated, { 
   useSharedValue, 
   useAnimatedStyle, 
@@ -414,7 +413,7 @@ export default function FocusScreen() {
   const taskId = params.taskId as string | undefined;
   
   // Tasks management
-  const [tasks, setTasks] = useState<Array<{ id: string; title: string; subject: string; completed: boolean }>>([]);
+  const [tasks, setTasks] = useState<{ id: string; title: string; subject: string; completed: boolean }[]>([]);
   const [currentTaskIndex, setCurrentTaskIndex] = useState(0);
   const [loadingTasks, setLoadingTasks] = useState(true);
   
@@ -456,7 +455,7 @@ export default function FocusScreen() {
       // Sinon, charger les tâches prioritaires depuis l'API
       const { primary, next } = await selectExamTasks();
 
-      const allTasks: Array<{ id: string; title: string; subject: string; completed: boolean }> = [];
+      const allTasks: { id: string; title: string; subject: string; completed: boolean }[] = [];
 
       // Ajouter la tâche principale
       if (primary) {

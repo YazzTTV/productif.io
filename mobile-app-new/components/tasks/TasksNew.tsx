@@ -8,6 +8,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import * as ImagePicker from 'expo-image-picker';
 import { subjectsService, tasksService, weeklyPlanningService } from '@/lib/api';
 import { format } from 'date-fns';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface Task {
   id: string;
@@ -94,6 +95,7 @@ const MOCK_SUBJECTS: Subject[] = [
 export function TasksNew() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { t } = useLanguage();
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [expandedSubjects, setExpandedSubjects] = useState<string[]>([]);
   const [expandedTasks, setExpandedTasks] = useState<string[]>([]);
@@ -490,7 +492,7 @@ export function TasksNew() {
     }
   };
 
-  const createSubjectsFromAnalysis = async (subjectsToCreate: Array<{ name: string; coefficient: number; ue?: string | null }>) => {
+  const createSubjectsFromAnalysis = async (subjectsToCreate: { name: string; coefficient: number; ue?: string | null }[]) => {
     try {
       setSaving(true);
       const createdSubjects: Subject[] = [];
@@ -735,13 +737,13 @@ export function TasksNew() {
           </TouchableOpacity>
 
           <View style={styles.headerContent}>
-            <Text style={styles.headerTitle}>Your Tasks</Text>
-            <Text style={styles.headerSubtitle}>Organized by subject and impact.</Text>
+            <Text style={styles.headerTitle}>{t('yourTasks')}</Text>
+            <Text style={styles.headerSubtitle}>{t('organizedBySubjectAndImpact')}</Text>
           </View>
 
           <View style={styles.progressInfo}>
             <Text style={styles.progressText}>
-              {completedTasks} of {totalTasks} completed
+              {t('tasksCompleted', { completed: completedTasks, total: totalTasks })}
             </Text>
           </View>
 
@@ -787,7 +789,7 @@ export function TasksNew() {
                 <Ionicons name="calendar-outline" size={20} color="#FFFFFF" />
               )}
               <Text style={styles.planWeekText}>
-                {planningWeek ? 'Planification en cours...' : 'Plan my week'}
+                {planningWeek ? 'Planification en cours...' : 'Planifier ma semaine'}
               </Text>
             </TouchableOpacity>
           )}
@@ -950,7 +952,7 @@ export function TasksNew() {
                                   onPress={() => handleStartFocus(task, subject)}
                                   activeOpacity={0.8}
                                 >
-                                  <Text style={styles.startFocusText}>Start Focus Session</Text>
+                                  <Text style={styles.startFocusText}>Commencer la session de concentration</Text>
                                 </TouchableOpacity>
                               )}
                               

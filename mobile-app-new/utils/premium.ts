@@ -9,25 +9,18 @@ export async function checkPremiumStatus(): Promise<PremiumStatus> {
   try {
     // Récupérer le statut depuis l'API (source de vérité)
     const user = await authService.checkAuth();
-    
+
     if (user) {
       return {
         isPremium: user.isPremium || false,
         plan: user.plan === 'premium' ? 'annual' : 'free', // Simplification, on pourrait récupérer le type exact
       };
     }
-    
-    // Fallback : essayer avec trial-status
-    try {
-      const trialStatus = await authService.getTrialStatus();
-      return {
-        isPremium: trialStatus.isPremium || false,
-        plan: trialStatus.plan === 'premium' ? 'annual' : 'free',
-      };
-    } catch (error) {
-      console.error('Error checking premium status via trial-status:', error);
-      return { isPremium: false, plan: 'free' };
-    }
+
+    // Si l'utilisateur n'est pas authentifié, retourner le statut par défaut
+    // Ne pas essayer trial-status car cela nécessite aussi une authentification
+    console.log('ℹ️ Utilisateur non authentifié, statut par défaut: free');
+    return { isPremium: false, plan: 'free' };
   } catch (error) {
     console.error('Error checking premium status:', error);
     return { isPremium: false, plan: 'free' };

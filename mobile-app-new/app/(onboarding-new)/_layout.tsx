@@ -1,7 +1,6 @@
-import { Stack } from 'expo-router';
+import { Stack , router, useSegments } from 'expo-router';
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { router, useSegments } from 'expo-router';
 import { View, ActivityIndicator } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 

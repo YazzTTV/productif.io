@@ -228,7 +228,7 @@ export function DisciplineDashboard({ userName }: DisciplineDashboardProps) {
             <div className="w-12 h-12 rounded-2xl flex items-center justify-center">
               <Users className="w-5 h-5" />
             </div>
-            <span className="text-xs">Community</span>
+            <span className="text-xs">Communauté</span>
           </motion.button>
         </div>
       </motion.div>

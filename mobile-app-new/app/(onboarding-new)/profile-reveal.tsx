@@ -16,8 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { onboardingService } from '@/lib/api';
-import { paymentService } from '@/lib/api';
+import { onboardingService , paymentService } from '@/lib/api';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function ProfileRevealScreen() {

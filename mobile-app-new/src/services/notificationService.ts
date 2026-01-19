@@ -123,20 +123,20 @@ export class NotificationService {
     return apiService.put<{ success: boolean }>(`${this.basePath}/${notificationId}/snooze`, { minutes });
   }
 
-  async getNotificationHistory(days: number = 30): Promise<Array<{
+  async getNotificationHistory(days: number = 30): Promise<{
     date: string;
     sentCount: number;
     readCount: number;
     clickCount: number;
-    types: Array<{ type: string; count: number }>;
-  }>> {
-    return apiService.get<Array<{
+    types: { type: string; count: number }[];
+  }[]> {
+    return apiService.get<{
       date: string;
       sentCount: number;
       readCount: number;
       clickCount: number;
-      types: Array<{ type: string; count: number }>;
-    }>>(`${this.basePath}/history?days=${days}`);
+      types: { type: string; count: number }[];
+    }[]>(`${this.basePath}/history?days=${days}`);
   }
 
   async createCustomReminder(data: {
@@ -154,7 +154,7 @@ export class NotificationService {
     return apiService.post<{ success: boolean; reminderId: string }>(`${this.basePath}/reminders`, data);
   }
 
-  async getCustomReminders(): Promise<Array<{
+  async getCustomReminders(): Promise<{
     id: string;
     title: string;
     message: string;
@@ -166,8 +166,8 @@ export class NotificationService {
       daysOfWeek?: number[];
       endDate?: string;
     };
-  }>> {
-    return apiService.get<Array<{
+  }[]> {
+    return apiService.get<{
       id: string;
       title: string;
       message: string;
@@ -179,7 +179,7 @@ export class NotificationService {
         daysOfWeek?: number[];
         endDate?: string;
       };
-    }>>(`${this.basePath}/reminders`);
+    }[]>(`${this.basePath}/reminders`);
   }
 
   async updateCustomReminder(reminderId: string, data: {
@@ -200,22 +200,22 @@ export class NotificationService {
     return apiService.delete<{ success: boolean }>(`${this.basePath}/reminders/${reminderId}`);
   }
 
-  async getSmartNotificationSuggestions(): Promise<Array<{
+  async getSmartNotificationSuggestions(): Promise<{
     type: 'task_reminder' | 'habit_reminder' | 'break_reminder' | 'deadline_alert';
     title: string;
     description: string;
     suggestedTime: string;
     confidence: number;
     basedOn: string[];
-  }>> {
-    return apiService.get<Array<{
+  }[]> {
+    return apiService.get<{
       type: 'task_reminder' | 'habit_reminder' | 'break_reminder' | 'deadline_alert';
       title: string;
       description: string;
       suggestedTime: string;
       confidence: number;
       basedOn: string[];
-    }>>(`${this.basePath}/suggestions`);
+    }[]>(`${this.basePath}/suggestions`);
   }
 }
 

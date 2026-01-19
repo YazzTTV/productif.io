@@ -24,12 +24,12 @@ interface Habit {
   daysOfWeek?: string[];
   category?: 'MORNING' | 'DAY' | 'EVENING' | 'ANTI';
   order?: number;
-  entries?: Array<{
+  entries?: {
     id: string;
     date: string;
     completed: boolean;
     count: number;
-  }>;
+  }[];
 }
 
 export function ReviewHabits() {

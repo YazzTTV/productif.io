@@ -105,7 +105,7 @@ export function DashboardNew() {
 
         {/* Today's Structure */}
         <Animated.View entering={FadeInDown.delay(200).duration(400)} style={styles.section}>
-          <Text style={styles.sectionTitle}>Today's structure</Text>
+          <Text style={styles.sectionTitle}>{t('todaysStructure')}</Text>
           
           <View style={styles.structureCard}>
             {/* Time Badge */}
@@ -144,7 +144,7 @@ export function DashboardNew() {
               onPress={() => router.push('/focus')}
               activeOpacity={0.8}
             >
-              <Text style={styles.startFocusText}>Start to Focus</Text>
+              <Text style={styles.startFocusText}>{t('startToFocus')}</Text>
             </TouchableOpacity>
           </View>
         </Animated.View>

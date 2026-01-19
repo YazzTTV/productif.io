@@ -35,14 +35,14 @@ interface Habit {
   daysOfWeek: string[];
   order: number;
   currentStreak?: number;
-  entries?: Array<{
+  entries?: {
     id: string;
     date: string;
     completed: boolean;
     count: number;
     rating?: number;
     note?: string;
-  }>;
+  }[];
 }
 
 const DAYS_OF_WEEK = [

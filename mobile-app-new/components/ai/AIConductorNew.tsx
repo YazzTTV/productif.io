@@ -18,37 +18,37 @@ const actions: Action[] = [
   {
     id: 'focus',
     icon: 'scan-outline',
-    label: 'Start focus',
+    label: 'Commencer la concentration',
   },
   {
     id: 'exam',
     icon: 'school-outline',
-    label: 'Exam Mode',
+    label: 'Mode Examen',
     previewAvailable: true,
     isPremium: true,
   },
   {
     id: 'tasks',
     icon: 'checkbox-outline',
-    label: 'Your Tasks',
-    subtitle: 'Organized by subject and impact.',
+    label: 'Vos Tâches',
+    subtitle: 'Organisées par matière et impact.',
   },
   {
     id: 'habits',
     icon: 'list-outline',
-    label: 'Review habits',
+    label: 'Examiner les habitudes',
   },
   {
     id: 'plan',
     icon: 'calendar-outline',
-    label: 'Plan my day',
+    label: 'Planifier ma journée',
     previewAvailable: true,
     isPremium: true,
   },
   {
     id: 'journal',
     icon: 'book-outline',
-    label: 'Daily journal',
+    label: 'Journal quotidien',
   },
 ];
 
@@ -96,8 +96,8 @@ export function AIConductorNew() {
           </TouchableOpacity>
 
           <View style={styles.headerContent}>
-            <Text style={styles.headerTitle}>Your system is ready.</Text>
-            <Text style={styles.headerSubtitle}>Today is structured for deep work.</Text>
+            <Text style={styles.headerTitle}>Votre système est prêt.</Text>
+            <Text style={styles.headerSubtitle}>Aujourd'hui est structuré pour le travail profond.</Text>
           </View>
         </Animated.View>
 
@@ -133,7 +133,7 @@ export function AIConductorNew() {
                     <Text style={styles.actionSubtitle}>{action.subtitle}</Text>
                   )}
                   {action.previewAvailable && !action.subtitle && (
-                    <Text style={styles.actionSubtitle}>Preview available</Text>
+                    <Text style={styles.actionSubtitle}>Aperçu disponible</Text>
                   )}
                 </View>
               </TouchableOpacity>

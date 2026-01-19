@@ -348,7 +348,7 @@ const TRANSLATIONS = {
     step9Feature1Title: "AI-powered task management",
     step9Feature1Desc: "Your AI organizes, prioritizes, and suggests what to tackle next.",
     step9Feature2Title: "WhatsApp AI assistant",
-    step9Feature2Desc: "Smart reminders and guidance without opening another app.",
+    step9Feature2Desc: "Rappels intelligents et conseils sans ouvrir une autre application.",
     step9Feature3Title: "Habits & goals that stick",
     step9Feature3Desc: "Build adaptive routines with contextual reminders; track OKRs.",
     step9Feature4Title: "Complete privacy & lifetime updates",

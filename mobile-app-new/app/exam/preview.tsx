@@ -41,11 +41,11 @@ export default function ExamPreviewScreen() {
       if (allTasks.length === 0) {
         // Si pas de tâches, afficher un message et proposer le paywall
         Alert.alert(
-          t('noTasks') || 'Aucune tâche',
-          t('noTasksForDemo') || 'Vous n\'avez pas de tâches à faire. Créez des tâches ou passez en Premium pour accéder à Exam Mode.',
+          t('noTasks'),
+          t('noTasksForDemo'),
           [
-            { text: t('cancel') || 'Annuler', style: 'cancel' },
-            { text: t('unlockExamMode') || 'Débloquer Exam Mode', onPress: () => setShowPaywall(true) }
+            { text: t('cancel'), style: 'cancel' },
+            { text: t('unlockExamMode'), onPress: () => setShowPaywall(true) }
           ]
         );
         return;
@@ -111,7 +111,7 @@ export default function ExamPreviewScreen() {
 
         {/* Preview Content */}
         <Animated.View entering={FadeInDown.delay(200).duration(400)} style={styles.previewSection}>
-          <Text style={styles.previewTitle}>{t('whatIsExamMode') || 'What is Exam Mode?'}</Text>
+          <Text style={styles.previewTitle}>{t('whatIsExamMode')}</Text>
           <Text style={styles.previewDescription}>
             {t('examModeDescription')}
           </Text>
@@ -120,7 +120,7 @@ export default function ExamPreviewScreen() {
         {/* Demo Timer */}
         <Animated.View entering={FadeInDown.delay(300).duration(400)} style={styles.demoSection}>
           <View style={styles.demoTimerCard}>
-            <Text style={styles.demoTimerLabel}>{t('demoTimer') || 'Demo Timer'}</Text>
+            <Text style={styles.demoTimerLabel}>{t('demoTimer')}</Text>
             <Text style={styles.demoTimerValue}>45:00</Text>
             <Text style={styles.demoTimerNote}>{t('staticPreview') || 'Static preview - timer doesn\'t run'}</Text>
           </View>
@@ -129,9 +129,9 @@ export default function ExamPreviewScreen() {
         {/* Sample Task Card */}
         <Animated.View entering={FadeInDown.delay(400).duration(400)} style={styles.demoSection}>
           <View style={styles.taskCard}>
-            <Text style={styles.taskCardLabel}>{t('sampleTask') || 'Sample Task'}</Text>
-            <Text style={styles.taskCardTitle}>{t('sampleTaskTitle') || 'Complete Chapter 12 Summary'}</Text>
-            <Text style={styles.taskCardSubject}>{t('sampleTaskSubject') || 'Organic Chemistry'}</Text>
+            <Text style={styles.taskCardLabel}>{t('sampleTask')}</Text>
+            <Text style={styles.taskCardTitle}>{t('sampleTaskTitle')}</Text>
+            <Text style={styles.taskCardSubject}>{t('sampleTaskSubject')}</Text>
             <View style={styles.lockedOverlay}>
               <Ionicons name="lock-closed" size={24} color="rgba(0, 0, 0, 0.4)" />
               <Text style={styles.lockedText}>{t('taskChainingLocked') || 'Task chaining locked'}</Text>
@@ -141,7 +141,7 @@ export default function ExamPreviewScreen() {
 
         {/* Locked Features */}
         <Animated.View entering={FadeInDown.delay(500).duration(400)} style={styles.featuresSection}>
-          <Text style={styles.featuresTitle}>{t('premiumFeatures') || 'Premium Features'}</Text>
+          <Text style={styles.featuresTitle}>{t('premiumFeatures')}</Text>
           
           <View style={styles.featureItem}>
             <Ionicons name="lock-closed" size={20} color="rgba(0, 0, 0, 0.4)" />

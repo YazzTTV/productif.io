@@ -200,7 +200,7 @@ export function LeaderboardEnhanced({ isPremium = false }: LeaderboardEnhancedPr
             animate={{ opacity: 1, y: 0 }}
             className="p-6 border-2 border-[#16A34A]/20 bg-[#16A34A]/5 rounded-3xl"
           >
-            <p className="text-black/40 mb-4 text-sm">Your position</p>
+            <p className="text-black/40 mb-4 text-sm">Votre position</p>
             <div className="flex items-center gap-4 mb-4">
               {/* Avatar */}
               <div className="w-16 h-16 rounded-full bg-[#16A34A]/10 flex items-center justify-center text-xl font-medium text-[#16A34A]">
@@ -247,7 +247,7 @@ export function LeaderboardEnhanced({ isPremium = false }: LeaderboardEnhancedPr
       {/* Motivational Quote */}
       <div className="px-6 pb-6">
         <p className="text-black/40 text-center text-sm">
-          You're aligned with this group. Keep showing up.
+          Vous êtes aligné avec ce groupe. Continuez à vous montrer.
         </p>
       </div>
 
@@ -263,8 +263,8 @@ export function LeaderboardEnhanced({ isPremium = false }: LeaderboardEnhancedPr
           className="w-full p-6 border border-[#16A34A]/20 bg-[#16A34A]/5 rounded-3xl hover:bg-[#16A34A]/10 transition-all"
         >
           <div className="text-center space-y-2">
-            <p className="text-black/60">Invite someone to stay consistent with you</p>
-            <p className="font-medium text-[#16A34A]">Invite a friend →</p>
+            <p className="text-black/60">Invitez quelqu'un à rester constant avec vous</p>
+            <p className="font-medium text-[#16A34A]">Inviter un ami →</p>
           </div>
         </motion.button>
       </div>
@@ -274,11 +274,11 @@ export function LeaderboardEnhanced({ isPremium = false }: LeaderboardEnhancedPr
         {currentData.length === 0 ? (
           <div className="text-center py-12">
             <p className="text-black/60">
-              {activeTab === 'friends' 
-                ? 'No friends yet. Invite someone to get started!' 
+              {activeTab === 'friends'
+                ? 'Aucun ami pour le moment. Invitez quelqu\'un pour commencer !'
                 : activeTab === 'class'
-                ? 'No group members yet. Join or create a group!'
-                : 'No data available.'}
+                ? 'Aucun membre de groupe pour le moment. Rejoignez ou créez un groupe !'
+                : 'Aucune donnée disponible.'}
             </p>
           </div>
         ) : (
@@ -350,25 +350,25 @@ export function LeaderboardEnhanced({ isPremium = false }: LeaderboardEnhancedPr
             
             <div className="space-y-2">
               <h3 className="text-xl tracking-tight" style={{ letterSpacing: '-0.03em' }}>
-                Join the global leaderboard
+                Rejoignez le classement mondial
               </h3>
               <p className="text-black/60">
-                Compete with students worldwide and track long-term progress.
+                Compétez avec des étudiants du monde entier et suivez vos progrès à long terme.
               </p>
             </div>
 
             <div className="space-y-3 text-left text-sm text-black/60">
               <div className="flex items-center gap-3">
                 <div className="w-1.5 h-1.5 rounded-full bg-[#16A34A]" />
-                <p>Global rankings and insights</p>
+                <p>Classements mondiaux et analyses</p>
               </div>
               <div className="flex items-center gap-3">
                 <div className="w-1.5 h-1.5 rounded-full bg-[#16A34A]" />
-                <p>Monthly and all-time views</p>
+                <p>Vues mensuelles et de tous les temps</p>
               </div>
               <div className="flex items-center gap-3">
                 <div className="w-1.5 h-1.5 rounded-full bg-[#16A34A]" />
-                <p>Advanced consistency metrics</p>
+                <p>Métriques de constance avancées</p>
               </div>
             </div>
 
@@ -376,11 +376,11 @@ export function LeaderboardEnhanced({ isPremium = false }: LeaderboardEnhancedPr
               onClick={() => handleNavigate('/dashboard/upgrade')}
               className="w-full bg-[#16A34A] hover:bg-[#16A34A]/90 text-white rounded-3xl h-16 shadow-xl shadow-[#16A34A]/30 hover:shadow-2xl hover:shadow-[#16A34A]/40 transition-all active:scale-[0.98]"
             >
-              Upgrade to Premium
+Passer en Premium
             </Button>
 
             <p className="text-xs text-black/40">
-              Continue tracking with friends and class for free
+Continuez à suivre avec vos amis et votre classe gratuitement
             </p>
           </div>
         </motion.div>
@@ -423,24 +423,24 @@ export function LeaderboardEnhanced({ isPremium = false }: LeaderboardEnhancedPr
                   <h2 className="text-2xl tracking-tight mb-1" style={{ letterSpacing: '-0.03em' }}>
                     {selectedUser.name}
                   </h2>
-                  <p className="text-black/60">Rank #{selectedUser.rank}</p>
+                  <p className="text-black/60">Rang #{selectedUser.rank}</p>
                 </div>
               </div>
 
               {/* Stats grid */}
               <div className="space-y-3">
                 <div className="p-6 border border-black/5 rounded-3xl bg-white">
-                  <p className="text-black/40 mb-2">Current streak</p>
+                  <p className="text-black/40 mb-2">Série actuelle</p>
                   <div className="flex items-baseline gap-2">
                     <p className="text-3xl tracking-tight" style={{ letterSpacing: '-0.04em' }}>
                       {selectedUser.streak}
                     </p>
-                    <p className="text-black/60">days</p>
+                    <p className="text-black/60">jours</p>
                   </div>
                 </div>
 
                 <div className="p-6 border border-black/5 rounded-3xl bg-white">
-                  <p className="text-black/40 mb-2">Weekly XP</p>
+                  <p className="text-black/40 mb-2">XP hebdomadaire</p>
                   <div className="flex items-baseline gap-2">
                     <p className="text-3xl tracking-tight" style={{ letterSpacing: '-0.04em' }}>
                       {selectedUser.xp.toLocaleString()}
@@ -450,12 +450,12 @@ export function LeaderboardEnhanced({ isPremium = false }: LeaderboardEnhancedPr
                 </div>
 
                 <div className="p-6 border border-black/5 rounded-3xl bg-white">
-                  <p className="text-black/40 mb-2">Focus sessions</p>
+                  <p className="text-black/40 mb-2">Sessions de concentration</p>
                   <div className="flex items-baseline gap-2">
                     <p className="text-3xl tracking-tight" style={{ letterSpacing: '-0.04em' }}>
                       {selectedUser.focusSessions}
                     </p>
-                    <p className="text-black/60">this week</p>
+                    <p className="text-black/60">cette semaine</p>
                   </div>
                 </div>
               </div>

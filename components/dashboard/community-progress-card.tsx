@@ -36,8 +36,8 @@ export function CommunityProgressCard({ onNavigate }: CommunityProgressCardProps
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h3 className="font-medium mb-1">Community Progress</h3>
-          <p className="text-sm text-black/40">Your group this week</p>
+          <h3 className="font-medium mb-1">Progrès de la communauté</h3>
+          <p className="text-sm text-black/40">Votre groupe cette semaine</p>
         </div>
         <ChevronRight className="w-5 h-5 text-black/20" />
       </div>
@@ -86,7 +86,7 @@ export function CommunityProgressCard({ onNavigate }: CommunityProgressCardProps
       {/* CTA */}
       <div className="mt-6 pt-4 border-t border-black/5">
         <p className="text-sm text-black/40 text-center">
-          View full leaderboard →
+          Voir le classement complet →
         </p>
       </div>
     </motion.button>

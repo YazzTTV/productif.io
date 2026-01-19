@@ -1,10 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState , useEffect } from 'react';
 import { SafeAreaView, View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Image, Alert, ActivityIndicator } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as AppleAuthentication from 'expo-apple-authentication';
-import { useEffect } from 'react';
 import { authService } from '@/lib/api';
 import { signInWithGoogle } from '@/lib/googleAuth';
 import productifLogo from '../../assets/images/icon.png';

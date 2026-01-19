@@ -647,8 +647,13 @@ export const subjectsService = {
         return result;
       }
       return result;
-    } catch (error) {
-      console.error('❌ [subjectsService] Erreur lors de la récupération:', error);
+    } catch (error: any) {
+      // Ne pas logger les erreurs d'authentification comme des erreurs critiques
+      if (error?.message?.includes('Non authentifié') || error?.status === 401) {
+        console.warn('⚠️ [subjectsService] Utilisateur non authentifié');
+      } else {
+        console.error('❌ [subjectsService] Erreur lors de la récupération:', error);
+      }
       throw error;
     }
   },
@@ -969,9 +974,24 @@ export const googleCalendarService = {
     connected: boolean;
   }> {
     try {
+      // Vérifier l'authentification avant d'appeler l'API
+      const token = await getAuthToken();
+      if (!token) {
+        console.warn('⚠️ [GoogleCalendarService] Utilisateur non authentifié, impossible de récupérer les événements');
+        return {
+          events: [],
+          connected: false,
+        };
+      }
+
       return await apiCall('/google-calendar/events');
     } catch (error: any) {
-      console.error('❌ [GoogleCalendarService] Erreur récupération événements:', error);
+      // Ne pas logger les erreurs d'authentification comme des erreurs critiques
+      if (error?.message?.includes('Non authentifié') || error?.status === 401) {
+        console.warn('⚠️ [GoogleCalendarService] Utilisateur non authentifié, impossible de récupérer les événements');
+      } else {
+        console.error('❌ [GoogleCalendarService] Erreur récupération événements:', error);
+      }
       return {
         events: [],
         connected: false,
@@ -986,6 +1006,16 @@ export const googleCalendarService = {
     error?: string;
   }> {
     try {
+      // Vérifier l'authentification avant d'appeler l'API
+      const token = await getAuthToken();
+      if (!token) {
+        console.warn('⚠️ [GoogleCalendarService] Utilisateur non authentifié, impossible de créer l\'événement');
+        return {
+          success: false,
+          error: 'Non authentifié',
+        };
+      }
+
       return await apiCall('/calendar/schedule', {
         method: 'POST',
         body: JSON.stringify({
@@ -996,7 +1026,12 @@ export const googleCalendarService = {
         }),
       });
     } catch (error: any) {
-      console.error('❌ [GoogleCalendarService] Erreur création événement:', error);
+      // Ne pas logger les erreurs d'authentification comme des erreurs critiques
+      if (error?.message?.includes('Non authentifié') || error?.status === 401) {
+        console.warn('⚠️ [GoogleCalendarService] Utilisateur non authentifié, impossible de créer l\'événement');
+      } else {
+        console.error('❌ [GoogleCalendarService] Erreur création événement:', error);
+      }
       return {
         success: false,
         error: error.message || 'Erreur lors de la création de l\'événement',
@@ -1203,6 +1238,13 @@ export const gamificationService = {
     rank: number;
   }>> {
     try {
+      // Vérifier l'authentification avant d'appeler l'API
+      const token = await getAuthToken();
+      if (!token) {
+        console.warn('⚠️ [gamificationService] Utilisateur non authentifié, impossible de récupérer le classement des amis');
+        return [];
+      }
+
       // Récupérer les utilisateurs de la même entreprise
       const companyUsers = await apiCall('/my-company/users');
       if (!companyUsers || !companyUsers.users || companyUsers.users.length === 0) {
@@ -1230,8 +1272,13 @@ export const gamificationService = {
         }));
       
       return friendsLeaderboard;
-    } catch (error) {
-      console.error('❌ Erreur récupération classement amis:', error);
+    } catch (error: any) {
+      // Ne pas logger les erreurs d'authentification comme des erreurs critiques
+      if (error?.message?.includes('Non authentifié') || error?.status === 401) {
+        console.warn('⚠️ [gamificationService] Utilisateur non authentifié, impossible de récupérer le classement des amis');
+      } else {
+        console.error('❌ [gamificationService] Erreur récupération classement amis:', error);
+      }
       return [];
     }
   },
@@ -1262,6 +1309,13 @@ export const gamificationService = {
     type?: string;
   }>> {
     try {
+      // Vérifier l'authentification avant d'appeler l'API
+      const token = await getAuthToken();
+      if (!token) {
+        console.warn('⚠️ [gamificationService] Utilisateur non authentifié, impossible de récupérer les groupes');
+        return [];
+      }
+
       const response = await apiCall('/gamification/groups');
       if (Array.isArray(response)) {
         return response;
@@ -1270,8 +1324,13 @@ export const gamificationService = {
         return response.groups;
       }
       return [];
-    } catch (error) {
-      console.error('❌ Erreur récupération groupes:', error);
+    } catch (error: any) {
+      // Ne pas logger les erreurs d'authentification comme des erreurs critiques
+      if (error?.message?.includes('Non authentifié') || error?.status === 401) {
+        console.warn('⚠️ [gamificationService] Utilisateur non authentifié, impossible de récupérer les groupes');
+      } else {
+        console.error('❌ [gamificationService] Erreur récupération groupes:', error);
+      }
       return [];
     }
   },
