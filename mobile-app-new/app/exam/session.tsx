@@ -392,7 +392,7 @@ export default function ExamSessionScreen() {
   if (loading || !session || !currentTask) {
     return (
       <View style={[styles.container, styles.centerContent, { paddingTop: insets.top }]}>
-        <Text style={styles.loadingText}>Loading session...</Text>
+        <Text style={styles.loadingText}>{t('loadingSession') || 'Loading session...'}</Text>
       </View>
     );
   }
@@ -414,7 +414,7 @@ export default function ExamSessionScreen() {
             onPress={handleEndSession}
             activeOpacity={0.7}
           >
-            <Text style={styles.endButtonText}>End</Text>
+            <Text style={styles.endButtonText}>{t('end') || 'End'}</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -469,7 +469,7 @@ export default function ExamSessionScreen() {
           onPress={handleComplete}
           activeOpacity={0.8}
         >
-          <Text style={styles.completeButtonText}>Complete</Text>
+          <Text style={styles.completeButtonText}>{t('complete') || 'Complete'}</Text>
         </TouchableOpacity>
 
         {!session.hardMode && (
@@ -490,7 +490,7 @@ export default function ExamSessionScreen() {
       {/* Next Task Preview */}
       {nextTask && (
         <View style={styles.nextTaskPreview}>
-          <Text style={styles.nextTaskLabel}>Next: {nextTask.title}</Text>
+          <Text style={styles.nextTaskLabel}>{t('next') || 'Next'}: {nextTask.title}</Text>
         </View>
       )}
     </View>
