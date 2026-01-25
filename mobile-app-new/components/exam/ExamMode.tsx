@@ -8,6 +8,7 @@ import { selectExamTasks, TaskForExam } from '@/utils/taskSelection';
 import { subjectsService, authService } from '@/lib/api';
 import { checkPremiumStatus } from '@/utils/premium';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useExamSettings } from '@/hooks/useExamSettings';
 
 type ExamPhase = 'dashboard' | 'focus' | 'paused' | 'complete';
 
@@ -29,6 +30,7 @@ export function ExamMode() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { t } = useLanguage();
+  const { settings: examSettings } = useExamSettings();
   const [phase, setPhase] = useState<ExamPhase>('dashboard');
   const [tasks, setTasks] = useState<Task[]>([]);
   const [upcomingExam, setUpcomingExam] = useState<ExamInfo | null>(null);
@@ -135,17 +137,17 @@ export function ExamMode() {
         );
 
         // Si on n'a pas assez de tâches pour la matière principale, prendre les plus importantes globalement
-        if (tasksForPrimarySubject.length < 3) {
-          // Prendre les 3 tâches les plus importantes (peu importe la matière)
-          tasksForPrimarySubject = allTasks.slice(0, 3);
+        if (tasksForPrimarySubject.length < examSettings.maxTasks) {
+          // Prendre le nombre maximum de tâches défini dans les paramètres
+          tasksForPrimarySubject = allTasks.slice(0, examSettings.maxTasks);
         } else {
-          // Prendre les 3 tâches les plus importantes de la matière principale
-          tasksForPrimarySubject = tasksForPrimarySubject.slice(0, 3);
+          // Prendre le nombre maximum de tâches de la matière principale
+          tasksForPrimarySubject = tasksForPrimarySubject.slice(0, examSettings.maxTasks);
         }
       } else {
-        // Pas de matière principale trouvée, prendre les 3 tâches les plus importantes globalement
+        // Pas de matière principale trouvée, prendre le nombre maximum de tâches défini dans les paramètres
         const allTasks = [primary, ...next].filter(Boolean) as TaskForExam[];
-        tasksForPrimarySubject = allTasks.slice(0, 3);
+        tasksForPrimarySubject = allTasks.slice(0, examSettings.maxTasks);
       }
 
       // Convertir les tâches en format Task
@@ -177,12 +179,16 @@ export function ExamMode() {
     router.push('/focus');
   };
 
+  const handleSettingsPress = () => {
+    router.push('/exam/settings');
+  };
+
   if (phase === 'dashboard') {
     if (loading) {
       return (
         <View style={[styles.container, styles.centerContent, { paddingTop: insets.top }]}>
           <ActivityIndicator size="large" color="#16A34A" />
-          <Text style={styles.loadingText}>Loading exam data...</Text>
+          <Text style={styles.loadingText}>{t('loadingExamData') || 'Loading exam data...'}</Text>
         </View>
       );
     }
@@ -210,7 +216,7 @@ export function ExamMode() {
 
             <TouchableOpacity
               style={styles.settingsButton}
-              onPress={() => {}}
+              onPress={handleSettingsPress}
             >
               <Ionicons name="settings-outline" size={20} color="#000" />
             </TouchableOpacity>
@@ -229,7 +235,7 @@ export function ExamMode() {
                 </View>
                 <View style={styles.examDays}>
                   <Text style={styles.examDaysNumber}>{upcomingExam.daysUntil}</Text>
-                  <Text style={styles.examDaysLabel}>days</Text>
+                  <Text style={styles.examDaysLabel}>{t('days') || 'days'}</Text>
                 </View>
               </View>
             </Animated.View>
@@ -237,7 +243,7 @@ export function ExamMode() {
 
           {/* Today's Priorities */}
           <Animated.View entering={FadeInDown.delay(300).duration(400)} style={styles.section}>
-            <Text style={styles.sectionLabel}>Today's priorities</Text>
+            <Text style={styles.sectionLabel}>{t('todaysPriorities') || 'Today\'s priorities'}</Text>
             <View style={styles.tasksList}>
               {tasks.map((task, index) => (
                 <View
@@ -252,17 +258,17 @@ export function ExamMode() {
                     <View style={styles.taskHeader}>
                       {task.priority === 'critical' && (
                         <View style={styles.priorityBadge}>
-                          <Text style={styles.priorityBadgeText}>Critical</Text>
+                          <Text style={styles.priorityBadgeText}>{t('critical') || 'Critical'}</Text>
                         </View>
                       )}
                       {task.priority === 'supporting' && (
                         <View style={styles.priorityBadgeSupporting}>
-                          <Text style={styles.priorityBadgeTextSupporting}>Supporting</Text>
+                          <Text style={styles.priorityBadgeTextSupporting}>{t('supporting') || 'Supporting'}</Text>
                         </View>
                       )}
                       {task.priority === 'light' && (
                         <View style={styles.priorityBadgeLight}>
-                          <Text style={styles.priorityBadgeTextLight}>Light</Text>
+                          <Text style={styles.priorityBadgeTextLight}>{t('light') || 'Light'}</Text>
                         </View>
                       )}
                     </View>

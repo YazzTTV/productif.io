@@ -36,8 +36,8 @@ export default function ExamSummaryScreen() {
         {/* Header */}
         <Animated.View entering={FadeInUp.delay(100).duration(400)} style={styles.header}>
           <View style={styles.headerContent}>
-            <Text style={styles.headerTitle}>Session Complete</Text>
-            <Text style={styles.headerSubtitle}>Great work today</Text>
+            <Text style={styles.headerTitle}>{t('sessionComplete') || 'Session Complete'}</Text>
+            <Text style={styles.headerSubtitle}>{t('greatWorkToday') || 'Great work today'}</Text>
           </View>
         </Animated.View>
 

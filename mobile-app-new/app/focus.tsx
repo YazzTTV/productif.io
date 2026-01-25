@@ -128,6 +128,7 @@ interface SessionSettingsModalProps {
   breakDuration: number;
   maxSessions: number;
   onSave: (settings: { focusDuration: number; breakDuration: number; maxSessions: number }) => void;
+  t: (key: string) => string;
 }
 
 function SessionSettingsModal({
@@ -137,6 +138,7 @@ function SessionSettingsModal({
   breakDuration: initialBreakDuration,
   maxSessions: initialMaxSessions,
   onSave,
+  t,
 }: SessionSettingsModalProps) {
   const [focusDuration, setFocusDuration] = useState(initialFocusDuration);
   const [breakDuration, setBreakDuration] = useState(initialBreakDuration);
@@ -844,6 +846,7 @@ export default function FocusScreen() {
           focusDuration={focusDuration}
           breakDuration={breakDuration}
           maxSessions={maxSessions}
+          t={t}
           onSave={(settings) => {
             setFocusDuration(settings.focusDuration);
             setBreakDuration(settings.breakDuration);
