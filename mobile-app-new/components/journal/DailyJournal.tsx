@@ -191,7 +191,7 @@ export function DailyJournal() {
     try {
       const permission = await Audio.requestPermissionsAsync();
       if (!permission.granted) {
-        Alert.alert('Permission refusée', 'L\'accès au microphone est nécessaire pour enregistrer.');
+        Alert.alert(t('permissionDenied'), t('microphoneAccessRequired'));
         return;
       }
 
@@ -210,7 +210,7 @@ export function DailyJournal() {
       setRecordingTime(0);
     } catch (error: any) {
       console.error('Erreur démarrage enregistrement:', error);
-      Alert.alert(t('error'), t('recordingStartError') || 'Impossible de démarrer l\'enregistrement.');
+      Alert.alert(t('error'), t('recordingStartError'));
     }
   };
 
@@ -227,7 +227,7 @@ export function DailyJournal() {
       }
     } catch (error: any) {
       console.error('Erreur pause/reprise enregistrement:', error);
-      Alert.alert(t('error'), t('recordingPauseError') || 'Impossible de mettre en pause l\'enregistrement.');
+      Alert.alert(t('error'), t('recordingPauseError'));
     }
   };
 
@@ -247,7 +247,7 @@ export function DailyJournal() {
       setRecordingTime(0);
     } catch (error: any) {
       console.error('Erreur arrêt enregistrement:', error);
-      Alert.alert(t('error'), t('recordingStopError') || 'Impossible d\'arrêter l\'enregistrement.');
+      Alert.alert(t('error'), t('recordingStopError'));
     }
   };
 
@@ -258,7 +258,7 @@ export function DailyJournal() {
       // Lire le fichier audio
       const fileInfo = await FileSystem.getInfoAsync(audioUri);
       if (!fileInfo.exists) {
-        throw new Error(t('audioFileNotFound') || 'Fichier audio introuvable');
+        throw new Error(t('audioFileNotFound'));
       }
 
       // Vérifier le token d'authentification
@@ -427,9 +427,9 @@ export function DailyJournal() {
   );
 
   const handleOffloadContinue = async () => {
+    const today = new Date().toISOString().split('T')[0];
+    
     try {
-      const today = new Date().toISOString().split('T')[0];
-      
       // Save to API
       await journalService.saveJournalEntry({
         date: today,
@@ -454,7 +454,7 @@ export function DailyJournal() {
       setStep('complete');
     } catch (error: any) {
       console.error('❌ Erreur sauvegarde journal:', error);
-      Alert.alert('Erreur', 'Impossible de sauvegarder le journal. Il sera sauvegardé localement.');
+      Alert.alert(t('error'), t('saveJournalError'));
       
       // Save locally anyway
       const newEntry: JournalEntry = {
@@ -736,7 +736,7 @@ export function DailyJournal() {
             {/* Current energy label */}
             <View style={styles.sliderLabelContainer}>
           <Text style={styles.sliderValue}>{getEnergyLabel(energyLevel)}</Text>
-          <Text style={styles.sliderHint}>{t('justObserve') || 'Just observe'}</Text>
+          <Text style={styles.sliderHint}>{t('justObserve')}</Text>
             </View>
 
             {/* Slider */}

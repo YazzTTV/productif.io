@@ -3,10 +3,12 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { AIConductorNew } from '@/components/ai/AIConductorNew';
 import AnalyticsScreen from './analytics';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 type TabType = 'assistant' | 'analytics';
 
 export default function AssistantScreen() {
+  const { t } = useLanguage();
   const params = useLocalSearchParams();
   const checkInType = params.checkInType as 'mood' | 'stress' | 'focus' | undefined;
   
@@ -22,7 +24,7 @@ export default function AssistantScreen() {
           onPress={() => setActiveTab('assistant')}
         >
           <Text style={[styles.tabText, activeTab === 'assistant' && styles.tabTextActive]}>
-            Assistant
+            {t('assistantTab') || 'Assistant'}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -30,7 +32,7 @@ export default function AssistantScreen() {
           onPress={() => setActiveTab('analytics')}
         >
           <Text style={[styles.tabText, activeTab === 'analytics' && styles.tabTextActive]}>
-            Analytics
+            {t('analyticsTab') || 'Analytics'}
           </Text>
         </TouchableOpacity>
       </View>

@@ -68,8 +68,8 @@ export default function ExamSettingsScreen() {
           </TouchableOpacity>
 
           <View style={styles.headerContent}>
-            <Text style={styles.headerTitle}>{t('examSettings') || 'Exam Settings'}</Text>
-            <Text style={styles.headerSubtitle}>{t('customizeYourExamExperience') || 'Customize your exam experience'}</Text>
+            <Text style={styles.headerTitle}>{t('examSettings')}</Text>
+            <Text style={styles.headerSubtitle}>{t('customizeYourExamExperience')}</Text>
           </View>
 
           <View style={styles.backButton} />
@@ -77,8 +77,8 @@ export default function ExamSettingsScreen() {
 
         {/* Exam Duration */}
         <Animated.View entering={FadeInDown.delay(200).duration(400)} style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('examDuration') || 'Exam duration'}</Text>
-          <Text style={styles.sectionSubtitle}>{t('totalTimeForExamSession') || 'Total time for your exam session'}</Text>
+          <Text style={styles.sectionTitle}>{t('examDuration')}</Text>
+          <Text style={styles.sectionSubtitle}>{t('totalTimeForExamSession')}</Text>
           <View style={styles.buttonRow}>
             {EXAM_DURATION_PRESETS.map((duration) => (
               <TouchableOpacity
@@ -105,8 +105,8 @@ export default function ExamSettingsScreen() {
 
         {/* Maximum Tasks */}
         <Animated.View entering={FadeInDown.delay(300).duration(400)} style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('maximumTasks') || 'Maximum tasks'}</Text>
-          <Text style={styles.sectionSubtitle}>{t('tasksToCompletePerSession') || 'Tasks to complete per session'}</Text>
+          <Text style={styles.sectionTitle}>{t('maximumTasks')}</Text>
+          <Text style={styles.sectionSubtitle}>{t('tasksToCompletePerSession')}</Text>
           <View style={styles.buttonRow}>
             {MAX_TASKS_OPTIONS.slice(0, 4).map((tasks) => (
               <TouchableOpacity
@@ -155,7 +155,7 @@ export default function ExamSettingsScreen() {
 
         {/* Mode Options */}
         <Animated.View entering={FadeInDown.delay(400).duration(400)} style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('examMode') || 'Exam Mode'}</Text>
+          <Text style={styles.sectionTitle}>{t('examMode')}</Text>
 
           {/* Hard Mode */}
           <View style={styles.optionItem}>
@@ -188,7 +188,7 @@ export default function ExamSettingsScreen() {
 
         {/* Session Preview */}
         <Animated.View entering={FadeInDown.delay(500).duration(400)} style={styles.previewCard}>
-          <Text style={styles.previewLabel}>{t('sessionPreview') || 'Session preview'}</Text>
+          <Text style={styles.previewLabel}>{t('sessionPreview')}</Text>
           <Text style={styles.previewText}>
             {examDuration}{t('min')} {t('examMode')} • {t('max')} {maxTasks} {t('tasks')}
           </Text>
@@ -204,7 +204,7 @@ export default function ExamSettingsScreen() {
             onPress={handleSaveSettings}
             activeOpacity={0.8}
           >
-            <Text style={styles.saveButtonText}>{t('saveSettings') || t('save')}</Text>
+            <Text style={styles.saveButtonText}>{t('saveSettings')}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -212,7 +212,7 @@ export default function ExamSettingsScreen() {
             onPress={resetToDefaults}
             activeOpacity={0.7}
           >
-            <Text style={styles.resetButtonText}>{t('resetToDefaults') || 'Reset to defaults'}</Text>
+            <Text style={styles.resetButtonText}>{t('resetToDefaults')}</Text>
           </TouchableOpacity>
         </Animated.View>
 

@@ -188,7 +188,7 @@ export function ExamMode() {
       return (
         <View style={[styles.container, styles.centerContent, { paddingTop: insets.top }]}>
           <ActivityIndicator size="large" color="#16A34A" />
-          <Text style={styles.loadingText}>{t('loadingExamData') || 'Loading exam data...'}</Text>
+          <Text style={styles.loadingText}>{t('loadingExamData')}</Text>
         </View>
       );
     }
@@ -235,7 +235,7 @@ export function ExamMode() {
                 </View>
                 <View style={styles.examDays}>
                   <Text style={styles.examDaysNumber}>{upcomingExam.daysUntil}</Text>
-                  <Text style={styles.examDaysLabel}>{t('days') || 'days'}</Text>
+                  <Text style={styles.examDaysLabel}>{t('days')}</Text>
                 </View>
               </View>
             </Animated.View>
@@ -243,7 +243,7 @@ export function ExamMode() {
 
           {/* Today's Priorities */}
           <Animated.View entering={FadeInDown.delay(300).duration(400)} style={styles.section}>
-            <Text style={styles.sectionLabel}>{t('todaysPriorities') || 'Today\'s priorities'}</Text>
+            <Text style={styles.sectionLabel}>{t('todaysPriorities')}</Text>
             <View style={styles.tasksList}>
               {tasks.map((task, index) => (
                 <View
@@ -258,17 +258,17 @@ export function ExamMode() {
                     <View style={styles.taskHeader}>
                       {task.priority === 'critical' && (
                         <View style={styles.priorityBadge}>
-                          <Text style={styles.priorityBadgeText}>{t('critical') || 'Critical'}</Text>
+                          <Text style={styles.priorityBadgeText}>{t('critical')}</Text>
                         </View>
                       )}
                       {task.priority === 'supporting' && (
                         <View style={styles.priorityBadgeSupporting}>
-                          <Text style={styles.priorityBadgeTextSupporting}>{t('supporting') || 'Supporting'}</Text>
+                          <Text style={styles.priorityBadgeTextSupporting}>{t('supporting')}</Text>
                         </View>
                       )}
                       {task.priority === 'light' && (
                         <View style={styles.priorityBadgeLight}>
-                          <Text style={styles.priorityBadgeTextLight}>{t('light') || 'Light'}</Text>
+                          <Text style={styles.priorityBadgeTextLight}>{t('light')}</Text>
                         </View>
                       )}
                     </View>
