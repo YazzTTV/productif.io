@@ -95,7 +95,7 @@ const MOCK_SUBJECTS: Subject[] = [
 export function TasksNew() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [expandedSubjects, setExpandedSubjects] = useState<string[]>([]);
   const [expandedTasks, setExpandedTasks] = useState<string[]>([]);
@@ -258,21 +258,21 @@ export function TasksNew() {
             : subject
         )
       );
-      Alert.alert('Erreur', 'Impossible de mettre à jour la tâche. Veuillez réessayer.');
+      Alert.alert(t('error'), t('updateTaskError'));
     }
   };
 
   const handleDeleteTask = async (subjectId: string, taskId: string) => {
     Alert.alert(
-      'Supprimer la tâche',
-      'Êtes-vous sûr de vouloir supprimer cette tâche ?',
+      t('deleteTask'),
+      t('deleteTaskConfirmation'),
       [
         {
-          text: 'Annuler',
+          text: t('cancel'),
           style: 'cancel',
         },
         {
-          text: 'Supprimer',
+          text: t('delete'),
           style: 'destructive',
           onPress: async () => {
             try {
@@ -295,7 +295,7 @@ export function TasksNew() {
               console.error('❌ [TasksNew] Erreur lors de la suppression de la tâche:', error);
               // Recharger les données en cas d'erreur
               await loadSubjects();
-              Alert.alert('Erreur', 'Impossible de supprimer la tâche. Veuillez réessayer.');
+              Alert.alert(t('error'), t('deleteTaskError'));
             }
           },
         },
@@ -321,8 +321,8 @@ export function TasksNew() {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
         Alert.alert(
-          'Permission requise',
-          'Nous avons besoin de votre permission pour accéder à vos photos.'
+          t('permissionRequired'),
+          t('photoAccessPermission')
         );
         return;
       }
@@ -340,7 +340,7 @@ export function TasksNew() {
       }
     } catch (error: any) {
       console.error('Erreur sélection image:', error);
-      Alert.alert('Erreur', 'Impossible de sélectionner l\'image');
+      Alert.alert(t('error'), t('selectImageError'));
     }
   };
 
@@ -350,8 +350,8 @@ export function TasksNew() {
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
       if (status !== 'granted') {
         Alert.alert(
-          'Permission requise',
-          'Nous avons besoin de votre permission pour accéder à votre appareil photo.'
+          t('permissionRequired'),
+          t('cameraAccessPermission')
         );
         return;
       }
@@ -368,7 +368,7 @@ export function TasksNew() {
       }
     } catch (error: any) {
       console.error('Erreur prise photo:', error);
-      Alert.alert('Erreur', 'Impossible de prendre la photo');
+      Alert.alert(t('error'), t('takePhotoError'));
     }
   };
 
@@ -387,25 +387,25 @@ export function TasksNew() {
 
       if (!result.success || !result.subjects || result.subjects.length === 0) {
         Alert.alert(
-          'Aucune matière trouvée',
-          'Aucune matière n\'a pu être extraite de l\'image. Assurez-vous que l\'image contient une liste de matières avec leurs ECTS.'
+          t('noSubjectsFound'),
+          t('noSubjectsExtractedFromImage')
         );
         return;
       }
 
       // Afficher un message de confirmation
-      const message = `${result.validCount} matière(s) trouvée(s). Voulez-vous les créer ?`;
+      const message = t('subjectsFound', { count: result.validCount });
       
       Alert.alert(
-        'Matières trouvées',
+        t('subjectsFoundTitle'),
         message,
         [
           {
-            text: 'Annuler',
+            text: t('cancel'),
             style: 'cancel',
           },
           {
-            text: 'Créer',
+            text: t('create'),
             onPress: async () => {
               await createSubjectsFromAnalysis(result.subjects);
             },
@@ -415,12 +415,12 @@ export function TasksNew() {
     } catch (error: any) {
       console.error('Erreur analyse image:', error);
       
-      let errorMessage = 'Impossible d\'analyser l\'image. Veuillez réessayer.';
+      let errorMessage = t('analyzeImageError');
       
       if (error.message?.includes('504') || error.message?.includes('timeout') || error.message?.includes('trop de temps')) {
-        errorMessage = 'L\'analyse prend trop de temps. Veuillez réessayer avec une image plus claire et mieux éclairée.';
+        errorMessage = t('analysisTakesTooLong');
       } else if (error.message?.includes('Non authentifié') || error.message?.includes('401')) {
-        errorMessage = 'Vous devez être connecté pour analyser une image.';
+        errorMessage = t('mustBeLoggedInToAnalyze');
       } else if (error.message) {
         errorMessage = error.message;
       }
@@ -442,14 +442,14 @@ export function TasksNew() {
         setWeeklyPlan(result.plan);
         setShowPlanPreview(true);
       } else {
-        Alert.alert('Erreur', 'Impossible de générer le plan. Vérifiez que vous avez des tâches à planifier.');
+        Alert.alert(t('error'), t('generatePlanError'));
       }
     } catch (error: any) {
       console.error('Erreur planification:', error);
-      let errorMessage = 'Impossible de planifier la semaine.';
+      let errorMessage = t('planWeekError');
       
       if (error.message?.includes('Google Calendar non connecté')) {
-        errorMessage = 'Connectez votre Google Calendar pour utiliser la planification automatique.';
+        errorMessage = t('connectGoogleCalendarForPlanning');
       } else if (error.message) {
         errorMessage = error.message;
       }
@@ -468,8 +468,8 @@ export function TasksNew() {
       
       if (result.success) {
         Alert.alert(
-          'Succès',
-          result.message || `${result.eventsCreated} session(s) créée(s) dans Google Calendar`,
+          t('success'),
+          result.message || t('sessionsCreatedInCalendar', { count: result.eventsCreated }),
           [
             {
               text: 'OK',
@@ -482,11 +482,11 @@ export function TasksNew() {
           ]
         );
       } else {
-        Alert.alert('Erreur', 'Impossible d\'appliquer le plan.');
+        Alert.alert(t('error'), t('applyPlanError'));
       }
     } catch (error: any) {
       console.error('Erreur application plan:', error);
-      Alert.alert('Erreur', error.message || 'Impossible d\'appliquer le plan.');
+      Alert.alert(t('error'), error.message || t('applyPlanError'));
     } finally {
       setPlanningWeek(false);
     }
@@ -519,18 +519,18 @@ export function TasksNew() {
         setExpandedSubjects([...expandedSubjects, ...createdSubjects.map(s => s.id)]);
         
         Alert.alert(
-          'Succès',
-          `${createdSubjects.length} matière(s) créée(s) avec succès !`
+          t('success'),
+          t('subjectsCreatedSuccessfully', { count: createdSubjects.length })
         );
       } else {
         Alert.alert(
-          'Erreur',
-          'Aucune matière n\'a pu être créée. Elles existent peut-être déjà.'
+          t('error'),
+          t('noSubjectsCreated')
         );
       }
     } catch (error: any) {
       console.error('Erreur création matières:', error);
-      Alert.alert('Erreur', 'Impossible de créer les matières');
+      Alert.alert(t('error'), t('createSubjectsError'));
     } finally {
       setSaving(false);
     }
@@ -538,7 +538,7 @@ export function TasksNew() {
 
   const handleAddSubject = async () => {
     if (!newSubjectName.trim()) {
-      Alert.alert('Erreur', 'Veuillez entrer un nom de matière');
+      Alert.alert(t('error'), t('enterSubjectName'));
       return;
     }
 
@@ -547,8 +547,8 @@ export function TasksNew() {
     const token = await getAuthToken();
     if (!token) {
       Alert.alert(
-        'Authentification requise',
-        'Vous devez être connecté pour ajouter une matière. Veuillez vous connecter.'
+        t('authenticationRequired'),
+        t('mustBeLoggedInToAddSubject')
       );
       return;
     }
@@ -588,16 +588,16 @@ export function TasksNew() {
       console.error('[TasksNew] Type d erreur:', error?.constructor?.name);
       console.error('[TasksNew] Stack:', error?.stack);
       
-      let userFriendlyMessage = 'Impossible dajouter la matière. Veuillez réessayer.';
+      let userFriendlyMessage = t('addSubjectError');
       
       if (errorMessage.includes('Non authentifié') || errorMessage.includes('401')) {
-        userFriendlyMessage = 'Vous devez être connecté pour ajouter une matière.';
+        userFriendlyMessage = t('mustBeLoggedInToAddSubject');
       } else if (errorMessage.includes('timeout')) {
-        userFriendlyMessage = 'La requête a pris trop de temps. Vérifiez votre connexion internet.';
+        userFriendlyMessage = t('requestTimeout');
       } else if (errorMessage.includes('Endpoint non trouvé') || errorMessage.includes('404') || errorMessage.includes('pas encore déployé')) {
-        userFriendlyMessage = 'Cette fonctionnalité est en cours de déploiement. Veuillez réessayer dans quelques instants ou contacter le support.';
+        userFriendlyMessage = t('featureDeploying');
       } else if (errorMessage.includes('Erreur de réseau') || errorMessage.includes('fetch') || errorMessage.includes('Network')) {
-        userFriendlyMessage = 'Erreur de connexion. Vérifiez votre connexion internet et réessayez.';
+        userFriendlyMessage = t('connectionError');
       } else if (errorMessage && errorMessage.length < 150) {
         userFriendlyMessage = errorMessage;
       }
@@ -609,7 +609,12 @@ export function TasksNew() {
   };
 
   const formatDate = (date: Date) => {
-    return date.toLocaleDateString('fr-FR', {
+    const localeMap: Record<string, string> = {
+      'fr': 'fr-FR',
+      'en': 'en-US',
+      'es': 'es-ES',
+    };
+    return date.toLocaleDateString(localeMap[language] || 'fr-FR', {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
@@ -618,12 +623,12 @@ export function TasksNew() {
 
   const handleAddTask = async () => {
     if (!newTaskTitle.trim()) {
-      Alert.alert('Erreur', 'Veuillez entrer un titre pour la tâche');
+      Alert.alert(t('error'), t('enterTaskTitle'));
       return;
     }
 
     if (!selectedSubjectForTask) {
-      Alert.alert('Erreur', 'Aucune matière sélectionnée');
+      Alert.alert(t('error'), t('noSubjectSelected'));
       return;
     }
 
@@ -663,11 +668,11 @@ export function TasksNew() {
       setShowAddTaskModal(false);
       setSelectedSubjectForTask(null);
       
-      Alert.alert('Succès', 'Tâche ajoutée avec succès');
+      Alert.alert(t('success'), t('taskAddedSuccessfully'));
     } catch (error: any) {
       const errorMessage = error?.message || String(error) || 'Erreur inconnue';
       console.error('[TasksNew] Erreur lors de lajout de la tâche:', errorMessage);
-      Alert.alert('Erreur', errorMessage.includes('réseau') ? 'Erreur de connexion. Vérifiez votre connexion internet.' : 'Impossible dajouter la tâche. Veuillez réessayer.');
+      Alert.alert(t('error'), errorMessage.includes('réseau') ? t('connectionError') : t('addTaskError'));
     } finally {
       setCreatingTask(false);
     }
@@ -701,11 +706,11 @@ export function TasksNew() {
   const getPriorityLabel = (priority: string) => {
     switch (priority) {
       case 'high':
-        return 'High impact';
+        return t('highImpact');
       case 'medium':
-        return 'Medium';
+        return t('medium');
       case 'low':
-        return 'Low';
+        return t('low');
       default:
         return '';
     }
@@ -715,7 +720,7 @@ export function TasksNew() {
     return (
       <View style={[styles.container, styles.loadingContainer, { paddingTop: insets.top }]}>
         <ActivityIndicator size="large" color="#16A34A" />
-        <Text style={styles.loadingText}>Chargement des matières...</Text>
+        <Text style={styles.loadingText}>{t('loadingSubjects')}</Text>
       </View>
     );
   }
@@ -755,7 +760,7 @@ export function TasksNew() {
               activeOpacity={0.8}
             >
               <Ionicons name="add-circle-outline" size={20} color="#16A34A" />
-              <Text style={styles.addSubjectText}>Ajouter une matière</Text>
+              <Text style={styles.addSubjectText}>{t('addSubject')}</Text>
             </TouchableOpacity>
             
             <TouchableOpacity
@@ -770,7 +775,7 @@ export function TasksNew() {
                 <Ionicons name="camera-outline" size={20} color="#16A34A" />
               )}
               <Text style={styles.addSubjectText}>
-                {analyzingImage ? 'Analyse en cours...' : 'Créer depuis une image'}
+                {analyzingImage ? t('analyzing') : t('createFromImage')}
               </Text>
             </TouchableOpacity>
           </View>
@@ -789,7 +794,7 @@ export function TasksNew() {
                 <Ionicons name="calendar-outline" size={20} color="#FFFFFF" />
               )}
               <Text style={styles.planWeekText}>
-                {planningWeek ? 'Planification en cours...' : 'Planifier ma semaine'}
+                {planningWeek ? t('planningInProgress') : t('planMyWeek')}
               </Text>
             </TouchableOpacity>
           )}
@@ -825,7 +830,7 @@ export function TasksNew() {
                     </View>
 
                     {subject.impact === 'high' && (
-                      <Text style={styles.highImpactLabel}>High impact on final grade</Text>
+                      <Text style={styles.highImpactLabel}>{t('highImpactOnFinalGrade')}</Text>
                     )}
 
                     {subject.nextDeadline && (
@@ -836,7 +841,7 @@ export function TasksNew() {
                     <View style={styles.progressSection}>
                       <View style={styles.progressLabels}>
                         <Text style={styles.progressLabel}>
-                          {completedCount}/{totalCount} tasks
+                          {completedCount}/{totalCount} {t('tasks')}
                         </Text>
                         <Text style={styles.progressLabel}>{calculatedProgress}%</Text>
                       </View>
@@ -952,7 +957,7 @@ export function TasksNew() {
                                   onPress={() => handleStartFocus(task, subject)}
                                   activeOpacity={0.8}
                                 >
-                                  <Text style={styles.startFocusText}>Commencer la session de concentration</Text>
+                                  <Text style={styles.startFocusText}>{t('startFocusSession')}</Text>
                                 </TouchableOpacity>
                               )}
                               
@@ -1005,7 +1010,7 @@ export function TasksNew() {
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { paddingBottom: insets.bottom + 24 }]}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Créer des matières depuis une image</Text>
+              <Text style={styles.modalTitle}>{t('createSubjectsFromImage')}</Text>
               <TouchableOpacity
                 onPress={() => setShowImagePickerOptions(false)}
                 style={styles.closeButton}
@@ -1037,9 +1042,9 @@ export function TasksNew() {
                 <View style={styles.imagePickerIconContainer}>
                   <Ionicons name="images" size={32} color="#16A34A" />
                 </View>
-                <Text style={styles.imagePickerOptionText}>Choisir depuis la galerie</Text>
+                <Text style={styles.imagePickerOptionText}>{t('chooseFromGallery')}</Text>
                 <Text style={styles.imagePickerOptionSubtext}>
-                  Sélectionnez une image de votre liste
+                  {t('selectAnImageFromYourList')}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -1047,7 +1052,7 @@ export function TasksNew() {
             <View style={styles.imagePickerHint}>
               <Ionicons name="information-circle-outline" size={16} color="rgba(0, 0, 0, 0.4)" />
               <Text style={styles.imagePickerHintText}>
-                L'IA analysera l'image et extraira automatiquement les matières avec leurs coefficients (ECTS)
+                {t('aiWillAnalyzeImage')}
               </Text>
             </View>
           </View>
@@ -1076,10 +1081,10 @@ export function TasksNew() {
             <ScrollView style={styles.modalScrollView} showsVerticalScrollIndicator={false}>
               {/* Subject Name */}
               <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Nom de la matière</Text>
+                <Text style={styles.formLabel}>{t('subjectName')}</Text>
                 <TextInput
                   style={styles.formInput}
-                  placeholder="Ex: Mathématiques, Physique..."
+                  placeholder={t('subjectNamePlaceholder')}
                   value={newSubjectName}
                   onChangeText={setNewSubjectName}
                   autoFocus
@@ -1088,8 +1093,8 @@ export function TasksNew() {
 
               {/* Coefficient */}
               <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Coefficient</Text>
-                <Text style={styles.formHint}>L'importance de cette matière pour votre moyenne</Text>
+                <Text style={styles.formLabel}>{t('coefficient')}</Text>
+                <Text style={styles.formHint}>{t('coefficientDescription')}</Text>
                 <View style={styles.coefficientContainer}>
                   {[1, 2, 3, 4, 5, 6].map((coeff) => (
                     <TouchableOpacity
@@ -1115,16 +1120,16 @@ export function TasksNew() {
 
               {/* Deadline */}
               <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Deadline (optionnel)</Text>
+                <Text style={styles.formLabel}>{t('deadlineOptional')}</Text>
                 <TouchableOpacity
                   style={styles.dateButton}
                   onPress={() => setShowDatePicker(true)}
                 >
                   <Ionicons name="calendar-outline" size={20} color="#16A34A" />
                   <Text style={styles.dateButtonText}>
-                    {newSubjectDeadline
-                      ? formatDate(newSubjectDeadline)
-                      : 'Sélectionner une date'}
+                      {newSubjectDeadline
+                        ? formatDate(newSubjectDeadline)
+                        : t('selectDate')}
                   </Text>
                   {newSubjectDeadline && (
                     <TouchableOpacity
@@ -1166,7 +1171,7 @@ export function TasksNew() {
                 {saving ? (
                   <ActivityIndicator size="small" color="#FFFFFF" />
                 ) : (
-                  <Text style={styles.submitButtonText}>Ajouter la matière</Text>
+                  <Text style={styles.submitButtonText}>{t('addSubject')}</Text>
                 )}
               </TouchableOpacity>
             </ScrollView>
@@ -1297,7 +1302,7 @@ export function TasksNew() {
                 )}
               </TouchableOpacity>
 
-              <Text style={styles.modalFooterText}>You can always adjust later.</Text>
+              <Text style={styles.modalFooterText}>{t('youCanAlwaysAdjustLater')}</Text>
             </ScrollView>
           </View>
         </View>
@@ -1314,9 +1319,9 @@ export function TasksNew() {
           <View style={[styles.modalContent, { paddingBottom: insets.bottom + 24, maxHeight: '90%' }]}>
             <View style={styles.modalHeader}>
               <View>
-                <Text style={styles.modalTitle}>Plan de la semaine</Text>
+                <Text style={styles.modalTitle}>{t('weeklyPlan')}</Text>
                 <Text style={styles.modalSubtitle}>
-                  {weeklyPlan?.summary?.totalSessions || 0} session(s) • {Math.round((weeklyPlan?.summary?.totalMinutes || 0) / 60)}h
+                  {weeklyPlan?.summary?.totalSessions || 0} {t('sessions')} • {Math.round((weeklyPlan?.summary?.totalMinutes || 0) / 60)}h
                 </Text>
               </View>
               <TouchableOpacity
@@ -1332,7 +1337,7 @@ export function TasksNew() {
                 <>
                   {/* Summary */}
                   <View style={styles.planSummaryCard}>
-                    <Text style={styles.planSummaryTitle}>Répartition par matière</Text>
+                    <Text style={styles.planSummaryTitle}>{t('distributionBySubject')}</Text>
                     {Object.entries(weeklyPlan.summary.distribution || {}).map(([subject, minutes]) => (
                       <View key={subject} style={styles.planSummaryRow}>
                         <Text style={styles.planSummarySubject}>{subject}</Text>
@@ -1343,7 +1348,7 @@ export function TasksNew() {
 
                   {/* Sessions */}
                   <View style={styles.planSessionsContainer}>
-                    <Text style={styles.planSessionsTitle}>Sessions planifiées</Text>
+                    <Text style={styles.planSessionsTitle}>{t('plannedSessions')}</Text>
                     {weeklyPlan.sessions.map((session: any, index: number) => (
                       <View key={index} style={styles.planSessionCard}>
                         <View style={styles.planSessionHeader}>
@@ -1363,9 +1368,9 @@ export function TasksNew() {
                 </>
               ) : (
                 <View style={styles.planEmptyContainer}>
-                  <Text style={styles.planEmptyText}>Aucune session à planifier</Text>
+                  <Text style={styles.planEmptyText}>{t('noSessionsToPlan')}</Text>
                   <Text style={styles.planEmptySubtext}>
-                    Assurez-vous d'avoir des tâches non complétées liées à vos matières.
+                    {t('ensureYouHaveUncompletedTasks')}
                   </Text>
                 </View>
               )}
@@ -1392,7 +1397,7 @@ export function TasksNew() {
                   ) : (
                     <>
                       <Ionicons name="calendar" size={18} color="#FFFFFF" />
-                      <Text style={styles.planApplyText}>Appliquer au calendrier</Text>
+                      <Text style={styles.planApplyText}>{t('applyToCalendar')}</Text>
                     </>
                   )}
                 </TouchableOpacity>

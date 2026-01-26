@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface Action {
   id: string;
@@ -14,47 +15,48 @@ interface Action {
   previewAvailable?: boolean;
 }
 
-const actions: Action[] = [
-  {
-    id: 'focus',
-    icon: 'scan-outline',
-    label: 'Commencer la concentration',
-  },
-  {
-    id: 'exam',
-    icon: 'school-outline',
-    label: 'Mode Examen',
-    previewAvailable: true,
-    isPremium: true,
-  },
-  {
-    id: 'tasks',
-    icon: 'checkbox-outline',
-    label: 'Vos Tâches',
-    subtitle: 'Organisées par matière et impact.',
-  },
-  {
-    id: 'habits',
-    icon: 'list-outline',
-    label: 'Examiner les habitudes',
-  },
-  {
-    id: 'plan',
-    icon: 'calendar-outline',
-    label: 'Planifier ma journée',
-    previewAvailable: true,
-    isPremium: true,
-  },
-  {
-    id: 'journal',
-    icon: 'book-outline',
-    label: 'Journal quotidien',
-  },
-];
-
 export function AIConductorNew() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { t } = useLanguage();
+
+  const actions: Action[] = [
+    {
+      id: 'focus',
+      icon: 'scan-outline',
+      label: t('startFocus'),
+    },
+    {
+      id: 'exam',
+      icon: 'school-outline',
+      label: t('examMode'),
+      previewAvailable: true,
+      isPremium: true,
+    },
+    {
+      id: 'tasks',
+      icon: 'checkbox-outline',
+      label: t('yourTasks'),
+      subtitle: t('organizedBySubjectAndImpact'),
+    },
+    {
+      id: 'habits',
+      icon: 'list-outline',
+      label: t('reviewHabits'),
+    },
+    {
+      id: 'plan',
+      icon: 'calendar-outline',
+      label: t('planMyDay'),
+      previewAvailable: true,
+      isPremium: true,
+    },
+    {
+      id: 'journal',
+      icon: 'book-outline',
+      label: t('dailyJournal'),
+    },
+  ];
 
   const handleAction = (actionId: string) => {
     switch (actionId) {
@@ -96,8 +98,8 @@ export function AIConductorNew() {
           </TouchableOpacity>
 
           <View style={styles.headerContent}>
-            <Text style={styles.headerTitle}>Votre système est prêt.</Text>
-            <Text style={styles.headerSubtitle}>Aujourd'hui est structuré pour le travail profond.</Text>
+            <Text style={styles.headerTitle}>{t('yourSystemIsReady')}</Text>
+            <Text style={styles.headerSubtitle}>{t('todayIsStructuredForDeepWork')}</Text>
           </View>
         </Animated.View>
 
@@ -125,7 +127,7 @@ export function AIConductorNew() {
                     {action.isPremium && (
                       <View style={styles.premiumBadge}>
                         <Ionicons name="lock-closed" size={10} color="rgba(0,0,0,0.6)" />
-                        <Text style={styles.premiumText}>Premium</Text>
+                        <Text style={styles.premiumText}>{t('premium')}</Text>
                       </View>
                     )}
                   </View>
@@ -133,7 +135,7 @@ export function AIConductorNew() {
                     <Text style={styles.actionSubtitle}>{action.subtitle}</Text>
                   )}
                   {action.previewAvailable && !action.subtitle && (
-                    <Text style={styles.actionSubtitle}>Aperçu disponible</Text>
+                    <Text style={styles.actionSubtitle}>{t('previewAvailable')}</Text>
                   )}
                 </View>
               </TouchableOpacity>
