@@ -55,3 +55,7 @@ android/app/google-services.json
 *.jks
 **/productif-upload.keystore
 productif-upload.keystore
+
+# Fichiers contenant des valeurs Firebase pour Railway (contiennent des clés privées)
+RAILWAY_FIREBASE_VALUES.txt
+*RAILWAY*FIREBASE*.txt
