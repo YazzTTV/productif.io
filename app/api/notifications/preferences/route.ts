@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getAuthUser } from '@/lib/auth';
+import { getAuthUserFromRequest } from '@/lib/auth';
 import { NotificationSettings, Prisma } from '@prisma/client';
 import EventManager from '@/lib/EventManager';
 
@@ -49,9 +50,9 @@ interface NotificationPreferences {
 }
 
 // GET /api/notifications/preferences
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
     try {
-        const user = await getAuthUser();
+        const user = await getAuthUserFromRequest(request);
         if (!user) {
             return NextResponse.json({ error: 'Non authentifié' }, { status: 401 });
         }
@@ -160,15 +161,17 @@ export async function GET(request: Request) {
 }
 
 // POST /api/notifications/preferences
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
     try {
-        const user = await getAuthUser();
+        const user = await getAuthUserFromRequest(request);
         if (!user) {
             return NextResponse.json({ error: 'Non authentifié' }, { status: 401 });
         }
 
         const body = await request.json();
         const userId = user.id;
+        
+        console.log(`🔐 [notifications/preferences] Utilisateur authentifié: ${userId} (email: ${user.email})`);
         const incomingPreferences = body as NotificationPreferences;
 
         // Récupérer les anciennes préférences pour comparaison
