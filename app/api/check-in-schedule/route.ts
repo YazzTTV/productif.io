@@ -96,7 +96,7 @@ export async function PATCH(req: NextRequest) {
       try {
         // Notifier le scheduler pour qu'il recharge les schedules
         // On utilise l'endpoint update-user qui déclenchera une mise à jour
-        const schedulerUrl = process.env.SCHEDULER_URL || 'http://localhost:3002'
+        const schedulerUrl = process.env.SCHEDULER_URL || 'http://localhost:3001'
         await fetch(`${schedulerUrl}/api/update-user`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

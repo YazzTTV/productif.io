@@ -43,12 +43,44 @@ export function usePushNotifications() {
     }
     
     try {
-      const { status } = await Notifications.requestPermissionsAsync();
+      // Sur Android, configurer le canal de notification AVANT de demander les permissions
+      // Cela garantit que la demande de permission POST_NOTIFICATIONS fonctionne correctement
+      if (Platform.OS === 'android') {
+        console.log('📱 [Android] Configuration du canal de notification...');
+        await Notifications.setNotificationChannelAsync('default', {
+          name: 'Notifications par défaut',
+          importance: Notifications.AndroidImportance.MAX,
+          vibrationPattern: [0, 250, 250, 250],
+          lightColor: '#00C27A',
+          sound: 'default',
+          enableVibrate: true,
+          showBadge: true,
+        });
+        console.log('✅ [Android] Canal de notification configuré');
+      }
+      
+      // Vérifier d'abord l'état actuel des permissions
+      const currentStatus = await Notifications.getPermissionsAsync();
+      console.log('🔍 [Permissions] État actuel:', currentStatus.status);
+      
+      // Demander les permissions (cela déclenchera la boîte de dialogue sur Android 13+)
+      console.log('📱 [Permissions] Demande des permissions de notification...');
+      const { status } = await Notifications.requestPermissionsAsync({
+        ios: {
+          allowAlert: true,
+          allowBadge: true,
+          allowSound: true,
+          allowAnnouncements: false,
+        },
+      });
+      
+      console.log('📱 [Permissions] Résultat de la demande:', status);
       
       if (!isMountedRef.current) return false;
       setPermissionStatus(status);
       
       if (status === 'granted') {
+        console.log('✅ [Permissions] Permissions accordées !');
         // Obtenir le token maintenant que les permissions sont accordées
         try {
           let token: string | null = null;
@@ -62,13 +94,19 @@ export function usePushNotifications() {
               token = deviceToken.data;
             }
           } else {
-            const projectId = Constants.expoConfig?.extra?.eas?.projectId || Constants.easConfig?.projectId;
-            if (projectId) {
-              token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
-            } else {
-              const deviceToken = await Notifications.getDevicePushTokenAsync();
-              token = deviceToken.data;
-            }
+            // Sur Android, configurer à nouveau le canal pour être sûr
+            await Notifications.setNotificationChannelAsync('default', {
+              name: 'Notifications par défaut',
+              importance: Notifications.AndroidImportance.MAX,
+              vibrationPattern: [0, 250, 250, 250],
+              lightColor: '#00C27A',
+            });
+            
+            // Pour Android, utiliser getDevicePushTokenAsync() pour obtenir le token FCM natif
+            // Cela permet d'envoyer directement via FCM depuis le backend sans passer par Expo Push Notification Service
+            const deviceToken = await Notifications.getDevicePushTokenAsync();
+            token = deviceToken.data;
+            console.log('📱 [Android] Token FCM natif obtenu:', token.substring(0, 20) + '...');
           }
           
           if (!isMountedRef.current) return false;
@@ -82,6 +120,8 @@ export function usePushNotifications() {
         } catch (tokenError) {
           console.error('❌ Erreur lors de l\'obtention du token push:', tokenError);
         }
+      } else {
+        console.warn('⚠️ [Permissions] Permissions refusées:', status);
       }
       
       return false;
@@ -421,13 +461,11 @@ async function registerForPushNotificationsAsync(): Promise<string | null> {
           token = deviceToken.data;
         }
       } else {
-        const projectId = Constants.expoConfig?.extra?.eas?.projectId || Constants.easConfig?.projectId;
-        if (projectId) {
-          token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
-        } else {
-          const deviceToken = await Notifications.getDevicePushTokenAsync();
-          token = deviceToken.data;
-        }
+        // Pour Android, utiliser getDevicePushTokenAsync() pour obtenir le token FCM natif
+        // Cela permet d'envoyer directement via FCM depuis le backend sans passer par Expo Push Notification Service
+        const deviceToken = await Notifications.getDevicePushTokenAsync();
+        token = deviceToken.data;
+        console.log('📱 [Android] Token FCM natif obtenu:', token.substring(0, 20) + '...');
       }
       
       console.log('📱 Token push obtenu:', token);

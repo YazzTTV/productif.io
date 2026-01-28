@@ -1,5 +1,5 @@
 import React, { useState , useEffect } from 'react';
-import { SafeAreaView, View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Image, Alert, ActivityIndicator } from 'react-native';
+import { SafeAreaView, View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Image, Alert, ActivityIndicator, Platform } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -211,10 +211,13 @@ export default function WelcomeScreen() {
                     <View style={styles.sepLine} />
                   </View>
 
-                  <TouchableOpacity style={styles.oauthBtn} onPress={handleApple}>
-                    <Ionicons name="logo-apple" size={18} color="#111827" />
-                    <Text style={styles.oauthText}>{t('continueWithApple')}</Text>
-                  </TouchableOpacity>
+                  {/* Apple Button - seulement sur iOS */}
+                  {Platform.OS === 'ios' && (
+                    <TouchableOpacity style={styles.oauthBtn} onPress={handleApple}>
+                      <Ionicons name="logo-apple" size={18} color="#111827" />
+                      <Text style={styles.oauthText}>{t('continueWithApple')}</Text>
+                    </TouchableOpacity>
+                  )}
 
                   <TouchableOpacity style={styles.oauthBtn} onPress={() => handleGoogle(true)} disabled={loadingGoogle}>
                     {loadingGoogle ? (
@@ -262,10 +265,13 @@ export default function WelcomeScreen() {
                     <View style={styles.sepLine} />
                   </View>
 
-                  <TouchableOpacity style={styles.oauthBtn} onPress={handleApple}>
-                    <Ionicons name="logo-apple" size={18} color="#111827" />
-                    <Text style={styles.oauthText}>{t('continueWithApple')}</Text>
-                  </TouchableOpacity>
+                  {/* Apple Button - seulement sur iOS */}
+                  {Platform.OS === 'ios' && (
+                    <TouchableOpacity style={styles.oauthBtn} onPress={handleApple}>
+                      <Ionicons name="logo-apple" size={18} color="#111827" />
+                      <Text style={styles.oauthText}>{t('continueWithApple')}</Text>
+                    </TouchableOpacity>
+                  )}
 
                   <TouchableOpacity style={styles.oauthBtn} onPress={() => handleGoogle(false)} disabled={loadingGoogle}>
                     {loadingGoogle ? (
@@ -297,10 +303,13 @@ export default function WelcomeScreen() {
                   <View style={styles.sepLine} />
                 </View>
 
-                <TouchableOpacity style={styles.oauthBtn} onPress={handleApple}>
-                  <Ionicons name="logo-apple" size={18} color="#111827" />
-                  <Text style={styles.oauthText}>{t('continueWithApple')}</Text>
-                </TouchableOpacity>
+                {/* Apple Button - seulement sur iOS */}
+                {Platform.OS === 'ios' && (
+                  <TouchableOpacity style={styles.oauthBtn} onPress={handleApple}>
+                    <Ionicons name="logo-apple" size={18} color="#111827" />
+                    <Text style={styles.oauthText}>{t('continueWithApple')}</Text>
+                  </TouchableOpacity>
+                )}
 
                 <TouchableOpacity style={styles.oauthBtn} onPress={() => handleGoogle(false)} disabled={loadingGoogle}>
                   {loadingGoogle ? (

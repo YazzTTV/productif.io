@@ -32,7 +32,7 @@
       "usesAppleSignIn": true
     },
     "android": {
-      "versionCode": 8,
+      "versionCode": 13,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
@@ -77,7 +77,9 @@
             "deploymentTarget": "15.1"
           },
           "android": {
-            "minSdkVersion": 26
+            "minSdkVersion": 26,
+            "compileSdkVersion": 35,
+            "targetSdkVersion": 35
           }
         }
       ],
@@ -107,6 +109,7 @@
     },
     "extra": {
       "googleClientId": "738789952398-m6risp9hae6ao11n7s4178nig64largu.apps.googleusercontent.com",
+      "googleAndroidClientId": "738789952398-di4elcaboo4407v1ineqnap9tb9hjhp5.apps.googleusercontent.com",
       "googleWebClientId": "738789952398-ikv20t6hf8jp82197ol5ifoiokqlbl3d.apps.googleusercontent.com",
       "apiUrl": "https://www.productif.io"
     }

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { View, Text, TouchableOpacity, StyleSheet, Dimensions, ScrollView, PanResponder, Modal, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Dimensions, ScrollView, PanResponder, Modal, Alert, BackHandler, Platform } from 'react-native';
 import Animated, { 
   useSharedValue, 
   useAnimatedStyle, 
@@ -436,6 +436,19 @@ export default function FocusScreen() {
     loadPrioritizedTasks();
   }, []);
 
+  // Gérer le bouton retour Android pour éviter l'erreur GO_BACK
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+      // Utiliser handleExit qui gère déjà la logique de sortie
+      handleExit();
+      return true; // Empêcher le comportement par défaut
+    });
+
+    return () => backHandler.remove();
+  }, [handleExit]);
+
   const loadPrioritizedTasks = async () => {
     try {
       setLoadingTasks(true);
@@ -702,7 +715,17 @@ export default function FocusScreen() {
         console.log('Session terminée localement');
       }
     }
-    router.back();
+    // Navigation sécurisée : essayer de revenir en arrière, sinon aller au dashboard
+    try {
+      if (router.canGoBack && router.canGoBack()) {
+        router.back();
+      } else {
+        router.replace('/(tabs)');
+      }
+    } catch (error) {
+      console.log('⚠️ Erreur lors du retour, redirection vers dashboard:', error);
+      router.replace('/(tabs)');
+    }
   }, [sessionId, router]);
 
   const handleExit = useCallback(async () => {
@@ -716,14 +739,24 @@ export default function FocusScreen() {
       
       // Arrêter la session deep work
       if (sessionId) {
-      try {
-        await assistantService.endDeepWorkSession(sessionId, 'cancel');
-      } catch (error) {
-        console.log('Session annulée localement');
+        try {
+          await assistantService.endDeepWorkSession(sessionId, 'cancel');
+        } catch (error) {
+          console.log('Session annulée localement');
         }
       }
     }
-    router.back();
+    // Navigation sécurisée : essayer de revenir en arrière, sinon aller au dashboard
+    try {
+      if (router.canGoBack && router.canGoBack()) {
+        router.back();
+      } else {
+        router.replace('/(tabs)');
+      }
+    } catch (error) {
+      console.log('⚠️ Erreur lors du retour, redirection vers dashboard:', error);
+      router.replace('/(tabs)');
+    }
   }, [sessionId, phase, router]);
 
   const strokeDashoffset = CIRCUMFERENCE * (1 - progress);

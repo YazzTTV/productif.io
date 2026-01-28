@@ -1,5 +1,5 @@
 import Constants from 'expo-constants';
-import { Alert, Platform } from 'react-native';
+import { Alert, Platform, InteractionManager } from 'react-native';
 import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 
 // Configuration Google OAuth
@@ -8,8 +8,13 @@ const IOS_CLIENT_ID = Constants.expoConfig?.extra?.googleClientId ||
   process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID || 
   '738789952398-m6risp9hae6ao11n7s4178nig64largu.apps.googleusercontent.com';
 
+// Android Client ID (OAuth client pour Android)
+const ANDROID_CLIENT_ID = Constants.expoConfig?.extra?.googleAndroidClientId ||
+  process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID ||
+  '738789952398-di4elcaboo4407v1ineqnap9tb9hjhp5.apps.googleusercontent.com';
+
 // Web Client ID (celui du backend - utilisé pour vérifier l'idToken)
-// IMPORTANT: Doit être dans le même projet Google Cloud que l'iOS Client ID (738789952398)
+// IMPORTANT: Doit être dans le même projet Google Cloud que les autres Client IDs (738789952398)
 // C'est le même que GOOGLE_CLIENT_ID dans les variables d'environnement du backend
 const WEB_CLIENT_ID = Constants.expoConfig?.extra?.googleWebClientId ||
   process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || 
@@ -29,31 +34,35 @@ function configureGoogleSignIn() {
       throw new Error('WEB_CLIENT_ID non défini. Configurez googleWebClientId dans app.json ou EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID');
     }
     
-    // Configuration Google Sign-In
-    // iosClientId: Client ID iOS (pour l'authentification native)
-    // webClientId: Client ID Web (pour générer l'idToken avec la bonne audience)
-    // IMPORTANT: Les deux doivent être dans le même projet Google Cloud
+    // Configuration Google Sign-In selon la plateforme
+    // iosClientId: Client ID natif (iOS ou Android) - la lib utilise ce nom pour les deux plateformes
+    // webClientId: Client ID Web (pour générer l'idToken avec la bonne audience) - OBLIGATOIRE
+    // IMPORTANT: Tous doivent être dans le même projet Google Cloud (738789952398)
+    const nativeClientId = Platform.OS === 'ios' ? IOS_CLIENT_ID : ANDROID_CLIENT_ID;
+    
     GoogleSignin.configure({
-      iosClientId: IOS_CLIENT_ID,
-      webClientId: WEB_CLIENT_ID, // Doit être dans le même projet que iosClientId
+      iosClientId: nativeClientId, // Utilise le Client ID iOS sur iOS, Android sur Android
+      webClientId: WEB_CLIENT_ID, // Doit être dans le même projet que les autres Client IDs
       offlineAccess: true, // Activer pour obtenir un idToken
       forceCodeForRefreshToken: false,
     });
+
     isConfigured = true;
     console.log('✅ [GoogleAuth] Google Sign-In configuré avec succès');
-    console.log('📱 [GoogleAuth] iOS Client ID:', IOS_CLIENT_ID);
+    console.log('📱 [GoogleAuth] Plateforme:', Platform.OS);
+    console.log(`📱 [GoogleAuth] ${Platform.OS === 'ios' ? 'iOS' : 'Android'} Client ID:`, nativeClientId);
     console.log('🌐 [GoogleAuth] Web Client ID:', WEB_CLIENT_ID);
     
-    // Vérifier que les deux IDs sont dans le même projet
-    const iosProjectId = IOS_CLIENT_ID.split('-')[0];
+    // Vérifier que tous les IDs sont dans le même projet
+    const nativeProjectId = nativeClientId.split('-')[0];
     const webProjectId = WEB_CLIENT_ID.split('-')[0];
-    if (iosProjectId !== webProjectId) {
+    if (nativeProjectId !== webProjectId) {
       console.error('❌ [GoogleAuth] ERREUR: Les Client IDs ne sont pas dans le même projet!');
-      console.error('❌ [GoogleAuth] iOS Project ID:', iosProjectId);
+      console.error(`❌ [GoogleAuth] ${Platform.OS === 'ios' ? 'iOS' : 'Android'} Project ID:`, nativeProjectId);
       console.error('❌ [GoogleAuth] Web Project ID:', webProjectId);
-      console.error('❌ [GoogleAuth] Créez un Web Client ID dans le projet iOS (738789952398)');
+      console.error('❌ [GoogleAuth] Tous les Client IDs doivent être dans le même projet (738789952398)');
     } else {
-      console.log('✅ [GoogleAuth] Les deux Client IDs sont dans le même projet:', iosProjectId);
+      console.log(`✅ [GoogleAuth] Tous les Client IDs sont dans le même projet:`, nativeProjectId);
     }
   } catch (error) {
     console.error('❌ [GoogleAuth] Erreur lors de la configuration:', error);
@@ -68,6 +77,22 @@ export interface GoogleAuthResult {
     name: string;
     picture?: string;
   };
+}
+
+/**
+ * Attendre que l'application soit stable après le retour d'une activité native
+ * Utile pour éviter les erreurs "Unable to find viewState" sur Android
+ */
+async function waitForAppStable(): Promise<void> {
+  return new Promise((resolve) => {
+    // Utiliser InteractionManager pour attendre que toutes les interactions soient terminées
+    InteractionManager.runAfterInteractions(() => {
+      // Attendre un peu plus pour que React Native se stabilise complètement
+      setTimeout(() => {
+        resolve();
+      }, 500);
+    });
+  });
 }
 
 /**
@@ -87,6 +112,11 @@ export async function signInWithGoogle(): Promise<GoogleAuthResult> {
     // Lancer la connexion
     console.log('🔐 [GoogleAuth] Lancement de la connexion Google...');
     const response = await GoogleSignin.signIn();
+    
+    // Sur Android, attendre que l'app soit stable après le retour de l'activité native
+    if (Platform.OS === 'android') {
+      await waitForAppStable();
+    }
 
     // Logs de débogage
     console.log('🔍 [GoogleAuth] Réponse complète:', JSON.stringify(response, null, 2));

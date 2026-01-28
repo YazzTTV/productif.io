@@ -1,0 +1,24 @@
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile.scheduler"
+
+[deploy]
+healthcheckPath = "/health"
+healthcheckTimeout = 300
+startCommand = "npx prisma migrate deploy || true && npm run start:scheduler"
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10
+
+[deploy.env]
+NODE_ENV = "production"
+DATABASE_URL = "${{Postgres.DATABASE_URL}}"
+OPENAI_API_KEY = "${{Secrets.OPENAI_API_KEY}}"
+WHATSAPP_ACCESS_TOKEN = "${{Secrets.WHATSAPP_ACCESS_TOKEN}}"
+WHATSAPP_VERIFY_TOKEN = "${{Secrets.WHATSAPP_VERIFY_TOKEN}}"
+WHATSAPP_PHONE_NUMBER_ID = "${{Secrets.WHATSAPP_PHONE_NUMBER_ID}}"
+APNS_KEY_ID = "${{Secrets.APNS_KEY_ID}}"
+APNS_TEAM_ID = "${{Secrets.APNS_TEAM_ID}}"
+APNS_BUNDLE_ID = "${{Secrets.APNS_BUNDLE_ID}}"
+APNS_KEY_P8 = "${{Secrets.APNS_KEY_P8}}"
+APNS_KEY_BASE64 = "${{Secrets.APNS_KEY_BASE64}}"
+APNS_PRODUCTION = "${{Secrets.APNS_PRODUCTION}}" 

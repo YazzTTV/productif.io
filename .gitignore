@@ -38,3 +38,7 @@ temp/
 *.tmp
 *.temp
 .env.railway
+
+# Firebase service account (clé privée - ne jamais commiter)
+firebase-service-account.json
+*firebase*service*account*.json

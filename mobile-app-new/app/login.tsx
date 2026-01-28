@@ -10,6 +10,7 @@ import {
   Platform,
   ScrollView,
   ActivityIndicator,
+  InteractionManager,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -28,6 +29,14 @@ export default function LoginScreen() {
   const [isLoadingApple, setIsLoadingApple] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [appleAvailable, setAppleAvailable] = useState(false);
+  const isMountedRef = React.useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     // Vérifier si Apple Sign-In est disponible
@@ -51,8 +60,13 @@ export default function LoginScreen() {
       if (response.success) {
         // Marquer la session comme persistante
         await AsyncStorage.setItem('onboarding_completed', 'true');
-        // Connexion réussie, redirection vers le dashboard
-        router.replace('/(tabs)');
+        // Attendre que toutes les interactions UI soient terminées avant de naviguer
+        // Cela évite l'erreur "Unable to find viewState" sur Android
+        InteractionManager.runAfterInteractions(() => {
+          setTimeout(() => {
+            router.replace('/(tabs)');
+          }, 100);
+        });
       } else {
         Alert.alert(t('error'), t('appleLoginFailed', undefined, 'Échec de la connexion avec Apple'));
       }
@@ -83,8 +97,12 @@ export default function LoginScreen() {
       if (response.success) {
         // Marquer la session comme persistante pour éviter une déconnexion à la fermeture
         await AsyncStorage.setItem('onboarding_completed', 'true');
-        // Connexion réussie, redirection vers le dashboard
-        router.replace('/(tabs)');
+        // Attendre que toutes les interactions UI soient terminées avant de naviguer
+        InteractionManager.runAfterInteractions(() => {
+          setTimeout(() => {
+            router.replace('/(tabs)');
+          }, 100);
+        });
       } else {
         Alert.alert(t('error'), t('loginIncorrect', undefined, 'Email ou mot de passe incorrect'));
       }
@@ -98,22 +116,36 @@ export default function LoginScreen() {
   };
 
   const handleGoogleLogin = async () => {
+    if (!isMountedRef.current) return;
     setIsLoadingGoogle(true);
     
     try {
       // Lancer le flux OAuth Google avec la lib native
       const googleResult = await signInWithGoogle();
       
+      if (!isMountedRef.current) return;
+      
       // Envoyer l'idToken au backend dans le header Authorization
       const response = await authService.loginWithGoogle(googleResult.idToken);
+      
+      if (!isMountedRef.current) return;
       
       if (response.success) {
         // Marquer la session comme persistante
         await AsyncStorage.setItem('onboarding_completed', 'true');
-        // Connexion réussie, redirection vers le dashboard
-        router.replace('/(tabs)');
+        // Attendre que toutes les interactions UI soient terminées avant de naviguer
+        // Cela évite l'erreur "Unable to find viewState" sur Android
+        InteractionManager.runAfterInteractions(() => {
+          setTimeout(() => {
+            if (isMountedRef.current) {
+              router.replace('/(tabs)');
+            }
+          }, 300);
+        });
       } else {
-        Alert.alert(t('error'), t('googleLoginFailed', undefined, 'Échec de la connexion avec Google'));
+        if (isMountedRef.current) {
+          Alert.alert(t('error'), t('googleLoginFailed', undefined, 'Échec de la connexion avec Google'));
+        }
       }
       
     } catch (error) {
@@ -122,9 +154,13 @@ export default function LoginScreen() {
         // Ne pas afficher d'alerte si l'utilisateur a annulé
         return;
       }
-      Alert.alert(t('error'), error instanceof Error ? error.message : t('somethingWentWrong'));
+      if (isMountedRef.current) {
+        Alert.alert(t('error'), error instanceof Error ? error.message : t('somethingWentWrong'));
+      }
     } finally {
-      setIsLoadingGoogle(false);
+      if (isMountedRef.current) {
+        setIsLoadingGoogle(false);
+      }
     }
   };
 
@@ -192,8 +228,8 @@ export default function LoginScreen() {
             </View>
           </View>
 
-          {/* Bouton Apple - seulement si disponible */}
-          {appleAvailable && (
+          {/* Bouton Apple - seulement sur iOS et si disponible */}
+          {Platform.OS === 'ios' && appleAvailable && (
             <TouchableOpacity
               style={[styles.appleButton, isLoadingApple && styles.appleButtonDisabled]}
               onPress={handleAppleLogin}
@@ -213,7 +249,7 @@ export default function LoginScreen() {
 
           {/* Bouton Google - même design que l'onboarding */}
           <TouchableOpacity
-            style={[styles.googleButton, isLoadingGoogle && styles.googleButtonDisabled, appleAvailable && styles.buttonSpacing]}
+            style={[styles.googleButton, isLoadingGoogle && styles.googleButtonDisabled, Platform.OS === 'ios' && appleAvailable && styles.buttonSpacing]}
             onPress={handleGoogleLogin}
             disabled={isLoadingGoogle}
             activeOpacity={0.9}

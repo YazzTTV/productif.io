@@ -204,12 +204,13 @@ class NotificationLogger {
     }
 
     logDatabaseWatcherScan(data) {
-        return this.log('DEBUG', 'DATABASE_WATCHER_SCAN', {
-            scanId: data.scanId,
-            usersChecked: data.usersChecked,
-            changesDetected: data.changesDetected,
-            scanDuration: data.scanDuration
-        });
+        // Log DEBUG supprimé - ne génère plus de logs
+        // return this.log('DEBUG', 'DATABASE_WATCHER_SCAN', {
+        //     scanId: data.scanId,
+        //     usersChecked: data.usersChecked,
+        //     changesDetected: data.changesDetected,
+        //     scanDuration: data.scanDuration
+        // });
     }
 
     // === MÉTRIQUES PERFORMANCE ===

@@ -4,7 +4,8 @@ dockerfilePath = "Dockerfile.scheduler"
 
 [deploy]
 healthcheckPath = "/health"
-healthcheckTimeout = 100
+healthcheckTimeout = 300
+startCommand = "npm run start:scheduler"
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 10
 

@@ -268,44 +268,60 @@ export async function POST(request: Request) {
         console.log(`📡 Événement de mise à jour émis pour l'utilisateur ${userId}`);
 
         // NOUVEAU : Notifier le scheduler par HTTP (communication inter-processus)
-        try {
-            console.log(`🔄 Notification du scheduler pour l'utilisateur ${userId}...`);
+        // Fire-and-forget : ne pas bloquer la réponse même si le scheduler ne répond pas
+        (async () => {
+            try {
+                console.log(`🔄 Notification du scheduler pour l'utilisateur ${userId}...`);
 
-            const bases = [
-                process.env.SCHEDULER_URL || 'http://localhost:3002',
-                'http://localhost:3002',
-                'http://127.0.0.1:3002'
-            ].filter((v, i, a) => a.indexOf(v) === i);
+                // Prioriser le scheduler local en développement
+                // Essayer d'abord localhost, puis Railway (SCHEDULER_URL)
+                const bases = [
+                    'http://localhost:3001',
+                    'http://127.0.0.1:3001',
+                    process.env.SCHEDULER_URL
+                ].filter((v, i, a) => v && a.indexOf(v) === i); // Filtrer les valeurs null/undefined et les doublons
 
-            let notified = false;
-            for (const base of bases) {
-                const schedulerUrl = `${base.replace(/\/$/, '')}/api/update-user`;
-                try {
-                    const resp = await fetch(schedulerUrl, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            userId,
-                            oldPreferences: oldPreferences || null,
-                            newPreferences: updatedPreferences,
-                            timestamp: new Date()
-                        })
-                    });
-                    if (resp.ok) {
-                        console.log(`✅ Scheduler notifié avec succès via ${base}`);
-                        notified = true;
-                        break;
+                let notified = false;
+                for (const base of bases) {
+                    const schedulerUrl = `${base.replace(/\/$/, '')}/api/update-user`;
+                    const isLocal = base.includes('localhost') || base.includes('127.0.0.1');
+                    try {
+                        console.log(`🔗 Tentative de connexion au scheduler ${isLocal ? '(LOCAL)' : '(RAILWAY)'}: ${schedulerUrl}`);
+                        const resp = await fetch(schedulerUrl, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                userId,
+                                oldPreferences: oldPreferences || null,
+                                newPreferences: updatedPreferences,
+                                timestamp: new Date()
+                            }),
+                            // Timeout réduit à 2 secondes pour éviter d'attendre trop longtemps
+                            signal: AbortSignal.timeout(2000)
+                        });
+                        if (resp.ok) {
+                            console.log(`✅ Scheduler ${isLocal ? '(LOCAL)' : '(RAILWAY)'} notifié avec succès via ${base}`);
+                            notified = true;
+                            break;
+                        }
+                        console.log(`⚠️ Notification via ${base} ${isLocal ? '(LOCAL)' : '(RAILWAY)'} échouée: ${resp.status}`);
+                    } catch (err: any) {
+                        if (err.name === 'AbortError') {
+                            console.log(`⏱️ Timeout lors de la connexion au scheduler ${isLocal ? '(LOCAL)' : '(RAILWAY)'} via ${base}`);
+                        } else {
+                            console.log(`⚠️ Erreur de connexion scheduler ${isLocal ? '(LOCAL)' : '(RAILWAY)'} via ${base}:`, err.message);
+                        }
                     }
-                    console.log(`⚠️ Notification via ${base} échouée: ${resp.status}`);
-                } catch (err) {
-                    console.log(`⚠️ Erreur de connexion scheduler via ${base}:`, err);
                 }
+                if (!notified) {
+                    console.log('⚠️ Aucune URL de scheduler n\'a répondu.');
+                    console.log('💡 Vérifiez que le scheduler local tourne sur le port 3001: node src/services/scheduler-service.js');
+                }
+            } catch (error) {
+                console.log(`❌ Erreur lors de la notification du scheduler:`, error);
+                // On continue même si le scheduler n'est pas accessible
             }
-            if (!notified) console.log('⚠️ Aucune URL de scheduler n\'a répondu.');
-        } catch (error) {
-            console.log(`❌ Erreur lors de la notification du scheduler:`, error);
-            // On continue même si le scheduler n'est pas accessible
-        }
+        })(); // IIFE pour exécuter de manière asynchrone sans bloquer
 
         return NextResponse.json(updatedPreferences);
     } catch (error) {
