@@ -42,3 +42,14 @@ temp/
 # Firebase service account (clé privée - ne jamais commiter)
 firebase-service-account.json
 *firebase*service*account*.json
+
+# Firebase google-services.json (contient des clés API)
+**/google-services.json
+mobile-app-new/android/app/google-services.json
+android/app/google-services.json
+
+# Keystore files (clés de signature - ne jamais commiter)
+*.keystore
+*.jks
+**/productif-upload.keystore
+productif-upload.keystore
