@@ -29,6 +29,11 @@ const IOS_CLIENT_ID = Constants.expoConfig?.extra?.googleClientId ||
   process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID || 
   '738789952398-m6risp9hae6ao11n7s4178nig64largu.apps.googleusercontent.com';
 
+// Android Client ID (OAuth client pour Android)
+const ANDROID_CLIENT_ID = Constants.expoConfig?.extra?.googleAndroidClientId ||
+  process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID ||
+  '738789952398-di4elcaboo4407v1ineqnap9tb9hjhp5.apps.googleusercontent.com';
+
 // Web Client ID (celui du backend - utilisé pour vérifier l'idToken)
 const GOOGLE_WEB_CLIENT_ID = Constants.expoConfig?.extra?.googleWebClientId ||
   process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
@@ -50,12 +55,14 @@ export async function configureGoogleCalendar(): Promise<void> {
       throw new Error('Google Web Client ID not configured');
     }
 
-    // Configuration Google Sign-In avec iosClientId et webClientId
-    // iosClientId: Client ID iOS (pour l'authentification native)
+    // Configuration Google Sign-In avec le Client ID natif selon la plateforme
+    // iosClientId: Client ID natif (iOS ou Android) - la lib utilise ce nom pour les deux plateformes
     // webClientId: Client ID Web (pour générer le serverAuthCode)
-    // IMPORTANT: Les deux doivent être dans le même projet Google Cloud
+    // IMPORTANT: Tous doivent être dans le même projet Google Cloud
+    const nativeClientId = Platform.OS === 'ios' ? IOS_CLIENT_ID : ANDROID_CLIENT_ID;
+    
     GoogleSignin.configure({
-      iosClientId: IOS_CLIENT_ID,
+      iosClientId: nativeClientId, // Utilise le Client ID iOS sur iOS, Android sur Android
       webClientId: GOOGLE_WEB_CLIENT_ID,
       scopes: CALENDAR_SCOPES,
       offlineAccess: true,
@@ -63,7 +70,7 @@ export async function configureGoogleCalendar(): Promise<void> {
     });
 
     console.log('✅ [CalendarAuth] Google Calendar configuré');
-    console.log('📱 [CalendarAuth] iOS Client ID:', IOS_CLIENT_ID);
+    console.log(`📱 [CalendarAuth] ${Platform.OS === 'ios' ? 'iOS' : 'Android'} Client ID:`, nativeClientId);
     console.log('🌐 [CalendarAuth] Web Client ID:', GOOGLE_WEB_CLIENT_ID);
   } catch (error) {
     console.error('❌ [CalendarAuth] Erreur configuration:', error);

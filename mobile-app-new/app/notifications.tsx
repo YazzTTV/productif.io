@@ -380,8 +380,8 @@ export default function NotificationsPage() {
   ) => (
     <View style={[styles.toggleItem, disabled && styles.toggleItemDisabled]}>
       <View style={styles.toggleContent}>
-        <Text style={[styles.toggleTitle, disabled && styles.toggleTitleDisabled]}>{title}</Text>
-        <Text style={[styles.toggleSubtitle, disabled && styles.toggleSubtitleDisabled]}>{subtitle}</Text>
+        <Text style={[styles.toggleTitle, disabled && styles.toggleTitleDisabled]} numberOfLines={1}>{title}</Text>
+        <Text style={[styles.toggleSubtitle, disabled && styles.toggleSubtitleDisabled]} numberOfLines={2}>{subtitle}</Text>
       </View>
       <Switch
         value={value}
@@ -1053,12 +1053,15 @@ const styles = StyleSheet.create({
   },
   toggleContent: {
     flex: 1,
+    flexShrink: 1,
+    marginRight: 8,
   },
   toggleTitle: {
     fontSize: 16,
     fontWeight: '500',
     color: '#1F2937',
     marginBottom: 4,
+    flexShrink: 1,
   },
   toggleTitleDisabled: {
     color: '#9CA3AF',
@@ -1066,6 +1069,7 @@ const styles = StyleSheet.create({
   toggleSubtitle: {
     fontSize: 14,
     color: '#6B7280',
+    flexShrink: 1,
   },
   toggleSubtitleDisabled: {
     color: '#9CA3AF',

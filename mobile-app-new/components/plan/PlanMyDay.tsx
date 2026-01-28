@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, TextInput, ActivityIndicator, Alert, Modal, PanResponder, Dimensions } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, TextInput, ActivityIndicator, Alert, Modal, PanResponder, Dimensions, Platform, InteractionManager } from 'react-native';
 import { useRouter } from 'expo-router';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
@@ -7,7 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Audio } from 'expo-av';
 import * as FileSystem from 'expo-file-system';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { taskAssociationService, googleCalendarService, dailyPlanningService, authService, PlanLimits } from '@/lib/api';
+import { taskAssociationService, googleCalendarService, dailyPlanningService, authService, PlanLimits, getAuthToken } from '@/lib/api';
 import { format, addMinutes, setHours, setMinutes, startOfDay, isBefore, getHours, getMinutes } from 'date-fns';
 import { useLanguage } from '@/contexts/LanguageContext';
 
@@ -34,6 +34,7 @@ export function PlanMyDay() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { t } = useLanguage();
+  const isMountedRef = useRef(true);
   const [phase, setPhase] = useState<PlanPhase>('entry');
   const [transcription, setTranscription] = useState('');
   const [processingStep, setProcessingStep] = useState(0);
@@ -64,26 +65,32 @@ export function PlanMyDay() {
   const [planPreviewLimited, setPlanPreviewLimited] = useState(false);
 
   useEffect(() => {
+    isMountedRef.current = true;
     return () => {
+      isMountedRef.current = false;
       // Nettoyer l'enregistrement si le composant est démonté
       if (recording) {
-        recording.stopAndUnloadAsync();
+        recording.stopAndUnloadAsync().catch(console.error);
       }
     };
   }, [recording]);
 
   useEffect(() => {
     let mounted = true;
-    (async () => {
-      try {
-        const user = await authService.checkAuth();
-        if (!mounted) return;
-        setPlanLimits(user?.planLimits || null);
-      } catch {
-        if (!mounted) return;
-        setPlanLimits(null);
-      }
-    })();
+    // Attendre que l'UI soit stable avant de charger les données
+    InteractionManager.runAfterInteractions(() => {
+      setTimeout(async () => {
+        if (!mounted || !isMountedRef.current) return;
+        try {
+          const user = await authService.checkAuth();
+          if (!mounted || !isMountedRef.current) return;
+          setPlanLimits(user?.planLimits || null);
+        } catch {
+          if (!mounted || !isMountedRef.current) return;
+          setPlanLimits(null);
+        }
+      }, 300);
+    });
     return () => {
       mounted = false;
     };
@@ -151,29 +158,52 @@ export function PlanMyDay() {
         throw new Error('Fichier audio introuvable');
       }
 
+      // Récupérer le token d'authentification via l'utilitaire centralisé
+      const token = await getAuthToken();
+      if (!token) {
+        throw new Error('Utilisateur non authentifié. Veuillez vous reconnecter.');
+      }
+
+      // Corriger l'URI selon la plateforme (comme dans DailyJournal)
+      const uri = Platform.OS === 'ios' ? audioUri.replace('file://', '') : audioUri;
+
       // Créer FormData pour l'upload
       const formData = new FormData();
       formData.append('audio', {
-        uri: audioUri,
+        uri,
         type: 'audio/m4a',
         name: 'recording.m4a',
       } as any);
 
+      console.log('🎤 [PlanMyDay] Envoi audio transcription', { uri, hasToken: !!token });
+
       // Appeler l'API de transcription
-      const token = await AsyncStorage.getItem('authToken');
       const response = await fetch('https://www.productif.io/api/transcribe', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
+          // Ne pas définir Content-Type, FormData le fera
         },
         body: formData,
       });
 
+      console.log('📡 [PlanMyDay] Réponse transcription', { status: response.status, ok: response.ok });
+
       if (!response.ok) {
-        throw new Error('Erreur lors de la transcription');
+        const errorText = await response.text();
+        let errorData: any;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          errorData = { error: errorText || `Erreur ${response.status}` };
+        }
+        console.error('❌ [PlanMyDay] Erreur API transcription:', errorData);
+        throw new Error(errorData.error || `Erreur ${response.status}: ${response.statusText}`);
       }
 
       const data = await response.json();
+      console.log('✅ [PlanMyDay] Transcription réussie', { success: data.success, hasTranscription: !!data.transcription });
+
       if (data.success && data.transcription) {
         setTranscription(data.transcription);
       } else {
@@ -578,7 +608,7 @@ export function PlanMyDay() {
                 activeOpacity={0.8}
               >
                 <Ionicons name="mic" size={20} color="#FFFFFF" />
-                <Text style={styles.recordButtonText}>Record voice</Text>
+                <Text style={styles.recordButtonText}>{t('recordVoice')}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -586,7 +616,7 @@ export function PlanMyDay() {
                 onPress={() => setPhase('transcription')}
                 activeOpacity={0.7}
               >
-                <Text style={styles.typeButtonText}>Type instead</Text>
+                <Text style={styles.typeButtonText}>{t('typeInstead')}</Text>
               </TouchableOpacity>
             </View>
 
@@ -595,7 +625,7 @@ export function PlanMyDay() {
               onPress={() => router.back()}
               activeOpacity={0.7}
             >
-              <Text style={styles.backButtonText}>Back</Text>
+              <Text style={styles.backButtonText}>{t('back')}</Text>
             </TouchableOpacity>
           </Animated.View>
         </ScrollView>
@@ -643,7 +673,7 @@ export function PlanMyDay() {
               )}
             </View>
             <Text style={styles.transcriptionTitle}>
-              {isTranscribing ? 'Transcription en cours...' : 'We got it.'}
+              {isTranscribing ? t('transcribing') || 'Transcription en cours...' : t('weGotIt') || 'We got it.'}
             </Text>
 
             <View style={styles.transcriptionCard}>
@@ -651,14 +681,14 @@ export function PlanMyDay() {
                 style={styles.transcriptionInput}
                 value={transcription}
                 onChangeText={setTranscription}
-                placeholder="Your transcription appears here..."
+                placeholder={t('transcriptionPlaceholder') || 'Your transcription appears here...'}
                 placeholderTextColor="rgba(0, 0, 0, 0.4)"
                 multiline
                 textAlignVertical="top"
                 editable={!isTranscribing}
               />
             </View>
-            <Text style={styles.editHint}>You can edit if needed</Text>
+            <Text style={styles.editHint}>{t('youCanEditIfNeeded') || 'You can edit if needed'}</Text>
 
             <TouchableOpacity
               style={[styles.generateButton, (!transcription.trim() || isTranscribing) && styles.generateButtonDisabled]}
@@ -667,7 +697,7 @@ export function PlanMyDay() {
               disabled={!transcription.trim() || isTranscribing}
             >
               <Ionicons name="sparkles" size={20} color="#FFFFFF" />
-              <Text style={styles.generateButtonText}>Generate my ideal day</Text>
+              <Text style={styles.generateButtonText}>{t('generateMyIdealDay') || 'Generate my ideal day'}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -678,7 +708,7 @@ export function PlanMyDay() {
               }}
               activeOpacity={0.7}
             >
-              <Text style={styles.recordAgainText}>Record again</Text>
+              <Text style={styles.recordAgainText}>{t('recordAgain') || 'Record again'}</Text>
             </TouchableOpacity>
           </Animated.View>
         </ScrollView>
@@ -688,9 +718,9 @@ export function PlanMyDay() {
 
   if (phase === 'processing') {
     const steps = [
-      'Extracting tasks',
-      'Associating with subjects',
-      'Prioritizing by impact + time + energy',
+      t('extractingTasks') || 'Extracting tasks',
+      t('associatingWithSubjects') || 'Associating with subjects',
+      t('prioritizingByImpactTimeEnergy') || 'Prioritizing by impact + time + energy',
     ];
 
     return (
@@ -700,7 +730,7 @@ export function PlanMyDay() {
             <Ionicons name="sparkles" size={40} color="#16A34A" />
           </View>
 
-          <Text style={styles.processingTitle}>Building your ideal day…</Text>
+          <Text style={styles.processingTitle}>{t('buildingYourIdealDay') || 'Building your ideal day…'}</Text>
 
           <View style={styles.stepsContainer}>
             {steps.map((step, index) => {
@@ -948,14 +978,16 @@ export function PlanMyDay() {
             </TouchableOpacity>
 
             <View style={styles.headerContent}>
-              <Text style={styles.headerTitle}>Your Ideal Day</Text>
-              <Text style={styles.headerSubtitle}>{format(targetDate, 'EEEE, d MMMM')}</Text>
+              <Text style={styles.headerTitle}>{t('yourIdealDay')}</Text>
+              <Text style={styles.headerSubtitle}>
+                {format(targetDate, 'EEEE, d MMMM')}
+              </Text>
             </View>
           </Animated.View>
 
           {/* Timeline interactive avec événements existants et nouvelles tâches */}
           <Animated.View entering={FadeInDown.delay(150).duration(400)} style={styles.section}>
-            <Text style={styles.sectionLabel}>Calendrier du jour</Text>
+            <Text style={styles.sectionLabel}>{t('calendarOfTheDay') || 'Calendrier du jour'}</Text>
             <TimelineCalendar
               targetDate={targetDate}
               existingEvents={existingCalendarEvents}
@@ -967,7 +999,7 @@ export function PlanMyDay() {
 
           <Animated.View entering={FadeInDown.delay(400).duration(400)} style={styles.reassuranceCard}>
             <Text style={styles.reassuranceText}>
-              This covers what matters. Nothing more, nothing less.
+              {t('idealDayReassurance') || "This covers what matters. Nothing more, nothing less."}
             </Text>
           </Animated.View>
 

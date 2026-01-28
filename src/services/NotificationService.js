@@ -76,7 +76,10 @@ class NotificationService {
             }
 
             // Vérifier si l'utilisateur accepte les notifications à cette heure
-            if (!this.canSendNotification(notification.user.notificationSettings, now)) {
+            if (!notification.user.notificationSettings) {
+                console.log(`⚠️ [${processingId}] Aucune préférence de notification trouvée pour l'utilisateur`);
+                // Continuer quand même l'envoi si les préférences de base sont activées
+            } else if (!this.canSendNotification(notification.user.notificationSettings, now)) {
                 console.log(`⏳ Notification reportée :`);
                 console.log(`  - Raison: Hors plage horaire`);
                 console.log(`  - Heure actuelle: ${now.getHours()}h${now.getMinutes()}`);
@@ -120,10 +123,11 @@ class NotificationService {
                 console.log(`🔵 [${processingId}] WhatsApp envoyé avec succès pour notification ${notification.id}`);
             }
             
-            // Envoyer aussi une notification push si activée
+            // Envoyer aussi une notification push si activée (iOS et Android)
             if (canSendPush) {
                 try {
-                    const { sendPushNotification } = await import('../../lib/apns.js');
+                    // Utiliser la fonction unifiée qui envoie à iOS et Android
+                    const { sendPushNotification } = await import('../../lib/push-notifications.js');
                     // Utiliser les titres/corps courts si disponibles pour le push,
                     // sinon fallback sur le titre générique + extrait du contenu
                     const title = notification.pushTitle || getNotificationTitle(notification.type);

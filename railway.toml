@@ -5,7 +5,7 @@ dockerfilePath = "Dockerfile.scheduler"
 [deploy]
 healthcheckPath = "/health"
 healthcheckTimeout = 300
-startCommand = "npx prisma migrate deploy || true && npm run start:scheduler"
+startCommand = "npm run start:scheduler"
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 10
 
@@ -16,9 +16,24 @@ OPENAI_API_KEY = "${{Secrets.OPENAI_API_KEY}}"
 WHATSAPP_ACCESS_TOKEN = "${{Secrets.WHATSAPP_ACCESS_TOKEN}}"
 WHATSAPP_VERIFY_TOKEN = "${{Secrets.WHATSAPP_VERIFY_TOKEN}}"
 WHATSAPP_PHONE_NUMBER_ID = "${{Secrets.WHATSAPP_PHONE_NUMBER_ID}}"
+WHATSAPP_APP_ID = "${{Secrets.WHATSAPP_APP_ID}}"
+WHATSAPP_APP_SECRET = "${{Secrets.WHATSAPP_APP_SECRET}}"
+WHATSAPP_BUSINESS_ACCOUNT_ID = "${{Secrets.WHATSAPP_BUSINESS_ACCOUNT_ID}}"
+WHATSAPP_API_URL = "${{Secrets.WHATSAPP_API_URL}}"
+WHATSAPP_USE_TEMPLATES = "${{Secrets.WHATSAPP_USE_TEMPLATES}}"
+WHATSAPP_TEMPLATE_LANGUAGE = "${{Secrets.WHATSAPP_TEMPLATE_LANGUAGE}}"
+NEXT_PUBLIC_APP_URL = "${{Secrets.NEXT_PUBLIC_APP_URL}}"
+TZ = "Europe/Paris"
+
+# Firebase (Android notifications via FCM)
+FIREBASE_PROJECT_ID = "${{Secrets.FIREBASE_PROJECT_ID}}"
+FIREBASE_CLIENT_EMAIL = "${{Secrets.FIREBASE_CLIENT_EMAIL}}"
+FIREBASE_PRIVATE_KEY = "${{Secrets.FIREBASE_PRIVATE_KEY}}"
+
+# APNs (iOS notifications)
 APNS_KEY_ID = "${{Secrets.APNS_KEY_ID}}"
 APNS_TEAM_ID = "${{Secrets.APNS_TEAM_ID}}"
-APNS_BUNDLE_ID = "${{Secrets.APNS_BUNDLE_ID}}"
-APNS_KEY_P8 = "${{Secrets.APNS_KEY_P8}}"
 APNS_KEY_BASE64 = "${{Secrets.APNS_KEY_BASE64}}"
-APNS_PRODUCTION = "${{Secrets.APNS_PRODUCTION}}" 
+APNS_BUNDLE_ID = "${{Secrets.APNS_BUNDLE_ID}}"
+APNS_PRODUCTION = "true"
+

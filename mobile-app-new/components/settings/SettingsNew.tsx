@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Switch, TextInput, Alert, Linking } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Switch, TextInput, Alert, Linking, Platform, InteractionManager } from 'react-native';
 import { useRouter } from 'expo-router';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { authService, onboardingService } from '@/lib/api';
+import { authService, onboardingService, apiCall } from '@/lib/api';
 import { connectGoogleCalendar, isGoogleCalendarConnected } from '@/lib/calendarAuth';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useOnboardingData } from '@/hooks/useOnboardingData';
@@ -46,14 +46,28 @@ export function SettingsNew() {
 
   // Notifications
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const [isRequestingNotificationPermission, setIsRequestingNotificationPermission] = useState(false);
   const [startOfDayReminder, setStartOfDayReminder] = useState(true);
   const [focusReminder, setFocusReminder] = useState(true);
   const [breakReminder, setBreakReminder] = useState(false);
   const [endOfDayRecap, setEndOfDayRecap] = useState(true);
+  const [startOfDayTime, setStartOfDayTime] = useState('08:00');
+  const [breakTime, setBreakTime] = useState('12:00');
+  const [endOfDayTime, setEndOfDayTime] = useState('21:00');
+  const [notificationPrefs, setNotificationPrefs] = useState<any | null>(null);
+  const [isSavingNotifications, setIsSavingNotifications] = useState(false);
+  const isMountedRef = useRef(true);
 
   // Connection status
   const [calendarConnected, setCalendarConnected] = useState(false);
   const [calendarLoading, setCalendarLoading] = useState(false);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     const loadUserData = async () => {
@@ -98,6 +112,29 @@ export function SettingsNew() {
     loadUserData();
   }, []);
 
+  // Charger les préférences de notifications (backend) pour synchroniser l'écran simple
+  useEffect(() => {
+    const loadNotificationSettings = async () => {
+      try {
+        const prefs = await apiCall<any>('/notifications/preferences');
+        if (!prefs) return;
+
+        setNotificationPrefs(prefs);
+        setNotificationsEnabled(Boolean(prefs.isEnabled));
+        setStartOfDayReminder(prefs.morningReminder ?? true);
+        setBreakReminder(prefs.noonReminder ?? false);
+        setEndOfDayRecap(prefs.recapReminder ?? true);
+        setStartOfDayTime(prefs.morningTime || '08:00');
+        setBreakTime(prefs.noonTime || '12:00');
+        setEndOfDayTime(prefs.recapTime || '21:00');
+      } catch (error) {
+        console.log('❌ Impossible de charger les préférences de notifications pour SettingsNew:', error);
+      }
+    };
+
+    loadNotificationSettings();
+  }, []);
+
   // Recharger les données quand on revient à la vue principale
   useEffect(() => {
     if (view === 'main') {
@@ -138,33 +175,151 @@ export function SettingsNew() {
     }
   }, [permissionStatus]);
 
+  const saveNotificationPreferences = async (updates: Record<string, any>) => {
+    if (!isMountedRef.current) return;
+
+    if (!notificationPrefs) {
+      // Si on n'a pas encore les préférences complètes, tenter de les charger d'abord
+      try {
+        const prefs = await apiCall<any>('/notifications/preferences');
+        if (!isMountedRef.current) return;
+        setNotificationPrefs(prefs);
+      } catch (error) {
+        console.log('❌ Impossible de charger les préférences avant sauvegarde:', error);
+      }
+    }
+
+    const current = notificationPrefs || {};
+    const body = { ...current, ...updates };
+
+    if (!isMountedRef.current) return;
+    setNotificationPrefs(body);
+
+    try {
+      if (!isMountedRef.current) return;
+      setIsSavingNotifications(true);
+      console.log('💾 [SettingsNew] Sauvegarde préférences notifications (vue simple):', updates);
+      await apiCall('/notifications/preferences', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      });
+      
+      // Utiliser InteractionManager pour différer les mises à jour d'état
+      InteractionManager.runAfterInteractions(() => {
+        setTimeout(() => {
+          if (!isMountedRef.current) return;
+          console.log('✅ [SettingsNew] Préférences notifications sauvegardées');
+          showSavedFeedback();
+        }, 300);
+      });
+    } catch (error) {
+      if (!isMountedRef.current) return;
+      console.error('❌ [SettingsNew] Erreur lors de la sauvegarde des préférences notifications:', error);
+      InteractionManager.runAfterInteractions(() => {
+        setTimeout(() => {
+          if (!isMountedRef.current) return;
+          Alert.alert(
+            t('error') || 'Erreur',
+            t('notifSaveError') || 'Impossible de sauvegarder vos préférences de notification. Veuillez réessayer.'
+          );
+        }, 300);
+      });
+    } finally {
+      if (isMountedRef.current) {
+        setIsSavingNotifications(false);
+      }
+    }
+  };
+
+  const isValidTime = (value: string) => {
+    const match = /^([0-1]?[0-9]|2[0-3]):([0-5][0-9])$/.exec(value.trim());
+    return !!match;
+  };
+
   // Fonction pour gérer le changement du toggle de notifications
   const handleNotificationToggle = async (value: boolean) => {
+    // Empêcher les changements multiples pendant la demande de permission
+    if (isRequestingNotificationPermission) {
+      return;
+    }
+
     if (value) {
       // L'utilisateur veut activer les notifications, demander la permission
-      const granted = await requestPermissions();
-      if (granted) {
-        setNotificationsEnabled(true);
-        showSavedFeedback();
-      } else {
-        // Permission refusée
+      setIsRequestingNotificationPermission(true);
+      try {
+        const granted = await requestPermissions();
+        if (granted) {
+          if (!isMountedRef.current) return;
+          setNotificationsEnabled(true);
+          await saveNotificationPreferences({ isEnabled: true });
+        } else {
+          // Permission refusée - remettre le toggle à false
+          if (!isMountedRef.current) return;
+          setNotificationsEnabled(false);
+          
+          // Vérifier si la permission a été refusée définitivement
+          const currentStatus = permissionStatus;
+          const isDenied = currentStatus === 'denied';
+          
+          InteractionManager.runAfterInteractions(() => {
+            setTimeout(() => {
+              if (!isMountedRef.current) return;
+              Alert.alert(
+                t('notificationPermissionRequired') || 'Permission requise',
+                isDenied
+                  ? (t('notificationPermissionDeniedMessage') || 'Les notifications ont été refusées. Pour les activer, allez dans Réglages > Applications > Productif.io > Notifications.')
+                  : (t('notificationPermissionMessage') || 'Veuillez autoriser les notifications pour recevoir vos rappels.'),
+                [
+                  { text: t('cancel') || 'Annuler', style: 'cancel' },
+                  ...(isDenied ? [{
+                    text: t('openSettings') || 'Ouvrir les réglages',
+                    onPress: () => {
+                      if (Platform.OS === 'android') {
+                        Linking.openSettings();
+                      } else {
+                        Linking.openURL('app-settings:');
+                      }
+                    }
+                  }] : [])
+                ]
+              );
+            }, 300);
+          });
+        }
+      } catch (error) {
+        console.error('Erreur lors de la demande de permission:', error);
+        if (!isMountedRef.current) return;
         setNotificationsEnabled(false);
-        Alert.alert(
-          t('notificationPermissionRequired') || 'Permission requise',
-          t('notificationPermissionMessage') || 'Veuillez autoriser les notifications dans les paramètres de votre appareil.',
-          [{ text: 'OK' }]
-        );
+        InteractionManager.runAfterInteractions(() => {
+          setTimeout(() => {
+            if (!isMountedRef.current) return;
+            Alert.alert(
+              t('error') || 'Erreur',
+              t('notificationPermissionError') || 'Une erreur est survenue lors de la demande de permission.'
+            );
+          }, 300);
+        });
+      } finally {
+        if (isMountedRef.current) {
+          setIsRequestingNotificationPermission(false);
+        }
       }
     } else {
       // L'utilisateur désactive les notifications
+      if (!isMountedRef.current) return;
       setNotificationsEnabled(false);
-      showSavedFeedback();
+      await saveNotificationPreferences({ isEnabled: false });
     }
   };
 
   const showSavedFeedback = () => {
+    if (!isMountedRef.current) return;
     setSavedFeedback(true);
-    setTimeout(() => setSavedFeedback(false), 2000);
+    setTimeout(() => {
+      if (isMountedRef.current) {
+        setSavedFeedback(false);
+      }
+    }, 2000);
   };
 
   const handleConnectCalendar = async () => {
@@ -503,9 +658,13 @@ export function SettingsNew() {
             {/* Global toggle */}
             <View style={styles.settingCard}>
               <View style={styles.settingCardRow}>
-                <View style={styles.settingCardContent}>
-                  <Text style={styles.settingCardTitle}>Activer les notifications</Text>
-                  <Text style={styles.settingCardSubtitle}>Recevoir des rappels et mises à jour</Text>
+                <View style={[styles.settingCardContent, { flex: 1, marginRight: 8 }]}>
+                  <Text style={styles.settingCardTitle}>
+                    {t('enableNotifications', undefined, 'Activer les notifications')}
+                  </Text>
+                  <Text style={styles.settingCardSubtitle}>
+                    {t('enableNotificationsDescription', undefined, 'Recevoir des rappels et mises à jour')}
+                  </Text>
                 </View>
                 <Switch
                   value={notificationsEnabled}
@@ -519,19 +678,35 @@ export function SettingsNew() {
             {/* Sub-section: Rappels et horaires */}
             {notificationsEnabled && (
               <>
-                <Text style={styles.subsectionLabel}>Rappels et horaires</Text>
+                <Text style={styles.subsectionLabel}>
+                  {t('remindersAndSchedules', undefined, 'Rappels et horaires')}
+                </Text>
 
                 <View style={styles.settingCard}>
                   <View style={styles.settingCardRow}>
-                    <View style={styles.settingCardContent}>
-                      <Text style={styles.settingCardTitle}>Rappel début de journée</Text>
-                      <Text style={styles.settingCardSubtitle}>8:00</Text>
-                    </View>
+                    <Text style={[styles.settingCardTitle, { flex: 1, marginRight: 12 }]}>
+                      {t('startOfDayReminder', undefined, 'Rappel début de journée')}
+                    </Text>
+                    <TextInput
+                      style={styles.timeInlineInput}
+                      value={startOfDayTime}
+                      onChangeText={async (value) => {
+                        if (!isMountedRef.current) return;
+                        setStartOfDayTime(value);
+                        if (isValidTime(value)) {
+                          await saveNotificationPreferences({ morningTime: value });
+                        }
+                      }}
+                      placeholder="08:00"
+                      maxLength={5}
+                      keyboardType="numbers-and-punctuation"
+                    />
                     <Switch
                       value={startOfDayReminder}
-                      onValueChange={(value) => {
+                      onValueChange={async (value) => {
+                        if (!isMountedRef.current) return;
                         setStartOfDayReminder(value);
-                        showSavedFeedback();
+                        await saveNotificationPreferences({ morningReminder: value });
                       }}
                       trackColor={{ false: 'rgba(0, 0, 0, 0.1)', true: '#16A34A' }}
                       thumbColor="#FFFFFF"
@@ -541,15 +716,26 @@ export function SettingsNew() {
 
                 <View style={styles.settingCard}>
                   <View style={styles.settingCardRow}>
-                    <View style={styles.settingCardContent}>
-                      <Text style={styles.settingCardTitle}>Rappel de session de concentration</Text>
-                      <Text style={styles.settingCardSubtitle}>Avant les blocs planifiés</Text>
+                    <View style={[styles.settingCardContent, { flex: 1, marginRight: 8 }]}>
+                      <Text style={styles.settingCardTitle}>
+                        {t('focusSessionReminder', undefined, 'Rappel de session de concentration')}
+                      </Text>
+                      <Text style={styles.settingCardSubtitle}>
+                        {t('focusSessionReminderDescription', undefined, 'Avant les blocs planifiés')}
+                      </Text>
                     </View>
                     <Switch
                       value={focusReminder}
                       onValueChange={(value) => {
+                        if (!isMountedRef.current) return;
                         setFocusReminder(value);
-                        showSavedFeedback();
+                        InteractionManager.runAfterInteractions(() => {
+                          setTimeout(() => {
+                            if (isMountedRef.current) {
+                              showSavedFeedback();
+                            }
+                          }, 300);
+                        });
                       }}
                       trackColor={{ false: 'rgba(0, 0, 0, 0.1)', true: '#16A34A' }}
                       thumbColor="#FFFFFF"
@@ -559,15 +745,29 @@ export function SettingsNew() {
 
                 <View style={styles.settingCard}>
                   <View style={styles.settingCardRow}>
-                    <View style={styles.settingCardContent}>
-                      <Text style={styles.settingCardTitle}>Rappel de pause</Text>
-                      <Text style={styles.settingCardSubtitle}>Quand la pause commence</Text>
-                    </View>
+                    <Text style={[styles.settingCardTitle, { flex: 1, marginRight: 12 }]}>
+                      {t('breakReminder', undefined, 'Rappel de pause')}
+                    </Text>
+                    <TextInput
+                      style={styles.timeInlineInput}
+                      value={breakTime}
+                      onChangeText={async (value) => {
+                        if (!isMountedRef.current) return;
+                        setBreakTime(value);
+                        if (isValidTime(value)) {
+                          await saveNotificationPreferences({ noonTime: value, noonReminder: breakReminder });
+                        }
+                      }}
+                      placeholder="12:00"
+                      maxLength={5}
+                      keyboardType="numbers-and-punctuation"
+                    />
                     <Switch
                       value={breakReminder}
-                      onValueChange={(value) => {
+                      onValueChange={async (value) => {
+                        if (!isMountedRef.current) return;
                         setBreakReminder(value);
-                        showSavedFeedback();
+                        await saveNotificationPreferences({ noonReminder: value });
                       }}
                       trackColor={{ false: 'rgba(0, 0, 0, 0.1)', true: '#16A34A' }}
                       thumbColor="#FFFFFF"
@@ -577,15 +777,29 @@ export function SettingsNew() {
 
                 <View style={styles.settingCard}>
                   <View style={styles.settingCardRow}>
-                    <View style={styles.settingCardContent}>
-                      <Text style={styles.settingCardTitle}>Récapitulatif de fin de journée</Text>
-                      <Text style={styles.settingCardSubtitle}>21:00</Text>
-                    </View>
+                    <Text style={[styles.settingCardTitle, { flex: 1, marginRight: 12 }]}>
+                      {t('endOfDayRecap', undefined, 'Heure du récapitulatif du soir')}
+                    </Text>
+                    <TextInput
+                      style={styles.timeInlineInput}
+                      value={endOfDayTime}
+                      onChangeText={async (value) => {
+                        if (!isMountedRef.current) return;
+                        setEndOfDayTime(value);
+                        if (isValidTime(value)) {
+                          await saveNotificationPreferences({ recapTime: value, recapReminder: endOfDayRecap });
+                        }
+                      }}
+                      placeholder="21:00"
+                      maxLength={5}
+                      keyboardType="numbers-and-punctuation"
+                    />
                     <Switch
                       value={endOfDayRecap}
-                      onValueChange={(value) => {
+                      onValueChange={async (value) => {
+                        if (!isMountedRef.current) return;
                         setEndOfDayRecap(value);
-                        showSavedFeedback();
+                        await saveNotificationPreferences({ recapReminder: value });
                       }}
                       trackColor={{ false: 'rgba(0, 0, 0, 0.1)', true: '#16A34A' }}
                       thumbColor="#FFFFFF"
@@ -671,9 +885,9 @@ export function SettingsNew() {
                 <Ionicons name="time-outline" size={24} color="#16A34A" />
               </View>
               <View style={styles.structureInfo}>
-                <Text style={styles.structureTitle}>{t('dailyStructure') || 'Daily Structure'}</Text>
-                <Text style={styles.structureSubtitle}>
-                  {focusDuration}min • {maxSessions} sessions • {workloadIntensity}
+                <Text style={styles.structureTitle}>{t('dailyStructureSettings') || t('dailyStructure') || 'Structure quotidienne'}</Text>
+                <Text style={styles.structureSubtitle} numberOfLines={1}>
+                  {focusDuration}{t('min') || 'min'} • {maxSessions} {t('sessions') || 'sessions'} • {workloadIntensity === 'light' ? t('workloadIntensityLight') : workloadIntensity === 'balanced' ? t('workloadIntensityBalanced') : t('workloadIntensityIntensive') || workloadIntensity}
                 </Text>
               </View>
             </View>
@@ -696,6 +910,7 @@ export function SettingsNew() {
                 <Switch
                   value={notificationsEnabled}
                   onValueChange={handleNotificationToggle}
+                  disabled={isRequestingNotificationPermission}
                   trackColor={{ false: 'rgba(0, 0, 0, 0.1)', true: '#16A34A' }}
                   thumbColor="#FFFFFF"
                 />
@@ -713,10 +928,10 @@ export function SettingsNew() {
                     <View style={styles.settingIcon}>
                       <Ionicons name="alarm-outline" size={24} color="#16A34A" />
                     </View>
-                    <View>
-                      <Text style={styles.settingCardTitle}>Rappels et horaires</Text>
-                      <Text style={styles.settingCardSubtitle}>
-                        Matin, midi, soir, questions humeur/stress/focus
+                    <View style={{ flex: 1, marginRight: 8 }}>
+                      <Text style={styles.settingCardTitle} numberOfLines={1}>{t('remindersAndSchedules') || 'Rappels et horaires'}</Text>
+                      <Text style={styles.settingCardSubtitle} numberOfLines={2}>
+                        {t('remindersAndSchedulesDescription') || 'Matin, midi, soir, questions humeur/stress/focus'}
                       </Text>
                     </View>
                   </View>
@@ -1047,6 +1262,7 @@ const styles = StyleSheet.create({
   structureSubtitle: {
     fontSize: 14,
     color: 'rgba(0, 0, 0, 0.6)',
+    flexShrink: 1,
   },
   notificationsContainer: {
     gap: 12,
@@ -1068,6 +1284,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 16,
     flex: 1,
+    flexShrink: 1,
   },
   settingIcon: {
     width: 48,
@@ -1082,10 +1299,14 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#000000',
     marginBottom: 4,
+    flexShrink: 1,
+    flexWrap: 'wrap',
   },
   settingCardSubtitle: {
     fontSize: 14,
     color: 'rgba(0, 0, 0, 0.6)',
+    flexShrink: 1,
+    flexWrap: 'wrap',
   },
   subsectionLabel: {
     fontSize: 12,
@@ -1095,6 +1316,24 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     marginTop: 8,
     marginBottom: 12,
+  },
+  timeInlineContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  timeInlineInput: {
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.1)',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    minWidth: 70,
+    textAlign: 'center',
+    fontSize: 14,
+    color: '#000000',
+    backgroundColor: '#F9FAFB',
   },
   privacyContainer: {
     gap: 12,

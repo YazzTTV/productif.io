@@ -31,9 +31,10 @@ ARG PORT=3002
 ENV PORT=$PORT
 EXPOSE $PORT
 
-# Add healthcheck using dynamic PORT
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-  CMD curl -fsS http://localhost:$PORT/health || exit 1
+# Add healthcheck using dynamic PORT (Railway injects PORT at runtime)
+# Use a script to read PORT from environment at runtime
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+  CMD sh -c 'curl -fsS http://localhost:${PORT:-3002}/health || exit 1'
 
 # Start the scheduler service
 # Les migrations sont gérées par Railway via startCommand dans railway.toml

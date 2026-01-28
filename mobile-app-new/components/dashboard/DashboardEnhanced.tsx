@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, RefreshControl } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, RefreshControl, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
@@ -514,20 +514,24 @@ const styles = StyleSheet.create({
   structureCard: {
     padding: 32,
     borderRadius: 24,
-    borderWidth: 2,
-    borderColor: 'rgba(22, 163, 74, 0.2)',
-    backgroundColor: 'rgba(22, 163, 74, 0.05)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(22, 163, 74, 0.25)',
+    backgroundColor: 'rgba(22, 163, 74, 0.08)',
+    // Ombre iOS uniquement
     shadowColor: '#16A34A',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
+    shadowOpacity: Platform.OS === 'ios' ? 0.1 : 0,
     shadowRadius: 8,
-    elevation: 4,
+    // Pas d'elevation sur Android - cause des problèmes avec les fonds transparents
+    elevation: 0,
   },
   structureContent: {
     gap: 24,
+    backgroundColor: 'transparent',
   },
   focusBlock: {
     gap: 12,
+    backgroundColor: 'transparent',
   },
   timeBadge: {
     flexDirection: 'row',
@@ -554,6 +558,7 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     borderTopWidth: 1,
     borderTopColor: 'rgba(0, 0, 0, 0.1)',
+    backgroundColor: 'transparent',
   },
   taskItem: {
     flexDirection: 'row',

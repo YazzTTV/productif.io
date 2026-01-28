@@ -789,14 +789,7 @@ class NotificationScheduler {
             const jobId = `${user.id}-${time}`;
             const jobStart = Date.now();
             
-            NotificationLogger.log('DEBUG', 'SCHEDULE_JOB_START', {
-                scheduleId,
-                jobId,
-                type,
-                time,
-                userId: user.id,
-                jobStart
-            });
+            // Log DEBUG supprimé
 
             try {
                 // Vérifier si le job existe déjà
@@ -1021,11 +1014,7 @@ class NotificationScheduler {
             type
         });
         
-        NotificationLogger.log('DEBUG', 'PROCESSING_MARKED_START', {
-            key,
-            jobExecutionId,
-            activeProcessingJobs: this.processingJobs.size
-        });
+        // Log DEBUG supprimé
     }
 
     async markProcessingEnd(userId, type, jobExecutionId) {
@@ -1037,12 +1026,7 @@ class NotificationScheduler {
         if (existing && existing.jobExecutionId === jobExecutionId) {
             this.processingJobs.delete(key);
             
-            NotificationLogger.log('DEBUG', 'PROCESSING_MARKED_END', {
-                key,
-                jobExecutionId,
-                duration: Date.now() - existing.startTime,
-                activeProcessingJobs: this.processingJobs.size
-            });
+            // Log DEBUG supprimé
         }
     }
 

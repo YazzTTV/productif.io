@@ -1,12 +1,64 @@
+// Charger les variables d'environnement depuis .env en premier
+import 'dotenv/config';
+
 import whatsappService from './whatsappService.js';
 import NotificationScheduler from './NotificationScheduler.js';
 import express from 'express';
 import { PrismaClient } from '@prisma/client';
 
+// Gestionnaire d'erreur global pour éviter que le processus ne plante
+// Doit être défini AVANT tout le reste
+process.on('uncaughtException', (error) => {
+    console.error('❌ Erreur non capturée:', error);
+    console.error('Stack:', error.stack);
+    console.error('⚠️ Le serveur continue de fonctionner pour le healthcheck');
+    // Ne pas faire planter le processus
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('❌ Promesse rejetée non gérée:', reason);
+    console.error('⚠️ Le serveur continue de fonctionner pour le healthcheck');
+    // Ne pas faire planter le processus
+});
+
 const app = express();
 
 // Variable globale pour le planificateur
 let scheduler = null;
+let serverStarted = false;
+
+// Démarrer le serveur IMMÉDIATEMENT, avant toute autre opération
+// Cela garantit que le healthcheck répond même si le reste du code échoue
+const port = Number(process.env.PORT || process.env.SCHEDULER_PORT) || 3001;
+
+// Configurer Express pour le healthcheck
+app.use(express.json());
+
+// Route de santé pour Railway - doit répondre immédiatement
+app.get('/health', (req, res) => {
+    res.json({ 
+        status: 'healthy', 
+        service: 'scheduler',
+        schedulerActive: scheduler !== null,
+        realtimeUpdates: true,
+        timestamp: new Date().toISOString()
+    });
+});
+
+// Démarrer le serveur de manière synchrone
+const server = app.listen(port, '0.0.0.0', () => {
+    serverStarted = true;
+    console.log(`✅ Serveur de monitoring démarré sur le port ${port}`);
+    console.log(`📊 Status disponible sur http://0.0.0.0:${port}/status`);
+    console.log(`❤️ Healthcheck disponible sur http://0.0.0.0:${port}/health`);
+});
+
+server.on('error', (err) => {
+    console.error('❌ Erreur lors du démarrage du serveur:', err);
+    console.error('Code:', err.code);
+    console.error('Message:', err.message);
+    // Ne pas faire planter le processus - essayer de continuer
+});
 
 // Fonction pour attendre que la base de données soit prête et que les migrations soient appliquées
 async function waitForDatabase(maxRetries = 30, delay = 2000) {
@@ -54,40 +106,31 @@ async function waitForDatabase(maxRetries = 30, delay = 2000) {
 }
 
 async function startSchedulerService() {
-    // 1. Configurer le serveur Express pour le healthcheck EN PREMIER
-    // Cela garantit que le healthcheck répond immédiatement
-    app.use(express.json());
-
-    // Route de santé pour Railway - doit répondre immédiatement
-    app.get('/health', (req, res) => {
-        res.json({ 
-            status: 'healthy', 
-            service: 'scheduler',
-            schedulerActive: scheduler !== null,
-            realtimeUpdates: true,
-            timestamp: new Date().toISOString()
-        });
-    });
-
-    // Démarrer le serveur IMMÉDIATEMENT pour que Railway puisse tester le healthcheck
-    const port = Number(process.env.PORT || process.env.SCHEDULER_PORT) || 3002;
-    
-    await new Promise((resolve, reject) => {
-        const server = app.listen(port, '0.0.0.0', () => {
-            console.log(`🌐 Serveur de monitoring démarré sur le port ${port}`);
-            console.log(`📊 Status disponible sur http://0.0.0.0:${port}/status`);
-            console.log(`❤️ Healthcheck disponible sur http://0.0.0.0:${port}/health`);
-            resolve();
-        });
-        
-        server.on('error', (err) => {
-            console.error('❌ Erreur lors du démarrage du serveur:', err);
-            reject(err);
-        });
-    });
-
-    // Maintenant que le serveur est prêt, on peut initialiser le reste
     try {
+        console.log('🚀 Démarrage du service scheduler...');
+        console.log(`📦 PORT=${port}`);
+        
+        // Attendre que le serveur soit démarré (il devrait déjà l'être)
+        if (!serverStarted) {
+            console.log('⏳ Attente que le serveur démarre...');
+            await new Promise((resolve) => {
+                const checkInterval = setInterval(() => {
+                    if (serverStarted) {
+                        clearInterval(checkInterval);
+                        resolve();
+                    }
+                }, 100);
+                // Timeout après 5 secondes
+                setTimeout(() => {
+                    clearInterval(checkInterval);
+                    resolve();
+                }, 5000);
+            });
+        }
+        
+        console.log('✅ Serveur Express démarré avec succès');
+
+        // Maintenant que le serveur est prêt, on peut initialiser le reste
         console.log('🚀 Démarrage du service de planification...');
         console.log('🔄 AVEC SYSTÈME DE MISE À JOUR TEMPS RÉEL');
 
@@ -282,20 +325,6 @@ async function startSchedulerService() {
     }
 }
 
-// Gestionnaire d'erreur global pour éviter que le processus ne plante
-process.on('uncaughtException', (error) => {
-    console.error('❌ Erreur non capturée:', error);
-    console.error('Stack:', error.stack);
-    console.error('⚠️ Le serveur continue de fonctionner pour le healthcheck');
-    // Ne pas faire planter le processus
-});
-
-process.on('unhandledRejection', (reason, promise) => {
-    console.error('❌ Promesse rejetée non gérée:', reason);
-    console.error('⚠️ Le serveur continue de fonctionner pour le healthcheck');
-    // Ne pas faire planter le processus
-});
-
 async function stopSchedulerService() {
     try {
         if (scheduler) {
@@ -309,5 +338,10 @@ async function stopSchedulerService() {
     }
 }
 
-// Démarrer le service
-startSchedulerService(); 
+// Démarrer le service avec gestion d'erreur
+startSchedulerService().catch((error) => {
+    console.error('❌ Erreur fatale lors du démarrage du service:', error);
+    console.error('Stack:', error.stack);
+    // Ne pas faire planter le processus - le serveur doit continuer à répondre au healthcheck
+    // Le serveur Express devrait déjà être démarré à ce stade
+}); 

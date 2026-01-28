@@ -122,6 +122,7 @@
     "embla-carousel-react": "8.5.1",
     "expo": "^54.0.30",
     "express": "^4.21.2",
+    "firebase-admin": "^13.6.0",
     "framer-motion": "^12.15.0",
     "googleapis": "^148.0.0",
     "http-proxy-middleware": "^3.0.5",
