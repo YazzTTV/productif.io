@@ -42,6 +42,8 @@ temp/
 # Firebase service account (clé privée - ne jamais commiter)
 firebase-service-account.json
 *firebase*service*account*.json
+*Firebase*Admin*SDK*.json
+**/Productifio Firebase Admin SDK.json
 
 # Firebase google-services.json (contient des clés API)
 **/google-services.json
