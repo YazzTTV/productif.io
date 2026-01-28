@@ -142,46 +142,51 @@ export async function PATCH(
     }
 
     // Vérifier si l'utilisateur peut modifier cette tâche
-    // Cas 1: C'est sa propre tâche -> OK
+    // Cas 1: C'est sa propre tâche -> OK (même sans entreprise)
     if (existingTask.userId === userId) {
-      // Autorisation OK
+      // Autorisation OK - continuer avec la mise à jour
     }
-    // Cas 2: L'utilisateur est admin et gère une entreprise
-    else if (isAdmin && userInfo?.managedCompanyId) {
-      // Vérifier que l'utilisateur assigné à la tâche appartient à l'entreprise gérée par l'admin
-      const userBelongsToManagedCompany = await prisma.userCompany.findFirst({
-        where: {
-          userId: existingTask.userId,
-          companyId: userInfo.managedCompanyId
-        }
-      })
-
-      if (!userBelongsToManagedCompany) {
-        return new Response("Non autorisé - L'utilisateur n'appartient pas à votre entreprise", { status: 403 })
-      }
-    }
-    // Cas 3: Utilisateur normal - vérifier qu'il appartient à la même entreprise que le propriétaire de la tâche
+    // Cas 2: L'utilisateur veut modifier la tâche d'un autre utilisateur
+    // -> Vérifier les droits d'entreprise
     else {
-      // Obtenir l'entreprise de l'utilisateur actuel
-      const userCompany = await prisma.userCompany.findFirst({
-        where: { userId },
-        select: { companyId: true }
-      })
-      
-      if (!userCompany) {
-        return new Response("Utilisateur non associé à une entreprise", { status: 403 })
-      }
-      
-      // Vérifier que le propriétaire de la tâche appartient à la même entreprise
-      const taskOwnerCompany = await prisma.userCompany.findFirst({
-        where: {
-          userId: existingTask.userId,
-          companyId: userCompany.companyId
+      // Cas 2a: L'utilisateur est admin et gère une entreprise
+      if (isAdmin && userInfo?.managedCompanyId) {
+        // Vérifier que l'utilisateur assigné à la tâche appartient à l'entreprise gérée par l'admin
+        const userBelongsToManagedCompany = await prisma.userCompany.findFirst({
+          where: {
+            userId: existingTask.userId,
+            companyId: userInfo.managedCompanyId
+          }
+        })
+
+        if (!userBelongsToManagedCompany) {
+          return new Response("Non autorisé - L'utilisateur n'appartient pas à votre entreprise", { status: 403 })
         }
-      })
-      
-      if (!taskOwnerCompany) {
-        return new Response("Non autorisé - Cette tâche n'appartient pas à un membre de votre entreprise", { status: 403 })
+      }
+      // Cas 2b: Utilisateur normal - vérifier qu'il appartient à la même entreprise que le propriétaire de la tâche
+      else {
+        // Obtenir l'entreprise de l'utilisateur actuel
+        const userCompany = await prisma.userCompany.findFirst({
+          where: { userId },
+          select: { companyId: true }
+        })
+        
+        // Si l'utilisateur n'a pas d'entreprise, il ne peut modifier que ses propres tâches
+        if (!userCompany) {
+          return new Response("Vous ne pouvez modifier que vos propres tâches", { status: 403 })
+        }
+        
+        // Vérifier que le propriétaire de la tâche appartient à la même entreprise
+        const taskOwnerCompany = await prisma.userCompany.findFirst({
+          where: {
+            userId: existingTask.userId,
+            companyId: userCompany.companyId
+          }
+        })
+        
+        if (!taskOwnerCompany) {
+          return new Response("Non autorisé - Cette tâche n'appartient pas à un membre de votre entreprise", { status: 403 })
+        }
       }
     }
 
@@ -267,6 +272,22 @@ export async function DELETE(
       )
     }
 
+    // Cas 1: L'utilisateur veut supprimer sa propre tâche -> OK (même sans entreprise)
+    if (task.userId === userId) {
+      // Supprimer directement la tâche
+      await prisma.task.delete({
+        where: { id }
+      })
+      
+      return NextResponse.json({ 
+        success: true, 
+        message: "Tâche supprimée avec succès" 
+      })
+    }
+    
+    // Cas 2: L'utilisateur veut supprimer la tâche d'un autre utilisateur
+    // -> Vérifier les droits d'entreprise
+    
     // Obtenir l'entreprise de l'utilisateur
     let userCompanyId: string | null = null;
     
@@ -282,9 +303,10 @@ export async function DELETE(
       userCompanyId = userCompany?.companyId || null;
     }
     
+    // Si l'utilisateur n'a pas d'entreprise, il ne peut pas supprimer les tâches d'autres utilisateurs
     if (!userCompanyId) {
       return NextResponse.json(
-        { error: "Utilisateur non associé à une entreprise" },
+        { error: "Vous ne pouvez supprimer que vos propres tâches" },
         { status: 403 }
       )
     }
