@@ -13,6 +13,7 @@ import {
   Modal,
   TextInput,
   Switch,
+  InteractionManager,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
@@ -987,10 +988,19 @@ export default function HabitsScreen() {
       <CreateHabitModal 
         visible={showCreateModal} 
         onClose={() => setShowCreateModal(false)} 
-        onCreated={async () => {
+        onCreated={() => {
+          // Fermer le modal d'abord
           setShowCreateModal(false);
-          await fetchHabits();
-          dashboardEvents.emit(DASHBOARD_DATA_CHANGED);
+          
+          // Attendre que l'animation de fermeture du modal soit terminée
+          // avant de recharger les données (évite le crash "Unable to find viewState" sur Android)
+          InteractionManager.runAfterInteractions(() => {
+            // Petit délai supplémentaire pour s'assurer que le modal est complètement démonté
+            setTimeout(() => {
+              fetchHabits();
+              dashboardEvents.emit(DASHBOARD_DATA_CHANGED);
+            }, 100);
+          });
         }}
       />
     </View>
@@ -1553,6 +1563,27 @@ function CreateHabitModal({ visible, onClose, onCreated }: { visible: boolean; o
   const [daily, setDaily] = useState(true);
   const [daysOfWeek, setDaysOfWeek] = useState<string[]>(['monday','tuesday','wednesday','thursday','friday','saturday','sunday']);
   const [loading, setLoading] = useState(false);
+  
+  // Ref pour éviter les mises à jour d'état après démontage (cause du crash "Unable to find viewState")
+  const isMountedRef = useRef(true);
+  
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+  
+  // Réinitialiser le formulaire quand le modal s'ouvre
+  useEffect(() => {
+    if (visible) {
+      setName('');
+      setDescription('');
+      setDaily(true);
+      setDaysOfWeek(['monday','tuesday','wednesday','thursday','friday','saturday','sunday']);
+      setLoading(false);
+    }
+  }, [visible]);
 
   const toggleDay = (day: string) => {
     setDaysOfWeek(prev => prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day]);
@@ -1561,24 +1592,34 @@ function CreateHabitModal({ visible, onClose, onCreated }: { visible: boolean; o
   const handleSave = async () => {
     if (!name.trim()) return Alert.alert(t('error'), t('habitNameRequired'));
     if (!daily && daysOfWeek.length === 0) return Alert.alert(t('error'), t('selectAtLeastOneDay'));
+    
     setLoading(true);
+    
     try {
+      console.log('📤 [CreateHabitModal] Création habitude...');
+      
       await habitsService.create({
         name: name.trim(),
         description: description.trim() || undefined,
         frequency: daily ? 'daily' : 'weekly',
         daysOfWeek,
       });
+      
+      console.log('✅ [CreateHabitModal] Habitude créée avec succès');
+      
+      // Ne pas mettre à jour l'état ici - onCreated va fermer le modal
+      // et l'effet useEffect va réinitialiser le formulaire à la prochaine ouverture
       onCreated();
-      setName('');
-      setDescription('');
-      setDaily(true);
-      setDaysOfWeek(['monday','tuesday','wednesday','thursday','friday','saturday','sunday']);
+      
     } catch (e: any) {
-      console.error('Erreur création habitude:', e);
-      Alert.alert(t('error'), e?.message || t('somethingWentWrong'));
-    } finally {
-      setLoading(false);
+      console.error('❌ [CreateHabitModal] Erreur création habitude:', e?.message);
+      
+      // Vérifier que le composant est toujours monté avant de mettre à jour l'état
+      if (isMountedRef.current) {
+        setLoading(false);
+        const errorMessage = e?.message || e?.errorData?.error || t('somethingWentWrong');
+        Alert.alert(t('error'), errorMessage);
+      }
     }
   };
 

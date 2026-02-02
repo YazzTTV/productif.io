@@ -31,6 +31,7 @@ const promptChips = [
 export default function TasksAwarenessScreen() {
   const { t } = useLanguage();
   const insets = useSafeAreaInsets();
+  const { saveResponse } = useOnboardingData();
   const [tasks, setTasks] = useState('');
   const [isRecording, setIsRecording] = useState(false);
   const [isLoading, setIsLoading] = useState(false);

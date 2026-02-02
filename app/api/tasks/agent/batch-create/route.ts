@@ -73,44 +73,9 @@ export async function POST(req: NextRequest) {
       }, { status: 400 })
     }
 
-    // Récupérer le contexte utilisateur (objectifs, projets)
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      include: {
-        missions: {
-          where: { 
-            year: new Date().getFullYear(),
-            quarter: Math.floor(new Date().getMonth() / 3) + 1
-          },
-          include: {
-            objectives: {
-              where: { 
-                // On pourrait filtrer par status si ce champ existe
-              },
-              take: 3,
-              select: { title: true }
-            }
-          },
-          take: 1
-        },
-        projects: {
-          where: { 
-            // On pourrait filtrer par status si ce champ existe
-          },
-          take: 5,
-          select: { name: true }
-        }
-      }
-    })
-
-    const userContext = {
-      objectives: user?.missions[0]?.objectives.map(o => o.title).join(', ') || 'Non spécifié',
-      projects: user?.projects.map(p => p.name).join(', ') || 'Non spécifié'
-    }
-
     // Analyser avec l'IA
     console.log('🤖 Analyse IA en cours...')
-    const analysis = await TaskAnalysisService.analyzeTasks(userInput, userContext)
+    const analysis = await TaskAnalysisService.analyzeTasks(userInput)
     console.log(`📅 Date détectée par l'IA : ${analysis.targetDate || 'Non détectée (demain par défaut)'}`)
 
     // Organiser par moment de la journée
@@ -148,15 +113,23 @@ export async function POST(req: NextRequest) {
       const hoursOffset = Math.floor((currentOrder * 60) / (organized.morning.length || 1))
       dueDate.setHours(8 + Math.floor(hoursOffset / 60), hoursOffset % 60, 0, 0)
 
+      // Convertir priority de 1-5 vers 0-4 pour la base de données
+      // 1 -> 0, 2 -> 1, 3 -> 2, 4 -> 3, 5 -> 4
+      const dbPriority = Math.max(0, Math.min(4, task.priority - 1))
+      
+      // Convertir energy de 1-5 vers 0-3 pour la base de données
+      // 1 -> 0 (très faible), 2 -> 1 (faible), 3 -> 2 (moyen), 4-5 -> 3 (élevé/extrême)
+      const dbEnergyLevel = task.energy <= 1 ? 0 : task.energy <= 2 ? 1 : task.energy <= 3 ? 2 : 3
+      
       // Calculer l'ordre basé sur priority et energyLevel
-      const priorityString = `P${task.priority}`
+      const priorityString = `P${dbPriority}`
       const energyLevels: { [key: number]: string } = {
         0: "Faible",
         1: "Moyen",
         2: "Élevé",
         3: "Extrême"
       }
-      const energyString = energyLevels[task.energy] || "Moyen"
+      const energyString = energyLevels[dbEnergyLevel] || "Moyen"
       const order = calculateTaskOrder(priorityString, energyString)
 
       const createdTask = await prisma.task.create({
@@ -164,8 +137,8 @@ export async function POST(req: NextRequest) {
           userId,
           title: task.title,
           description: task.description,
-          priority: task.priority,
-          energyLevel: task.energy,
+          priority: dbPriority,
+          energyLevel: dbEnergyLevel,
           dueDate,
           projectId: projectId || null,
           completed: false,
@@ -197,15 +170,21 @@ export async function POST(req: NextRequest) {
       const hoursOffset = Math.floor((afternoonIndex * 60) / (organized.afternoon.length || 1))
       dueDate.setHours(14 + Math.floor(hoursOffset / 60), hoursOffset % 60, 0, 0)
 
+      // Convertir priority de 1-5 vers 0-4 pour la base de données
+      const dbPriority = Math.max(0, Math.min(4, task.priority - 1))
+      
+      // Convertir energy de 1-5 vers 0-3 pour la base de données
+      const dbEnergyLevel = Math.max(0, Math.min(3, Math.floor((task.energy - 1) * 3 / 4)))
+      
       // Calculer l'ordre
-      const priorityString = `P${task.priority}`
+      const priorityString = `P${dbPriority}`
       const energyLevels: { [key: number]: string } = {
         0: "Faible",
         1: "Moyen",
         2: "Élevé",
         3: "Extrême"
       }
-      const energyString = energyLevels[task.energy] || "Moyen"
+      const energyString = energyLevels[dbEnergyLevel] || "Moyen"
       const order = calculateTaskOrder(priorityString, energyString)
 
       const createdTask = await prisma.task.create({
@@ -213,8 +192,8 @@ export async function POST(req: NextRequest) {
           userId,
           title: task.title,
           description: task.description,
-          priority: task.priority,
-          energyLevel: task.energy,
+          priority: dbPriority,
+          energyLevel: dbEnergyLevel,
           dueDate,
           projectId: projectId || null,
           completed: false,
@@ -225,7 +204,8 @@ export async function POST(req: NextRequest) {
       createdTasks.push({
         ...createdTask,
         reasoning: task.reasoning,
-        suggestedTime: 'afternoon'
+        suggestedTime: 'afternoon',
+        estimatedDuration: task.estimatedDuration
       })
       
       currentOrder++
@@ -245,15 +225,21 @@ export async function POST(req: NextRequest) {
       const hoursOffset = Math.floor((eveningIndex * 30) / (organized.evening.length || 1))
       dueDate.setHours(17, hoursOffset, 0, 0)
 
+      // Convertir priority de 1-5 vers 0-4 pour la base de données
+      const dbPriority = Math.max(0, Math.min(4, task.priority - 1))
+      
+      // Convertir energy de 1-5 vers 0-3 pour la base de données
+      const dbEnergyLevel = Math.max(0, Math.min(3, Math.floor((task.energy - 1) * 3 / 4)))
+      
       // Calculer l'ordre
-      const priorityString = `P${task.priority}`
+      const priorityString = `P${dbPriority}`
       const energyLevels: { [key: number]: string } = {
         0: "Faible",
         1: "Moyen",
         2: "Élevé",
         3: "Extrême"
       }
-      const energyString = energyLevels[task.energy] || "Moyen"
+      const energyString = energyLevels[dbEnergyLevel] || "Moyen"
       const order = calculateTaskOrder(priorityString, energyString)
 
       const createdTask = await prisma.task.create({
@@ -261,8 +247,8 @@ export async function POST(req: NextRequest) {
           userId,
           title: task.title,
           description: task.description,
-          priority: task.priority,
-          energyLevel: task.energy,
+          priority: dbPriority,
+          energyLevel: dbEnergyLevel,
           dueDate,
           projectId: projectId || null,
           completed: false,
@@ -273,7 +259,8 @@ export async function POST(req: NextRequest) {
       createdTasks.push({
         ...createdTask,
         reasoning: task.reasoning,
-        suggestedTime: 'evening'
+        suggestedTime: 'evening',
+        estimatedDuration: task.estimatedDuration
       })
       
       currentOrder++
@@ -281,6 +268,10 @@ export async function POST(req: NextRequest) {
 
     // Générer le résumé
     const planSummary = TaskAnalysisService.generatePlanSummary(organized)
+    
+    // Calculer le temps total estimé si non fourni
+    const totalEstimatedTime = analysis.totalEstimatedTime || 
+      createdTasks.reduce((sum, task) => sum + (task.estimatedDuration || 30), 0)
 
     return NextResponse.json({
       success: true,
@@ -288,7 +279,7 @@ export async function POST(req: NextRequest) {
       tasks: createdTasks,
       analysis: {
         summary: analysis.summary,
-        totalEstimatedTime: analysis.totalEstimatedTime,
+        totalEstimatedTime,
         planSummary
       },
       organized: {
@@ -300,9 +291,11 @@ export async function POST(req: NextRequest) {
 
   } catch (error) {
     console.error('❌ Erreur création tâches intelligentes:', error)
+    console.error('❌ Stack trace:', error instanceof Error ? error.stack : 'No stack trace')
     return NextResponse.json({ 
       error: 'Erreur serveur',
-      details: error instanceof Error ? error.message : 'Unknown error'
+      details: error instanceof Error ? error.message : 'Unknown error',
+      stack: process.env.NODE_ENV === 'development' && error instanceof Error ? error.stack : undefined
     }, { status: 500 })
   }
 }

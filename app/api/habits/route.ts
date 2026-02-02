@@ -293,7 +293,17 @@ export async function POST(req: NextRequest) {
       },
     })
 
-    return NextResponse.json(habit, { status: 201 })
+    // S'assurer que la réponse contient tous les champs nécessaires pour le mobile
+    // Pour une nouvelle habitude, entries sera toujours vide
+    const habitResponse = {
+      ...habit,
+      entries: [], // Toujours un tableau vide pour une nouvelle habitude
+      currentStreak: 0, // Initialiser à 0 pour une nouvelle habitude
+    }
+
+    console.log("[HABITS_POST] Habitude créée avec succès:", habitResponse.id)
+    console.log("[HABITS_POST] Réponse formatée:", JSON.stringify(habitResponse, null, 2))
+    return NextResponse.json(habitResponse, { status: 201 })
   } catch (error) {
     console.error("Erreur lors de la création de l'habitude:", error)
     return NextResponse.json(

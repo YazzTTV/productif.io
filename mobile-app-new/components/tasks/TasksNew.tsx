@@ -627,7 +627,7 @@ export function TasksNew() {
       return;
     }
 
-    if (!selectedSubjectForTask) {
+    if (!selectedSubjectForTask || selectedSubjectForTask === 'no-subject') {
       Alert.alert(t('error'), t('noSubjectSelected'));
       return;
     }
@@ -635,6 +635,12 @@ export function TasksNew() {
     try {
       setCreatingTask(true);
       const selectedSubject = subjects.find(s => s.id === selectedSubjectForTask);
+      
+      // Vérifier que la matière existe vraiment (pas une matière virtuelle)
+      if (!selectedSubject || selectedSubjectForTask === 'no-subject') {
+        Alert.alert(t('error'), 'Veuillez sélectionner une matière valide');
+        return;
+      }
       
       // Convertir la priorité en format API (high=4, medium=3, low=2)
       const priorityMap: Record<'high' | 'medium' | 'low', number> = {
@@ -645,11 +651,11 @@ export function TasksNew() {
 
       const taskData = {
         title: newTaskTitle.trim(),
-        description: undefined,
+        description: null, // Utiliser null au lieu de undefined pour l'API
         estimatedMinutes: newTaskEstimatedTime,
         priority: priorityMap[newTaskPriority],
-        subjectId: selectedSubjectForTask,
-        subject: selectedSubject?.name || undefined,
+        subjectId: selectedSubjectForTask, // Sera validé côté serveur
+        // Ne pas envoyer 'subject' car ce n'est pas un champ de la base de données
       };
 
       console.log('📤 [TasksNew] Création tâche - Données:', taskData);
@@ -670,9 +676,35 @@ export function TasksNew() {
       
       Alert.alert(t('success'), t('taskAddedSuccessfully'));
     } catch (error: any) {
-      const errorMessage = error?.message || String(error) || 'Erreur inconnue';
+      console.error('[TasksNew] Erreur complète:', error);
+      console.error('[TasksNew] Type d\'erreur:', typeof error);
+      console.error('[TasksNew] Erreur status:', error?.status);
+      console.error('[TasksNew] Erreur errorData:', error?.errorData);
+      
+      // Extraire le message d'erreur détaillé
+      let errorMessage = 'Erreur inconnue';
+      if (error?.errorData?.error) {
+        errorMessage = error.errorData.error;
+      } else if (error?.message) {
+        errorMessage = error.message;
+      } else if (typeof error === 'string') {
+        errorMessage = error;
+      } else if (error?.error) {
+        errorMessage = error.error;
+      }
+      
       console.error('[TasksNew] Erreur lors de lajout de la tâche:', errorMessage);
-      Alert.alert(t('error'), errorMessage.includes('réseau') ? t('connectionError') : t('addTaskError'));
+      
+      // Afficher un message d'erreur plus spécifique
+      const displayMessage = errorMessage.includes('réseau') || errorMessage.includes('network')
+        ? t('connectionError')
+        : errorMessage.includes('matière') || errorMessage.includes('subject')
+        ? errorMessage
+        : errorMessage.length > 100
+        ? t('addTaskError')
+        : errorMessage;
+      
+      Alert.alert(t('error'), displayMessage);
     } finally {
       setCreatingTask(false);
     }
@@ -975,14 +1007,25 @@ export function TasksNew() {
                       })}
                     </View>
 
-                    {/* Add task button */}
+                    {/* Add task button - Désactivé pour la matière virtuelle "no-subject" */}
                     <TouchableOpacity
-                      style={styles.addTaskButton}
+                      style={[
+                        styles.addTaskButton,
+                        subject.id === 'no-subject' && styles.addTaskButtonDisabled
+                      ]}
                       onPress={() => {
+                        if (subject.id === 'no-subject') {
+                          Alert.alert(
+                            t('error'),
+                            'Impossible d\'ajouter une tâche dans "Autres tâches". Veuillez créer une matière d\'abord.'
+                          );
+                          return;
+                        }
                         setSelectedSubjectForTask(subject.id);
                         setShowAddTaskModal(true);
                       }}
                       activeOpacity={0.8}
+                      disabled={subject.id === 'no-subject'}
                     >
                       <View style={styles.addTaskIconContainer}>
                         <Ionicons name="add" size={16} color="rgba(0, 0, 0, 0.4)" />
@@ -2004,6 +2047,10 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(0, 0, 0, 0.1)',
     borderRadius: 16,
     backgroundColor: 'transparent',
+  },
+  addTaskButtonDisabled: {
+    opacity: 0.5,
+    borderColor: 'rgba(0, 0, 0, 0.05)',
   },
   addTaskIconContainer: {
     width: 24,

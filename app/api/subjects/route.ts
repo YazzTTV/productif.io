@@ -120,3 +120,99 @@ export async function GET(req: NextRequest) {
     )
   }
 }
+
+// POST /api/subjects - Créer une nouvelle matière
+export async function POST(req: NextRequest) {
+  try {
+    console.log("[SUBJECTS_POST] Début de la requête")
+    
+    const user = await getAuthUserFromRequest(req)
+    if (!user) {
+      console.log("[SUBJECTS_POST] Utilisateur non authentifié")
+      return NextResponse.json({ error: "Non authentifié" }, { status: 401 })
+    }
+    
+    console.log("[SUBJECTS_POST] Utilisateur authentifié:", user.id)
+    
+    const body = await req.json()
+    const { name, coefficient, deadline } = body
+    
+    console.log("[SUBJECTS_POST] Données reçues:", { name, coefficient, deadline })
+    
+    // Validation
+    if (!name || !name.trim()) {
+      return NextResponse.json(
+        { error: "Le nom de la matière est requis" },
+        { status: 400 }
+      )
+    }
+    
+    if (!coefficient || (coefficient < 1 || coefficient > 3)) {
+      return NextResponse.json(
+        { error: "Le coefficient doit être entre 1 et 3" },
+        { status: 400 }
+      )
+    }
+    
+    // Vérifier si une matière avec le même nom existe déjà pour cet utilisateur
+    const existingSubject = await prisma.subject.findFirst({
+      where: {
+        userId: user.id,
+        name: {
+          equals: name.trim(),
+          mode: 'insensitive'
+        }
+      }
+    })
+    
+    if (existingSubject) {
+      return NextResponse.json(
+        { error: "Une matière avec ce nom existe déjà" },
+        { status: 400 }
+      )
+    }
+    
+    // Créer la matière
+    const subject = await prisma.subject.create({
+      data: {
+        name: name.trim(),
+        coefficient: coefficient,
+        deadline: deadline ? new Date(deadline) : null,
+        userId: user.id,
+      },
+      include: {
+        tasks: {
+          where: {
+            completed: false,
+          },
+        },
+      },
+    })
+    
+    console.log("[SUBJECTS_POST] Matière créée avec succès:", subject.id)
+    
+    // Transformer pour correspondre au format attendu par le mobile
+    const transformedSubject = {
+      ...subject,
+      tasks: subject.tasks.map(task => ({
+        ...task,
+        estimatedTime: task.estimatedMinutes || 30,
+        priority: task.priority === null || task.priority === undefined
+          ? 'medium'
+          : task.priority >= 8
+          ? 'high'
+          : task.priority >= 5
+          ? 'medium'
+          : 'low',
+      })),
+    }
+    
+    return NextResponse.json(transformedSubject)
+  } catch (error) {
+    console.error("[SUBJECTS_POST] Erreur:", error)
+    return NextResponse.json(
+      { error: "Erreur lors de la création de la matière" },
+      { status: 500 }
+    )
+  }
+}

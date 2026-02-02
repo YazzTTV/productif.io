@@ -14,12 +14,16 @@ export interface Task {
   priority: number // 1-5
   energy: number // 1-5 (1 = low energy, 5 = high energy)
   estimatedDuration: number // en minutes
+  reasoning?: string // Explication du scoring
+  suggestedTime?: string // morning, afternoon, evening
+  dueDate?: string // Date spécifique pour cette tâche
 }
 
 export interface TaskAnalysisResult {
   tasks: Task[]
   summary: string
   targetDate: string | null
+  totalEstimatedTime?: number // Temps total estimé en minutes
 }
 
 export class TaskAnalysisService {
@@ -137,14 +141,99 @@ RÈGLES IMPORTANTES:
         estimatedDuration: Math.max(15, Number(task.estimatedDuration) || 30),
       }))
 
+      // Calculer le temps total estimé
+      const totalEstimatedTime = tasks.reduce((sum, task) => sum + task.estimatedDuration, 0)
+
       return {
         tasks,
         summary: String(result.summary || 'Tâches extraites de la transcription'),
         targetDate: result.targetDate || null,
+        totalEstimatedTime,
       }
     } catch (error: any) {
       console.error('Erreur analyse tâches:', error)
       throw new Error(`Erreur lors de l'analyse: ${error.message}`)
     }
+  }
+
+  /**
+   * Organiser les tâches par moment de la journée
+   */
+  static organizeTasks(tasks: Task[]): {
+    morning: Task[]
+    afternoon: Task[]
+    evening: Task[]
+  } {
+    const morning: Task[] = []
+    const afternoon: Task[] = []
+    const evening: Task[] = []
+
+    // Calculer les scores et trier
+    const tasksWithScore = tasks.map(task => ({
+      task,
+      score: this.calculatePriorityScore(task)
+    })).sort((a, b) => b.score - a.score)
+
+    // Répartir intelligemment
+    tasksWithScore.forEach(({ task }) => {
+      if (task.suggestedTime === 'morning' || (task.energy >= 3 && task.priority >= 4)) {
+        morning.push(task)
+      } else if (task.suggestedTime === 'evening' || (task.energy <= 2 && task.priority <= 2)) {
+        evening.push(task)
+      } else {
+        afternoon.push(task)
+      }
+    })
+
+    return { morning, afternoon, evening }
+  }
+
+  /**
+   * Calculer le score de priorisation pour l'ordre des tâches
+   */
+  static calculatePriorityScore(task: Task): number {
+    const priorityWeight = 3
+    const energyWeight = 1.5
+    
+    // Bonus pour les tâches haute énergie (à faire le matin)
+    const morningBonus = task.energy >= 4 ? 2 : 0
+
+    return (task.priority * priorityWeight) + (task.energy * energyWeight) + morningBonus
+  }
+
+  /**
+   * Générer un résumé textuel de la planification
+   */
+  static generatePlanSummary(organized: {
+    morning: Task[]
+    afternoon: Task[]
+    evening: Task[]
+  }): string {
+    let summary = '📅 *Voici ta journée optimisée :*\n\n'
+    
+    if (organized.morning.length > 0) {
+      summary += '🌅 *Matin (8h-12h) :*\n'
+      organized.morning.forEach((task, index) => {
+        summary += `${index + 1}. ${task.title}\n`
+      })
+      summary += '\n'
+    }
+    
+    if (organized.afternoon.length > 0) {
+      summary += '☀️ *Après-midi (14h-17h) :*\n'
+      organized.afternoon.forEach((task, index) => {
+        summary += `${index + 1}. ${task.title}\n`
+      })
+      summary += '\n'
+    }
+    
+    if (organized.evening.length > 0) {
+      summary += '🌙 *Soir (17h-19h) :*\n'
+      organized.evening.forEach((task, index) => {
+        summary += `${index + 1}. ${task.title}\n`
+      })
+    }
+    
+    return summary
   }
 }

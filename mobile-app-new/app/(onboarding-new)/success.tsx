@@ -20,6 +20,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { authService } from '@/lib/api';
+import { useOnboardingData } from '@/hooks/useOnboardingData';
 
 const AnimatedView = Animated.createAnimatedComponent(View);
 

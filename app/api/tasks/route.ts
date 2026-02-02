@@ -367,6 +367,16 @@ export async function POST(request: NextRequest) {
 
     // Calculer l'ordre
     const order = calculateTaskOrder(priorityString, energyString)
+    
+    console.log("[TASKS_POST] Données calculées:", {
+      priority,
+      priorityString,
+      energyLevel,
+      energyString,
+      order,
+      subjectId,
+      estimatedMinutes
+    });
 
     // Utiliser un processus existant ou en créer un nouveau si nécessaire
     let finalProcessId = processId || null;
@@ -390,7 +400,42 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Vérifier que le subjectId existe et appartient à l'utilisateur (si fourni)
+    // Rejeter explicitement "no-subject" qui est une matière virtuelle
+    if (subjectId) {
+      if (subjectId === 'no-subject') {
+        console.error("[TASKS_POST] Tentative de création avec matière virtuelle 'no-subject'");
+        return NextResponse.json({ 
+          error: "Impossible de créer une tâche dans la catégorie 'Autres tâches'. Veuillez sélectionner une matière valide." 
+        }, { status: 400 });
+      }
+      
+      const subject = await prisma.subject.findFirst({
+        where: {
+          id: subjectId,
+          userId: targetUserId
+        }
+      });
+      
+      if (!subject) {
+        console.error("[TASKS_POST] SubjectId invalide ou n'appartient pas à l'utilisateur:", subjectId);
+        return NextResponse.json({ 
+          error: "La matière sélectionnée n'existe pas ou ne vous appartient pas" 
+        }, { status: 400 });
+      }
+    }
+
     // Créer la tâche
+    console.log("[TASKS_POST] Création de la tâche avec les données:", {
+      title,
+      priority,
+      energyLevel,
+      subjectId,
+      estimatedMinutes,
+      userId: targetUserId,
+      order
+    });
+    
     const task = await prisma.task.create({
       data: {
         title,
@@ -408,10 +453,25 @@ export async function POST(request: NextRequest) {
       }
     })
 
+    console.log("[TASKS_POST] Tâche créée avec succès:", task.id);
     return NextResponse.json(task)
   } catch (error) {
-    console.error("[TASKS_POST] Error", error)
-    return NextResponse.json({ error: "Erreur lors de la création de la tâche" }, { status: 500 })
+    console.error("[TASKS_POST] Error", error);
+    console.error("[TASKS_POST] Error details:", {
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      name: error instanceof Error ? error.name : undefined
+    });
+    
+    // Retourner un message d'erreur plus détaillé
+    const errorMessage = error instanceof Error 
+      ? error.message 
+      : "Erreur lors de la création de la tâche";
+    
+    return NextResponse.json({ 
+      error: errorMessage,
+      details: process.env.NODE_ENV === 'development' ? (error instanceof Error ? error.stack : String(error)) : undefined
+    }, { status: 500 })
   }
 }
 
