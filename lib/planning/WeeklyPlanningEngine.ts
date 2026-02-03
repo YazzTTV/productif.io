@@ -81,7 +81,17 @@ export class WeeklyPlanningEngine {
     const distribution = this.calculateDistribution(data.subjects, calendarContext)
     
     // 4. Générer les créneaux libres
-    const freeSlots = this.findFreeSlots(calendarContext.events, data.weekStart, data.weekEnd)
+    // Combiner les événements du calendrier avec les périodes occupées (FreeBusy API)
+    // pour être sûr de ne pas créer de conflit
+    const allBusyPeriods = [
+      ...calendarContext.events.map(e => ({ start: e.start, end: e.end })),
+      ...calendarContext.busyPeriods,
+    ]
+    // Dédupliquer les périodes qui se chevauchent
+    const uniqueBusyPeriods = this.mergeBusyPeriods(allBusyPeriods)
+    console.log(`📅 [WeeklyPlanning] planWeek - ${uniqueBusyPeriods.length} périodes occupées au total`)
+    
+    const freeSlots = this.findFreeSlots(uniqueBusyPeriods, data.weekStart, data.weekEnd)
     
     // 5. Assigner les sessions aux créneaux
     const sessions = this.assignSessionsToSlots(
@@ -403,11 +413,14 @@ export class WeeklyPlanningEngine {
     const slots: FreeSlot[] = []
     const dayStart = 8 // 8h
     const dayEnd = 22 // 22h
+    const lunchStart = 12 // Pause déjeuner début 12h
+    const lunchEnd = 14 // Pause déjeuner fin 14h
     const minSlotDuration = 30 // Minimum 30 minutes
     const now = new Date()
     
     console.log('📅 [WeeklyPlanning] findFreeSlots - now:', now.toISOString(), 'Local:', now.toString())
     console.log('📅 [WeeklyPlanning] findFreeSlots - weekStart:', weekStart.toISOString(), 'weekEnd:', weekEnd.toISOString())
+    console.log('📅 [WeeklyPlanning] findFreeSlots - busyPeriods count:', busyPeriods.length)
 
     // Toujours commencer par aujourd'hui si on est dans la semaine
     const today = new Date(now)
@@ -422,6 +435,8 @@ export class WeeklyPlanningEngine {
         today,
         dayStart,
         dayEnd,
+        lunchStart,
+        lunchEnd,
         busyPeriods,
         minSlotDuration
       )
@@ -452,6 +467,8 @@ export class WeeklyPlanningEngine {
         currentDay,
         dayStart,
         dayEnd,
+        lunchStart,
+        lunchEnd,
         busyPeriods,
         minSlotDuration
       )
@@ -484,6 +501,8 @@ export class WeeklyPlanningEngine {
     day: Date,
     dayStart: number,
     dayEnd: number,
+    lunchStart: number,
+    lunchEnd: number,
     busyPeriods: Array<{ start: Date; end: Date }>,
     minDuration: number
   ): FreeSlot[] {
@@ -512,10 +531,24 @@ export class WeeklyPlanningEngine {
     const endOfDay = new Date(day)
     endOfDay.setHours(dayEnd, 0, 0, 0)
 
+    // Créer la période de pause déjeuner (12h-14h)
+    const lunchBreakStart = new Date(day)
+    lunchBreakStart.setHours(lunchStart, 0, 0, 0)
+    const lunchBreakEnd = new Date(day)
+    lunchBreakEnd.setHours(lunchEnd, 0, 0, 0)
+
     // Filtrer les périodes occupées de ce jour
     const dayBusyPeriods = busyPeriods.filter((period) =>
       isSameDay(period.start, day)
     )
+    
+    // Ajouter la pause déjeuner comme période occupée
+    dayBusyPeriods.push({
+      start: lunchBreakStart,
+      end: lunchBreakEnd,
+    })
+    
+    console.log(`📅 [WeeklyPlanning] findDayFreeSlots - ${dayBusyPeriods.length} périodes occupées (incluant pause déjeuner 12h-14h)`)
 
     // Trier les périodes occupées
     dayBusyPeriods.sort((a, b) => a.start.getTime() - b.start.getTime())
@@ -797,6 +830,38 @@ export class WeeklyPlanningEngine {
     }
     
     return bestSlot
+  }
+
+  /**
+   * Fusionne les périodes occupées qui se chevauchent
+   */
+  private mergeBusyPeriods(
+    periods: Array<{ start: Date; end: Date }>
+  ): Array<{ start: Date; end: Date }> {
+    if (periods.length === 0) return []
+
+    // Trier par date de début
+    const sorted = [...periods].sort((a, b) => a.start.getTime() - b.start.getTime())
+
+    const merged: Array<{ start: Date; end: Date }> = [sorted[0]]
+
+    for (let i = 1; i < sorted.length; i++) {
+      const current = sorted[i]
+      const lastMerged = merged[merged.length - 1]
+
+      // Si les périodes se chevauchent ou sont adjacentes, fusionner
+      if (current.start.getTime() <= lastMerged.end.getTime()) {
+        // Étendre la fin si nécessaire
+        if (current.end.getTime() > lastMerged.end.getTime()) {
+          lastMerged.end = current.end
+        }
+      } else {
+        // Pas de chevauchement, ajouter comme nouvelle période
+        merged.push(current)
+      }
+    }
+
+    return merged
   }
 
   /**

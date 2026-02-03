@@ -889,3 +889,28 @@ model ScheduledTaskEvent {
   @@index([googleEventId])
   @@map("scheduled_task_events")
 }
+
+model ScanCapture {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  email     String?
+  sessionId String?
+  query     String?
+  sourceUrl String?
+  status    String   @default("pending")
+  error     String?
+
+  attribution Json?
+  ocrText     String?
+  aiJson      Json?
+
+  imageMime String?
+  imageData Bytes?
+
+  @@index([email])
+  @@index([sessionId])
+  @@index([status])
+  @@map("scan_captures")
+}

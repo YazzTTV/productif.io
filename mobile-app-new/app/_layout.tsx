@@ -166,6 +166,13 @@ function AppContent() {
               }} 
             />
             <Stack.Screen 
+              name="ent-webview" 
+              options={{ 
+                headerShown: false,
+                gestureEnabled: true,
+              }} 
+            />
+            <Stack.Screen 
               name="stripe-checkout" 
               options={{ 
                 headerShown: false,

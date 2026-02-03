@@ -70,7 +70,12 @@ export function PlanMyDay() {
       isMountedRef.current = false;
       // Nettoyer l'enregistrement si le composant est démonté
       if (recording) {
-        recording.stopAndUnloadAsync().catch(console.error);
+        recording.stopAndUnloadAsync().catch((err) => {
+          // Ignorer si déjà déchargé (cas normal après stopRecording)
+          if (!err?.message?.includes('already been unloaded')) {
+            console.error(err);
+          }
+        });
       }
     };
   }, [recording]);
@@ -288,6 +293,37 @@ export function PlanMyDay() {
     }
   };
 
+  // Fonction de tri des tâches par priorité (priorité > énergie > coefficient matière)
+  // La priorité est le critère principal car c'est ce que l'utilisateur peut modifier manuellement
+  // L'énergie en second car les tâches demandant plus de concentration doivent être faites en premier
+  const sortTasksByPriority = (tasksToSort: TaskWithSubject[]): TaskWithSubject[] => {
+    return [...tasksToSort].sort((a, b) => {
+      // 1. D'abord par priorité décroissante (5 > 4 > 3 > 2 > 1)
+      // C'est le critère principal car l'utilisateur peut le modifier
+      if (b.priority !== a.priority) {
+        return b.priority - a.priority;
+      }
+      
+      // 2. En cas d'égalité de priorité, par niveau d'énergie décroissant (5 > 4 > 3 > 2 > 1)
+      // Les tâches qui demandent plus de concentration sont faites en premier (quand on est frais)
+      if (b.energy !== a.energy) {
+        return b.energy - a.energy;
+      }
+      
+      // 3. En cas d'égalité, par coefficient de la matière (plus élevé = plus prioritaire)
+      const getCoefficient = (task: TaskWithSubject): number => {
+        if (!task.subjectId) return 0;
+        const subject = subjects.find(s => s.id === task.subjectId);
+        return subject?.coefficient || 0;
+      };
+      
+      const coeffA = getCoefficient(a);
+      const coeffB = getCoefficient(b);
+      
+      return coeffB - coeffA;
+    });
+  };
+
   const updateTaskSubject = (taskIndex: number, subjectId: string | null) => {
     const updatedTasks = [...tasks];
     const task = updatedTasks[taskIndex];
@@ -297,7 +333,8 @@ export function PlanMyDay() {
     task.subjectName = subject?.name || null;
     task.confidence = subjectId ? 1.0 : 0.0;
 
-    setTasks(updatedTasks);
+    // Trier les tâches après modification (le coefficient de la matière affecte l'ordre)
+    setTasks(sortTasksByPriority(updatedTasks));
     setShowSubjectPicker(false);
     setSelectedTaskIndex(null);
   };
@@ -339,32 +376,9 @@ export function PlanMyDay() {
         setExistingCalendarEvents([]);
       }
 
-      // Trier les tâches en priorisant selon les coefficients des matières
-      // Les matières avec un coefficient élevé sont plus importantes
-      const sortedTasks = [...tasks].sort((a, b) => {
-        // 1. D'abord par coefficient de la matière (plus élevé = plus prioritaire)
-        const getCoefficient = (task: TaskWithSubject): number => {
-          if (!task.subjectId) return 0; // Tâche sans matière = coefficient 0
-          const subject = subjects.find(s => s.id === task.subjectId);
-          return subject?.coefficient || 0;
-        };
-        
-        const coeffA = getCoefficient(a);
-        const coeffB = getCoefficient(b);
-        
-        if (coeffB !== coeffA) {
-          return coeffB - coeffA; // Coefficient décroissant
-        }
-        
-        // 2. En cas d'égalité de coefficient, par priorité décroissante (5 > 4 > 3 > 2 > 1)
-        if (b.priority !== a.priority) {
-          return b.priority - a.priority;
-        }
-        
-        // 3. En cas d'égalité de priorité, par niveau d'énergie décroissant (5 > 4 > 3 > 2 > 1)
-        // Les tâches qui nécessitent plus de concentration sont placées tôt dans la journée
-        return b.energy - a.energy;
-      });
+      // Trier les tâches : priorité > coefficient matière > énergie
+      // La priorité est le critère principal car l'utilisateur peut la modifier manuellement
+      const sortedTasks = sortTasksByPriority(tasks);
 
       console.log('📋 [PlanMyDay] Tâches triées par coefficient puis priorité:', sortedTasks.map(t => {
         const subject = subjects.find(s => s.id === t.subjectId);
@@ -379,7 +393,21 @@ export function PlanMyDay() {
 
       // Calculer les heures de début en évitant les créneaux occupés
       const dayStart = startOfDay(targetDate);
-      const defaultStart = setMinutes(setHours(dayStart, 9), 0); // 9h par défaut
+      const now = new Date();
+      const isToday = format(targetDate, 'yyyy-MM-dd') === format(now, 'yyyy-MM-dd');
+      
+      // Si c'est aujourd'hui et qu'il est après 9h, commencer à l'heure actuelle (arrondie à la prochaine demi-heure)
+      let defaultStart: Date;
+      if (isToday) {
+        const currentMinutes = now.getMinutes();
+        const roundedMinutes = currentMinutes < 30 ? 30 : 0;
+        const hoursToAdd = currentMinutes >= 30 ? 1 : 0;
+        const startHour = Math.max(9, now.getHours() + hoursToAdd);
+        defaultStart = setMinutes(setHours(dayStart, startHour), roundedMinutes);
+        console.log('📍 [PlanMyDay] Aujourd\'hui - début à', format(defaultStart, 'HH:mm'));
+      } else {
+        defaultStart = setMinutes(setHours(dayStart, 9), 0); // 9h par défaut pour les autres jours
+      }
       let currentTime = new Date(defaultStart);
 
       console.log('📋 [PlanMyDay] Calcul des créneaux pour', sortedTasks.length, 'tâches');
@@ -474,6 +502,26 @@ export function PlanMyDay() {
     const newDuration = Math.max(15, Math.min(480, task.estimatedDuration + delta)); // 15min - 8h
     task.estimatedDuration = newDuration;
     setTasks(updatedTasks);
+  };
+
+  // Modifier la priorité d'une tâche (phase association) - avec tri automatique
+  const updateTaskPriority = (taskIndex: number, delta: number) => {
+    const updatedTasks = [...tasks];
+    const task = updatedTasks[taskIndex];
+    const newPriority = Math.max(1, Math.min(5, task.priority + delta)); // 1-5
+    task.priority = newPriority;
+    // Trier les tâches après modification pour que la plus prioritaire soit en haut
+    setTasks(sortTasksByPriority(updatedTasks));
+  };
+
+  // Modifier l'énergie d'une tâche (phase association) - avec tri automatique
+  const updateTaskEnergy = (taskIndex: number, delta: number) => {
+    const updatedTasks = [...tasks];
+    const task = updatedTasks[taskIndex];
+    const newEnergy = Math.max(1, Math.min(5, task.energy + delta)); // 1-5
+    task.energy = newEnergy;
+    // Trier les tâches après modification pour que la plus prioritaire soit en haut
+    setTasks(sortTasksByPriority(updatedTasks));
   };
 
   // Modifier l'heure de début d'un événement (phase overview)
@@ -878,13 +926,49 @@ export function PlanMyDay() {
                       </TouchableOpacity>
                     </View>
                   </View>
-                  <View style={styles.taskMetaItem}>
-                    <Ionicons name="flash-outline" size={14} color="rgba(0, 0, 0, 0.4)" />
-                    <Text style={styles.taskMetaText}>Énergie: {task.energy}/5</Text>
+                </View>
+                <View style={styles.taskMetaRow}>
+                  <View style={styles.taskMetaItemAdjustable}>
+                    <Ionicons name="flag-outline" size={14} color="#16A34A" />
+                    <Text style={styles.taskMetaLabel}>Priorité</Text>
+                    <View style={styles.adjustableControl}>
+                      <TouchableOpacity
+                        style={styles.adjustButton}
+                        onPress={() => updateTaskPriority(index, -1)}
+                        disabled={task.priority <= 1}
+                      >
+                        <Ionicons name="remove" size={14} color={task.priority <= 1 ? 'rgba(0,0,0,0.2)' : '#16A34A'} />
+                      </TouchableOpacity>
+                      <Text style={styles.adjustableValue}>{task.priority}/5</Text>
+                      <TouchableOpacity
+                        style={styles.adjustButton}
+                        onPress={() => updateTaskPriority(index, 1)}
+                        disabled={task.priority >= 5}
+                      >
+                        <Ionicons name="add" size={14} color={task.priority >= 5 ? 'rgba(0,0,0,0.2)' : '#16A34A'} />
+                      </TouchableOpacity>
+                    </View>
                   </View>
-                  <View style={styles.taskMetaItem}>
-                    <Ionicons name="flag-outline" size={14} color="rgba(0, 0, 0, 0.4)" />
-                    <Text style={styles.taskMetaText}>Priorité: {task.priority}/5</Text>
+                  <View style={styles.taskMetaItemAdjustable}>
+                    <Ionicons name="flash-outline" size={14} color="#F59E0B" />
+                    <Text style={styles.taskMetaLabel}>Énergie</Text>
+                    <View style={styles.adjustableControl}>
+                      <TouchableOpacity
+                        style={styles.adjustButton}
+                        onPress={() => updateTaskEnergy(index, -1)}
+                        disabled={task.energy <= 1}
+                      >
+                        <Ionicons name="remove" size={14} color={task.energy <= 1 ? 'rgba(0,0,0,0.2)' : '#F59E0B'} />
+                      </TouchableOpacity>
+                      <Text style={styles.adjustableValue}>{task.energy}/5</Text>
+                      <TouchableOpacity
+                        style={styles.adjustButton}
+                        onPress={() => updateTaskEnergy(index, 1)}
+                        disabled={task.energy >= 5}
+                      >
+                        <Ionicons name="add" size={14} color={task.energy >= 5 ? 'rgba(0,0,0,0.2)' : '#F59E0B'} />
+                      </TouchableOpacity>
+                    </View>
                   </View>
                 </View>
               </View>
@@ -1074,7 +1158,16 @@ function TimelineCalendar({
   const [dragStartY, setDragStartY] = useState(0);
   const timelineRef = useRef<View>(null);
   const scrollViewRef = useRef<ScrollView>(null);
-  const panRespondersRef = useRef<Map<number, ReturnType<typeof PanResponder.create>>>(new Map());
+  
+  // Utiliser des refs pour stocker les valeurs actuelles (résout le problème de closure)
+  const draggingIndexRef = useRef<number | null>(null);
+  const dragYRef = useRef(0);
+  const eventStartTimesRef = useRef(eventStartTimes);
+  
+  // Mettre à jour les refs quand les valeurs changent
+  useEffect(() => {
+    eventStartTimesRef.current = eventStartTimes;
+  }, [eventStartTimes]);
 
   // Convertir une heure en position Y sur la timeline
   const hourToY = (date: Date): number => {
@@ -1093,46 +1186,70 @@ function TimelineCalendar({
     return setMinutes(setHours(dayStart, hours), minutes);
   };
 
-  // Obtenir ou créer un pan responder pour une tâche (mémorisé)
-  const getTaskPanResponder = (taskIndex: number): ReturnType<typeof PanResponder.create> => {
-    if (!panRespondersRef.current.has(taskIndex)) {
-      panRespondersRef.current.set(taskIndex, PanResponder.create({
-        onStartShouldSetPanResponder: () => true,
-        onMoveShouldSetPanResponder: () => true,
-        onPanResponderGrant: (evt, gestureState) => {
-          const taskY = hourToY(eventStartTimes[taskIndex]);
-          setDraggingIndex(taskIndex);
-          setDragStartY(taskY);
-          setDragY(taskY);
-        },
-        onPanResponderMove: (evt, gestureState) => {
-          if (draggingIndex === taskIndex) {
-            const taskY = hourToY(eventStartTimes[taskIndex]);
-            const newY = taskY + gestureState.dy;
-            const minY = 0;
-            const maxY = (END_HOUR - START_HOUR) * HOUR_HEIGHT;
-            const clampedY = Math.max(minY, Math.min(maxY, newY));
-            setDragY(clampedY);
-          }
-        },
-        onPanResponderRelease: (evt, gestureState) => {
-          if (draggingIndex === taskIndex) {
-            // Arrondir à la demi-heure la plus proche pour un meilleur alignement
-            const newTime = yToHour(dragY);
-            const minutes = getMinutes(newTime);
-            const roundedMinutes = Math.round(minutes / 30) * 30;
-            const finalTime = setMinutes(newTime, roundedMinutes);
-            
-            onTimeChange(taskIndex, finalTime);
-            setDraggingIndex(null);
-            setDragY(0);
-            setDragStartY(0);
-          }
-        },
-      }));
-    }
-    return panRespondersRef.current.get(taskIndex)!;
+  // Créer un pan responder pour une tâche - utilise les refs pour éviter les problèmes de closure
+  const createTaskPanResponder = (taskIndex: number): ReturnType<typeof PanResponder.create> => {
+    return PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        // Activer le pan responder seulement si le mouvement vertical est significatif
+        return Math.abs(gestureState.dy) > 5;
+      },
+      onPanResponderGrant: () => {
+        const currentStartTimes = eventStartTimesRef.current;
+        const taskY = hourToY(currentStartTimes[taskIndex] || new Date());
+        draggingIndexRef.current = taskIndex;
+        dragYRef.current = taskY;
+        setDraggingIndex(taskIndex);
+        setDragStartY(taskY);
+        setDragY(taskY);
+      },
+      onPanResponderMove: (_, gestureState) => {
+        // Utiliser la ref au lieu de l'état pour éviter les problèmes de closure
+        if (draggingIndexRef.current === taskIndex) {
+          const currentStartTimes = eventStartTimesRef.current;
+          const taskY = hourToY(currentStartTimes[taskIndex] || new Date());
+          const newY = taskY + gestureState.dy;
+          const minY = 0;
+          const maxY = (END_HOUR - START_HOUR) * HOUR_HEIGHT;
+          const clampedY = Math.max(minY, Math.min(maxY, newY));
+          dragYRef.current = clampedY;
+          setDragY(clampedY);
+        }
+      },
+      onPanResponderRelease: () => {
+        if (draggingIndexRef.current === taskIndex) {
+          // Arrondir à la demi-heure la plus proche pour un meilleur alignement
+          const currentDragY = dragYRef.current;
+          const newTime = yToHour(currentDragY);
+          const minutes = getMinutes(newTime);
+          const roundedMinutes = Math.round(minutes / 30) * 30;
+          const finalTime = setMinutes(newTime, roundedMinutes);
+          
+          onTimeChange(taskIndex, finalTime);
+          draggingIndexRef.current = null;
+          dragYRef.current = 0;
+          setDraggingIndex(null);
+          setDragY(0);
+          setDragStartY(0);
+        }
+      },
+      onPanResponderTerminate: () => {
+        // Gérer le cas où le gesture est interrompu
+        if (draggingIndexRef.current === taskIndex) {
+          draggingIndexRef.current = null;
+          dragYRef.current = 0;
+          setDraggingIndex(null);
+          setDragY(0);
+          setDragStartY(0);
+        }
+      },
+    });
   };
+
+  // Mémoriser les pan responders pour chaque tâche
+  const panResponders = useMemo(() => {
+    return tasks.map((_, index) => createTaskPanResponder(index));
+  }, [tasks.length, targetDate]); // Recréer seulement si le nombre de tâches change
 
   // Combiner tous les événements (existants + nouvelles tâches)
   // Utiliser useMemo pour recalculer quand eventStartTimes change
@@ -1265,7 +1382,7 @@ function TimelineCalendar({
 
             // Obtenir le pan responder pour les tâches (pas les événements existants)
             const panResponder = !evt.isExisting && evt.taskIndex !== undefined 
-              ? getTaskPanResponder(evt.taskIndex)
+              ? panResponders[evt.taskIndex]
               : null;
 
             return (
@@ -1720,10 +1837,52 @@ const styles = StyleSheet.create({
     gap: 16,
     flexWrap: 'wrap',
   },
+  taskMetaRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 4,
+  },
   taskMetaItem: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
+  },
+  taskMetaItemAdjustable: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    padding: 8,
+    borderRadius: 10,
+    backgroundColor: 'rgba(0, 0, 0, 0.02)',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.06)',
+  },
+  taskMetaLabel: {
+    fontSize: 12,
+    color: 'rgba(0, 0, 0, 0.5)',
+    fontWeight: '500',
+  },
+  adjustableControl: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginLeft: 'auto',
+  },
+  adjustButton: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  adjustableValue: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#000',
+    minWidth: 28,
+    textAlign: 'center',
   },
   taskMetaText: {
     fontSize: 13,

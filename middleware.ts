@@ -19,6 +19,8 @@ function decodeJwtPayload(token: string): any | null {
 const publicRoutes = [
   "/login",
   "/register",
+  "/scan",
+  "/connect/ent",
   "/onboarding",
   "/auth/callback", // Callback pour synchroniser NextAuth avec le système d'auth personnalisé
   "/upgrade",
@@ -120,4 +122,3 @@ export const config = {
     "/((?!_next/static|_next/image|favicon.ico|public/).*)",
   ],
 }
-
