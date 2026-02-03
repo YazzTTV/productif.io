@@ -1,242 +1,321 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 
-const SEARCH_ENGINE = "https://duckduckgo.com/html/?q=";
-const QR_CODE_URL = "/qr/scan.svg";
 const APP_STORE_URL =
   process.env.NEXT_PUBLIC_APP_STORE_URL || "https://apps.apple.com/app/id0000000000";
 
-const MICRO_COPY = [
-  "Extraction des salles…",
-  "Analyse des matières…",
-  "Optimisation de tes pauses…",
-  "Création des coefficients…",
-  "Assemblage du planning…",
+// Chips de suggestions pour l'entrée des tâches
+const PROMPT_CHIPS = [
+  { key: "classesLectures", label: "Cours / TD" },
+  { key: "deadlines", label: "Deadlines" },
+  { key: "revisions", label: "Révisions" },
+  { key: "avoiding", label: "Ce que j'évite" },
+  { key: "personalObligations", label: "Obligations perso" },
 ];
 
-type Step = "landing" | "webview" | "voice" | "wait" | "reveal";
+// Étapes de construction du plan
+const BUILD_STEPS = [
+  { key: "priorities", text: "Analyse de tes priorités…", duration: 2000 },
+  { key: "effort", text: "Estimation de l'effort…", duration: 2500 },
+  { key: "plan", text: "Création de ton planning…", duration: 2000 },
+];
 
-type ScanResult = {
-  subjects?: Array<{ name: string; coefficient: number; ue?: string }>;
-  schedule?: Array<{
-    day: string;
-    start: string;
-    end: string;
-    subject: string;
-    location?: string;
-    teacher?: string;
-  }>;
-  summary?: string;
-};
+type Step = "hook" | "tasks-input" | "task-clarification" | "building-plan" | "ideal-day";
 
-function resolveUrlFromQuery(value: string) {
-  const trimmed = value.trim();
-  if (!trimmed) return `${SEARCH_ENGINE}${encodeURIComponent("ENT Pronote")}`;
-  const looksLikeUrl = trimmed.includes(".") && !trimmed.includes(" ");
-  if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
-    return trimmed;
-  }
-  if (looksLikeUrl) {
-    return `https://${trimmed}`;
-  }
-  return `${SEARCH_ENGINE}${encodeURIComponent(trimmed)}`;
+interface ClarifiedTask {
+  id: string;
+  title: string;
+  category: string;
+  priority: number;
+  energyLevel: number;
+  dueDate: string;
+  suggestedTime: string;
+  estimatedDuration: number;
 }
 
-function isValidEmail(value: string) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+interface TimelineBlock {
+  time: string;
+  duration: number;
+  activity: string;
+  priority: boolean;
 }
 
 export default function ScanClient() {
-  const [step, setStep] = useState<Step>("landing");
-  const [query, setQuery] = useState("");
-  const [activeUrl, setActiveUrl] = useState(resolveUrlFromQuery(""));
+  const [step, setStep] = useState<Step>("hook");
+  const [tasks, setTasks] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [isBlocked, setIsBlocked] = useState(false);
-  const loadedRef = useRef(false);
-  const [email, setEmail] = useState("");
-  const [progress, setProgress] = useState(0);
-  const [copyIndex, setCopyIndex] = useState(0);
+  const [isRecording, setIsRecording] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  
+  // Task clarification state
+  const [clarifiedTasks, setClarifiedTasks] = useState<ClarifiedTask[]>([]);
+  
+  // Building plan state
+  const [buildStep, setBuildStep] = useState(0);
+  const [completedBuildSteps, setCompletedBuildSteps] = useState<number[]>([]);
+  
+  // Ideal day state
+  const [priorities, setPriorities] = useState<string[]>([]);
+  const [timeline, setTimeline] = useState<TimelineBlock[]>([]);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [editingTime, setEditingTime] = useState("");
+  
   const sessionIdRef = useRef<string | null>(null);
-  const attributionRef = useRef<string | null>(null);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
 
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [filePreview, setFilePreview] = useState<string | null>(null);
-  const [uploadError, setUploadError] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [result, setResult] = useState<ScanResult | null>(null);
-
-  const [qrOpen, setQrOpen] = useState(false);
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  const qrControlsRef = useRef<any>(null);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
-
+  // Générer un session ID unique
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const params = new URLSearchParams(window.location.search);
-    const attribution = {
-      utm_source: params.get("utm_source"),
-      utm_medium: params.get("utm_medium"),
-      utm_campaign: params.get("utm_campaign"),
-      utm_content: params.get("utm_content"),
-      utm_term: params.get("utm_term"),
-      entry: params.get("entry"),
-      ts: new Date().toISOString(),
-    };
-    const serialized = JSON.stringify(attribution);
-    attributionRef.current = serialized;
-    window.localStorage.setItem("scan_attribution", serialized);
-
     const sessionId =
       window.crypto?.randomUUID?.() ||
       `scan_${Math.random().toString(36).slice(2, 10)}_${Date.now()}`;
     sessionIdRef.current = sessionId;
-    window.localStorage.setItem("scan_session_id", sessionId);
   }, []);
 
-  useEffect(() => {
-    return () => {
-      if (filePreview) {
-        URL.revokeObjectURL(filePreview);
-      }
-    };
-  }, [filePreview]);
-
-  useEffect(() => {
-    if (step !== "webview") return;
-    setIsLoading(true);
-    setIsBlocked(false);
-    loadedRef.current = false;
-
-    const timeoutId = window.setTimeout(() => {
-      if (!loadedRef.current) {
-        setIsLoading(false);
-        setIsBlocked(true);
-      }
-    }, 2500);
-
-    return () => window.clearTimeout(timeoutId);
-  }, [step, activeUrl]);
-
-  useEffect(() => {
-    if (step !== "wait") return;
-    setProgress(0);
-    setCopyIndex(0);
-
-    const progressTimer = window.setInterval(() => {
-      setProgress((current) => {
-        if (isSubmitting) {
-          return Math.min(95, current + 2);
-        }
-        if (current >= 90) return 90;
-        return Math.min(90, current + 4);
-      });
-    }, 220);
-
-    const copyTimer = window.setInterval(() => {
-      setCopyIndex((current) => (current + 1) % MICRO_COPY.length);
-    }, 1400);
-
-    return () => {
-      window.clearInterval(progressTimer);
-      window.clearInterval(copyTimer);
-    };
-  }, [step, isSubmitting]);
-
-  useEffect(() => {
-    if (!qrOpen) return;
-    let isActive = true;
-
-    const startScanner = async () => {
-      const { BrowserQRCodeReader } = await import("@zxing/browser");
-      const reader = new BrowserQRCodeReader();
-      if (!videoRef.current || !isActive) return;
-      qrControlsRef.current = await reader.decodeFromVideoDevice(
-        undefined,
-        videoRef.current,
-        (result) => {
-          if (!result) return;
-          const text = result.getText();
-          setQuery(text);
-          const url = resolveUrlFromQuery(text);
-          setActiveUrl(url);
-          setStep("webview");
-          setQrOpen(false);
-          if (qrControlsRef.current) {
-            qrControlsRef.current.stop();
-          }
-        }
-      );
-    };
-
-    startScanner();
-
-    return () => {
-      isActive = false;
-      if (qrControlsRef.current) {
-        qrControlsRef.current.stop();
-        qrControlsRef.current = null;
-      }
-    };
-  }, [qrOpen]);
-
-  const handleSearch = () => {
-    const url = resolveUrlFromQuery(query);
-    setActiveUrl(url);
-    setIsBlocked(false);
+  // Gestion des chips
+  const handleChipClick = (label: string) => {
+    const newText = tasks ? `${tasks}\n${label}: ` : `${label}: `;
+    setTasks(newText);
   };
 
-  const handleSelectFile = (file: File | null) => {
-    if (!file) return;
-    setSelectedFile(file);
-    setUploadError(null);
-    const previewUrl = URL.createObjectURL(file);
-    setFilePreview(previewUrl);
-  };
+  // Transcription vocale (Web Speech API)
+  const toggleRecording = () => {
+    if (typeof window === "undefined") return;
 
-  const handleCapture = () => {
-    if (!selectedFile) {
-      setUploadError("Ajoute une capture d’écran de ton planning pour continuer.");
+    const SpeechRecognitionAPI =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+
+    if (!SpeechRecognitionAPI) {
+      setError("La reconnaissance vocale n'est pas supportée par ton navigateur.");
       return;
     }
-    setStep("wait");
+
+    if (isRecording) {
+      recognitionRef.current?.stop();
+      setIsRecording(false);
+      return;
+    }
+
+    setError(null);
+    const recognition = new SpeechRecognitionAPI();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = "fr-FR";
+
+    recognition.onresult = (event: SpeechRecognitionEvent) => {
+      let finalTranscript = "";
+      let interimTranscript = "";
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const transcript = event.results[i][0].transcript;
+        if (event.results[i].isFinal) {
+          finalTranscript += transcript;
+        } else {
+          interimTranscript += transcript;
+        }
+      }
+      if (finalTranscript) {
+        setTasks((prev) => (prev ? `${prev} ${finalTranscript}` : finalTranscript));
+      }
+    };
+
+    recognition.onerror = (event: { error: string }) => {
+      if (event.error === "not-allowed") {
+        setError("Autorise l'accès au micro pour utiliser la transcription.");
+      } else if (event.error !== "aborted") {
+        setError(`Erreur: ${event.error}`);
+      }
+      setIsRecording(false);
+    };
+
+    recognition.onend = () => {
+      setIsRecording(false);
+    };
+
+    recognitionRef.current = recognition;
+    recognition.start();
+    setIsRecording(true);
   };
 
-  const handleEmailSubmit = async () => {
-    if (!isValidEmail(email) || !selectedFile || isSubmitting) return;
-    setUploadError(null);
-    setIsSubmitting(true);
+  // Nettoyage de la reconnaissance vocale au démontage
+  useEffect(() => {
+    return () => {
+      recognitionRef.current?.abort();
+    };
+  }, []);
 
+  // Soumettre les tâches pour analyse
+  const handleSubmitTasks = async () => {
+    if (!tasks.trim() || isLoading) return;
+    
+    setIsLoading(true);
+    setError(null);
+    
     try {
-      const formData = new FormData();
-      formData.append("image", selectedFile);
-      formData.append("email", email);
-      if (sessionIdRef.current) formData.append("sessionId", sessionIdRef.current);
-      if (query) formData.append("query", query);
-      if (activeUrl) formData.append("sourceUrl", activeUrl);
-      if (attributionRef.current) formData.append("attribution", attributionRef.current);
-
-      const response = await fetch("/api/scan", {
+      const response = await fetch("/api/scan/analyze-tasks", {
         method: "POST",
-        body: formData,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userInput: tasks.trim() }),
       });
-
+      
       if (!response.ok) {
-        const error = await response.json().catch(() => ({}));
-        throw new Error(error.error || "Erreur lors de l'analyse");
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.error || "Erreur lors de l'analyse");
       }
-
+      
       const data = await response.json();
-      setResult(data.result);
-      setProgress(100);
-      window.setTimeout(() => setStep("reveal"), 800);
-    } catch (error) {
-      setUploadError(String(error));
+      
+      if (!data.tasks || data.tasks.length === 0) {
+        throw new Error("Aucune tâche détectée. Essaie d'être plus précis.");
+      }
+      
+      setClarifiedTasks(data.tasks);
+      setStep("task-clarification");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Une erreur est survenue");
     } finally {
-      setIsSubmitting(false);
+      setIsLoading(false);
     }
   };
 
+  // Toggle priorité d'une tâche
+  const togglePriority = (id: string) => {
+    setClarifiedTasks(prev =>
+      prev.map(task =>
+        task.id === id
+          ? { ...task, priority: task.priority === 4 ? 0 : 4 }
+          : task
+      )
+    );
+  };
+
+  // Supprimer une tâche
+  const deleteTask = (id: string) => {
+    setClarifiedTasks(prev => prev.filter(task => task.id !== id));
+  };
+
+  // Modifier le titre d'une tâche
+  const updateTaskTitle = (id: string, title: string) => {
+    setClarifiedTasks(prev =>
+      prev.map(task => (task.id === id ? { ...task, title } : task))
+    );
+  };
+
+  // Lancer la construction du plan
+  const handleBuildPlan = () => {
+    if (clarifiedTasks.length === 0) return;
+    setStep("building-plan");
+    setBuildStep(0);
+    setCompletedBuildSteps([]);
+  };
+
+  // Animation de construction du plan
+  useEffect(() => {
+    if (step !== "building-plan") return;
+    
+    if (buildStep < BUILD_STEPS.length) {
+      const timer = setTimeout(() => {
+        setCompletedBuildSteps(prev => [...prev, buildStep]);
+        setBuildStep(prev => prev + 1);
+      }, BUILD_STEPS[buildStep].duration);
+      return () => clearTimeout(timer);
+    } else {
+      // Toutes les étapes terminées, préparer ideal-day
+      const timer = setTimeout(() => {
+        // Extraire les priorités (tâches avec priority = 4)
+        const priorityTasks = clarifiedTasks
+          .filter(task => task.priority === 4)
+          .slice(0, 3)
+          .map(task => task.title);
+        setPriorities(priorityTasks);
+        
+        // Créer la timeline
+        const blocks: TimelineBlock[] = clarifiedTasks
+          .filter(task => task.dueDate)
+          .map(task => {
+            const dueDate = new Date(task.dueDate);
+            const hours = dueDate.getHours();
+            const minutes = dueDate.getMinutes();
+            const timeStr = `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;
+            
+            // Durée basée sur energyLevel
+            let duration = 60;
+            if (task.energyLevel === 0) duration = 30;
+            else if (task.energyLevel === 1) duration = 45;
+            else if (task.energyLevel === 2) duration = 60;
+            else if (task.energyLevel === 3) duration = 90;
+            
+            return {
+              time: timeStr,
+              duration,
+              activity: task.title,
+              priority: task.priority === 4,
+            };
+          })
+          .sort((a, b) => {
+            const [aHours, aMinutes] = a.time.split(":").map(Number);
+            const [bHours, bMinutes] = b.time.split(":").map(Number);
+            return aHours * 60 + aMinutes - (bHours * 60 + bMinutes);
+          });
+        
+        // Ajouter des pauses
+        const blocksWithBreaks: TimelineBlock[] = [];
+        for (let i = 0; i < blocks.length; i++) {
+          blocksWithBreaks.push(blocks[i]);
+          
+          if (blocks[i].duration >= 90 && i < blocks.length - 1) {
+            const [hours, minutes] = blocks[i].time.split(":").map(Number);
+            const endTime = hours * 60 + minutes + blocks[i].duration;
+            const breakHours = Math.floor(endTime / 60);
+            const breakMinutes = endTime % 60;
+            const breakTimeStr = `${breakHours.toString().padStart(2, "0")}:${breakMinutes.toString().padStart(2, "0")}`;
+            
+            blocksWithBreaks.push({
+              time: breakTimeStr,
+              duration: 15,
+              activity: "Pause",
+              priority: false,
+            });
+          }
+        }
+        
+        setTimeline(blocksWithBreaks);
+        setStep("ideal-day");
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [step, buildStep, clarifiedTasks]);
+
+  // Édition de l'heure
+  const handleTimeEdit = (index: number) => {
+    if (!isEditing) return;
+    setEditingIndex(index);
+    setEditingTime(timeline[index].time);
+  };
+
+  const handleTimeSave = () => {
+    if (editingIndex === null) return;
+    
+    const updatedTimeline = [...timeline];
+    updatedTimeline[editingIndex] = {
+      ...updatedTimeline[editingIndex],
+      time: editingTime,
+    };
+    
+    // Trier par heure
+    updatedTimeline.sort((a, b) => {
+      const [aHours, aMinutes] = a.time.split(":").map(Number);
+      const [bHours, bMinutes] = b.time.split(":").map(Number);
+      return aHours * 60 + aMinutes - (bHours * 60 + bMinutes);
+    });
+    
+    setTimeline(updatedTimeline);
+    setEditingIndex(null);
+  };
+
+  // Lien App Store avec session
   const appStoreLink = useMemo(() => {
     const url = new URL(APP_STORE_URL);
     if (sessionIdRef.current) {
@@ -245,366 +324,592 @@ export default function ScanClient() {
     return url.toString();
   }, []);
 
-  useEffect(() => {
-    if (step !== "reveal") return;
-    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-    const oscillator = audioContext.createOscillator();
-    const gainNode = audioContext.createGain();
-    oscillator.type = "sine";
-    oscillator.frequency.value = 880;
-    gainNode.gain.value = 0.05;
-    oscillator.connect(gainNode).connect(audioContext.destination);
-    oscillator.start();
-    setTimeout(() => {
-      oscillator.stop();
-      audioContext.close();
-    }, 140);
-  }, [step]);
+  // Grouper les tâches par catégorie
+  const groupedTasks = clarifiedTasks.reduce((acc, task) => {
+    const category = task.category || "Général";
+    if (!acc[category]) acc[category] = [];
+    acc[category].push(task);
+    return acc;
+  }, {} as Record<string, ClarifiedTask[]>);
+
+  // Progress circulaire
+  const circumference = 2 * Math.PI * 56;
+  const progress = completedBuildSteps.length / BUILD_STEPS.length;
+  const strokeDashoffset = circumference - progress * circumference;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-emerald-900 text-white">
-      <div className="mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-10 px-6 py-12">
-        <header className="flex flex-col gap-4">
-          <p className="text-sm uppercase tracking-[0.3em] text-emerald-300">Productif Hybrid Scan</p>
-          <h1 className="text-4xl font-semibold leading-tight md:text-5xl">
-            Ton emploi du temps, version cerveau.
-          </h1>
-          <p className="max-w-2xl text-base text-emerald-100/80">
-            Scanne ton ENT, on transforme ton planning en un agenda personnalisé avec matières, coefficients et
-            routines intelligentes.
-          </p>
-        </header>
-
-        {step === "landing" && (
-          <section className="grid gap-8 rounded-3xl border border-emerald-200/20 bg-white/5 p-6 backdrop-blur md:grid-cols-[1.2fr_0.8fr]">
-            <div className="flex flex-col justify-between gap-6">
-              <div className="space-y-4">
-                <h2 className="text-2xl font-semibold">Prêt à importer ton planning ?</h2>
-                <p className="text-sm text-emerald-100/70">
-                  Choisis ton point d&apos;entrée, puis laisse Productif générer ton planning idéal.
-                </p>
-              </div>
-              <div className="flex flex-col gap-3">
-                <button
-                  type="button"
-                  onClick={() => setStep("webview")}
-                  className="rounded-2xl bg-emerald-400 px-6 py-4 text-base font-semibold text-emerald-950 transition hover:translate-y-[-1px] hover:bg-emerald-300"
-                >
-                  Scanner mon emploi du temps
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setStep("voice")}
-                  className="flex items-center justify-center gap-2 rounded-2xl border border-white/20 px-6 py-3 text-sm font-medium text-white/80 transition hover:border-white/40 hover:text-white"
-                >
-                  <span className="inline-flex h-2 w-2 rounded-full bg-emerald-300" />
-                  Ou configure-le à la voix
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setQrOpen(true)}
-                  className="text-xs font-semibold text-emerald-200/80 underline underline-offset-4"
-                >
-                  Scanner un QR
-                </button>
-              </div>
-            </div>
-            <div className="flex flex-col items-center gap-4 rounded-2xl border border-white/10 bg-black/30 p-6 text-center">
-              <p className="text-xs uppercase tracking-[0.3em] text-emerald-200">QR Code</p>
-              <img
-                src={QR_CODE_URL}
-                alt="QR code vers productif.io/scan"
-                className="h-48 w-48 rounded-xl border border-white/10 bg-white p-3"
-              />
-              <p className="text-xs text-emerald-100/70">
-                Affiche-le sur tes supports physiques pour rediriger directement vers ce scan.
-              </p>
-            </div>
-          </section>
-        )}
-
-        {step === "webview" && (
-          <section className="grid gap-6">
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="flex flex-1 items-center gap-3 rounded-2xl border border-white/15 bg-white/10 px-4 py-3">
-                <input
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                  placeholder="Ex: ent moma"
-                  className="w-full bg-transparent text-sm text-white placeholder:text-white/50 focus:outline-none"
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") handleSearch();
-                  }}
-                />
-                <button
-                  type="button"
-                  onClick={handleSearch}
-                  className="rounded-xl bg-emerald-400 px-4 py-2 text-sm font-semibold text-emerald-950"
-                >
-                  Rechercher
-                </button>
-              </div>
-              <button
-                type="button"
-                onClick={() => window.open(activeUrl, "_blank", "noopener,noreferrer")}
-                className="rounded-2xl border border-white/20 px-4 py-3 text-xs font-semibold text-white/80"
-              >
-                Ouvrir dans un nouvel onglet
-              </button>
-              <button
-                type="button"
-                onClick={() => setQrOpen(true)}
-                className="rounded-2xl border border-white/20 px-4 py-3 text-xs font-semibold text-white/80"
-              >
-                Scanner un QR
-              </button>
-            </div>
-
-            <div className="relative overflow-hidden rounded-3xl border border-emerald-200/20 bg-white/5">
-              {isBlocked && (
-                <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-black/70 p-8 text-center">
-                  <p className="text-base font-semibold">L&apos;ENT bloque l&apos;intégration.</p>
-                  <p className="text-sm text-white/70">
-                    Ouvre l&apos;ENT dans un nouvel onglet, puis reviens ici.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => window.open(activeUrl, "_blank", "noopener,noreferrer")}
-                    className="rounded-xl bg-emerald-400 px-4 py-2 text-sm font-semibold text-emerald-950"
-                  >
-                    Ouvrir l&apos;ENT
-                  </button>
-                </div>
-              )}
-              {isLoading && (
-                <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/40">
-                  <div className="h-10 w-10 animate-spin rounded-full border-2 border-emerald-200 border-t-transparent" />
-                </div>
-              )}
-              <iframe
-                key={activeUrl}
-                src={activeUrl}
-                title="Connexion ENT"
-                className="h-[70vh] w-full bg-white"
-                sandbox="allow-forms allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
-                onLoad={() => {
-                  loadedRef.current = true;
-                  setIsLoading(false);
-                  setIsBlocked(false);
-                }}
-                onError={() => {
-                  setIsLoading(false);
-                  setIsBlocked(true);
-                }}
-              />
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="absolute bottom-6 right-6 rounded-full bg-emerald-400 px-5 py-3 text-sm font-semibold text-emerald-950 shadow-lg"
-              >
-                C&apos;est ma page, scanne !
-              </button>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-4">
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(event) => handleSelectFile(event.target.files?.[0] || null)}
-              />
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="rounded-xl border border-white/20 px-4 py-2 text-xs font-semibold text-white/80"
-              >
-                Importer une capture
-              </button>
-              {selectedFile && (
-                <span className="text-xs text-emerald-200">{selectedFile.name}</span>
-              )}
-              {filePreview && (
-                <img
-                  src={filePreview}
-                  alt="Capture sélectionnée"
-                  className="h-12 w-12 rounded-lg border border-white/10 object-cover"
-                />
-              )}
-            </div>
-
-            <div className="rounded-2xl border border-white/10 bg-black/30 p-4 text-sm text-white/70">
-              <p className="font-semibold text-white">Comment faire la capture ?</p>
-              <p className="mt-2">
-                Connecte-toi sur l&apos;ENT dans la fenêtre ci-dessus, affiche ton planning complet, puis
-                fais une capture d&apos;écran et importe-la ici. On ne peut pas capturer automatiquement une
-                page ENT (sécurité navigateur).
-              </p>
-            </div>
-
-            {uploadError && <p className="text-sm text-rose-200">{uploadError}</p>}
-
-            <button
-              type="button"
-              onClick={handleCapture}
-              className={`w-full rounded-2xl px-6 py-4 text-sm font-semibold ${
-                selectedFile
-                  ? "bg-white text-emerald-950"
-                  : "cursor-not-allowed bg-white/10 text-white/40"
-              }`}
+    <div className="min-h-screen bg-white text-black">
+      <div className="mx-auto flex min-h-screen w-full max-w-2xl flex-col px-6 py-12">
+        <AnimatePresence mode="wait">
+          {/* ÉTAPE 0: Hook - avant les tâches */}
+          {step === "hook" && (
+            <motion.div
+              key="hook"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0, x: -50 }}
+              className="flex flex-1 flex-col justify-center"
             >
-              Importe ton emploi du temps
-            </button>
-          </section>
-        )}
-
-        {step === "voice" && (
-          <section className="rounded-3xl border border-white/10 bg-white/5 p-8">
-            <div className="flex flex-col gap-6">
-              <div>
-                <h2 className="text-2xl font-semibold">Dis-nous ta promo</h2>
-                <p className="text-sm text-white/70">
-                  Dicte ta formation et on retrouve le planning correspondant.
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1 }}
+                className="mb-12 text-center"
+              >
+                <h1 className="text-3xl font-semibold tracking-tight md:text-4xl">
+                  Vide ta tête en 20 secondes.
+                </h1>
+                <p className="mt-4 text-lg text-black/60">
+                  Dis-moi tout ce que tu dois faire et je t&apos;organise ta journée automatiquement.
                 </p>
-              </div>
-              <div className="flex items-center gap-2">
-                {Array.from({ length: 12 }).map((_, index) => (
-                  <span
-                    key={index}
-                    className="inline-flex w-2 animate-pulse rounded-full bg-emerald-300"
-                    style={{ height: `${12 + (index % 5) * 6}px`, animationDelay: `${index * 120}ms` }}
-                  />
+                <p className="mt-3 text-base text-black/50">
+                  Devoirs, projets, exams, trucs en retard… balance tout. On s&apos;occupe du reste.
+                </p>
+              </motion.div>
+
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 }}
+              >
+                <button
+                  type="button"
+                  onClick={() => setStep("tasks-input")}
+                  className="w-full rounded-3xl bg-emerald-500 py-4 text-lg font-semibold text-white transition hover:bg-emerald-600"
+                >
+                  Organiser ma journée maintenant
+                </button>
+              </motion.div>
+            </motion.div>
+          )}
+
+          {/* ÉTAPE 1: Entrée des tâches */}
+          {step === "tasks-input" && (
+            <motion.div
+              key="tasks-input"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0, x: -50 }}
+              className="flex flex-1 flex-col justify-center"
+            >
+              {/* Petit texte en haut - enlève la friction */}
+              <motion.p
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1 }}
+                className="mb-6 text-center text-base text-black/70"
+              >
+                Parle naturellement : ex: réviser partiels, finir exposé, sport 18h, appeler coloc
+              </motion.p>
+
+              {/* Chips de suggestions */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
+                className="mb-6 flex flex-wrap justify-center gap-2"
+              >
+                {PROMPT_CHIPS.map((chip) => (
+                  <button
+                    key={chip.key}
+                    type="button"
+                    onClick={() => handleChipClick(chip.label)}
+                    className="rounded-full bg-black/5 px-4 py-2 text-sm text-black/60 transition hover:bg-black/10"
+                  >
+                    {chip.label}
+                  </button>
                 ))}
-              </div>
-              <input
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="Ex: MOMA 2026, L2 économie..."
-                className="w-full rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-sm text-white placeholder:text-white/50"
-              />
-              <div className="flex flex-wrap gap-3">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setUploadError("Le flux vocal arrive bientôt. Utilise la capture pour l'instant.");
-                    setStep("webview");
-                  }}
-                  className="rounded-2xl bg-emerald-400 px-6 py-3 text-sm font-semibold text-emerald-950"
-                >
-                  Lancer l&apos;analyse
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setStep("landing")}
-                  className="rounded-2xl border border-white/20 px-6 py-3 text-sm text-white/80"
-                >
-                  Revenir
-                </button>
-              </div>
-            </div>
-          </section>
-        )}
+              </motion.div>
 
-        {step === "wait" && (
-          <section className="rounded-3xl border border-white/10 bg-white/5 p-8">
-            <div className="flex flex-col gap-6">
-              <div>
-                <h2 className="text-2xl font-semibold">On prépare ton planning</h2>
-                <p className="text-sm text-white/70">{MICRO_COPY[copyIndex]}</p>
-              </div>
-              <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
-                <div
-                  className="h-full rounded-full bg-emerald-300 transition-all duration-500"
-                  style={{ width: `${progress}%` }}
-                />
-              </div>
-              <div className="rounded-2xl border border-white/10 bg-white/10 p-4">
-                <p className="text-sm text-white/80">
-                  C&apos;est presque prêt. Laisse ton mail pour recevoir ton accès privé.
-                </p>
-                <div className="mt-4 flex flex-wrap gap-3">
-                  <input
-                    value={email}
-                    onChange={(event) => setEmail(event.target.value)}
-                    placeholder="ton@email.fr"
-                    className="min-w-[220px] flex-1 rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white placeholder:text-white/50"
+              {/* Zone de texte */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 }}
+                className="mb-8"
+              >
+                <div className="relative">
+                  <textarea
+                    value={tasks}
+                    onChange={(e) => setTasks(e.target.value)}
+                    placeholder="Ex: Réviser le chapitre 12, finir le rapport de stage, appeler maman..."
+                    className="min-h-[200px] w-full resize-none rounded-2xl border border-black/10 bg-white p-4 pr-14 text-base focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
                   />
                   <button
                     type="button"
-                    onClick={handleEmailSubmit}
-                    disabled={!isValidEmail(email) || !selectedFile || isSubmitting}
-                    className={`rounded-xl px-5 py-3 text-sm font-semibold transition ${
-                      isValidEmail(email) && selectedFile && !isSubmitting
-                        ? "bg-emerald-400 text-emerald-950"
-                        : "cursor-not-allowed bg-white/10 text-white/40"
+                    onClick={toggleRecording}
+                    disabled={isLoading}
+                    className={`absolute bottom-4 right-4 flex h-12 w-12 items-center justify-center rounded-full transition disabled:opacity-50 ${
+                      isRecording
+                        ? "bg-red-500 text-white animate-pulse"
+                        : "bg-black/5 text-black/60 hover:bg-black/10"
                     }`}
+                    title={isRecording ? "Arrêter l'enregistrement" : "Dicter avec le micro"}
                   >
-                    {isSubmitting ? "Analyse…" : "Terminer"}
+                    {isRecording ? (
+                      <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
+                        <rect x="6" y="6" width="12" height="12" rx="2" />
+                      </svg>
+                    ) : (
+                      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                      </svg>
+                    )}
                   </button>
+                  {isRecording && (
+                    <div className="absolute top-4 right-4 flex items-center gap-2 rounded-full bg-red-500/10 px-3 py-1">
+                      <span className="h-2 w-2 animate-pulse rounded-full bg-red-500" />
+                      <span className="text-xs font-medium text-red-600">Enregistrement…</span>
+                    </div>
+                  )}
                 </div>
-                {uploadError && <p className="mt-3 text-sm text-rose-200">{uploadError}</p>}
-              </div>
-            </div>
-          </section>
-        )}
+                <p className="mt-2 pl-1 text-xs text-black/40">
+                  Le désordre, c&apos;est OK.
+                </p>
+              </motion.div>
 
-        {step === "reveal" && (
-          <section className="rounded-3xl border border-emerald-300/30 bg-gradient-to-br from-emerald-300/20 via-white/10 to-white/5 p-8">
-            <div className="flex flex-col gap-6">
-              <div>
-                <p className="text-xs uppercase tracking-[0.3em] text-emerald-200">Succès</p>
-                <h2 className="text-3xl font-semibold">Ton planning est prêt. Ouvre-le dans l&apos;app.</h2>
-                {result?.summary && (
-                  <p className="mt-2 text-sm text-white/70">{result.summary}</p>
+              {/* Erreur */}
+              {error && (
+                <motion.p
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="mb-4 text-center text-sm text-red-500"
+                >
+                  {error}
+                </motion.p>
+              )}
+
+              {/* Bouton continuer */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4 }}
+              >
+                <button
+                  type="button"
+                  onClick={handleSubmitTasks}
+                  disabled={!tasks.trim() || isLoading}
+                  className="w-full rounded-3xl bg-emerald-500 py-4 text-lg font-semibold text-white transition hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {isLoading ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <svg className="h-5 w-5 animate-spin" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      Analyse en cours…
+                    </span>
+                  ) : (
+                    "Continuer"
+                  )}
+                </button>
+              </motion.div>
+            </motion.div>
+          )}
+
+          {/* ÉTAPE 2: Clarification des tâches */}
+          {step === "task-clarification" && (
+            <motion.div
+              key="task-clarification"
+              initial={{ opacity: 0, x: 50 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -50 }}
+              className="flex flex-1 flex-col"
+            >
+              {/* Titre */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1 }}
+                className="mb-8 text-center"
+              >
+                <h1 className="text-2xl font-semibold tracking-tight">
+                  Voilà ce qu&apos;on a compris.
+                </h1>
+              </motion.div>
+
+              {/* Liste des tâches groupées */}
+              <div className="flex-1 space-y-6 pb-28">
+                {Object.entries(groupedTasks).map(([category, categoryTasks], categoryIndex) => (
+                  <motion.div
+                    key={category}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.2 + categoryIndex * 0.1 }}
+                  >
+                    <p className="mb-3 pl-1 text-sm text-black/40">{category}</p>
+                    <div className="space-y-2">
+                      {categoryTasks.map((task, taskIndex) => (
+                        <motion.div
+                          key={task.id}
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: 0.3 + categoryIndex * 0.1 + taskIndex * 0.05 }}
+                          className={`rounded-2xl border p-4 ${
+                            task.priority === 4
+                              ? "border-emerald-500/30 bg-emerald-500/5"
+                              : "border-black/10 bg-white"
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            {/* Checkbox priorité */}
+                            <button
+                              type="button"
+                              onClick={() => togglePriority(task.id)}
+                              className={`flex h-6 w-6 items-center justify-center rounded-full border-2 transition ${
+                                task.priority === 4
+                                  ? "border-emerald-500 bg-emerald-500"
+                                  : "border-black/20"
+                              }`}
+                            >
+                              {task.priority === 4 && (
+                                <svg className="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                </svg>
+                              )}
+                            </button>
+
+                            {/* Titre éditable */}
+                            <input
+                              type="text"
+                              value={task.title}
+                              onChange={(e) => updateTaskTitle(task.id, e.target.value)}
+                              className="flex-1 bg-transparent text-base focus:outline-none"
+                            />
+
+                            {/* Bouton supprimer */}
+                            <button
+                              type="button"
+                              onClick={() => deleteTask(task.id)}
+                              className="p-1 text-black/40 transition hover:text-red-500"
+                            >
+                              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
+                          </div>
+
+                          {task.priority === 4 && (
+                            <p className="mt-2 pl-9 text-xs text-emerald-600">
+                              Priorité pour demain
+                            </p>
+                          )}
+                        </motion.div>
+                      ))}
+                    </div>
+                  </motion.div>
+                ))}
+
+                {clarifiedTasks.length === 0 && (
+                  <div className="py-12 text-center">
+                    <p className="text-black/40">Aucune tâche détectée…</p>
+                  </div>
                 )}
               </div>
-              <div className="rounded-2xl border border-white/20 bg-black/40 p-5">
-                <p className="text-sm text-white/80">
-                  Salut ! J&apos;ai vu que tu as 3h de trou le jeudi, on prévoit quoi ?
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-3">
-                <a
-                  href={appStoreLink}
-                  className="rounded-2xl bg-emerald-400 px-6 py-3 text-sm font-semibold text-emerald-950"
-                >
-                  Prendre mon planning avec moi
-                </a>
-                <button
-                  type="button"
-                  onClick={() => setStep("landing")}
-                  className="rounded-2xl border border-white/20 px-6 py-3 text-sm text-white/80"
-                >
-                  Revenir au début
-                </button>
-              </div>
-            </div>
-          </section>
-        )}
-      </div>
 
-      {qrOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-6">
-          <div className="w-full max-w-lg rounded-3xl border border-white/10 bg-slate-950 p-6">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold">Scanner un QR</h3>
-              <button
-                type="button"
-                onClick={() => setQrOpen(false)}
-                className="text-xs font-semibold text-white/60"
+              {/* Footer fixe */}
+              <div className="fixed bottom-0 left-0 right-0 border-t border-black/5 bg-white px-6 py-6">
+                <div className="mx-auto max-w-2xl">
+                  <button
+                    type="button"
+                    onClick={handleBuildPlan}
+                    disabled={clarifiedTasks.length === 0}
+                    className="w-full rounded-3xl bg-emerald-500 py-4 text-lg font-semibold text-white transition hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    Construire ma journée idéale
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {/* ÉTAPE 3: Construction du plan */}
+          {step === "building-plan" && (
+            <motion.div
+              key="building-plan"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="flex flex-1 flex-col items-center justify-center"
+            >
+              {/* Titre */}
+              <motion.h1
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mb-12 text-center text-2xl font-semibold tracking-tight"
               >
-                Fermer
-              </button>
-            </div>
-            <div className="mt-4 overflow-hidden rounded-2xl border border-white/10">
-              <video ref={videoRef} className="h-64 w-full bg-black object-cover" />
-            </div>
-            <p className="mt-3 text-xs text-white/60">
-              Autorise la caméra pour scanner le QR. Tu peux ensuite continuer sur l&apos;ENT.
-            </p>
-          </div>
-        </div>
-      )}
+                On prépare ta journée idéale…
+              </motion.h1>
+
+              {/* Progress circulaire */}
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.2 }}
+                className="relative mb-12"
+              >
+                <svg width="160" height="160" className="-rotate-90">
+                  <circle
+                    cx="80"
+                    cy="80"
+                    r="56"
+                    stroke="rgba(0,0,0,0.05)"
+                    strokeWidth="8"
+                    fill="none"
+                  />
+                  <motion.circle
+                    cx="80"
+                    cy="80"
+                    r="56"
+                    stroke="#16A34A"
+                    strokeWidth="8"
+                    fill="none"
+                    strokeLinecap="round"
+                    strokeDasharray={circumference}
+                    initial={{ strokeDashoffset: circumference }}
+                    animate={{ strokeDashoffset }}
+                    transition={{ duration: 0.5 }}
+                  />
+                </svg>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className="text-2xl font-semibold">
+                    {completedBuildSteps.length}/{BUILD_STEPS.length}
+                  </span>
+                </div>
+              </motion.div>
+
+              {/* Liste des étapes */}
+              <div className="w-full max-w-md space-y-3">
+                {BUILD_STEPS.map((s, index) => {
+                  const isCompleted = completedBuildSteps.includes(index);
+                  const isCurrent = buildStep === index;
+
+                  return (
+                    <motion.div
+                      key={s.key}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.3 + index * 0.1 }}
+                      className={`flex items-center gap-4 rounded-2xl p-4 ${
+                        isCurrent
+                          ? "border border-emerald-500/20 bg-emerald-500/10"
+                          : isCompleted
+                          ? "bg-emerald-500/5"
+                          : "bg-black/5"
+                      }`}
+                    >
+                      <div
+                        className={`flex h-8 w-8 items-center justify-center rounded-full ${
+                          isCompleted
+                            ? "bg-emerald-500"
+                            : isCurrent
+                            ? "bg-emerald-500/20"
+                            : "bg-black/10"
+                        }`}
+                      >
+                        {isCompleted ? (
+                          <svg className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                          </svg>
+                        ) : (
+                          <div
+                            className={`h-2 w-2 rounded-full ${
+                              isCurrent ? "bg-emerald-500" : "bg-black/30"
+                            }`}
+                          />
+                        )}
+                      </div>
+
+                      <span
+                        className={`flex-1 ${
+                          isCurrent
+                            ? "font-medium text-black"
+                            : isCompleted
+                            ? "text-emerald-600"
+                            : "text-black/40"
+                        }`}
+                      >
+                        {s.text}
+                      </span>
+
+                      {isCurrent && (
+                        <div className="h-5 w-5 animate-spin rounded-full border-2 border-emerald-500/30 border-t-emerald-500" />
+                      )}
+                    </motion.div>
+                  );
+                })}
+              </div>
+            </motion.div>
+          )}
+
+          {/* ÉTAPE 4: Journée idéale */}
+          {step === "ideal-day" && (
+            <motion.div
+              key="ideal-day"
+              initial={{ opacity: 0, x: 50 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0 }}
+              className="flex flex-1 flex-col pb-52"
+            >
+              {/* Message dopamine */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1 }}
+                className="mb-8 text-center"
+              >
+                <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">
+                  Ta journée est optimisée.
+                </h1>
+                <p className="mt-3 text-base text-black/60">
+                  Imagine avoir ça automatiquement tous les jours.
+                </p>
+              </motion.div>
+
+              {/* Priorités */}
+              {priorities.length > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.2 }}
+                  className="mb-8 rounded-3xl border border-emerald-500/20 bg-emerald-500/5 p-6"
+                >
+                  <h2 className="mb-4 text-lg font-semibold">Tes 3 priorités</h2>
+                  <div className="space-y-3">
+                    {priorities.map((priority, index) => (
+                      <motion.div
+                        key={index}
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.3 + index * 0.1 }}
+                        className="flex items-center gap-3"
+                      >
+                        <div className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-sm font-semibold text-white">
+                          {index + 1}
+                        </div>
+                        <span className="text-black/80">{priority}</span>
+                      </motion.div>
+                    ))}
+                  </div>
+                </motion.div>
+              )}
+
+              {/* Timeline */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4 }}
+                className="mb-8 space-y-2"
+              >
+                {timeline.map((block, index) => (
+                  <motion.div
+                    key={index}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.5 + index * 0.03 }}
+                    className={`flex items-center gap-4 rounded-2xl border p-4 ${
+                      block.priority
+                        ? "border-emerald-500/30 bg-emerald-500/5"
+                        : "border-black/10"
+                    } ${isEditing ? "border-emerald-500/30" : ""}`}
+                  >
+                    {/* Heure */}
+                    <button
+                      type="button"
+                      onClick={() => handleTimeEdit(index)}
+                      disabled={!isEditing}
+                      className={`flex w-16 flex-col items-center ${
+                        isEditing ? "cursor-pointer" : "cursor-default"
+                      }`}
+                    >
+                      {editingIndex === index ? (
+                        <input
+                          type="time"
+                          value={editingTime}
+                          onChange={(e) => setEditingTime(e.target.value)}
+                          onBlur={handleTimeSave}
+                          onKeyDown={(e) => e.key === "Enter" && handleTimeSave()}
+                          className="w-16 rounded border border-emerald-500 bg-white px-1 text-center text-sm font-semibold text-emerald-600 focus:outline-none"
+                          autoFocus
+                        />
+                      ) : (
+                        <span
+                          className={`text-sm ${
+                            isEditing ? "font-semibold text-emerald-600" : "text-black/60"
+                          }`}
+                        >
+                          {block.time}
+                        </span>
+                      )}
+                      <span className="text-xs text-black/40">{block.duration}min</span>
+                    </button>
+
+                    {/* Activité */}
+                    <div className="flex-1">
+                      <span
+                        className={
+                          block.priority ? "font-medium text-black" : "text-black/70"
+                        }
+                      >
+                        {block.activity}
+                      </span>
+                    </div>
+
+                    {/* Indicateur priorité */}
+                    {block.priority && (
+                      <div className="h-2 w-2 rounded-full bg-emerald-500" />
+                    )}
+                  </motion.div>
+                ))}
+              </motion.div>
+
+              {/* Bénéfices futurs */}
+              <motion.p
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.8 }}
+                className="mb-2 text-center text-sm text-black/60"
+              >
+                Rappels intelligents, suivi de progrès, planning auto chaque semaine.
+              </motion.p>
+
+              {/* Lien Ajuster discret */}
+              <motion.button
+                type="button"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.85 }}
+                onClick={() => setIsEditing(!isEditing)}
+                className="mx-auto mb-6 block text-sm text-black/60 underline underline-offset-2 transition hover:text-black/80"
+              >
+                {isEditing ? "Sauvegarder les horaires" : "Ajuster les horaires"}
+              </motion.button>
+
+              {/* Footer fixe */}
+              <div className="fixed bottom-0 left-0 right-0 border-t border-black/5 bg-white px-6 py-6">
+                <div className="mx-auto flex max-w-2xl flex-col gap-3">
+                  <a
+                    href={appStoreLink}
+                    className="flex w-full items-center justify-center gap-2 rounded-3xl bg-emerald-500 py-4 text-lg font-semibold text-white transition hover:bg-emerald-600"
+                  >
+                    <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z" />
+                    </svg>
+                    Installer l&apos;app et garder mon planning
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => setStep("hook")}
+                    className="text-center text-sm text-black/50 transition hover:text-black/70"
+                  >
+                    Continuer sans sauvegarder
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
     </div>
   );
 }
