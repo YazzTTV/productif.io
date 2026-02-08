@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, TextInput, ActivityIndicator, Alert, Modal, PanResponder, Dimensions, Platform, InteractionManager } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, TextInput, ActivityIndicator, Alert, Modal, Dimensions, Platform, InteractionManager } from 'react-native';
+import { ScrollView as GestureScrollView, PanGestureHandler, State } from 'react-native-gesture-handler';
 import { useRouter } from 'expo-router';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
@@ -293,24 +294,28 @@ export function PlanMyDay() {
     }
   };
 
-  // Fonction de tri des tâches par priorité (priorité > énergie > coefficient matière)
-  // La priorité est le critère principal car c'est ce que l'utilisateur peut modifier manuellement
-  // L'énergie en second car les tâches demandant plus de concentration doivent être faites en premier
+  // Fonction de tri des tâches par priorité
+  // Logique : tâches importantes (académiques) d'abord, sport/perso en dernier
   const sortTasksByPriority = (tasksToSort: TaskWithSubject[]): TaskWithSubject[] => {
     return [...tasksToSort].sort((a, b) => {
       // 1. D'abord par priorité décroissante (5 > 4 > 3 > 2 > 1)
-      // C'est le critère principal car l'utilisateur peut le modifier
       if (b.priority !== a.priority) {
         return b.priority - a.priority;
       }
       
-      // 2. En cas d'égalité de priorité, par niveau d'énergie décroissant (5 > 4 > 3 > 2 > 1)
-      // Les tâches qui demandent plus de concentration sont faites en premier (quand on est frais)
+      // 2. En cas d'égalité de priorité, les tâches académiques (avec matière) passent avant les perso/sport
+      const aHasSubject = a.subjectId ? 1 : 0;
+      const bHasSubject = b.subjectId ? 1 : 0;
+      if (bHasSubject !== aHasSubject) {
+        return bHasSubject - aHasSubject;
+      }
+      
+      // 3. Par concentration mentale (energy) décroissante — les tâches exigeantes d'abord (quand on est frais)
       if (b.energy !== a.energy) {
         return b.energy - a.energy;
       }
       
-      // 3. En cas d'égalité, par coefficient de la matière (plus élevé = plus prioritaire)
+      // 4. En cas d'égalité, par coefficient de la matière (plus élevé = plus prioritaire)
       const getCoefficient = (task: TaskWithSubject): number => {
         if (!task.subjectId) return 0;
         const subject = subjects.find(s => s.id === task.subjectId);
@@ -525,24 +530,71 @@ export function PlanMyDay() {
   };
 
   // Modifier l'heure de début d'un événement (phase overview)
-  const updateEventStartTime = (index: number, deltaMinutes: number, newTime?: Date) => {
-    const updated = [...eventStartTimes];
-    if (newTime) {
-      updated[index] = newTime;
-    } else {
-      updated[index] = addMinutes(updated[index], deltaMinutes);
-    }
-    // S'assurer que l'heure ne devient pas négative
-    const dayStart = startOfDay(targetDate);
-    if (updated[index] < dayStart) {
-      updated[index] = new Date(dayStart);
-    }
-    setEventStartTimes(updated);
-  };
-  
-  // Wrapper pour la timeline qui accepte newTime
+  // Quand une tâche est glissée à une nouvelle heure :
+  // 1. La tâche glissée garde son heure (newTime)
+  // 2. On trie par heure et on supprime les chevauchements en décalant les autres
+  // 3. On évite les événements existants du calendrier
   const handleTimelineTimeChange = (index: number, newTime: Date) => {
-    updateEventStartTime(index, 0, newTime);
+    const dayStart = startOfDay(targetDate);
+    const minStart = setHours(dayStart, 6);
+
+    // Préparer les périodes occupées (événements existants)
+    const existingBusyPeriods = existingCalendarEvents
+      .filter((evt) => evt.startDate && evt.endDate)
+      .map((evt) => ({
+        start: new Date(evt.startDate!),
+        end: new Date(evt.endDate!),
+      }))
+      .sort((a, b) => a.start.getTime() - b.start.getTime());
+
+    // Heure de chaque tâche (la glissée garde newTime)
+    const times = tasks.map((t, i) => (i === index ? newTime : eventStartTimes[i] || new Date()));
+
+    // Trier par heure de début (la tâche glissée prend sa nouvelle position)
+    const indexed = tasks.map((t, i) => ({ task: t, time: times[i], index: i }));
+    indexed.sort((a, b) => a.time.getTime() - b.time.getTime());
+
+    // Supprimer les chevauchements : chaque tâche garde son heure sauf si elle chevauche la précédente
+    // ou un événement existant -> on la décale
+    const newTimes: Date[] = new Array(tasks.length);
+    let lastEnd = 0;
+
+    for (const { task, time, index } of indexed) {
+      let start = new Date(time);
+      if (start < minStart) start = new Date(minStart);
+
+      const duration = task.estimatedDuration;
+      let end = addMinutes(start, duration);
+
+      // Ne pas commencer avant la fin de la tâche précédente
+      const prevEndDate = new Date(lastEnd);
+      if (start < prevEndDate) {
+        start = new Date(prevEndDate);
+        end = addMinutes(start, duration);
+      }
+
+      // Éviter les événements existants du calendrier
+      let overlapping = existingBusyPeriods.find(
+        (p) => start.getTime() < p.end.getTime() && end.getTime() > p.start.getTime()
+      );
+      while (overlapping) {
+        start = new Date(overlapping.end);
+        end = addMinutes(start, duration);
+        overlapping = existingBusyPeriods.find(
+          (p) => start.getTime() < p.end.getTime() && end.getTime() > p.start.getTime()
+        );
+      }
+
+      newTimes[index] = start;
+      lastEnd = end.getTime();
+    }
+
+    // Réordonner les tâches et les heures selon le nouvel ordre
+    const reorderedTasks = indexed.map((x) => x.task);
+    const reorderedTimes = indexed.map((x) => newTimes[x.index]);
+
+    setTasks(reorderedTasks);
+    setEventStartTimes(reorderedTimes);
   };
 
   // Créer les événements dans Google Calendar
@@ -1070,8 +1122,13 @@ export function PlanMyDay() {
           </Animated.View>
 
           {/* Timeline interactive avec événements existants et nouvelles tâches */}
-          <Animated.View entering={FadeInDown.delay(150).duration(400)} style={styles.section}>
-            <Text style={styles.sectionLabel}>{t('calendarOfTheDay') || 'Calendrier du jour'}</Text>
+          <Animated.View entering={FadeInDown.delay(150).duration(400)} style={[styles.section, styles.timelineSectionFullWidth]}>
+            <View style={styles.timelineSectionHeader}>
+              <Text style={styles.sectionLabel}>{t('calendarOfTheDay') || 'Calendrier du jour'}</Text>
+              <Text style={styles.timelineDragHint}>
+                Maintiens une tâche pour la déplacer
+              </Text>
+            </View>
             <TimelineCalendar
               targetDate={targetDate}
               existingEvents={existingCalendarEvents}
@@ -1159,10 +1216,13 @@ function TimelineCalendar({
   const timelineRef = useRef<View>(null);
   const scrollViewRef = useRef<ScrollView>(null);
   
-  // Utiliser des refs pour stocker les valeurs actuelles (résout le problème de closure)
+  // Refs pour le closure
   const draggingIndexRef = useRef<number | null>(null);
   const dragYRef = useRef(0);
+  const dragStartYRef = useRef(0);
   const eventStartTimesRef = useRef(eventStartTimes);
+  const scrollOffsetRef = useRef(0);
+  const lastScrollTimeRef = useRef(0);
   
   // Mettre à jour les refs quand les valeurs changent
   useEffect(() => {
@@ -1186,70 +1246,66 @@ function TimelineCalendar({
     return setMinutes(setHours(dayStart, hours), minutes);
   };
 
-  // Créer un pan responder pour une tâche - utilise les refs pour éviter les problèmes de closure
-  const createTaskPanResponder = (taskIndex: number): ReturnType<typeof PanResponder.create> => {
-    return PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: (_, gestureState) => {
-        // Activer le pan responder seulement si le mouvement vertical est significatif
-        return Math.abs(gestureState.dy) > 5;
-      },
-      onPanResponderGrant: () => {
-        const currentStartTimes = eventStartTimesRef.current;
-        const taskY = hourToY(currentStartTimes[taskIndex] || new Date());
-        draggingIndexRef.current = taskIndex;
-        dragYRef.current = taskY;
-        setDraggingIndex(taskIndex);
-        setDragStartY(taskY);
-        setDragY(taskY);
-      },
-      onPanResponderMove: (_, gestureState) => {
-        // Utiliser la ref au lieu de l'état pour éviter les problèmes de closure
-        if (draggingIndexRef.current === taskIndex) {
-          const currentStartTimes = eventStartTimesRef.current;
-          const taskY = hourToY(currentStartTimes[taskIndex] || new Date());
-          const newY = taskY + gestureState.dy;
-          const minY = 0;
-          const maxY = (END_HOUR - START_HOUR) * HOUR_HEIGHT;
-          const clampedY = Math.max(minY, Math.min(maxY, newY));
-          dragYRef.current = clampedY;
-          setDragY(clampedY);
-        }
-      },
-      onPanResponderRelease: () => {
-        if (draggingIndexRef.current === taskIndex) {
-          // Arrondir à la demi-heure la plus proche pour un meilleur alignement
-          const currentDragY = dragYRef.current;
-          const newTime = yToHour(currentDragY);
-          const minutes = getMinutes(newTime);
-          const roundedMinutes = Math.round(minutes / 30) * 30;
-          const finalTime = setMinutes(newTime, roundedMinutes);
-          
-          onTimeChange(taskIndex, finalTime);
-          draggingIndexRef.current = null;
-          dragYRef.current = 0;
-          setDraggingIndex(null);
-          setDragY(0);
-          setDragStartY(0);
-        }
-      },
-      onPanResponderTerminate: () => {
-        // Gérer le cas où le gesture est interrompu
-        if (draggingIndexRef.current === taskIndex) {
-          draggingIndexRef.current = null;
-          dragYRef.current = 0;
-          setDraggingIndex(null);
-          setDragY(0);
-          setDragStartY(0);
-        }
-      },
-    });
+  // Handlers pour le glisser-déposer avec PanGestureHandler (comme sur la page /scan)
+  const handlePanStateChange = (taskIndex: number, event: { nativeEvent: { state: number } }) => {
+    const { state } = event.nativeEvent;
+    if (state === State.ACTIVE) {
+      const currentStartTimes = eventStartTimesRef.current;
+      const taskY = hourToY(currentStartTimes[taskIndex] || new Date());
+      draggingIndexRef.current = taskIndex;
+      dragStartYRef.current = taskY;
+      dragYRef.current = taskY;
+      setDraggingIndex(taskIndex);
+      setDragStartY(taskY);
+      setDragY(taskY);
+    } else if (state === State.END || state === State.CANCELLED) {
+      if (draggingIndexRef.current === taskIndex) {
+        const currentDragY = dragYRef.current;
+        const newTime = yToHour(currentDragY);
+        const minutes = getMinutes(newTime);
+        const roundedMinutes = Math.round(minutes / 15) * 15;
+        const finalTime = setMinutes(newTime, roundedMinutes);
+        onTimeChange(taskIndex, finalTime);
+        draggingIndexRef.current = null;
+        dragYRef.current = 0;
+        dragStartYRef.current = 0;
+        setDraggingIndex(null);
+        setDragY(0);
+        setDragStartY(0);
+      }
+    }
   };
 
-  // Mémoriser les pan responders pour chaque tâche
-  const panResponders = useMemo(() => {
-    return tasks.map((_, index) => createTaskPanResponder(index));
-  }, [tasks.length, targetDate]); // Recréer seulement si le nombre de tâches change
+  const handlePanGesture = (taskIndex: number, event: { nativeEvent: { translationY: number } }) => {
+    if (draggingIndexRef.current === taskIndex) {
+      const startY = dragStartYRef.current;
+      const newY = startY + event.nativeEvent.translationY;
+      const minY = 0;
+      const maxY = (END_HOUR - START_HOUR) * HOUR_HEIGHT;
+      const clampedY = Math.max(minY, Math.min(maxY, newY));
+      dragYRef.current = clampedY;
+      setDragY(clampedY);
+
+      // Auto-scroll quand on drag près des bords pour atteindre 20h, 22h, etc.
+      const now = Date.now();
+      if (now - lastScrollTimeRef.current < 80) return; // Throttle
+      const scroll = scrollViewRef.current as any;
+      if (!scroll?.scrollTo) return;
+
+      const visibleHeight = Dimensions.get('window').height * 0.35;
+      const scrollOffset = scrollOffsetRef.current;
+
+      if (clampedY > scrollOffset + visibleHeight - 100) {
+        const newOffset = Math.min(clampedY - visibleHeight + 80, maxY);
+        scroll.scrollTo({ y: newOffset, animated: false });
+        lastScrollTimeRef.current = now;
+      } else if (clampedY < scrollOffset + 80) {
+        const newOffset = Math.max(0, clampedY - 80);
+        scroll.scrollTo({ y: newOffset, animated: false });
+        lastScrollTimeRef.current = now;
+      }
+    }
+  };
 
   // Combiner tous les événements (existants + nouvelles tâches)
   // Utiliser useMemo pour recalculer quand eventStartTimes change
@@ -1294,59 +1350,17 @@ function TimelineCalendar({
     return [...allEvents].sort((a, b) => a.start!.getTime() - b.start!.getTime());
   }, [allEvents]);
 
-  // Détecter les chevauchements et assigner des colonnes
-  // Recalculer à chaque fois que les événements changent
-  const { eventsWithColumns, totalMaxColumns } = useMemo(() => {
-    type EventWithColumn = typeof sortedEvents[0] & { column: number; maxColumns: number; taskIndex?: number; subjectName?: string | null };
-    const eventsWithCols: EventWithColumn[] = [];
-    let maxCols = 1;
-    
-    for (let index = 0; index < sortedEvents.length; index++) {
-      const evt = sortedEvents[index];
-      if (!evt.start || !evt.end) {
-        eventsWithCols.push({ ...evt, column: 0, maxColumns: 1 });
-        continue;
-      }
-      
-      // Trouver tous les événements précédents qui se chevauchent avec celui-ci
-      const usedColumns = new Set<number>();
-      for (let i = 0; i < index; i++) {
-        const prevEvt = eventsWithCols[i];
-        if (!prevEvt.start || !prevEvt.end) continue;
-        
-        const prevStart = prevEvt.start.getTime();
-        const prevEnd = prevEvt.end.getTime();
-        const thisStart = evt.start.getTime();
-        const thisEnd = evt.end.getTime();
-        
-        // Vérifier le chevauchement
-        if (thisStart < prevEnd && thisEnd > prevStart) {
-          usedColumns.add(prevEvt.column);
-        }
-      }
-      
-      // Trouver la première colonne libre
-      let column = 0;
-      while (usedColumns.has(column)) {
-        column++;
-      }
-      
-      maxCols = Math.max(maxCols, column + 1);
-      
-      eventsWithCols.push({ ...evt, column, maxColumns: maxCols });
-    }
-
-    return { eventsWithColumns: eventsWithCols, totalMaxColumns: maxCols };
-  }, [sortedEvents]);
-
   const timelineHeight = (END_HOUR - START_HOUR) * HOUR_HEIGHT;
 
   return (
-    <ScrollView 
+    <GestureScrollView 
       ref={scrollViewRef}
       style={styles.timelineScrollView}
       contentContainerStyle={{ paddingBottom: 20 }}
       showsVerticalScrollIndicator={true}
+      scrollEnabled={draggingIndex === null}
+      onScroll={(e) => { scrollOffsetRef.current = e.nativeEvent.contentOffset.y; }}
+      scrollEventThrottle={16}
     >
       <View style={styles.timelineContainer}>
         <View style={styles.timelineContent}>
@@ -1363,67 +1377,113 @@ function TimelineCalendar({
           })}
         </View>
 
-        {/* Événements et tâches */}
+        {/* Événements et tâches - pleine largeur, pas de colonnes côte à côte */}
         <View style={styles.timelineEvents}>
-          {eventsWithColumns.map((evt) => {
+          {sortedEvents.map((evt) => {
             if (!evt.start || !evt.end) return null;
             
             const top = hourToY(evt.start);
-            const height = ((evt.end.getTime() - evt.start.getTime()) / (1000 * 60 * 60)) * HOUR_HEIGHT;
+            const durationHours = (evt.end.getTime() - evt.start.getTime()) / (1000 * 60 * 60);
+            const height = durationHours * HOUR_HEIGHT;
             const isDragging = draggingIndex !== null && !evt.isExisting && evt.taskIndex === draggingIndex;
             const currentTop = isDragging ? dragY : top;
-            
-            // Calculer la largeur et la position horizontale en fonction de la colonne
-            // Si on est en train de glisser, mettre la tâche en pleine largeur pour éviter les chevauchements
-            const isDraggingThis = isDragging;
-            const columnWidth = isDraggingThis ? 100 : (100 / totalMaxColumns);
-            const left = isDraggingThis ? 0 : ((evt.column || 0) * (100 / totalMaxColumns));
-            const width = isDraggingThis ? 100 : ((100 / totalMaxColumns) - 2); // -2 pour un petit espace entre les colonnes
 
-            // Obtenir le pan responder pour les tâches (pas les événements existants)
-            const panResponder = !evt.isExisting && evt.taskIndex !== undefined 
-              ? panResponders[evt.taskIndex]
-              : null;
+            // Toujours pleine largeur (pas de colonnes côte à côte)
+            const isDraggable = !evt.isExisting && evt.taskIndex !== undefined;
+            const taskIndex = evt.taskIndex ?? -1;
+
+            const isCompact = height < 44;
+            const eventInnerContent = (
+              <>
+                {isCompact ? (
+                  <View style={styles.timelineEventRowCompact}>
+                    <Text style={styles.timelineEventTimeCompact} numberOfLines={1}>
+                      {format(evt.start, 'HH:mm')} - {format(evt.end, 'HH:mm')}
+                    </Text>
+                    <Text style={styles.timelineEventTitleCompact} numberOfLines={1}>
+                      {evt.title}
+                    </Text>
+                    {!evt.isExisting && (
+                      <View style={styles.timelineEventDragHandleCompact}>
+                        <Ionicons name="reorder-three" size={16} color="rgba(0,0,0,0.5)" />
+                      </View>
+                    )}
+                  </View>
+                ) : (
+                  <>
+                    <Text style={styles.timelineEventTime}>
+                      {format(evt.start, 'HH:mm')} - {format(evt.end, 'HH:mm')}
+                    </Text>
+                    <Text style={styles.timelineEventTitle} numberOfLines={2}>
+                      {evt.title}
+                    </Text>
+                    {!evt.isExisting && evt.subjectName && (
+                      <View style={styles.timelineEventBadge}>
+                        <Text style={styles.timelineEventBadgeText}>{evt.subjectName}</Text>
+                      </View>
+                    )}
+                    {!evt.isExisting && (
+                      <View style={styles.timelineEventDragHandle}>
+                        <Ionicons name="reorder-three" size={22} color="rgba(0,0,0,0.5)" />
+                      </View>
+                    )}
+                  </>
+                )}
+              </>
+            );
+
+            if (isDraggable) {
+              return (
+                <PanGestureHandler
+                  key={evt.id}
+                  onHandlerStateChange={(e) => handlePanStateChange(taskIndex, e)}
+                  onGestureEvent={(e) => handlePanGesture(taskIndex, e)}
+                  activeOffsetY={[-10, 10]}
+                  activateAfterLongPress={250}
+                >
+                  <View
+                    style={[
+                      styles.timelineEventBase,
+                      isCompact && styles.timelineEventCompact,
+                      styles.timelineEventNew,
+                      {
+                        top: currentTop,
+                        height,
+                        left: 0,
+                        right: 0,
+                      },
+                      isDragging && styles.timelineEventDragging,
+                    ]}
+                  >
+                    {eventInnerContent}
+                  </View>
+                </PanGestureHandler>
+              );
+            }
 
             return (
               <View
                 key={evt.id}
                 style={[
-                  styles.timelineEvent,
+                  styles.timelineEventBase,
+                  isCompact && styles.timelineEventCompact,
                   evt.isExisting ? styles.timelineEventExisting : styles.timelineEventNew,
                   {
                     top: currentTop,
-                    height: Math.max(height, 40),
-                    left: `${left}%`,
-                    width: `${width}%`,
+                    height,
+                    left: 0,
+                    right: 0,
                   },
-                  isDragging && styles.timelineEventDragging,
                 ]}
-                {...(panResponder?.panHandlers || {})}
               >
-                <Text style={styles.timelineEventTime}>
-                  {format(evt.start, 'HH:mm')} - {format(evt.end, 'HH:mm')}
-                </Text>
-                <Text style={styles.timelineEventTitle} numberOfLines={2}>
-                  {evt.title}
-                </Text>
-                {!evt.isExisting && evt.subjectName && (
-                  <View style={styles.timelineEventBadge}>
-                    <Text style={styles.timelineEventBadgeText}>{evt.subjectName}</Text>
-                  </View>
-                )}
-                {!evt.isExisting && (
-                  <View style={styles.timelineEventDragHandle}>
-                    <Ionicons name="move" size={18} color="rgba(0,0,0,0.4)" />
-                  </View>
-                )}
+                {eventInnerContent}
               </View>
             );
           })}
         </View>
       </View>
     </View>
-    </ScrollView>
+    </GestureScrollView>
   );
 }
 
@@ -1957,6 +2017,19 @@ const styles = StyleSheet.create({
   section: {
     marginBottom: 32,
   },
+  timelineSectionFullWidth: {
+    marginHorizontal: -24,
+    width: Dimensions.get('window').width,
+  },
+  timelineSectionHeader: {
+    paddingHorizontal: 24,
+    marginBottom: 8,
+  },
+  timelineDragHint: {
+    fontSize: 12,
+    color: '#94a3b8',
+    marginTop: -4,
+  },
   sectionLabel: {
     fontSize: 12,
     fontWeight: '600',
@@ -1992,7 +2065,7 @@ const styles = StyleSheet.create({
     color: 'rgba(0, 0, 0, 0.7)',
   },
   timelineScrollView: {
-    maxHeight: 600,
+    flex: 1,
   },
   timelineContainer: {
     marginTop: 16,
@@ -2017,16 +2090,16 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     flexDirection: 'row',
-    alignItems: 'center',
-    paddingLeft: 16,
-    paddingRight: 16,
+    alignItems: 'flex-start',
+    paddingLeft: 12,
+    paddingRight: 8,
     height: HOUR_HEIGHT,
   },
   timelineHourText: {
     fontSize: 12,
     color: 'rgba(0, 0, 0, 0.4)',
     fontWeight: '500',
-    width: 50,
+    width: 36,
   },
   timelineHourLine: {
     flex: 1,
@@ -2036,8 +2109,8 @@ const styles = StyleSheet.create({
   },
   timelineEvents: {
     position: 'absolute',
-    left: 70,
-    right: 16,
+    left: 56,
+    right: 8,
     height: (END_HOUR - START_HOUR) * HOUR_HEIGHT,
   },
   timelineEvent: {
@@ -2048,6 +2121,37 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginHorizontal: 4,
     minHeight: 40,
+  },
+  timelineEventBase: {
+    position: 'absolute',
+    padding: 8,
+    borderRadius: 8,
+    marginHorizontal: 2,
+  },
+  timelineEventCompact: {
+    paddingVertical: 4,
+    paddingHorizontal: 6,
+    justifyContent: 'center',
+  },
+  timelineEventRowCompact: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flex: 1,
+    minWidth: 0,
+  },
+  timelineEventTimeCompact: {
+    fontSize: 10,
+    color: 'rgba(0, 0, 0, 0.6)',
+    fontWeight: '600',
+    flexShrink: 0,
+  },
+  timelineEventTitleCompact: {
+    fontSize: 12,
+    color: '#000000',
+    fontWeight: '500',
+    flex: 1,
+    minWidth: 0,
   },
   timelineEventExisting: {
     backgroundColor: 'rgba(0, 0, 0, 0.05)',
@@ -2105,6 +2209,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 4,
     padding: 4,
+  },
+  timelineEventDragHandleCompact: {
+    flexShrink: 0,
+    padding: 2,
   },
   timelineEventDragHint: {
     fontSize: 10,
