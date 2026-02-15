@@ -14,10 +14,16 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle } from 'react-native-svg';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { assistantService, tasksService } from '@/lib/api';
+import { assistantService, authService, tasksService } from '@/lib/api';
 import { selectExamTasks, TaskForExam } from '@/utils/taskSelection';
 import { useDailyStructureSettings } from '@/hooks/useDailyStructureSettings';
-
+import { Coachmark } from '@/tutorial/Coachmark';
+import {
+  getTutorialCompleted,
+  getTutorialStage,
+  setTutorialCompleted,
+  setTutorialStage,
+} from '@/tutorial/tutorialStorage';
 const { width } = Dimensions.get('window');
 const RING_SIZE = Math.min(width * 0.65, 260);
 const STROKE_WIDTH = 8;
@@ -405,6 +411,7 @@ export default function FocusScreen() {
   const { t } = useLanguage();
   const params = useLocalSearchParams();
   const { settings: dailyStructure } = useDailyStructureSettings();
+  const startButtonRef = useRef<TouchableOpacity>(null);
   
   const [phase, setPhase] = useState<FocusPhase>('intro');
   const [selectedDuration, setSelectedDuration] = useState(parseInt(params.duration as string) || dailyStructure.focusDuration);
@@ -418,9 +425,58 @@ export default function FocusScreen() {
   const [tasks, setTasks] = useState<{ id: string; title: string; subject: string; completed: boolean }[]>([]);
   const [currentTaskIndex, setCurrentTaskIndex] = useState(0);
   const [loadingTasks, setLoadingTasks] = useState(true);
+  const [tutorialStage, setTutorialStageState] = useState<string | null>(null);
+  const [tutorialCompleted, setTutorialCompletedState] = useState(false);
+  const [maxFocusDuration, setMaxFocusDuration] = useState<number | null>(null);
   
   const currentTask = tasks[currentTaskIndex] || { id: '', title: '', subject: '', completed: false };
   const completedCount = tasks.filter(t => t.completed).length;
+
+  const refreshTutorialState = async () => {
+    const [completed, stage] = await Promise.all([
+      getTutorialCompleted(),
+      getTutorialStage(),
+    ]);
+    console.log('[Tutorial] Focus load state', { completed, stage });
+    setTutorialCompletedState(completed);
+    setTutorialStageState(stage);
+  };
+
+  useEffect(() => {
+    refreshTutorialState();
+  }, []);
+
+  useEffect(() => {
+    const loadPlanLimits = async () => {
+      try {
+        const user = await authService.checkAuth();
+        const limit = user?.planLimits?.focusMaxDurationMinutes ?? null;
+        if (typeof limit === 'number') {
+          setMaxFocusDuration(limit);
+        } else {
+          setMaxFocusDuration(null);
+        }
+      } catch (error) {
+        console.error('❌ [Focus] Erreur chargement planLimits:', error);
+        setMaxFocusDuration(null);
+      }
+    };
+    loadPlanLimits();
+  }, []);
+
+  useEffect(() => {
+    if (!maxFocusDuration) return;
+    if (selectedDuration > maxFocusDuration) {
+      setSelectedDuration(maxFocusDuration);
+    }
+  }, [maxFocusDuration, selectedDuration]);
+
+  useEffect(() => {
+    if (tutorialCompleted) return;
+    if (tutorialStage !== 'focus') return;
+    if (phase !== 'intro') return;
+    console.log('[Tutorial] Focus coachmark intro');
+  }, [tutorialCompleted, tutorialStage, phase]);
 
   // Synchroniser avec les paramètres de Daily Structure
   useEffect(() => {
@@ -534,8 +590,27 @@ export default function FocusScreen() {
 
   const handleStartFocus = async () => {
     try {
+      const effectiveDuration =
+        maxFocusDuration && selectedDuration > maxFocusDuration
+          ? maxFocusDuration
+          : selectedDuration;
+      if (effectiveDuration !== selectedDuration) {
+        setSelectedDuration(effectiveDuration);
+        Alert.alert(
+          'Focus limité',
+          `La durée max en freemium est ${effectiveDuration} minutes.`
+        );
+      }
+
+      if (tutorialStage === 'focus') {
+        await setTutorialCompleted(false);
+        await setTutorialStage('habits');
+        setTutorialCompletedState(false);
+        setTutorialStageState('habits');
+      }
+
       const startLocally = () => {
-        setTimeLeft(selectedDuration * 60);
+        setTimeLeft(effectiveDuration * 60);
         setPhase('active');
         setIsRunning(true);
         setCurrentTaskIndex(0);
@@ -570,7 +645,7 @@ export default function FocusScreen() {
         console.log('ℹ️ [Focus] Impossible de vérifier les sessions actives, continuation:', checkError);
       }
 
-      const result = await assistantService.startDeepWorkSession(selectedDuration, 'deepwork', currentTask.title);
+      const result = await assistantService.startDeepWorkSession(effectiveDuration, 'deepwork', currentTask.title);
       if (result?.session?.id) {
         setSessionId(result.session.id);
         console.log('✅ [Focus] Nouvelle session démarrée:', result.session.id);
@@ -715,18 +790,13 @@ export default function FocusScreen() {
         console.log('Session terminée localement');
       }
     }
-    // Navigation sécurisée : essayer de revenir en arrière, sinon aller au dashboard
-    try {
-      if (router.canGoBack && router.canGoBack()) {
-        router.back();
-      } else {
-        router.replace('/(tabs)');
-      }
-    } catch (error) {
-      console.log('⚠️ Erreur lors du retour, redirection vers dashboard:', error);
-      router.replace('/(tabs)');
+    if (!tutorialCompleted && tutorialStage === 'habits') {
+      router.replace('/review-habits');
+      return;
     }
-  }, [sessionId, router]);
+    // Toujours revenir au dashboard après une session
+    router.replace('/(tabs)');
+  }, [sessionId, router, tutorialCompleted, tutorialStage]);
 
   const handleExit = useCallback(async () => {
     if (phase === 'active') {
@@ -746,18 +816,13 @@ export default function FocusScreen() {
         }
       }
     }
-    // Navigation sécurisée : essayer de revenir en arrière, sinon aller au dashboard
-    try {
-      if (router.canGoBack && router.canGoBack()) {
-        router.back();
-      } else {
-        router.replace('/(tabs)');
-      }
-    } catch (error) {
-      console.log('⚠️ Erreur lors du retour, redirection vers dashboard:', error);
-      router.replace('/(tabs)');
+    if (!tutorialCompleted && tutorialStage === 'habits') {
+      router.replace('/review-habits');
+      return;
     }
-  }, [sessionId, phase, router]);
+    // Toujours revenir au dashboard après une session
+    router.replace('/(tabs)');
+  }, [sessionId, phase, router, tutorialCompleted, tutorialStage]);
 
   const strokeDashoffset = CIRCUMFERENCE * (1 - progress);
 
@@ -858,9 +923,10 @@ export default function FocusScreen() {
                 </View>
               </Animated.View>
 
-              {/* Start button - Simplifié */}
+              {/* Start button */}
               <Animated.View entering={FadeInDown.delay(500).duration(400)} style={introStyles.startButtonContainer}>
                 <TouchableOpacity
+                  ref={startButtonRef}
                   style={introStyles.startButton}
                   onPress={handleStartFocus}
                   activeOpacity={0.8}
@@ -871,6 +937,20 @@ export default function FocusScreen() {
             </View>
           </ScrollView>
         </View>
+          <Coachmark
+          visible={!tutorialCompleted && tutorialStage === 'focus' && phase === 'intro'}
+          targetRef={startButtonRef}
+          text="Lance une session focus courte."
+          nextLabel="Démarrer"
+          onNext={handleStartFocus}
+          onSkip={async () => {
+            await setTutorialCompleted(false);
+            await setTutorialStage('habits');
+            setTutorialCompletedState(false);
+            setTutorialStageState('habits');
+            router.replace('/review-habits');
+          }}
+        />
 
         {/* Session Settings Modal */}
         <SessionSettingsModal

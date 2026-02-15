@@ -92,6 +92,10 @@ export async function POST(req: NextRequest) {
           email: userEmail.toLowerCase(),
           name: userName,
           password: "", // Pas de mot de passe pour les utilisateurs Apple
+          emailVerifiedAt: new Date(),
+          emailVerificationToken: null,
+          emailVerificationExpiresAt: null,
+          emailVerificationSentAt: null,
           // TODO: Stocker aussi appleUserId (sub) dans un champ dédié pour pouvoir retrouver l'utilisateur même si l'email change
         },
       })
@@ -100,7 +104,24 @@ export async function POST(req: NextRequest) {
       if (name && user.name !== name) {
         user = await prisma.user.update({
           where: { id: user.id },
-          data: { name },
+          data: {
+            name,
+            emailVerifiedAt: user.emailVerifiedAt ?? new Date(),
+            emailVerificationToken: null,
+            emailVerificationExpiresAt: null,
+            emailVerificationSentAt: null,
+          },
+        })
+      }
+      if (!user.emailVerifiedAt) {
+        user = await prisma.user.update({
+          where: { id: user.id },
+          data: {
+            emailVerifiedAt: new Date(),
+            emailVerificationToken: null,
+            emailVerificationExpiresAt: null,
+            emailVerificationSentAt: null,
+          },
         })
       }
     }
@@ -130,4 +151,3 @@ export async function POST(req: NextRequest) {
     )
   }
 }
-

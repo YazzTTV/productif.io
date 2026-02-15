@@ -4,6 +4,7 @@ import { getAuthUserFromRequest, verifyToken } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { calculateTaskOrder } from "@/lib/tasks"
 import { localDateToUTC } from "@/lib/date-utils"
+import { GamificationService } from "@/services/gamification"
 
 // GET /api/tasks/[id] - Récupérer une tâche spécifique
 export async function GET(
@@ -208,6 +209,8 @@ export async function PATCH(
     // Calculer l'ordre
     const order = calculateTaskOrder(priorityString, energyString)
 
+    const wasCompleted = existingTask.completed
+
     const task = await prisma.task.update({
       where: {
         id
@@ -223,6 +226,17 @@ export async function PATCH(
         order
       }
     })
+
+    // Gamification : si on vient de compléter la tâche (false -> true), ajouter des points
+    if (!wasCompleted && completed === true) {
+      try {
+        const gamificationService = new GamificationService()
+        await gamificationService.processTaskCompletion(userId, new Date())
+      } catch (error) {
+        console.error("[TASK_PATCH] Erreur gamification lors de la complétion de tâche:", error)
+        // On ne bloque pas la réponse pour une erreur de gamification
+      }
+    }
 
     return NextResponse.json(task)
   } catch (error) {

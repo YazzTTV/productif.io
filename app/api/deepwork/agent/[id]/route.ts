@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verifyApiToken, hasRequiredScopes } from '@/lib/api-token'
 import { getAuthUserFromRequest, getAuthUser } from '@/lib/auth'
+import { GamificationService } from '@/services/gamification'
 
 export async function PATCH(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
@@ -101,6 +102,17 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
     let actualDuration: number | null = null
     if (action === 'complete') {
       actualDuration = Math.floor((now.getTime() - session.timeEntry.startTime.getTime()) / 60000)
+
+      // Gamification: ajouter des points en fonction de la durée réelle de la session
+      try {
+        if (actualDuration > 0) {
+          const gamificationService = new GamificationService()
+          await gamificationService.processDeepWorkCompletion(userId, actualDuration, session.type, now)
+        }
+      } catch (error) {
+        console.error('[DEEPWORK_AGENT_PATCH] Erreur gamification lors de la complétion de session:', error)
+        // Ne pas bloquer la réponse en cas d'erreur de gamification
+      }
     }
 
     return NextResponse.json({ session: updatedSession, actualDuration, message: `Session ${action === 'complete' ? 'terminée' : 'mise à jour'}` })

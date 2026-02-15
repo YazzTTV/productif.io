@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import { cookies } from "next/headers"
 import { verify } from "jsonwebtoken"
 import { prisma } from "@/lib/prisma"
-import { hash } from "bcrypt"
+import { hash } from "bcryptjs"
 
 // GET /api/admin/users - Récupérer tous les utilisateurs (pour super admin)
 export async function GET(request: Request) {

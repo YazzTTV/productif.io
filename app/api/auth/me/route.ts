@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { getAuthUserFromRequest, verifyToken } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { getPlanInfo } from "@/lib/plans"
+import { getEmailVerificationBlockAt } from "@/lib/email-verification"
 
 async function minimalUserFromToken(req: NextRequest) {
   try {
@@ -15,7 +16,22 @@ async function minimalUserFromToken(req: NextRequest) {
     if (!token) return null
     const decoded = await verifyToken(token)
     if (!decoded) return null
-    return { id: decoded.userId, email: decoded.email }
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.userId },
+      select: {
+        id: true,
+        email: true,
+        createdAt: true,
+        emailVerifiedAt: true,
+        emailVerificationSentAt: true,
+      },
+    })
+    if (!user) return null
+    const blockedAt = getEmailVerificationBlockAt(user.createdAt)
+    const isBlocked =
+      !user.emailVerifiedAt && !!user.emailVerificationSentAt && new Date() > blockedAt
+    if (isBlocked) return null
+    return { id: user.id, email: user.email }
   } catch {
     return null
   }
@@ -43,7 +59,9 @@ export async function GET(req: NextRequest) {
         role: true,
         managedCompanyId: true,
         createdAt: true,
-        updatedAt: true
+        updatedAt: true,
+        emailVerifiedAt: true,
+        emailVerificationSentAt: true,
       }
     })
 
@@ -52,6 +70,10 @@ export async function GET(req: NextRequest) {
     }
 
     const planInfo = getPlanInfo(user)
+    const emailVerificationDueAt = getEmailVerificationBlockAt(userInfo.createdAt)
+    const emailVerificationRequired = !!userInfo.emailVerificationSentAt && !userInfo.emailVerifiedAt
+    const emailVerificationBlocked =
+      emailVerificationRequired && new Date() > emailVerificationDueAt
 
     // Récupérer l'entreprise de l'utilisateur
     const userCompany = await prisma.userCompany.findFirst({
@@ -73,6 +95,10 @@ export async function GET(req: NextRequest) {
         plan: planInfo.plan,
         planLimits: planInfo.limits,
         isPremium: planInfo.isPremium,
+        emailVerified: !!userInfo.emailVerifiedAt || !emailVerificationRequired,
+        emailVerificationRequired,
+        emailVerificationDueAt,
+        emailVerificationBlocked,
       }
     })
   } catch (error: any) {

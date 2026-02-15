@@ -63,34 +63,20 @@ export async function GET(req: NextRequest) {
     })
 
     // Créer une matière virtuelle "Autres tâches" pour les tâches sans matière
-    // ou les ajouter à la première matière si elle existe
+    // (ne pas les injecter dans une matière existante pour éviter la confusion)
     let subjectsWithAllTasks = [...subjects]
-    
+
     if (tasksWithoutSubject.length > 0) {
-      // Si on a des matières, ajouter les tâches sans matière à la première
-      // Sinon, créer une matière virtuelle "Autres tâches"
-      if (subjects.length > 0) {
-        // Ajouter les tâches sans matière à la première matière
-        subjectsWithAllTasks[0] = {
-          ...subjectsWithAllTasks[0],
-          tasks: [
-            ...subjectsWithAllTasks[0].tasks,
-            ...tasksWithoutSubject,
-          ],
-        }
-      } else {
-        // Créer une matière virtuelle "Autres tâches"
-        subjectsWithAllTasks.push({
-          id: 'no-subject',
-          name: 'Autres tâches',
-          coefficient: 1,
-          deadline: null,
-          userId: user.id,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          tasks: tasksWithoutSubject,
-        })
-      }
+      subjectsWithAllTasks.push({
+        id: 'no-subject',
+        name: 'Autres tâches',
+        coefficient: 0,
+        deadline: null,
+        userId: user.id,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        tasks: tasksWithoutSubject,
+      })
     }
 
     // Transformer les données pour correspondre au format attendu par le mobile
@@ -147,9 +133,14 @@ export async function POST(req: NextRequest) {
       )
     }
     
-    if (!coefficient || (coefficient < 1 || coefficient > 3)) {
+    const parsedCoefficient = Number(coefficient)
+    const normalizedCoefficient = Number.isFinite(parsedCoefficient)
+      ? Math.round(parsedCoefficient)
+      : NaN
+
+    if (!Number.isFinite(normalizedCoefficient) || normalizedCoefficient < 1 || normalizedCoefficient > 6) {
       return NextResponse.json(
-        { error: "Le coefficient doit être entre 1 et 3" },
+        { error: "Le coefficient doit être entre 1 et 6" },
         { status: 400 }
       )
     }
@@ -176,7 +167,7 @@ export async function POST(req: NextRequest) {
     const subject = await prisma.subject.create({
       data: {
         name: name.trim(),
-        coefficient: coefficient,
+        coefficient: normalizedCoefficient,
         deadline: deadline ? new Date(deadline) : null,
         userId: user.id,
       },

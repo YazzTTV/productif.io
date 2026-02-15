@@ -1,17 +1,20 @@
 import { DarkTheme, DefaultTheme, ThemeProvider as NavigationThemeProvider } from '@react-navigation/native';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StripeProvider } from '@stripe/stripe-react-native';
 import 'react-native-reanimated';
+import { CopilotProvider } from 'react-native-copilot';
+import { TutorialTooltip } from '@/tutorial/TutorialTooltip';
 
 import { ThemeProvider, useTheme } from '@/contexts/ThemeContext';
 import { LanguageProvider } from '@/contexts/LanguageContext';
 import Constants from 'expo-constants';
 import '@/utils/suppressWarnings'; // Supprimer les warnings NativeEventEmitter
 import { usePushNotifications } from '@/hooks/usePushNotifications';
+import { initAppCheck } from '@/lib/appCheck';
 
 // Stripe publishable key - from environment variables or app.json extra config
 const STRIPE_PUBLISHABLE_KEY = 
@@ -173,13 +176,6 @@ function AppContent() {
               }} 
             />
             <Stack.Screen 
-              name="stripe-checkout" 
-              options={{ 
-                headerShown: false,
-                gestureEnabled: true, // Permettre le retour vers (tabs)
-              }} 
-            />
-            <Stack.Screen 
               name="habits-manager" 
               options={{ 
                 headerShown: false,
@@ -230,6 +226,20 @@ function AppContent() {
               }} 
             />
             <Stack.Screen 
+              name="invite" 
+              options={{ 
+                headerShown: false,
+                gestureEnabled: true,
+              }} 
+            />
+            <Stack.Screen 
+              name="verify-email" 
+              options={{ 
+                headerShown: false,
+                gestureEnabled: true,
+              }} 
+            />
+            <Stack.Screen 
               name="daily-journal" 
               options={{ 
                 headerShown: false,
@@ -244,12 +254,49 @@ function AppContent() {
 }
 
 export default function RootLayout() {
+  const [appCheckReady, setAppCheckReady] = useState(false);
+
+  // Initialiser App Check le plus tôt possible (AVANT Google Sign-In)
+  useEffect(() => {
+    async function bootstrap() {
+      try {
+        await initAppCheck();
+        console.log('✅ [RootLayout] App Check initialisé');
+      } catch (error) {
+        console.error('❌ [RootLayout] Erreur init App Check:', error);
+        // En prod, on pourrait vouloir bloquer l'app ici
+        // Pour l'instant, on continue quand même
+      } finally {
+        setAppCheckReady(true);
+      }
+    }
+    bootstrap();
+  }, []);
+
+  // Optionnel: attendre que App Check soit prêt avant de rendre l'app
+  // Décommentez si vous voulez bloquer le rendu jusqu'à l'init
+  // if (!appCheckReady) {
+  //   return null;
+  // }
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <StripeProvider publishableKey={STRIPE_PUBLISHABLE_KEY}>
         <ThemeProvider>
           <LanguageProvider>
-            <AppContent />
+            <CopilotProvider
+              animated
+              overlay="svg"
+              tooltipComponent={TutorialTooltip}
+              labels={{
+                next: 'Suivant',
+                previous: 'Retour',
+                skip: 'Passer',
+                finish: 'Terminer',
+              }}
+            >
+              <AppContent />
+            </CopilotProvider>
           </LanguageProvider>
         </ThemeProvider>
       </StripeProvider>

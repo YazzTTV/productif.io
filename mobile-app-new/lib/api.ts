@@ -1,8 +1,17 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 
-// Configuration de l'API  
-const API_BASE_URL = 'https://www.productif.io/api'; // Utilisation de l'API de production avec www
+// Configuration de l'API
+const DEFAULT_API_BASE_URL = 'https://www.productif.io/api';
+const API_BASE_URL = (process.env.EXPO_PUBLIC_API_BASE_URL || DEFAULT_API_BASE_URL).replace(/\/$/, '');
+
+export const getApiBaseUrl = () => API_BASE_URL;
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+const normalizeEmail = (email: string) => email.trim().toLowerCase();
+
+const isValidEmail = (email: string) => EMAIL_REGEX.test(email);
 
 // Fonction utilitaire pour vérifier AsyncStorage
 const isAsyncStorageAvailable = () => {
@@ -48,6 +57,11 @@ export interface User {
   role: string;
   createdAt: string;
   updatedAt: string;
+  emailVerifiedAt?: string | null;
+  emailVerified?: boolean;
+  emailVerificationRequired?: boolean;
+  emailVerificationDueAt?: string | null;
+  emailVerificationBlocked?: boolean;
   plan?: string;
   planLimits?: PlanLimits;
   isPremium?: boolean;
@@ -367,10 +381,20 @@ export const authService = {
     // Nettoyer l'ancien token avant l'inscription pour éviter les conflits
     console.log('🧹 [SIGNUP] Nettoyage de l\'ancien token avant inscription...');
     await TokenStorage.getInstance().clearToken();
-    
+
+    const normalizedEmail = normalizeEmail(userData.email || '');
+    if (!normalizedEmail || !isValidEmail(normalizedEmail)) {
+      throw new Error('Adresse email invalide');
+    }
+
+    const payload: SignupRequest = {
+      ...userData,
+      email: normalizedEmail,
+    };
+
     const response = await apiCall<AuthResponse>('/auth/register', {
       method: 'POST',
-      body: JSON.stringify(userData),
+      body: JSON.stringify(payload),
     });
 
     // Stocker le token si présent dans la réponse
@@ -382,6 +406,18 @@ export const authService = {
       console.error('❌ [SIGNUP] Aucun token dans la réponse d\'inscription');
     }
 
+    return response;
+  },
+
+  // Renvoyer l'email de vérification
+  async resendVerificationEmail(email?: string): Promise<{ success: boolean; alreadyVerified?: boolean }> {
+    const response = await apiCall<{ success: boolean; alreadyVerified?: boolean }>(
+      '/auth/resend-verification',
+      {
+        method: 'POST',
+        body: JSON.stringify(email ? { email } : {}),
+      }
+    );
     return response;
   },
 
@@ -681,6 +717,13 @@ export const subjectsService = {
       }
       throw error;
     }
+  },
+
+  // Supprimer une matière
+  async delete(subjectId: string): Promise<{ success: boolean }> {
+    return await apiCall(`/subjects/${subjectId}`, {
+      method: 'DELETE',
+    });
   },
 
   // Analyser une image pour extraire les matières
@@ -1209,7 +1252,8 @@ export const gamificationService = {
       userId: string;
       userName: string | null;
       userEmail: string;
-      totalPoints: number;
+      points?: number;
+      totalPoints?: number;
       level: number;
       currentStreak: number;
       longestStreak: number;
@@ -1229,7 +1273,8 @@ export const gamificationService = {
     userId: string;
     userName: string | null;
     userEmail: string;
-    totalPoints: number;
+    points?: number;
+    totalPoints?: number;
     level: number;
     currentStreak: number;
     longestStreak: number;
@@ -1265,7 +1310,7 @@ export const gamificationService = {
       const companyUserIds = companyUsers.users.map((u: any) => u.id);
       const friendsLeaderboard = leaderboardData
         .filter((entry: any) => companyUserIds.includes(entry.userId))
-        .sort((a: any, b: any) => (b.totalPoints || 0) - (a.totalPoints || 0))
+        .sort((a: any, b: any) => (b.totalPoints ?? b.points ?? 0) - (a.totalPoints ?? a.points ?? 0))
         .map((entry: any, index: number) => ({
           ...entry,
           rank: index + 1,
@@ -1340,7 +1385,8 @@ export const gamificationService = {
     userId: string;
     userName: string | null;
     userEmail: string;
-    totalPoints: number;
+    points?: number;
+    totalPoints?: number;
     level: number;
     currentStreak: number;
     longestStreak: number;

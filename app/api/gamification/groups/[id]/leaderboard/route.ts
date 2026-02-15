@@ -49,6 +49,7 @@ export async function GET(
       userName: string
       userEmail: string
       points: number
+      totalPoints: number
       level: number
       currentStreak: number
       longestStreak: number
@@ -65,6 +66,7 @@ export async function GET(
           userName: member.user.name || member.user.email.split('@')[0],
           userEmail: member.user.email,
           points: gamif.points,
+          totalPoints: gamif.points,
           level: gamif.level,
           currentStreak: gamif.currentStreak,
           longestStreak: gamif.longestStreak,
@@ -107,4 +109,3 @@ export async function GET(
     )
   }
 }
-

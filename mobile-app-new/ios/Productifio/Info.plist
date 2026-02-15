@@ -29,7 +29,8 @@
       <dict>
         <key>CFBundleURLSchemes</key>
         <array>
-          <string>com.googleusercontent.apps.738789952398-m6risp9hae6ao11n7s4178nig64largu</string>
+          <string>productifio</string>
+          <string>io.productif.app</string>
         </array>
       </dict>
       <dict>
@@ -38,9 +39,17 @@
           <string>exp+productif-io</string>
         </array>
       </dict>
+      <dict>
+        <key>CFBundleURLSchemes</key>
+        <array>
+          <string>com.googleusercontent.apps.738789952398-m6risp9hae6ao11n7s4178nig64largu</string>
+        </array>
+      </dict>
     </array>
     <key>CFBundleVersion</key>
     <string>1</string>
+    <key>ITSAppUsesNonExemptEncryption</key>
+    <false/>
     <key>LSMinimumSystemVersion</key>
     <string>12.0</string>
     <key>LSRequiresIPhoneOS</key>

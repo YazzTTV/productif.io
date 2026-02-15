@@ -1,18 +1,30 @@
 import { NextResponse } from "next/server"
 import { hash } from "bcryptjs"
 import { prisma } from "@/lib/prisma"
-import { v4 as uuidv4 } from "uuid"
 import { TrialService } from "@/lib/trial/TrialService"
 import { createToken, createSession } from "@/lib/auth"
 import { createDefaultHabits } from "@/lib/habits-utils"
+import {
+  generateEmailVerificationToken,
+  getEmailVerificationExpiry,
+  sendEmailVerificationEmail,
+} from "@/lib/email-verification"
 
 export async function POST(req: Request) {
   try {
     const { name, email, password, company } = await req.json()
 
     // Validation simple
-    if (!name || !email || !password) {
+    const rawEmail = typeof email === "string" ? email : ""
+    const normalizedEmail = rawEmail.trim().toLowerCase()
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+    if (!name || !normalizedEmail || !password) {
       return NextResponse.json({ error: "Tous les champs sont requis" }, { status: 400 })
+    }
+
+    if (!emailRegex.test(normalizedEmail)) {
+      return NextResponse.json({ error: "Email invalide" }, { status: 400 })
     }
 
     // Validation de l'entreprise si fournie
@@ -21,8 +33,13 @@ export async function POST(req: Request) {
     }
 
     // Vérifier si l'utilisateur existe déjà
-    const existingUser = await prisma.user.findUnique({
-      where: { email }
+    const existingUser = await prisma.user.findFirst({
+      where: {
+        email: {
+          equals: normalizedEmail,
+          mode: "insensitive",
+        },
+      },
     })
 
     if (existingUser) {
@@ -34,12 +51,19 @@ export async function POST(req: Request) {
       const hashedPassword = await hash(password, 10)
       
       // Créer l'utilisateur
+      const emailVerificationToken = generateEmailVerificationToken()
+      const emailVerificationExpiresAt = getEmailVerificationExpiry()
+
       const user = await prisma.user.create({
         data: {
           name,
-          email,
+          email: normalizedEmail,
           password: hashedPassword,
           role: 'USER',
+          emailVerifiedAt: null,
+          emailVerificationToken,
+          emailVerificationExpiresAt,
+          emailVerificationSentAt: new Date(),
         },
         select: {
           id: true,
@@ -48,8 +72,20 @@ export async function POST(req: Request) {
           role: true,
           createdAt: true,
           updatedAt: true,
+          emailVerifiedAt: true,
         }
       })
+
+      // Envoyer l'email de vérification
+      try {
+        await sendEmailVerificationEmail({
+          email: user.email,
+          name: user.name,
+          token: emailVerificationToken,
+        })
+      } catch (emailError) {
+        console.error("Erreur envoi email de vérification:", emailError)
+      }
       
       // Initialiser le trial gratuit de 7 jours
       await TrialService.initializeTrial(user.id)
@@ -131,4 +167,3 @@ export async function POST(req: Request) {
     }, { status: 500 })
   }
 }
-

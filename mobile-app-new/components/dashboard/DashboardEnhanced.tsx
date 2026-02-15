@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, RefreshControl, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, RefreshControl, Platform, Modal, Alert, ActivityIndicator, AppState } from 'react-native';
 import { useRouter } from 'expo-router';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,6 +10,13 @@ import { checkPremiumStatus } from '@/utils/premium';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { selectExamTasks, TaskForExam } from '@/utils/taskSelection';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import {
+  getTutorialCompleted,
+  getTutorialStage,
+  setTutorialCompleted,
+  setTutorialStage,
+} from '@/tutorial/tutorialStorage';
+import { Coachmark } from '@/tutorial/Coachmark';
 
 interface KeyMoment {
   time: string;
@@ -35,12 +42,15 @@ interface GroupMember {
   totalPoints: number;
 }
 
+
 export function DashboardEnhanced() {
   const { t } = useLanguage();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const timelineScrollRef = useRef<ScrollView>(null);
   const timelineItemPositions = useRef<{ [key: number]: number }>({});
+  const connectCalendarRef = useRef<TouchableOpacity>(null);
+  const tutorialAutoAdvanceRef = useRef(false);
   
   const [userName, setUserName] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -53,11 +63,67 @@ export function DashboardEnhanced() {
   const [groupAveragePoints, setGroupAveragePoints] = useState<number | null>(null);
   const [groupMembers, setGroupMembers] = useState<GroupMember[]>([]);
   const [favoriteGroupId, setFavoriteGroupId] = useState<string | null>(null);
+  const [tutorialStage, setTutorialStageState] = useState<string | null>(null);
+  const [tutorialCompleted, setTutorialCompleted] = useState(false);
+  const [showEmailVerificationModal, setShowEmailVerificationModal] = useState(false);
+  const [emailVerificationDueAt, setEmailVerificationDueAt] = useState<string | null>(null);
+  const [isResendingVerification, setIsResendingVerification] = useState(false);
+  const verificationIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const FAVORITE_GROUP_KEY = 'favorite_group_id';
 
   const currentHour = new Date().getHours();
   const greeting = currentHour < 12 ? t('goodMorning') : currentHour < 18 ? t('goodAfternoon') : t('goodEvening');
+
+  useEffect(() => {
+    const loadTutorialState = async () => {
+      const [completed, stage] = await Promise.all([
+        getTutorialCompleted(),
+        getTutorialStage(),
+      ]);
+      console.log('[Tutorial] Dashboard load state', { completed, stage });
+      setTutorialCompleted(completed);
+      if (!completed && !stage) {
+        await setTutorialStage('calendar');
+        setTutorialStageState('calendar');
+        return;
+      }
+      setTutorialStageState(stage);
+    };
+    loadTutorialState();
+  }, []);
+
+  useEffect(() => {
+    if (Platform.OS !== 'ios') return;
+    if (tutorialCompleted) return;
+    if (tutorialStage !== 'calendar') return;
+    console.log('[Tutorial] Dashboard coachmark calendar');
+  }, [tutorialCompleted, tutorialStage]);
+
+  useEffect(() => {
+    if (tutorialCompleted) return;
+    if (tutorialStage !== 'calendar') return;
+    if (!isCalendarConnected) return;
+    if (tutorialAutoAdvanceRef.current) return;
+    tutorialAutoAdvanceRef.current = true;
+    console.log('[Tutorial] Calendar already connected -> skip to subjects');
+    (async () => {
+      await setTutorialCompleted(false);
+      await setTutorialStage('subjects');
+      setTutorialStageState('subjects');
+      router.push({ pathname: '/tasks-new', params: { tutorial: 'subjects' } });
+    })();
+  }, [tutorialCompleted, tutorialStage, isCalendarConnected, router]);
+
+  // Coachmarks are handled locally in this screen.
+
+  const handleConnectCalendarPress = () => {
+    if (tutorialStage === 'calendar') {
+      router.push('/(onboarding-new)/calendar-sync');
+      return;
+    }
+    router.push('/parametres');
+  };
 
   // Convertir les événements Google Calendar en KeyMoments
   const keyMoments: KeyMoment[] = React.useMemo(() => {
@@ -110,6 +176,21 @@ export function DashboardEnhanced() {
       const user = await authService.checkAuth();
       if (user?.name) {
         setUserName(user.name.split(' ')[0]);
+      }
+      if (user) {
+        const isVerified = user.emailVerified ?? !!user.emailVerifiedAt;
+        const needsVerification = user.emailVerificationRequired ?? !isVerified;
+        if (user.emailVerificationBlocked) {
+          router.replace('/verify-email');
+          return;
+        }
+        if (needsVerification) {
+          setEmailVerificationDueAt(user.emailVerificationDueAt ?? null);
+          setShowEmailVerificationModal(true);
+        } else {
+          setEmailVerificationDueAt(null);
+          setShowEmailVerificationModal(false);
+        }
       }
 
       // Check premium status
@@ -174,6 +255,100 @@ export function DashboardEnhanced() {
     loadData();
   }, []);
 
+  const handleResendVerification = async () => {
+    try {
+      setIsResendingVerification(true);
+      const response = await authService.resendVerificationEmail();
+      if (response.alreadyVerified) {
+        Alert.alert(t('info', undefined, 'Info'), t('emailAlreadyVerified', undefined, 'Ton email est déjà vérifié.'));
+        setShowEmailVerificationModal(false);
+        return;
+      }
+      Alert.alert(
+        t('success', undefined, 'Succès'),
+        t('emailVerificationSent', undefined, 'Email de vérification envoyé.')
+      );
+    } catch (error: any) {
+      Alert.alert(
+        t('error', undefined, 'Erreur'),
+        error?.message || t('emailVerificationSendError', undefined, 'Impossible d\'envoyer l\'email.')
+      );
+    } finally {
+      setIsResendingVerification(false);
+    }
+  };
+
+  const getDaysLeft = () => {
+    if (!emailVerificationDueAt) return null;
+    const due = new Date(emailVerificationDueAt);
+    const now = new Date();
+    const diffMs = due.getTime() - now.getTime();
+    const days = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+    return Math.max(0, days);
+  };
+
+  const handleCheckVerification = async () => {
+    try {
+      const user = await authService.checkAuth();
+      const isVerified = user?.emailVerified ?? !!user?.emailVerifiedAt;
+      const needsVerification = user?.emailVerificationRequired ?? !isVerified;
+      if (!needsVerification) {
+        setShowEmailVerificationModal(false);
+        Alert.alert(
+          t('success', undefined, 'Succès'),
+          t('emailVerifiedSuccess', undefined, 'Merci, ton email est vérifié.')
+        );
+      } else {
+        Alert.alert(
+          t('info', undefined, 'Info'),
+          t('emailNotVerifiedYet', undefined, 'Ton email n\'est pas encore vérifié.')
+        );
+      }
+    } catch (error: any) {
+      Alert.alert(
+        t('error', undefined, 'Erreur'),
+        error?.message || t('emailVerificationCheckError', undefined, 'Impossible de vérifier le statut.')
+      );
+    }
+  };
+
+  const autoCheckVerification = async () => {
+    const user = await authService.checkAuth();
+    const isVerified = user?.emailVerified ?? !!user?.emailVerifiedAt;
+    const needsVerification = user?.emailVerificationRequired ?? !isVerified;
+    if (!needsVerification) {
+      setShowEmailVerificationModal(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!showEmailVerificationModal) {
+      if (verificationIntervalRef.current) {
+        clearInterval(verificationIntervalRef.current);
+        verificationIntervalRef.current = null;
+      }
+      return;
+    }
+
+    verificationIntervalRef.current = setInterval(() => {
+      autoCheckVerification().catch(() => {});
+    }, 8000);
+
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        autoCheckVerification().catch(() => {});
+      }
+    });
+
+    return () => {
+      if (verificationIntervalRef.current) {
+        clearInterval(verificationIntervalRef.current);
+        verificationIntervalRef.current = null;
+      }
+      sub.remove();
+    };
+  }, [showEmailVerificationModal]);
+
   // Scroll automatique vers l'événement actif ou le prochain événement
   useEffect(() => {
     if (keyMoments.length > 0) {
@@ -221,6 +396,21 @@ export function DashboardEnhanced() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
+      <Coachmark
+        visible={!tutorialCompleted && tutorialStage === 'calendar'}
+        targetRef={connectCalendarRef}
+        text="Connecte ton calendrier pour importer ton emploi du temps."
+        nextLabel="Continuer"
+        onNext={handleConnectCalendarPress}
+        onSkip={async () => {
+          console.log('[Tutorial] Calendar skip -> subjects');
+          await setTutorialCompleted(false);
+          await setTutorialStage('subjects');
+          setTutorialStageState('subjects');
+          setTutorialCompleted(false);
+          router.push({ pathname: '/tasks-new', params: { tutorial: 'subjects' } });
+        }}
+      />
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
@@ -375,8 +565,9 @@ export function DashboardEnhanced() {
                   <View style={styles.connectCalendarContainer}>
                     <Text style={styles.emptyCalendarText}>{t('connectCalendarDescription')}</Text>
                     <TouchableOpacity
+                      ref={connectCalendarRef}
                       style={styles.connectCalendarButton}
-                      onPress={() => router.push('/parametres')}
+                      onPress={handleConnectCalendarPress}
                       activeOpacity={0.8}
                     >
                       <Text style={styles.connectCalendarButtonText}>{t('connect')}</Text>
@@ -451,6 +642,69 @@ export function DashboardEnhanced() {
           <View style={{ height: 120 }} />
         </View>
       </ScrollView>
+
+      <Modal visible={showEmailVerificationModal} transparent animationType="fade">
+        <View style={styles.emailModalOverlay}>
+          <View style={styles.emailModalContainer}>
+            <Text style={styles.emailModalTitle}>
+              {t('verifyYourEmail', undefined, 'Vérifie ton email')}
+            </Text>
+            <Text style={styles.emailModalText}>
+              {t(
+                'verifyYourEmailBody',
+                undefined,
+                'On t\'a envoyé un email de vérification. Pense à cliquer sur le lien.'
+              )}
+            </Text>
+            {emailVerificationDueAt && (
+              <Text style={styles.emailModalCountdown}>
+                {t(
+                  'verifyYourEmailCountdown',
+                  undefined,
+                  `J-${getDaysLeft()} avant le blocage.`
+                )}
+              </Text>
+            )}
+            {emailVerificationDueAt && (
+              <Text style={styles.emailModalText}>
+                {t(
+                  'verifyYourEmailDeadline',
+                  undefined,
+                  'Vérifie ton email avant l\'échéance pour éviter le blocage.'
+                )}
+              </Text>
+            )}
+            <View style={styles.emailModalActions}>
+              <TouchableOpacity
+                style={styles.emailModalButton}
+                onPress={() => setShowEmailVerificationModal(false)}
+              >
+                <Text style={styles.emailModalButtonText}>
+                  {t('later', undefined, 'Plus tard')}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.emailModalButton, styles.emailModalButtonPrimary]}
+                onPress={handleResendVerification}
+                disabled={isResendingVerification}
+              >
+                {isResendingVerification ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.emailModalButtonPrimaryText}>
+                    {t('resendEmail', undefined, 'Renvoyer')}
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
+            <TouchableOpacity style={styles.emailModalCheck} onPress={handleCheckVerification}>
+              <Text style={styles.emailModalCheckText}>
+                {t('iVerified', undefined, 'J\'ai vérifié')}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -822,6 +1076,81 @@ const styles = StyleSheet.create({
   connectCalendarButtonText: {
     color: '#FFFFFF',
     fontSize: 14,
+    fontWeight: '600',
+  },
+  tutorialHighlight: {
+    borderWidth: 2,
+    borderColor: '#16A34A',
+    shadowColor: '#16A34A',
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+  },
+  tutorialHintContainer: {
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  emailModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  emailModalContainer: {
+    width: '100%',
+    maxWidth: 420,
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 20,
+  },
+  emailModalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 8,
+  },
+  emailModalText: {
+    fontSize: 14,
+    color: '#374151',
+    marginBottom: 8,
+    lineHeight: 20,
+  },
+  emailModalCountdown: {
+    fontSize: 14,
+    color: '#B45309',
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  emailModalActions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 12,
+  },
+  emailModalButton: {
+    flex: 1,
+    borderRadius: 10,
+    paddingVertical: 10,
+    alignItems: 'center',
+    backgroundColor: '#E5E7EB',
+  },
+  emailModalButtonPrimary: {
+    backgroundColor: '#10B981',
+  },
+  emailModalButtonText: {
+    color: '#111827',
+    fontWeight: '600',
+  },
+  emailModalButtonPrimaryText: {
+    color: '#fff',
+    fontWeight: '600',
+  },
+  emailModalCheck: {
+    marginTop: 12,
+    alignItems: 'center',
+  },
+  emailModalCheckText: {
+    color: '#10B981',
     fontWeight: '600',
   },
 });

@@ -6,6 +6,7 @@ import { format, isEqual, isBefore } from "date-fns"
 import { formatInTimezone, USER_TIMEZONE, localDateToUTC } from "@/lib/date-utils"
 import { parse, parseISO, isWithinInterval } from "date-fns"
 import { toZonedTime } from "date-fns-tz"
+import { GamificationService } from "@/services/gamification"
 
 // Augmenter le timeout pour les requêtes complexes (30 secondes)
 export const maxDuration = 30
@@ -543,6 +544,8 @@ export async function PATCH(req: Request) {
     // Calculer l'ordre
     const order = calculateTaskOrder(priorityString, energyString)
     
+    const wasCompleted = task.completed
+
     // Mettre à jour la tâche
     const updatedTask = await prisma.task.update({
       where: { id },
@@ -558,6 +561,17 @@ export async function PATCH(req: Request) {
         updatedAt: new Date()
       }
     })
+
+    // Gamification : si on vient de compléter la tâche (false -> true), ajouter des points
+    if (!wasCompleted && updatedTask.completed === true) {
+      try {
+        const gamificationService = new GamificationService()
+        await gamificationService.processTaskCompletion(task.userId, new Date())
+      } catch (error) {
+        console.error("[TASKS_PATCH] Erreur gamification lors de la complétion de tâche:", error)
+        // On ne bloque pas la réponse pour une erreur de gamification
+      }
+    }
     
     return NextResponse.json(updatedTask)
   } catch (error) {

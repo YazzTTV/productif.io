@@ -3,6 +3,7 @@ import { compare } from "bcryptjs"
 import { prisma } from "@/lib/prisma"
 import { createToken, createSession } from "@/lib/auth"
 import { getCookieConfig, getClientCookieConfig } from "@/lib/cookie-config"
+import { isEmailVerificationBlocked } from "@/lib/email-verification"
 
 export async function POST(req: Request) {
   try {
@@ -19,11 +20,29 @@ export async function POST(req: Request) {
     // Récupérer l'utilisateur depuis la base de données
     const user = await prisma.user.findUnique({
       where: { email: normalizedEmail },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        createdAt: true,
+        updatedAt: true,
+        emailVerifiedAt: true,
+        emailVerificationSentAt: true,
+        password: true,
+      },
     })
 
     // Vérifier si l'utilisateur existe
     if (!user) {
       return NextResponse.json({ error: "Identifiants invalides" }, { status: 401 })
+    }
+
+    if (isEmailVerificationBlocked(user.createdAt, user.emailVerifiedAt, user.emailVerificationSentAt)) {
+      return NextResponse.json(
+        { error: "Email non vérifié. Vérifie ton email pour continuer." },
+        { status: 403 }
+      )
     }
 
     // Vérifier le mot de passe
@@ -42,7 +61,7 @@ export async function POST(req: Request) {
     await createSession(user.id, token)
 
     // Ne pas renvoyer le mot de passe
-    const { password: _, ...userWithoutPassword } = user
+    const { password: _, emailVerificationSentAt: __, ...userWithoutPassword } = user
 
     // Créer la réponse
     const response = NextResponse.json(
@@ -75,4 +94,3 @@ export async function POST(req: Request) {
     )
   }
 }
-

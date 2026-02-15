@@ -68,6 +68,7 @@ interface HabitCardProps {
   canMoveUp?: boolean;
   canMoveDown?: boolean;
   onLongPress?: () => void;
+  onDelete?: () => void;
 }
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
@@ -83,6 +84,7 @@ const HabitCard: React.FC<HabitCardProps> = ({
   canMoveUp = false,
   canMoveDown = false,
   onLongPress,
+  onDelete,
 }) => {
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const colorAnim = useRef(new Animated.Value(0)).current;
@@ -240,7 +242,7 @@ const HabitCard: React.FC<HabitCardProps> = ({
         </Animated.View>
       )}
 
-      {/* Nom de l'habitude avec boutons de déplacement */}
+      {/* Nom de l'habitude avec boutons de déplacement & suppression */}
       <View style={styles.habitHeader}>
         <View style={styles.habitHeaderContent}>
           <Text style={styles.habitName}>{habit.name}</Text>
@@ -254,34 +256,46 @@ const HabitCard: React.FC<HabitCardProps> = ({
             </Text>
           )}
         </View>
-        {/* Boutons de déplacement - SIMPLES ET VISIBLES */}
-        <View style={styles.moveButtonsContainer}>
-          {onMoveUp && (
+        {/* Boutons d'actions sur l'habitude (déplacement + suppression) */}
+        <View style={styles.headerActionsContainer}>
+          <View style={styles.moveButtonsContainer}>
+            {onMoveUp && (
+              <TouchableOpacity
+                style={[styles.moveButton, !canMoveUp && styles.moveButtonDisabled]}
+                onPress={() => {
+                  if (canMoveUp && onMoveUp) {
+                    onMoveUp();
+                  }
+                }}
+                disabled={!canMoveUp}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="chevron-up" size={20} color={canMoveUp ? "#16A34A" : "rgba(0, 0, 0, 0.2)"} />
+              </TouchableOpacity>
+            )}
+            {onMoveDown && (
+              <TouchableOpacity
+                style={[styles.moveButton, !canMoveDown && styles.moveButtonDisabled]}
+                onPress={() => {
+                  if (canMoveDown && onMoveDown) {
+                    onMoveDown();
+                  }
+                }}
+                disabled={!canMoveDown}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="chevron-down" size={20} color={canMoveDown ? "#16A34A" : "rgba(0, 0, 0, 0.2)"} />
+              </TouchableOpacity>
+            )}
+          </View>
+          {onDelete && (
             <TouchableOpacity
-              style={[styles.moveButton, !canMoveUp && styles.moveButtonDisabled]}
-              onPress={() => {
-                if (canMoveUp && onMoveUp) {
-                  onMoveUp();
-                }
-              }}
-              disabled={!canMoveUp}
+              style={styles.deleteButton}
+              onPress={onDelete}
               activeOpacity={0.7}
+              disabled={isUpdating}
             >
-              <Ionicons name="chevron-up" size={20} color={canMoveUp ? "#16A34A" : "rgba(0, 0, 0, 0.2)"} />
-            </TouchableOpacity>
-          )}
-          {onMoveDown && (
-            <TouchableOpacity
-              style={[styles.moveButton, !canMoveDown && styles.moveButtonDisabled]}
-              onPress={() => {
-                if (canMoveDown && onMoveDown) {
-                  onMoveDown();
-                }
-              }}
-              disabled={!canMoveDown}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="chevron-down" size={20} color={canMoveDown ? "#16A34A" : "rgba(0, 0, 0, 0.2)"} />
+              <Ionicons name="trash-outline" size={18} color="#EF4444" />
             </TouchableOpacity>
           )}
         </View>
@@ -775,6 +789,7 @@ export default function HabitsScreen() {
                       onMoveDown={() => handleMoveHabit(habit.id, 'down', 'MORNING')}
                       canMoveUp={index > 0}
                       canMoveDown={index < morningHabits.length - 1}
+                      onDelete={() => handleDeleteHabit(habit.id)}
                       onLongPress={() => {
                         Alert.alert(
                           t('deleteHabit'),
@@ -834,6 +849,7 @@ export default function HabitsScreen() {
                       onMoveDown={() => handleMoveHabit(habit.id, 'down', 'DAY')}
                       canMoveUp={index > 0}
                       canMoveDown={index < dayHabits.length - 1}
+                      onDelete={() => handleDeleteHabit(habit.id)}
                       onLongPress={() => {
                         Alert.alert(
                           t('deleteHabit'),
@@ -893,6 +909,7 @@ export default function HabitsScreen() {
                       onMoveDown={() => handleMoveHabit(habit.id, 'down', 'EVENING')}
                       canMoveUp={index > 0}
                       canMoveDown={index < eveningHabits.length - 1}
+                      onDelete={() => handleDeleteHabit(habit.id)}
                       onLongPress={() => {
                         Alert.alert(
                           t('deleteHabit'),
@@ -1220,6 +1237,11 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: 12,
   },
+  headerActionsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   moveButtonsContainer: {
     flexDirection: 'column',
     gap: 6,
@@ -1247,6 +1269,12 @@ const styles = StyleSheet.create({
     opacity: 0.3,
     backgroundColor: '#F9FAFB',
     borderColor: 'rgba(0, 0, 0, 0.1)',
+  },
+  deleteButton: {
+    marginLeft: 4,
+    padding: 6,
+    borderRadius: 999,
+    backgroundColor: 'rgba(239, 68, 68, 0.05)',
   },
   actionMenu: {
     position: 'absolute',

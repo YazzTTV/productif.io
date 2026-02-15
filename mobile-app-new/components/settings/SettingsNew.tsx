@@ -5,6 +5,7 @@ import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { resetTutorial, setTutorialCompleted, setTutorialStage } from '@/tutorial/tutorialStorage';
 import { authService, onboardingService, apiCall } from '@/lib/api';
 import { connectGoogleCalendar, isGoogleCalendarConnected } from '@/lib/calendarAuth';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -26,6 +27,7 @@ export function SettingsNew() {
   const { settings: dailyStructure, saveSettings: saveDailyStructure } = useDailyStructureSettings();
   const [view, setView] = useState<SettingsView>('main');
   const [savedFeedback, setSavedFeedback] = useState(false);
+  const [emailVerificationRequired, setEmailVerificationRequired] = useState(false);
 
   // Profile
   const [name, setName] = useState('');
@@ -76,6 +78,9 @@ export function SettingsNew() {
         if (user?.name) {
           setName(user.name);
         }
+        const isVerified = user?.emailVerified ?? !!user?.emailVerifiedAt;
+        const needsVerification = user?.emailVerificationRequired ?? !isVerified;
+        setEmailVerificationRequired(!!needsVerification);
 
         // Charger les données de l'onboarding depuis le backend
         try {
@@ -126,7 +131,7 @@ export function SettingsNew() {
         setEndOfDayRecap(prefs.recapReminder ?? true);
         setStartOfDayTime(prefs.morningTime || '08:00');
         setBreakTime(prefs.noonTime || '12:00');
-        setEndOfDayTime(prefs.recapTime || '21:00');
+        setEndOfDayTime(prefs.journalTime || prefs.recapTime || '21:00');
       } catch (error) {
         console.log('❌ Impossible de charger les préférences de notifications pour SettingsNew:', error);
       }
@@ -385,6 +390,31 @@ export function SettingsNew() {
             } catch (error) {
               console.error('Erreur lors de la réinitialisation de l\'onboarding:', error);
               Alert.alert(t('error'), t('resetOnboardingError') || 'Impossible de réinitialiser l\'onboarding');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const restartTutorial = async () => {
+    Alert.alert(
+      'Relancer le didacticiel',
+      'Voulez-vous relancer le didacticiel depuis le début ?',
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Relancer',
+          style: 'default',
+          onPress: async () => {
+            try {
+              await resetTutorial();
+              await setTutorialCompleted(false);
+              await setTutorialStage('calendar');
+              router.replace('/(tabs)');
+            } catch (error) {
+              console.error('Erreur relance didacticiel:', error);
+              Alert.alert(t('error'), 'Impossible de relancer le didacticiel.');
             }
           },
         },
@@ -778,7 +808,7 @@ export function SettingsNew() {
                 <View style={styles.settingCard}>
                   <View style={styles.settingCardRow}>
                     <Text style={[styles.settingCardTitle, { flex: 1, marginRight: 12 }]}>
-                      {t('endOfDayRecap', undefined, 'Heure du récapitulatif du soir')}
+                      {t('endOfDayRecap', undefined, 'Heure du journal du soir')}
                     </Text>
                     <TextInput
                       style={styles.timeInlineInput}
@@ -787,7 +817,7 @@ export function SettingsNew() {
                         if (!isMountedRef.current) return;
                         setEndOfDayTime(value);
                         if (isValidTime(value)) {
-                          await saveNotificationPreferences({ recapTime: value, recapReminder: endOfDayRecap });
+                          await saveNotificationPreferences({ journalTime: value, recapReminder: endOfDayRecap });
                         }
                       }}
                       placeholder="21:00"
@@ -834,10 +864,24 @@ export function SettingsNew() {
             <Ionicons name="arrow-back" size={22} color="#000" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>{t('settings')}</Text>
-          {savedFeedback && (
+          {savedFeedback ? (
             <View style={styles.savedBadge}>
               <Ionicons name="checkmark" size={16} color="#16A34A" />
               <Text style={styles.savedText}>Saved</Text>
+            </View>
+          ) : emailVerificationRequired ? (
+            <TouchableOpacity
+              style={styles.unverifiedBadge}
+              onPress={() => router.push('/verify-email')}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="alert-circle" size={16} color="#B45309" />
+              <Text style={styles.unverifiedText}>Email non vérifié</Text>
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.verifiedBadge}>
+              <Ionicons name="checkmark-circle" size={16} color="#16A34A" />
+              <Text style={styles.verifiedText}>Email vérifié</Text>
             </View>
           )}
         </Animated.View>
@@ -984,8 +1028,61 @@ export function SettingsNew() {
               )}
             </View>
 
-            <TouchableOpacity style={styles.deleteCard} activeOpacity={0.7}>
-              <Text style={styles.deleteText}>Supprimer mon compte</Text>
+            <TouchableOpacity
+              style={styles.deleteCard}
+              activeOpacity={0.7}
+              onPress={() => {
+                Alert.alert(
+                  t('deleteAccount') || 'Supprimer le compte',
+                  t('deleteAccountConfirm') ||
+                    'Êtes-vous sûr de vouloir supprimer votre compte ? Cette action est irréversible.',
+                  [
+                    {
+                      text: t('cancel') || 'Annuler',
+                      style: 'cancel',
+                    },
+                    {
+                      text: t('deleteAccount') || 'Supprimer',
+                      style: 'destructive',
+                      onPress: async () => {
+                        try {
+                          // Appeler l'endpoint de suppression de compte
+                          await apiCall('/auth/delete-account', {
+                            method: 'POST',
+                          });
+
+                          // Nettoyer la session locale
+                          await authService.logout();
+                          await AsyncStorage.removeItem('onboarding_completed');
+
+                          Alert.alert(
+                            t('accountDeleted') || 'Compte supprimé',
+                            t('accountDeletedDescription') ||
+                              'Votre compte et toutes vos données ont été supprimés.',
+                            [
+                              {
+                                text: 'OK',
+                                onPress: () => {
+                                  router.replace('/(onboarding-new)/connection');
+                                },
+                              },
+                            ]
+                          );
+                        } catch (error: any) {
+                          console.error('Erreur lors de la suppression du compte:', error);
+                          Alert.alert(
+                            t('error') || 'Erreur',
+                            error?.message ||
+                              "Impossible de supprimer votre compte pour le moment. Veuillez réessayer."
+                          );
+                        }
+                      },
+                    },
+                  ]
+                );
+              }}
+            >
+              <Text style={styles.deleteText}>{t('deleteAccount') || 'Supprimer mon compte'}</Text>
             </TouchableOpacity>
           </View>
         </Animated.View>
@@ -1088,6 +1185,19 @@ export function SettingsNew() {
               <Ionicons name="refresh-outline" size={20} color="#16A34A" />
             </View>
           </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.settingCard} 
+            activeOpacity={0.7}
+            onPress={restartTutorial}
+          >
+            <View style={styles.settingCardRow}>
+              <View style={styles.settingCardContent}>
+                <Text style={styles.settingCardTitle}>Relancer le didacticiel</Text>
+                <Text style={styles.settingCardSubtitle}>Rejouer le tutoriel guidé</Text>
+              </View>
+              <Ionicons name="play-circle-outline" size={20} color="#16A34A" />
+            </View>
+          </TouchableOpacity>
         </Animated.View>
 
         {/* SECTION 8 — LOGOUT */}
@@ -1177,6 +1287,38 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#16A34A',
     fontWeight: '500',
+  },
+  unverifiedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: 'rgba(245, 158, 11, 0.15)',
+  },
+  unverifiedText: {
+    fontSize: 14,
+    color: '#B45309',
+    fontWeight: '500',
+  },
+  verifiedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: 'rgba(22, 163, 74, 0.1)',
+  },
+  verifiedText: {
+    fontSize: 14,
+    color: '#16A34A',
+    fontWeight: '500',
+  },
+  headerSpacer: {
+    width: 1,
+    height: 1,
   },
   section: {
     marginBottom: 48,

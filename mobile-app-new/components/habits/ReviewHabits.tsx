@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Alert, Modal, TextInput, Switch } from 'react-native';
 import { useRouter } from 'expo-router';
 import Animated, { 
@@ -16,6 +16,14 @@ import { useFocusEffect } from '@react-navigation/native';
 import { habitsService } from '@/lib/api';
 import { format, startOfDay } from 'date-fns';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { Coachmark } from '@/tutorial/Coachmark';
+import {
+  getTutorialCompleted,
+  getTutorialStage,
+  setTutorialCompleted,
+  setTutorialStage,
+  TutorialStage,
+} from '@/tutorial/tutorialStorage';
 
 interface Habit {
   id: string;
@@ -37,6 +45,7 @@ export function ReviewHabits() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { t } = useLanguage();
+  const addHabitButtonRef = useRef<TouchableOpacity>(null);
   const [habits, setHabits] = useState<Habit[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDate] = useState(() => startOfDay(new Date()));
@@ -47,6 +56,8 @@ export function ReviewHabits() {
   const [newHabitDaysOfWeek, setNewHabitDaysOfWeek] = useState<string[]>(['monday','tuesday','wednesday','thursday','friday','saturday','sunday']);
   const [creating, setCreating] = useState(false);
   const [showActionMenu, setShowActionMenu] = useState<string | null>(null);
+  const [tutorialStage, setTutorialStageState] = useState<TutorialStage | null>(null);
+  const [tutorialCompleted, setTutorialCompletedState] = useState(false);
 
   const fetchHabits = async () => {
     try {
@@ -75,10 +86,20 @@ export function ReviewHabits() {
     }
   };
 
+  const refreshTutorialState = useCallback(async () => {
+    const [completed, stage] = await Promise.all([
+      getTutorialCompleted(),
+      getTutorialStage(),
+    ]);
+    setTutorialCompletedState(completed);
+    setTutorialStageState(stage);
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
       fetchHabits();
-    }, [])
+      refreshTutorialState();
+    }, [refreshTutorialState])
   );
 
   const toggleHabit = async (habitId: string) => {
@@ -159,6 +180,13 @@ export function ReviewHabits() {
       setNewHabitDaily(true);
       setNewHabitDaysOfWeek(['monday','tuesday','wednesday','thursday','friday','saturday','sunday']);
       await fetchHabits();
+      if (!tutorialCompleted && tutorialStage === 'habits') {
+        await setTutorialCompleted(false);
+        await setTutorialStage('journal');
+        setTutorialCompletedState(false);
+        setTutorialStageState('journal');
+        router.push('/daily-journal');
+      }
     } catch (e: any) {
       console.error('Erreur création habitude:', e);
       Alert.alert('Erreur', e?.message || 'Création impossible');
@@ -353,6 +381,13 @@ export function ReviewHabits() {
                 {habit.name}
               </Text>
             </View>
+            <TouchableOpacity
+              style={styles.deleteButton}
+              onPress={onDelete}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            >
+              <Ionicons name="trash-outline" size={20} color="#EF4444" />
+            </TouchableOpacity>
           </View>
           
           {/* Menu d'actions */}
@@ -433,6 +468,7 @@ export function ReviewHabits() {
         {/* Add Habit Button - Design System */}
         <Animated.View entering={FadeInDown.delay(200).duration(400)} style={styles.addHabitSection}>
           <TouchableOpacity
+            ref={addHabitButtonRef}
             style={styles.addHabitButton}
             onPress={() => setShowCreateModal(true)}
             activeOpacity={0.7}
@@ -480,6 +516,13 @@ export function ReviewHabits() {
               {getHabitsByCategory('anti-habit').map((habit) => (
                 <View key={habit.id} style={styles.antiHabitCard}>
                   <Text style={styles.antiHabitText}>{habit.name}</Text>
+                  <TouchableOpacity
+                    style={styles.antiHabitDeleteButton}
+                    onPress={() => handleDeleteHabit(habit.id)}
+                    hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                  >
+                    <Ionicons name="trash-outline" size={18} color="#EF4444" />
+                  </TouchableOpacity>
                 </View>
               ))}
             </View>
@@ -568,6 +611,21 @@ export function ReviewHabits() {
           </View>
         </View>
       </Modal>
+
+      <Coachmark
+        visible={!tutorialCompleted && tutorialStage === 'habits' && !showCreateModal}
+        targetRef={addHabitButtonRef}
+        text="Défi 30 jours : crée une habitude et garde le rythme."
+        nextLabel="Créer"
+        onNext={() => setShowCreateModal(true)}
+        onSkip={async () => {
+          await setTutorialCompleted(false);
+          await setTutorialStage('journal');
+          setTutorialCompletedState(false);
+          setTutorialStageState('journal');
+          router.push('/daily-journal');
+        }}
+      />
     </View>
   );
 }
@@ -697,6 +755,10 @@ const styles = StyleSheet.create({
   habitNameCompleted: {
     color: 'rgba(0, 0, 0, 0.6)',
   },
+  deleteButton: {
+    padding: 8,
+    marginLeft: 8,
+  },
   antiHabitsSection: {
     marginTop: 48,
     marginBottom: 32,
@@ -711,6 +773,9 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   antiHabitCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     padding: 24,
     borderRadius: 24,
     borderWidth: 1,
@@ -718,8 +783,12 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.05)', // bg-black/5
   },
   antiHabitText: {
+    flex: 1,
     fontSize: 16,
     color: 'rgba(0, 0, 0, 0.6)',
+  },
+  antiHabitDeleteButton: {
+    padding: 8,
   },
   actionMenu: {
     position: 'absolute',

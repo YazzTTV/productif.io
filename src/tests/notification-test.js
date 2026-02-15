@@ -27,7 +27,7 @@ async function testNotificationSystem() {
 
         // 2. Initialiser le planificateur
         console.log('⚙️ Initialisation du planificateur...');
-        const scheduler = new NotificationScheduler(whatsappService);
+        const scheduler = new NotificationScheduler();
         scheduler.start();
 
         // 3. Attendre 1 minute

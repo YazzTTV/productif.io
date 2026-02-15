@@ -11,8 +11,6 @@ interface NotificationPreferences {
   isEnabled: boolean;
   emailEnabled: boolean;
   pushEnabled: boolean;
-  whatsappEnabled: boolean;
-  whatsappNumber?: string;
   startHour: number;
   endHour: number;
   allowedDays: number[];
@@ -36,6 +34,7 @@ interface NotificationPreferences {
   eveningTime: string;
   nightTime: string;
   recapTime: string;
+  journalTime?: string;
   timezone: string;
   // Questions aléatoires
   moodEnabled: boolean;
@@ -79,8 +78,6 @@ export async function GET(request: NextRequest) {
             isEnabled: preferences.isEnabled,
             emailEnabled: preferences.emailEnabled,
             pushEnabled: preferences.pushEnabled,
-            whatsappEnabled: preferences.whatsappEnabled,
-            whatsappNumber: preferences.whatsappNumber || '',
             startHour: preferences.startHour,
             endHour: preferences.endHour,
             allowedDays: preferences.allowedDays,
@@ -103,6 +100,7 @@ export async function GET(request: NextRequest) {
             eveningTime: preferences.eveningTime,
             nightTime: preferences.nightTime,
             recapTime: preferences.recapTime,
+            journalTime: preferences.journalTime || preferences.recapTime,
             timezone: preferences.timezone,
             moodEnabled: preferences.moodEnabled,
             stressEnabled: preferences.stressEnabled,
@@ -117,8 +115,6 @@ export async function GET(request: NextRequest) {
             isEnabled: true,
             emailEnabled: true,
             pushEnabled: true,
-            whatsappEnabled: false,
-            whatsappNumber: '',
             startHour: 9,
             endHour: 18,
             allowedDays: [1, 2, 3, 4, 5],
@@ -141,6 +137,7 @@ export async function GET(request: NextRequest) {
             eveningTime: '18:30',
             nightTime: '21:30',
             recapTime: '21:00',
+            journalTime: '21:00',
             timezone: 'Europe/Paris',
             moodEnabled: true,
             stressEnabled: true,
@@ -189,12 +186,17 @@ export async function POST(request: NextRequest) {
 
         // Synchroniser les types de notifications avec les champs booléens
         const notificationTypes = incomingPreferences.notificationTypes || [];
+        const journalTime =
+            incomingPreferences.journalTime ||
+            (incomingPreferences as any).recapTime ||
+            oldPreferences?.journalTime ||
+            oldPreferences?.recapTime ||
+            '21:00';
+
         const prismaData = {
             isEnabled: incomingPreferences.isEnabled,
             emailEnabled: incomingPreferences.emailEnabled,
             pushEnabled: incomingPreferences.pushEnabled,
-            whatsappEnabled: incomingPreferences.whatsappEnabled,
-            whatsappNumber: incomingPreferences.whatsappNumber,
             startHour: normalizedStart,
             endHour: normalizedEnd,
             allowedDays: incomingPreferences.allowedDays,
@@ -217,6 +219,7 @@ export async function POST(request: NextRequest) {
             eveningTime: incomingPreferences.eveningTime,
             nightTime: incomingPreferences.nightTime,
             recapTime: incomingPreferences.recapTime,
+            journalTime,
             timezone: incomingPreferences.timezone,
             moodEnabled: incomingPreferences.moodEnabled,
             stressEnabled: incomingPreferences.stressEnabled,
@@ -276,13 +279,12 @@ export async function POST(request: NextRequest) {
             try {
                 console.log(`🔄 Notification du scheduler pour l'utilisateur ${userId}...`);
 
-                // Prioriser le scheduler local en développement
-                // Essayer d'abord localhost, puis Railway (SCHEDULER_URL)
-                const bases = [
-                    'http://localhost:3001',
-                    'http://127.0.0.1:3001',
-                    process.env.SCHEDULER_URL
-                ].filter((v, i, a) => v && a.indexOf(v) === i); // Filtrer les valeurs null/undefined et les doublons
+                // En prod, on notifie uniquement le scheduler Railway (SCHEDULER_URL)
+                const bases = [process.env.SCHEDULER_URL].filter((v, i, a) => v && a.indexOf(v) === i);
+                if (bases.length === 0) {
+                    console.log('⚠️ SCHEDULER_URL manquant, notification scheduler ignorée.');
+                    return;
+                }
 
                 let notified = false;
                 for (const base of bases) {
@@ -318,7 +320,6 @@ export async function POST(request: NextRequest) {
                 }
                 if (!notified) {
                     console.log('⚠️ Aucune URL de scheduler n\'a répondu.');
-                    console.log('💡 Vérifiez que le scheduler local tourne sur le port 3001: node src/services/scheduler-service.js');
                 }
             } catch (error) {
                 console.log(`❌ Erreur lors de la notification du scheduler:`, error);

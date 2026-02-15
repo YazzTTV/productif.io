@@ -1,4 +1,5 @@
 import { apiService } from './api';
+import { getApiBaseUrl } from '../../lib/api';
 import { Habit, HabitEntry, CreateHabitData } from '../types';
 
 export class HabitService {
@@ -177,7 +178,7 @@ export class HabitService {
   }
 
   async exportHabitData(habitId: string, format: 'csv' | 'json'): Promise<Blob> {
-    const API_BASE_URL = 'https://www.productif.io/api';
+    const API_BASE_URL = getApiBaseUrl();
     const token = localStorage.getItem('auth_token');
     const headers: HeadersInit = {};
     if (token) {

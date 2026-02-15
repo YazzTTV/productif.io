@@ -21,7 +21,8 @@ export const getNotificationTitle = (type) => {
     'STRESS_CHECK_PREMIUM': '🧠 Check-in stress',
     'MOOD_CHECK_PREMIUM': '🙂 Check-in humeur',
     'FOCUS_CHECK_PREMIUM': '🎯 Check-in focus',
-    'EVENING_PLAN': '🌙 Planifie demain'
+    'EVENING_PLAN': '🌙 Planifie demain',
+    'JOURNAL_PROMPT': '📔 Journal du soir'
     };
     return titles[type] || type;
 };

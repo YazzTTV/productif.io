@@ -1,6 +1,6 @@
-import { TokenStorage } from '../../lib/api';
+import { TokenStorage, getApiBaseUrl } from '../../lib/api';
 
-const API_BASE_URL = 'https://www.productif.io/api';
+const API_BASE_URL = getApiBaseUrl();
 
 export interface ApiResponse<T> {
   data: T;

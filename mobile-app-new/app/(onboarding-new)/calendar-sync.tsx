@@ -20,6 +20,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { connectGoogleCalendar, connectAppleCalendar, createAppleCalendarEvent } from '@/lib/calendarAuth';
 import { googleCalendarService } from '@/lib/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getTutorialStage, setTutorialCompleted, setTutorialStage } from '@/tutorial/tutorialStorage';
 
 export default function CalendarSyncScreen() {
   const { t } = useLanguage();
@@ -144,6 +145,15 @@ export default function CalendarSyncScreen() {
           }
         }
         
+        const tutorialStage = await getTutorialStage();
+        console.log('[Tutorial] CalendarSync stage', tutorialStage);
+        if (tutorialStage === 'calendar') {
+          await setTutorialCompleted(false);
+          await setTutorialStage('subjects');
+          router.replace('/tasks-new');
+          return;
+        }
+
         // Récupérer le firstName depuis les paramètres ou AsyncStorage
         const firstName = (params.firstName as string) || await AsyncStorage.getItem('onboarding_firstName') || '';
         // Rediriger vers la page de succès après connexion réussie
@@ -194,6 +204,15 @@ export default function CalendarSyncScreen() {
           }
         }
         
+        const tutorialStage = await getTutorialStage();
+        console.log('[Tutorial] CalendarSync stage', tutorialStage);
+        if (tutorialStage === 'calendar') {
+          await setTutorialCompleted(false);
+          await setTutorialStage('subjects');
+          router.replace('/tasks-new');
+          return;
+        }
+
         // Récupérer le firstName depuis les paramètres ou AsyncStorage
         const firstName = (params.firstName as string) || await AsyncStorage.getItem('onboarding_firstName') || '';
         // Rediriger vers la page de succès après connexion réussie

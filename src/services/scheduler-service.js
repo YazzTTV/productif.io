@@ -1,7 +1,6 @@
 // Charger les variables d'environnement depuis .env en premier
 import 'dotenv/config';
 
-import whatsappService from './whatsappService.js';
 import NotificationScheduler from './NotificationScheduler.js';
 import express from 'express';
 import { PrismaClient } from '@prisma/client';
@@ -34,13 +33,24 @@ const port = Number(process.env.PORT || process.env.SCHEDULER_PORT) || 3001;
 // Configurer Express pour le healthcheck
 app.use(express.json());
 
+function requireSchedulerKey(req, res) {
+    const requiredKey = process.env.SCHEDULER_API_KEY;
+    if (!requiredKey) return true;
+    const provided = req.headers['x-scheduler-key'] || req.headers['x-api-key'];
+    if (provided !== requiredKey) {
+        res.status(401).json({ error: 'Unauthorized' });
+        return false;
+    }
+    return true;
+}
+
 // Route de santé pour Railway - doit répondre immédiatement
 app.get('/health', (req, res) => {
     res.json({ 
         status: 'healthy', 
         service: 'scheduler',
         schedulerActive: scheduler !== null,
-        realtimeUpdates: true,
+        realtimeUpdates: false,
         timestamp: new Date().toISOString()
     });
 });
@@ -48,9 +58,7 @@ app.get('/health', (req, res) => {
 // Démarrer le serveur de manière synchrone
 const server = app.listen(port, '0.0.0.0', () => {
     serverStarted = true;
-    console.log(`✅ Serveur de monitoring démarré sur le port ${port}`);
-    console.log(`📊 Status disponible sur http://0.0.0.0:${port}/status`);
-    console.log(`❤️ Healthcheck disponible sur http://0.0.0.0:${port}/health`);
+    console.log(`✅ Scheduler écoute sur le port ${port}`);
 });
 
 server.on('error', (err) => {
@@ -108,7 +116,6 @@ async function waitForDatabase(maxRetries = 30, delay = 2000) {
 async function startSchedulerService() {
     try {
         console.log('🚀 Démarrage du service scheduler...');
-        console.log(`📦 PORT=${port}`);
         
         // Attendre que le serveur soit démarré (il devrait déjà l'être)
         if (!serverStarted) {
@@ -128,11 +135,10 @@ async function startSchedulerService() {
             });
         }
         
-        console.log('✅ Serveur Express démarré avec succès');
+        console.log('✅ Serveur Express démarré');
 
         // Maintenant que le serveur est prêt, on peut initialiser le reste
         console.log('🚀 Démarrage du service de planification...');
-        console.log('🔄 AVEC SYSTÈME DE MISE À JOUR TEMPS RÉEL');
 
         // Route pour obtenir le statut complet du planificateur
         app.get('/status', (req, res) => {
@@ -170,16 +176,9 @@ async function startSchedulerService() {
 
         // Endpoint de test pour générer des logs
         app.get('/api/test-logs', (req, res) => {
-            console.log('📝 TEST LOGS - Requête reçue à', new Date().toISOString());
-            console.log('📊 Statut du scheduler:', scheduler ? 'ACTIF' : 'INACTIF');
-            if (scheduler) {
-                const status = scheduler.getStatus();
-                console.log('📈 Jobs actifs:', status.activeJobs);
-                console.log('🔄 Système réactif:', status.reactiveSystem?.isStarted ? 'ACTIF' : 'INACTIF');
-            }
             res.json({ 
                 success: true, 
-                message: 'Logs générés - Vérifiez les Deploy Logs sur Railway',
+                message: 'OK',
                 timestamp: new Date().toISOString(),
                 schedulerActive: scheduler !== null
             });
@@ -188,11 +187,12 @@ async function startSchedulerService() {
         // Endpoint pour déclencher immédiatement le traitement des notifications
         app.post('/api/process-now', async (req, res) => {
             try {
+                if (!requireSchedulerKey(req, res)) return;
                 if (!scheduler) {
                     return res.status(503).json({ error: 'Scheduler non disponible' });
                 }
 
-                console.log('\n⚡ Déclenchement manuel du traitement des notifications');
+                console.log('⚡ Déclenchement manuel du traitement des notifications');
                 await scheduler.processNotifications();
                 const status = scheduler.getStatus();
                 return res.json({ success: true, activeJobs: status.activeJobs });
@@ -205,6 +205,7 @@ async function startSchedulerService() {
         // Endpoint pour recharger les check-in schedules
         app.post('/api/reload-checkin-schedules', async (req, res) => {
             try {
+                if (!requireSchedulerKey(req, res)) return;
                 const { userId } = req.body;
                 
                 // Importer dynamiquement le BehaviorCheckInScheduler
@@ -230,19 +231,12 @@ async function startSchedulerService() {
         // NOUVEAU : Endpoint pour recevoir les mises à jour de préférences depuis l'API Next.js
         app.post('/api/update-user', async (req, res) => {
             try {
-                console.log('\n🔥 REQUÊTE HTTP REÇUE : MISE À JOUR UTILISATEUR');
-                console.log('='.repeat(80));
-                
+                if (!requireSchedulerKey(req, res)) return;
                 const { userId, oldPreferences, newPreferences, timestamp } = req.body;
                 
                 if (!userId || !newPreferences) {
-                    console.log('❌ Données manquantes dans la requête');
                     return res.status(400).json({ error: 'userId et newPreferences requis' });
                 }
-                
-                console.log(`👤 Utilisateur: ${userId}`);
-                console.log(`⏰ Timestamp: ${timestamp}`);
-                console.log('📡 Source: API Next.js → Scheduler Node.js');
                 
                 // Simuler un événement EventManager pour déclencher les logs détaillés
                 const event = {
@@ -256,9 +250,6 @@ async function startSchedulerService() {
                     // Appeler directement le gestionnaire de mise à jour
                     await scheduler.handlePreferencesUpdate(event);
                     
-                    console.log('✅ TRAITEMENT TERMINÉ AVEC SUCCÈS !');
-                    console.log('='.repeat(80));
-                    
                     res.json({ 
                         success: true, 
                         message: 'Préférences mises à jour avec succès',
@@ -266,13 +257,9 @@ async function startSchedulerService() {
                         activeJobs: scheduler.jobs?.size || 0
                     });
                 } else {
-                    console.log('❌ Scheduler non disponible');
-                    console.log('='.repeat(80));
                     res.status(503).json({ error: 'Scheduler non disponible' });
                 }
             } catch (error) {
-                console.log('\n❌ ERREUR LORS DU TRAITEMENT !');
-                console.log('='.repeat(80));
                 console.error('Erreur:', error);
                 res.status(500).json({ error: 'Erreur serveur' });
             }
@@ -292,7 +279,7 @@ async function startSchedulerService() {
         // 3. Démarrer le planificateur (après le serveur pour que le healthcheck réponde rapidement)
         console.log('⚙️ Initialisation du planificateur...');
         try {
-            scheduler = new NotificationScheduler(whatsappService);
+            scheduler = new NotificationScheduler();
             await scheduler.start();
             console.log('✅ Planificateur démarré');
         } catch (error) {
@@ -315,8 +302,7 @@ async function startSchedulerService() {
             process.exit(0);
         });
 
-        console.log('✨ Service de planification démarré et fonctionnel !');
-        console.log('🎯 Prêt à recevoir les mises à jour de préférences !');
+        console.log('✅ Service de planification prêt');
     } catch (error) {
         console.error('❌ Erreur lors du démarrage du service:', error);
         console.error('Stack:', error.stack);

@@ -1,5 +1,4 @@
 const { MongoClient } = require('mongodb');
-const WhatsAppService = require('./whatsappService');
 const NotificationScheduler = require('./NotificationScheduler');
 const express = require('express');
 
@@ -34,8 +33,7 @@ class StartupService {
 
             // 3. Démarrer le planificateur
             console.log('⚙️ Initialisation du planificateur...');
-            const whatsappService = new WhatsAppService();
-            this.scheduler = new NotificationScheduler(whatsappService);
+            this.scheduler = new NotificationScheduler();
             this.scheduler.start();
             console.log('✅ Planificateur démarré');
 

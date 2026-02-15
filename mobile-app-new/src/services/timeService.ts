@@ -1,4 +1,5 @@
 import { apiService } from './api';
+import { getApiBaseUrl } from '../../lib/api';
 import { TimeEntry, CreateTimeEntryData } from '../types';
 
 export class TimeService {
@@ -165,7 +166,7 @@ export class TimeService {
       });
     }
 
-    const API_BASE_URL = 'https://www.productif.io/api';
+    const API_BASE_URL = getApiBaseUrl();
     const token = localStorage.getItem('auth_token');
     const headers: HeadersInit = {};
     if (token) {

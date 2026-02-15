@@ -6,6 +6,11 @@ import { sign, verify } from "./jwt"
 export interface JWTPayload {
   userId: string
   email: string
+  /**
+   * Version du token côté serveur.
+   * Permet de révoquer tous les JWT existants en incrémentant tokenVersion en base (RISC, logout global, etc.).
+   */
+  tokenVersion?: number
   iat?: number
   exp?: number
 }
@@ -20,8 +25,30 @@ export async function verifyToken(token: string): Promise<JWTPayload | null> {
   }
 }
 
-export async function createToken(payload: Omit<JWTPayload, "iat" | "exp">) {
-  return await sign(payload)
+export async function createToken(
+  payload: Omit<JWTPayload, "iat" | "exp" | "tokenVersion"> & { tokenVersion?: number }
+) {
+  let tokenVersion = payload.tokenVersion
+
+  // Si tokenVersion n'est pas fourni, on le récupère depuis la base
+  if (tokenVersion === undefined) {
+    try {
+      const user = await prisma.user.findUnique({
+        where: { id: payload.userId },
+        select: { tokenVersion: true },
+      })
+      tokenVersion = user?.tokenVersion ?? 0
+    } catch (error) {
+      console.error("Error fetching tokenVersion for user:", error)
+      tokenVersion = 0
+    }
+  }
+
+  return await sign({
+    userId: payload.userId,
+    email: payload.email,
+    tokenVersion,
+  })
 }
 
 export async function getAuthUser() {
@@ -43,11 +70,46 @@ export async function getAuthUser() {
     // Vérifier si l'utilisateur existe
     const user = await prisma.user.findUnique({
       where: { id: decoded.userId },
+      select: {
+        id: true,
+        email: true,
+        tokenVersion: true,
+        name: true,
+        password: true,
+        whatsappNumber: true,
+        createdAt: true,
+        updatedAt: true,
+        emailVerifiedAt: true,
+        emailVerificationSentAt: true,
+        managedCompanyId: true,
+        subscriptionStatus: true,
+        subscriptionTier: true,
+        stripeCustomerId: true,
+        stripeSubscriptionId: true,
+        subscriptionEndDate: true,
+        convertedAt: true,
+        cancelledAt: true,
+        trialEndsAt: true,
+        role: true,
+      },
     })
 
     if (!user) {
       console.log("User not found in database, removing auth cookie")
       // Supprimer le cookie d'authentification si l'utilisateur n'existe pas
+      cookieStore.delete("auth_token")
+      return null
+    }
+
+    // Vérifier que le tokenVersion du JWT correspond à celui stocké en base
+    const tokenVersionFromToken = decoded.tokenVersion ?? 0
+    const tokenVersionFromDb = user.tokenVersion ?? 0
+
+    if (tokenVersionFromToken !== tokenVersionFromDb) {
+      console.log(
+        "Token version mismatch, treating token as revoked",
+        { tokenVersionFromToken, tokenVersionFromDb }
+      )
       cookieStore.delete("auth_token")
       return null
     }
@@ -113,10 +175,43 @@ export async function getAuthUserFromRequest(req: NextRequest) {
     // Vérifier si l'utilisateur existe
     const user = await prisma.user.findUnique({
       where: { id: decoded.userId },
+      select: {
+        id: true,
+        email: true,
+        tokenVersion: true,
+        name: true,
+        password: true,
+        whatsappNumber: true,
+        createdAt: true,
+        updatedAt: true,
+        emailVerifiedAt: true,
+        emailVerificationSentAt: true,
+        managedCompanyId: true,
+        subscriptionStatus: true,
+        subscriptionTier: true,
+        stripeCustomerId: true,
+        stripeSubscriptionId: true,
+        subscriptionEndDate: true,
+        convertedAt: true,
+        cancelledAt: true,
+        trialEndsAt: true,
+        role: true,
+      },
     })
 
     if (!user) {
       console.log("User not found in database")
+      return null
+    }
+
+    const tokenVersionFromToken = decoded.tokenVersion ?? 0
+    const tokenVersionFromDb = user.tokenVersion ?? 0
+
+    if (tokenVersionFromToken !== tokenVersionFromDb) {
+      console.log(
+        "Token version mismatch in getAuthUserFromRequest, treating token as revoked",
+        { tokenVersionFromToken, tokenVersionFromDb }
+      )
       return null
     }
 

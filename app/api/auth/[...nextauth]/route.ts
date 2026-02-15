@@ -29,6 +29,13 @@ const authOptions: NextAuthOptions = {
       }
 
       try {
+        const googleSub =
+          // `sub` est généralement présent dans le profil Google
+          (profile as any).sub ||
+          // Fallback éventuel si Google renvoie l'id ailleurs
+          (account as any).id ||
+          null;
+
         // Vérifier si l'utilisateur existe déjà
         let dbUser = await prisma.user.findUnique({
           where: { email: user.email },
@@ -41,6 +48,33 @@ const authOptions: NextAuthOptions = {
               email: user.email,
               name: user.name || "Utilisateur Google",
               password: "", // Pas de mot de passe pour les utilisateurs Google
+              googleSubject: googleSub ?? undefined,
+              emailVerifiedAt: new Date(),
+              emailVerificationToken: null,
+              emailVerificationExpiresAt: null,
+              emailVerificationSentAt: null,
+            },
+          });
+        } else if (googleSub && !dbUser.googleSubject) {
+          // Mettre à jour googleSubject si on vient de le récupérer
+          dbUser = await prisma.user.update({
+            where: { id: dbUser.id },
+            data: {
+              googleSubject: googleSub,
+              emailVerifiedAt: dbUser.emailVerifiedAt ?? new Date(),
+              emailVerificationToken: null,
+              emailVerificationExpiresAt: null,
+              emailVerificationSentAt: null,
+            },
+          });
+        } else if (!dbUser.emailVerifiedAt) {
+          dbUser = await prisma.user.update({
+            where: { id: dbUser.id },
+            data: {
+              emailVerifiedAt: new Date(),
+              emailVerificationToken: null,
+              emailVerificationExpiresAt: null,
+              emailVerificationSentAt: null,
             },
           });
         }

@@ -174,6 +174,38 @@ export function usePushNotifications() {
       if (!data) {
         data = sources.find(s => s && typeof s === 'object' && Object.keys(s).length > 0);
       }
+
+      const tryParseJson = (value: any) => {
+        if (typeof value !== 'string') return value;
+        try {
+          return JSON.parse(value);
+        } catch {
+          return value;
+        }
+      };
+
+      const tryNestedAction = (value: any) => {
+        const parsed = tryParseJson(value);
+        if (parsed && typeof parsed === 'object' && (parsed as any).action) return parsed;
+        return null;
+      };
+
+      if (data && typeof data === 'object' && !data.action) {
+        const nestedCandidates = [
+          data.body,
+          data.data,
+          data.payload,
+          (content as any)?.data?.body,
+          (trigger as any)?.payload?.body,
+        ];
+        for (const candidate of nestedCandidates) {
+          const nested = tryNestedAction(candidate);
+          if (nested) {
+            data = nested;
+            break;
+          }
+        }
+      }
       
       console.log('📦 Données de notification extraites:', {
         hasData: !!data,
@@ -203,6 +235,9 @@ export function usePushNotifications() {
         normalizedType === 'STRESS_CHECK' ||
         normalizedType === 'MOOD_CHECK' ||
         normalizedType === 'FOCUS_CHECK';
+      const shouldOpenJournal =
+        data?.action === 'open_journal' ||
+        normalizedType === 'JOURNAL_PROMPT';
 
       // Navigation vers Focus pour MORNING_ANCHOR
       if (shouldOpenFocus) {
@@ -258,6 +293,32 @@ export function usePushNotifications() {
           }
         }, 500);
         
+        return;
+      }
+
+      // Navigation vers le journal quotidien
+      if (shouldOpenJournal) {
+        console.log('✅ Conditions remplies - Navigation vers Daily Journal', {
+          type: data.type || normalizedType,
+        });
+
+        if (navigationTimeoutRef.current) {
+          clearTimeout(navigationTimeoutRef.current);
+        }
+        navigationTimeoutRef.current = setTimeout(() => {
+          if (!isMountedRef.current) {
+            console.log('⚠️ Composant démonté, navigation annulée');
+            return;
+          }
+          try {
+            console.log('🚀 Navigation vers /daily-journal');
+            router.replace('/daily-journal' as any);
+            console.log('✅ Navigation vers Daily Journal déclenchée avec succès');
+          } catch (navError) {
+            console.error('❌ Erreur de navigation vers Daily Journal:', navError);
+          }
+        }, 500);
+
         return;
       }
 

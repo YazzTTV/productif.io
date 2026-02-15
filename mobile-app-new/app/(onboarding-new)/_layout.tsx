@@ -16,9 +16,9 @@ export default function OnboardingNewLayout() {
       return false;
     }
     
-    // Ne pas rediriger si on est sur la page stripe-webview (pour permettre les paiements)
+    // Ne pas rediriger si on est sur stripe-webview ou stripe-checkout (pour permettre les paiements)
     const currentRoute = segments[segments.length - 1];
-    if (currentRoute === 'stripe-webview') {
+    if (currentRoute === 'stripe-webview' || currentRoute === 'stripe-checkout') {
       return false;
     }
     
@@ -58,9 +58,9 @@ export default function OnboardingNewLayout() {
   // Vérifier à chaque fois que l'écran est focus (mais pas si on est déjà en train de naviguer)
   useFocusEffect(
     useCallback(() => {
-      // Ne pas vérifier l'onboarding si on est sur stripe-webview
+      // Ne pas vérifier l'onboarding si on est sur stripe-webview ou stripe-checkout
       const currentRoute = segments[segments.length - 1];
-      if (currentRoute === 'stripe-webview') {
+      if (currentRoute === 'stripe-webview' || currentRoute === 'stripe-checkout') {
         return;
       }
       
@@ -152,6 +152,13 @@ export default function OnboardingNewLayout() {
       />
       <Stack.Screen 
         name="stripe-webview" 
+        options={{
+          gestureEnabled: false,
+          animation: 'none',
+        }}
+      />
+      <Stack.Screen 
+        name="stripe-checkout" 
         options={{
           gestureEnabled: false,
           animation: 'none',

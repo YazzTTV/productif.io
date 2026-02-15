@@ -1,8 +1,39 @@
 import { useState, useEffect, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { onboardingService, authService } from '@/lib/api';
+import { onboardingService, authService, TokenStorage } from '@/lib/api';
 
 const ONBOARDING_STORAGE_KEY = 'onboarding_responses';
+const ONBOARDING_USER_KEY = 'onboarding_user_id';
+
+function decodeJWT(token: string): any {
+  try {
+    const base64Url = token.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
+    );
+    return JSON.parse(jsonPayload);
+  } catch (error) {
+    console.error('❌ [OnboardingData] Erreur lors du décodage du token:', error);
+    return null;
+  }
+}
+
+async function getUserId(): Promise<string | null> {
+  const token = await TokenStorage.getInstance().getToken();
+  if (!token) return null;
+  const decoded = decodeJWT(token);
+  return decoded?.userId || decoded?.sub || null;
+}
+
+async function getScopedKey() {
+  const userId = await getUserId();
+  const key = userId ? `${ONBOARDING_STORAGE_KEY}:${userId}` : ONBOARDING_STORAGE_KEY;
+  return { userId, key };
+}
 
 export interface OnboardingResponses {
   // Langue
@@ -62,7 +93,17 @@ export function useOnboardingData() {
 
   const loadResponses = async () => {
     try {
-      const stored = await AsyncStorage.getItem(ONBOARDING_STORAGE_KEY);
+      const { userId, key } = await getScopedKey();
+      let stored = await AsyncStorage.getItem(key);
+      if (stored === null && userId) {
+        const legacyUserId = await AsyncStorage.getItem(ONBOARDING_USER_KEY);
+        if (legacyUserId && legacyUserId === userId) {
+          stored = await AsyncStorage.getItem(ONBOARDING_STORAGE_KEY);
+          if (stored !== null) {
+            await AsyncStorage.setItem(key, stored);
+          }
+        }
+      }
       if (stored) {
         const parsed = JSON.parse(stored);
         setResponses(parsed);
@@ -79,7 +120,11 @@ export function useOnboardingData() {
   const saveToLocal = async (updates: Partial<OnboardingResponses>) => {
     try {
       const updated = { ...responses, ...updates };
-      await AsyncStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify(updated));
+      const { userId, key } = await getScopedKey();
+      await AsyncStorage.setItem(key, JSON.stringify(updated));
+      if (userId) {
+        await AsyncStorage.setItem(ONBOARDING_USER_KEY, userId);
+      }
       setResponses(updated);
       console.log('💾 [OnboardingData] Sauvegardé localement:', Object.keys(updates));
       return updated;
@@ -142,6 +187,8 @@ export function useOnboardingData() {
   // Réinitialiser toutes les réponses
   const clearResponses = async () => {
     try {
+      const { key } = await getScopedKey();
+      await AsyncStorage.removeItem(key);
       await AsyncStorage.removeItem(ONBOARDING_STORAGE_KEY);
       setResponses({});
       console.log('🗑️ [OnboardingData] Réponses réinitialisées');
@@ -166,4 +213,3 @@ export function useOnboardingData() {
     forceSync,
   };
 }
-

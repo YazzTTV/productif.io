@@ -14,8 +14,8 @@ interface LeaderboardUser {
   id: string;
   rank: number;
   name: string;
-  xp: number;
-  maxXP: number;
+  points: number;
+  level: number;
   streak: number;
   focusSessions: number;
   isCurrentUser?: boolean;
@@ -55,6 +55,25 @@ export function LeaderboardEnhanced() {
   const [loadingGlobal, setLoadingGlobal] = useState(false);
 
   const FAVORITE_GROUP_KEY = 'favorite_group_id';
+  const LEVEL_BASE_POINTS = 100;
+  const LEVEL_MULTIPLIER = 1.5;
+
+  const getLevelFromPoints = (points: number) =>
+    Math.floor(Math.log(points / LEVEL_BASE_POINTS + 1) / Math.log(LEVEL_MULTIPLIER)) + 1;
+
+  const getLevelStartPoints = (level: number) =>
+    Math.floor(LEVEL_BASE_POINTS * (Math.pow(LEVEL_MULTIPLIER, level - 1) - 1));
+
+  const getNextLevelPoints = (level: number) =>
+    Math.floor(LEVEL_BASE_POINTS * (Math.pow(LEVEL_MULTIPLIER, level) - 1));
+
+  const getLevelProgress = (points: number, level?: number) => {
+    const resolvedLevel = level ?? getLevelFromPoints(points);
+    const start = getLevelStartPoints(resolvedLevel);
+    const next = getNextLevelPoints(resolvedLevel);
+    const denom = Math.max(1, next - start);
+    return Math.max(0, Math.min(1, (points - start) / denom));
+  };
 
   useEffect(() => {
     const loadPlan = async () => {
@@ -88,8 +107,8 @@ export function LeaderboardEnhanced() {
         id: entry.userId,
         rank: entry.rank || index + 1,
         name: entry.userName || entry.userEmail?.split('@')[0] || 'User',
-        xp: entry.totalPoints || 0,
-        maxXP: 3000, // Valeur par défaut
+        points: entry.totalPoints ?? entry.points ?? 0,
+        level: entry.level || 1,
         streak: entry.currentStreak || 0,
         focusSessions: entry.totalHabitsCompleted || 0,
         isCurrentUser: entry.userId === userId,
@@ -157,8 +176,8 @@ export function LeaderboardEnhanced() {
         id: entry.userId,
         rank: entry.rank || index + 1,
         name: entry.userName || entry.userEmail?.split('@')[0] || 'User',
-        xp: entry.totalPoints || 0,
-        maxXP: 3000,
+        points: entry.totalPoints ?? entry.points ?? 0,
+        level: entry.level || 1,
         streak: entry.currentStreak || 0,
         focusSessions: entry.totalHabitsCompleted || 0,
         isCurrentUser: entry.userId === userId,
@@ -187,8 +206,8 @@ export function LeaderboardEnhanced() {
         id: entry.userId,
         rank: entry.rank || index + 1,
         name: entry.userName || entry.userEmail?.split('@')[0] || 'User',
-        xp: entry.totalPoints || 0,
-        maxXP: 3000,
+        points: entry.totalPoints ?? entry.points ?? 0,
+        level: entry.level || 1,
         streak: entry.currentStreak || 0,
         focusSessions: entry.totalHabitsCompleted || 0,
         isCurrentUser: entry.userId === currentUserId,
@@ -249,8 +268,8 @@ export function LeaderboardEnhanced() {
         id: entry.userId,
         rank: entry.rank || index + 1,
         name: entry.userName || entry.userEmail?.split('@')[0] || 'User',
-        xp: entry.totalPoints || 0,
-        maxXP: 3000,
+        points: entry.totalPoints ?? entry.points ?? 0,
+        level: entry.level || 1,
         streak: entry.currentStreak || 0,
         focusSessions: entry.totalHabitsCompleted || 0,
       }));
@@ -418,13 +437,13 @@ export function LeaderboardEnhanced() {
                 <Animated.View
                   style={[
                     styles.progressBarFill,
-                    { width: `${(currentUser.xp / currentUser.maxXP) * 100}%` }
+                    { width: `${getLevelProgress(currentUser.points, currentUser.level) * 100}%` }
                   ]}
                 />
               </View>
               <View style={styles.progressBarLabels}>
-                <Text style={styles.progressBarLabel}>{currentUser.xp.toLocaleString()} XP</Text>
-                <Text style={styles.progressBarLabel}>{currentUser.maxXP.toLocaleString()} XP</Text>
+                <Text style={styles.progressBarLabel}>Niv. {currentUser.level}</Text>
+                <Text style={styles.progressBarLabel}>Niv. {currentUser.level + 1}</Text>
               </View>
             </View>
           </Animated.View>
@@ -555,7 +574,7 @@ export function LeaderboardEnhanced() {
             data.map((user, index) => {
               if (user.isCurrentUser) return null;
 
-            const progressPercent = (user.xp / user.maxXP) * 100;
+            const progressPercent = getLevelProgress(user.points, user.level) * 100;
 
             return (
               <Animated.View
@@ -781,10 +800,10 @@ export function LeaderboardEnhanced() {
                 </View>
 
                 <View style={styles.modalStatCard}>
-                  <Text style={styles.modalStatLabel}>Weekly XP</Text>
+                  <Text style={styles.modalStatLabel}>Niveau</Text>
                   <View style={styles.modalStatValue}>
-                    <Text style={styles.modalStatNumber}>{selectedUser.xp.toLocaleString()}</Text>
-                    <Text style={styles.modalStatUnit}>XP</Text>
+                    <Text style={styles.modalStatNumber}>{selectedUser.level}</Text>
+                    <Text style={styles.modalStatUnit}>lvl</Text>
                   </View>
                 </View>
 

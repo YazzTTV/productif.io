@@ -1,5 +1,5 @@
-bimport { CapacitorHttp } from '@capacitor/core';
-import { TokenStorage } from '../../lib/api';
+import { CapacitorHttp } from '@capacitor/core';
+import { TokenStorage, getApiBaseUrl } from '../../lib/api';
 
 export interface User {
   id: string;
@@ -14,7 +14,7 @@ export interface AuthResponse {
 }
 
 class AuthService {
-  private API_URL = 'https://www.productif.io/api';
+  private API_URL = getApiBaseUrl();
 
   async login(email: string, password: string): Promise<AuthResponse> {
     const response = await CapacitorHttp.post({

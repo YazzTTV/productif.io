@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, TextInput, PanResponder, Dimensions, Alert, ActivityIndicator, Platform } from 'react-native';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, TextInput, Alert, ActivityIndicator, Platform, PanResponder } from 'react-native';
 import { useRouter } from 'expo-router';
 import Animated, { FadeInDown, FadeInUp, FadeIn } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,8 +10,13 @@ import * as FileSystem from 'expo-file-system';
 import { getAuthToken, journalService } from '@/lib/api';
 import { useFocusEffect } from '@react-navigation/native';
 import { useLanguage } from '@/contexts/LanguageContext';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+import { Coachmark } from '@/tutorial/Coachmark';
+import {
+  getTutorialCompleted,
+  getTutorialStage,
+  markTutorialDone,
+  TutorialStage,
+} from '@/tutorial/tutorialStorage';
 
 type JournalStep = 'entry' | 'emotional' | 'energy' | 'offload' | 'complete';
 
@@ -23,54 +28,42 @@ interface JournalEntry {
   note?: string;
 }
 
-// Slider Component
-function Slider({ value, onValueChange, min = 0, max = 100 }: { value: number; onValueChange: (value: number) => void; min?: number; max?: number }) {
-  const containerWidth = SCREEN_WIDTH - 48;
-  const trackWidth = containerWidth - 32;
-  const thumbSize = 24;
-  const thumbPosition = ((value - min) / (max - min)) * trackWidth;
-  const [isDragging, setIsDragging] = useState(false);
+// Slider custom (100% JS, fonctionne sans module natif)
+function EnergySlider({ value, onValueChange, min = 0, max = 100 }: { value: number; onValueChange: (value: number) => void; min?: number; max?: number }) {
   const trackRef = useRef<View>(null);
 
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: () => {
-        setIsDragging(true);
-      },
-      onPanResponderMove: (evt) => {
-        if (trackRef.current) {
-          trackRef.current.measure((x, y, w, h, pageX, pageY) => {
-            const touchX = evt.nativeEvent.pageX - pageX;
-            const newX = Math.max(0, Math.min(trackWidth, touchX));
-            const newValue = Math.round(min + (newX / trackWidth) * (max - min));
-            onValueChange(newValue);
-          });
-        }
-      },
-      onPanResponderRelease: () => {
-        setIsDragging(false);
-      },
-    })
-  ).current;
+  const updateFromPageX = useMemo(() => {
+    return (pageX: number) => {
+      trackRef.current?.measureInWindow((x, _y, w) => {
+        const relativeX = pageX - x;
+        const ratio = Math.max(0, Math.min(1, relativeX / w));
+        const newValue = Math.round(min + ratio * (max - min));
+        onValueChange(newValue);
+      });
+    };
+  }, [onValueChange, min, max]);
+
+  const panResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: () => true,
+        onPanResponderGrant: (e) => updateFromPageX(e.nativeEvent.pageX),
+        onPanResponderMove: (e) => updateFromPageX(e.nativeEvent.pageX),
+      }),
+    [updateFromPageX]
+  );
 
   return (
     <View style={sliderStyles.container}>
       <View
         ref={trackRef}
-        style={[sliderStyles.trackContainer, { width: trackWidth }]}
+        style={[sliderStyles.trackContainer, { width: '100%' }]}
         {...panResponder.panHandlers}
       >
-        <View style={[sliderStyles.trackBackground, { width: trackWidth }]} />
-        <View style={[sliderStyles.trackFill, { width: thumbPosition }]} />
-        <View
-          style={[
-            sliderStyles.thumb,
-            { left: thumbPosition - thumbSize / 2 },
-            isDragging && sliderStyles.thumbActive,
-          ]}
-        />
+        <View style={sliderStyles.trackBackground} />
+        <View style={[sliderStyles.trackFill, { width: `${((value - min) / (max - min)) * 100}%` }]} />
+        <View style={[sliderStyles.thumb, { left: `${((value - min) / (max - min)) * 100}%`, marginLeft: -12 }]} />
       </View>
     </View>
   );
@@ -80,24 +73,29 @@ const sliderStyles = StyleSheet.create({
   container: {
     paddingVertical: 32,
     width: '100%',
-    alignItems: 'center',
+    alignItems: 'stretch',
   },
   trackContainer: {
-    height: 40,
+    height: 56,
     justifyContent: 'center',
     position: 'relative',
   },
   trackBackground: {
     height: 8,
-    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+    backgroundColor: 'rgba(0, 0, 0, 0.08)',
     borderRadius: 4,
     position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 24,
   },
   trackFill: {
     height: 8,
     backgroundColor: '#000000',
     borderRadius: 4,
     position: 'absolute',
+    left: 0,
+    top: 24,
   },
   thumb: {
     width: 24,
@@ -105,15 +103,7 @@ const sliderStyles = StyleSheet.create({
     borderRadius: 12,
     backgroundColor: '#000000',
     position: 'absolute',
-    top: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  thumbActive: {
-    transform: [{ scale: 1.2 }],
+    top: 16,
   },
 });
 
@@ -121,7 +111,10 @@ export function DailyJournal() {
   const { t } = useLanguage();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const beginButtonRef = useRef<TouchableOpacity>(null);
   const [step, setStep] = useState<JournalStep>('entry');
+  const [tutorialStage, setTutorialStageState] = useState<TutorialStage | null>(null);
+  const [tutorialCompleted, setTutorialCompletedState] = useState(false);
   const [emotionalLevel, setEmotionalLevel] = useState(50);
   const [energyLevel, setEnergyLevel] = useState(50);
   const [note, setNote] = useState('');
@@ -139,6 +132,14 @@ export function DailyJournal() {
   const [expandedEntryId, setExpandedEntryId] = useState<string | null>(null);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [todayJournal, setTodayJournal] = useState<JournalEntry | null>(null);
+  const refreshTutorialState = useCallback(async () => {
+    const [completed, stage] = await Promise.all([
+      getTutorialCompleted(),
+      getTutorialStage(),
+    ]);
+    setTutorialCompletedState(completed);
+    setTutorialStageState(stage);
+  }, []);
 
   const getEmotionalLabel = (value: number) => {
     if (value < 25) return t('calm');
@@ -419,11 +420,12 @@ export function DailyJournal() {
 
   // Load history when component mounts or screen is focused
   useFocusEffect(
-    React.useCallback(() => {
+    useCallback(() => {
       if (step === 'entry') {
         loadJournalHistory();
       }
-    }, [step])
+      refreshTutorialState();
+    }, [step, refreshTutorialState])
   );
 
   const handleOffloadContinue = async () => {
@@ -486,7 +488,13 @@ export function DailyJournal() {
           <Animated.View entering={FadeInUp.delay(100).duration(400)} style={styles.entryHeader}>
             <TouchableOpacity
               style={styles.backButton}
-              onPress={() => router.back()}
+              onPress={() => {
+                if (!tutorialCompleted && tutorialStage === 'journal') {
+                  router.replace('/(tabs)');
+                } else {
+                  router.back();
+                }
+              }}
               activeOpacity={0.7}
             >
               <Ionicons name="arrow-back" size={20} color="#000" />
@@ -621,6 +629,7 @@ export function DailyJournal() {
 
           <Animated.View entering={FadeInDown.delay(400).duration(400)}>
             <TouchableOpacity
+              ref={beginButtonRef}
               style={styles.beginButton}
               onPress={() => setStep('emotional')}
               activeOpacity={0.8}
@@ -629,6 +638,25 @@ export function DailyJournal() {
             </TouchableOpacity>
           </Animated.View>
         </ScrollView>
+
+        <Coachmark
+          visible={!tutorialCompleted && tutorialStage === 'journal' && step === 'entry'}
+          targetRef={beginButtonRef}
+          text="Décharge ta journée ici pour obtenir des analyses personnalisées."
+          nextLabel="Commencer"
+          onNext={async () => {
+            await markTutorialDone();
+            setTutorialCompletedState(true);
+            setTutorialStageState('done');
+            setStep('emotional');
+          }}
+          onSkip={async () => {
+            await markTutorialDone();
+            setTutorialCompletedState(true);
+            setTutorialStageState('done');
+            router.replace('/(tabs)');
+          }}
+        />
       </View>
     );
   }
@@ -672,7 +700,7 @@ export function DailyJournal() {
 
             {/* Slider */}
           <View style={styles.sliderWrapper}>
-              <Slider
+              <EnergySlider
                 value={emotionalLevel}
                 onValueChange={setEmotionalLevel}
                 min={0}
@@ -741,7 +769,7 @@ export function DailyJournal() {
 
             {/* Slider */}
           <View style={styles.sliderWrapper}>
-              <Slider
+              <EnergySlider
                 value={energyLevel}
                 onValueChange={setEnergyLevel}
                 min={0}

@@ -2,7 +2,17 @@ import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
 class NotificationLogger {
+    private static shouldLog(level: 'error' | 'warn' | 'success' | 'info' | 'debug') {
+        const configured = (process.env.LOG_LEVEL || 'warn').toLowerCase();
+        if (configured === 'silent') return false;
+        const order: Record<string, number> = { error: 0, warn: 1, success: 2, info: 3, debug: 4 };
+        const current = order[configured] ?? order.warn;
+        const incoming = order[level] ?? order.info;
+        return incoming <= current;
+    }
+
     static logNotificationCreation(notification: any) {
+        if (!this.shouldLog('info')) return;
         console.log('\n📝 CRÉATION DE NOTIFICATION');
         console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
         console.log(`ID: ${notification.id}`);
@@ -17,6 +27,7 @@ class NotificationLogger {
     }
 
     static logNotificationProcessing(notification: any) {
+        if (!this.shouldLog('info')) return;
         console.log('\n🔄 TRAITEMENT DE NOTIFICATION');
         console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
         console.log(`ID: ${notification.id}`);
@@ -34,11 +45,10 @@ class NotificationLogger {
     }
 
     static logNotificationSettings(settings: any) {
+        if (!this.shouldLog('info')) return;
         console.log('\n⚙️ PARAMÈTRES DE NOTIFICATION');
         console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
         console.log(`Notifications activées: ${settings.isEnabled ? '✅' : '❌'}`);
-        console.log(`WhatsApp: ${settings.whatsappEnabled ? '✅' : '❌'}`);
-        console.log(`Numéro WhatsApp: ${settings.whatsappNumber || '❌'}`);
         console.log(`Plage horaire: ${settings.startHour}h-${settings.endHour}h`);
         console.log('\nHoraires des notifications:');
         console.log(`Matin: ${settings.morningTime}`);
@@ -50,6 +60,7 @@ class NotificationLogger {
     }
 
     static logWhatsAppSending(phoneNumber: string, message: string) {
+        if (!this.shouldLog('info')) return;
         console.log('\n📱 ENVOI WHATSAPP');
         console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
         console.log(`Numéro: ${phoneNumber}`);
@@ -60,6 +71,7 @@ class NotificationLogger {
     }
 
     static logWhatsAppResponse(status: number, response: any) {
+        if (!this.shouldLog('info')) return;
         console.log('\n📬 RÉPONSE WHATSAPP');
         console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
         console.log(`Status: ${status}`);

@@ -6,8 +6,18 @@ class NotificationLogger {
         this.logCount = 0;
     }
 
+    shouldLog(level) {
+        const configured = (process.env.LOG_LEVEL || 'warn').toLowerCase();
+        if (configured === 'silent') return false;
+        const order = { error: 0, warn: 1, success: 2, info: 3, debug: 4 };
+        const current = order[configured] ?? order.warn;
+        const incoming = order[level.toLowerCase()] ?? order.info;
+        return incoming <= current;
+    }
+
     // Logger avec timestamp ultra-précis
     log(level, action, data = {}) {
+        if (!this.shouldLog(level)) return null;
         this.logCount++;
         const now = new Date();
         const timestamp = now.toISOString();
@@ -262,8 +272,6 @@ class NotificationLogger {
     logNotificationSettings(settings) {
         return this.log('INFO', 'NOTIFICATION_SETTINGS', {
             isEnabled: settings?.isEnabled,
-            whatsappEnabled: settings?.whatsappEnabled,
-            whatsappNumber: !!settings?.whatsappNumber,
             morningTime: settings?.morningTime,
             noonTime: settings?.noonTime,
             afternoonTime: settings?.afternoonTime,

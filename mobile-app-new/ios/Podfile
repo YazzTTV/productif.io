@@ -14,6 +14,11 @@ install! 'cocoapods',
 prepare_react_native_project!
 
 target 'Productifio' do
+  # Modular headers requis pour Firebase (Swift pods)
+  pod 'GoogleUtilities', :modular_headers => true
+  pod 'FirebaseCore', :modular_headers => true
+  pod 'FirebaseCoreInternal', :modular_headers => true
+  pod 'FirebaseAppCheckInterop', :modular_headers => true
   use_expo_modules!
 
   if ENV['EXPO_USE_COMMUNITY_AUTOLINKING'] == '1'

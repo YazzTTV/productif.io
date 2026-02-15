@@ -11,8 +11,6 @@ function mapPrismaToFrontend(preferences: PrismaNotificationSettings) {
     isEnabled: preferences.isEnabled,
     emailEnabled: preferences.emailEnabled,
     pushEnabled: preferences.pushEnabled,
-    whatsappEnabled: preferences.whatsappEnabled,
-    whatsappNumber: preferences.whatsappNumber || undefined,
     startHour: preferences.startHour,
     endHour: preferences.endHour,
     allowedDays: preferences.allowedDays,
@@ -28,7 +26,8 @@ function mapPrismaToFrontend(preferences: PrismaNotificationSettings) {
     noonTime: preferences.noonTime,
     afternoonTime: preferences.afternoonTime,
     eveningTime: preferences.eveningTime,
-    nightTime: preferences.nightTime
+    nightTime: preferences.nightTime,
+    journalTime: preferences.journalTime || preferences.recapTime
   }
 }
 
@@ -58,8 +57,6 @@ export default async function NotificationsPage() {
         isEnabled: true,
         emailEnabled: true,
         pushEnabled: true,
-        whatsappEnabled: false,
-        whatsappNumber: null,
         startHour: 9,
         endHour: 18,
         allowedDays: [1, 2, 3, 4, 5],
@@ -75,7 +72,8 @@ export default async function NotificationsPage() {
         noonTime: "12:00",
         afternoonTime: "14:00",
         eveningTime: "18:00",
-        nightTime: "22:00"
+        nightTime: "22:00",
+        journalTime: "21:00"
       }
     })
 

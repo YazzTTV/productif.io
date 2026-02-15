@@ -1,6 +1,8 @@
 import { PrismaClient } from '@prisma/client';
 import NotificationLogger from './NotificationLogger';
 
+const shouldLog = (level: string) => NotificationLogger.shouldLog(level);
+
 class NotificationContentBuilder {
     private prisma: PrismaClient;
 
@@ -10,25 +12,27 @@ class NotificationContentBuilder {
 
     async buildMorningContent(userId: string): Promise<string> {
         try {
-            console.log('🔍 Début de buildMorningContent pour userId:', userId);
+            if (shouldLog('debug')) console.log('🔍 Début de buildMorningContent pour userId:', userId);
             const today = new Date();
             today.setHours(0, 0, 0, 0);
-            console.log('📅 Date du jour:', today);
+            if (shouldLog('debug')) console.log('📅 Date du jour:', today);
 
             // Récupérer les tâches prioritaires
-            console.log('🎯 Recherche des tâches prioritaires avec les critères:');
-            console.log({
-                userId,
-                completed: false,
-                OR: [
-                    { dueDate: { equals: today } },
-                    { scheduledFor: { equals: today } }
-                ],
-                priority: {
-                    not: null,
-                    gte: 3
-                }
-            });
+            if (shouldLog('debug')) {
+                console.log('🎯 Recherche des tâches prioritaires avec les critères:');
+                console.log({
+                    userId,
+                    completed: false,
+                    OR: [
+                        { dueDate: { equals: today } },
+                        { scheduledFor: { equals: today } }
+                    ],
+                    priority: {
+                        not: null,
+                        gte: 3
+                    }
+                });
+            }
 
             const tasks = await this.prisma.task.findMany({
                 where: {
@@ -50,12 +54,12 @@ class NotificationContentBuilder {
                 take: 5
             });
 
-            console.log('📋 Tâches trouvées:', tasks);
+            if (shouldLog('debug')) console.log('📋 Tâches trouvées:', tasks);
 
             // Récupérer les habitudes du jour
-            console.log('💫 Recherche des habitudes du jour');
+            if (shouldLog('debug')) console.log('💫 Recherche des habitudes du jour');
             const dayNameEN = today.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
-            console.log('📅 Jour de la semaine (EN):', dayNameEN);
+            if (shouldLog('debug')) console.log('📅 Jour de la semaine (EN):', dayNameEN);
             
             const habits = await this.prisma.habit.findMany({
                 where: {
@@ -73,7 +77,7 @@ class NotificationContentBuilder {
                 }
             });
 
-            console.log('📋 Habitudes trouvées:', habits);
+            if (shouldLog('debug')) console.log('📋 Habitudes trouvées:', habits);
 
             // Construire le message
             let message = "🌅 C'est parti pour une nouvelle journée !\n\n";
@@ -101,7 +105,7 @@ class NotificationContentBuilder {
                 });
             }
 
-            console.log('📤 Message final:', message);
+            if (shouldLog('debug')) console.log('📤 Message final:', message);
             return message;
         } catch (error) {
             console.error('❌ Erreur dans buildMorningContent:', error);

@@ -2,7 +2,6 @@ import { ScheduledTask } from 'node-cron'
 import cron from 'node-cron'
 import { PrismaClient } from '@prisma/client'
 import NotificationService from './NotificationService.ts'
-import WhatsAppService from './WhatsAppService.ts'
 import NotificationLogger from './NotificationLogger.ts'
 import EventManager, { NotificationPreferencesUpdateEvent } from '../../lib/EventManager.js'
 
@@ -10,15 +9,13 @@ class NotificationScheduler {
   private jobs: Map<string, ScheduledTask>
   private prisma: PrismaClient
   private notificationService: typeof NotificationService
-  private whatsappService: typeof WhatsAppService
   private eventManager: EventManager
   private isStarted: boolean = false
 
-  constructor(whatsappService: typeof WhatsAppService, prisma?: PrismaClient) {
+  constructor(prisma?: PrismaClient) {
     this.jobs = new Map()
     this.prisma = prisma || new PrismaClient()
     this.notificationService = NotificationService
-    this.whatsappService = whatsappService
     this.eventManager = EventManager.getInstance()
     
     // S'abonner aux événements de mise à jour des préférences

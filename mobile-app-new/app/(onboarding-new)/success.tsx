@@ -21,6 +21,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { authService } from '@/lib/api';
 import { useOnboardingData } from '@/hooks/useOnboardingData';
+import { setTutorialCompleted, setTutorialStage } from '@/tutorial/tutorialStorage';
 
 const AnimatedView = Animated.createAnimatedComponent(View);
 
@@ -99,11 +100,17 @@ export default function SuccessScreen() {
     await saveResponse('completed', true);
     await forceSync(); // Forcer la synchronisation finale avec le backend
     await AsyncStorage.setItem('onboarding_completed', 'true');
+    await setTutorialCompleted(false);
+    await setTutorialStage('calendar');
+    console.log('[Tutorial] Success -> set stage calendar');
     router.replace('/(tabs)');
   };
 
-  const handleViewCalendar = () => {
+  const handleViewCalendar = async () => {
     // TODO: Ouvrir le calendrier natif ou l'app
+    await setTutorialCompleted(false);
+    await setTutorialStage('calendar');
+    console.log('[Tutorial] Success -> set stage calendar (view calendar)');
     router.replace('/(tabs)');
   };
 

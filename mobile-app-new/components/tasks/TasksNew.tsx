@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Modal, TextInput, Platform, Alert, ActivityIndicator, Image } from 'react-native';
-import { useRouter, useFocusEffect } from 'expo-router';
+import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -9,6 +9,15 @@ import * as ImagePicker from 'expo-image-picker';
 import { subjectsService, tasksService, weeklyPlanningService } from '@/lib/api';
 import { format } from 'date-fns';
 import { useLanguage } from '@/contexts/LanguageContext';
+import {
+  getTutorialCompleted,
+  getTutorialStage,
+  setTutorialCompleted,
+  setTutorialStage,
+  TutorialStage,
+} from '@/tutorial/tutorialStorage';
+import { InlineHint } from '@/tutorial/InlineHint';
+import { Coachmark } from '@/tutorial/Coachmark';
 
 interface Task {
   id: string;
@@ -94,6 +103,7 @@ const MOCK_SUBJECTS: Subject[] = [
 
 export function TasksNew() {
   const router = useRouter();
+  const params = useLocalSearchParams();
   const insets = useSafeAreaInsets();
   const { t, language } = useLanguage();
   const [subjects, setSubjects] = useState<Subject[]>([]);
@@ -117,6 +127,64 @@ export function TasksNew() {
   const [planningWeek, setPlanningWeek] = useState(false);
   const [weeklyPlan, setWeeklyPlan] = useState<any>(null);
   const [showPlanPreview, setShowPlanPreview] = useState(false);
+  const [tutorialSubjectId, setTutorialSubjectId] = useState<string | null>(null);
+  const tutorialSubjectIdRef = useRef<string | null>(null);
+  const addSubjectButtonRef = useRef<TouchableOpacity>(null);
+  const addTaskButtonRef = useRef<TouchableOpacity>(null);
+  const scrollViewRef = useRef<ScrollView>(null);
+  const subjectPositionsRef = useRef<Record<string, number>>({});
+  const [tutorialStage, setTutorialStageState] = useState<TutorialStage | null>(null);
+  const [tutorialCompleted, setTutorialCompletedState] = useState(false);
+
+  const refreshTutorialState = async () => {
+    const [completed, stage] = await Promise.all([
+      getTutorialCompleted(),
+      getTutorialStage(),
+    ]);
+    if (!completed && stage === 'calendar') {
+      console.log('[Tutorial] TasksNew force stage -> subjects');
+      await setTutorialStage('subjects');
+      setTutorialCompletedState(false);
+      setTutorialStageState('subjects');
+      return;
+    }
+    console.log('[Tutorial] TasksNew load state', { completed, stage });
+    setTutorialCompletedState(completed);
+    setTutorialStageState(stage);
+  };
+
+  useEffect(() => {
+    refreshTutorialState();
+  }, [tutorialSubjectId]);
+
+  useEffect(() => {
+    if (params.tutorial === 'subjects') {
+      console.log('[Tutorial] TasksNew param override -> subjects');
+      void setTutorialCompleted(false);
+      void setTutorialStage('subjects');
+      refreshTutorialState();
+    }
+  }, [params.tutorial]);
+
+  useEffect(() => {
+    if (tutorialCompleted) return;
+    if (tutorialStage !== 'subjects' && tutorialStage !== 'task') return;
+    console.log('[Tutorial] TasksNew inline mode', { tutorialStage });
+  }, [tutorialCompleted, tutorialStage]);
+
+  // Coachmarks are handled locally in this screen.
+
+  useEffect(() => {
+    if (tutorialCompleted) {
+      setTutorialSubjectId(null);
+      tutorialSubjectIdRef.current = null;
+      return;
+    }
+    if (tutorialStage && tutorialStage !== 'subjects' && tutorialStage !== 'task') {
+      setTutorialSubjectId(null);
+      tutorialSubjectIdRef.current = null;
+    }
+  }, [tutorialCompleted, tutorialStage]);
 
   const loadSubjects = React.useCallback(async () => {
     try {
@@ -129,7 +197,7 @@ export function TasksNew() {
         const now = new Date();
         const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
         
-        const normalizedData = data.map(subject => ({
+        let normalizedData = data.map(subject => ({
           ...subject,
           tasks: Array.isArray(subject.tasks) 
             ? subject.tasks.filter((t: Task & { updatedAt?: string }) => {
@@ -145,6 +213,14 @@ export function TasksNew() {
               })
             : [],
         }));
+        const focusSubjectId = tutorialSubjectIdRef.current ?? tutorialSubjectId;
+        if (focusSubjectId) {
+          const targetIndex = normalizedData.findIndex(subject => subject.id === focusSubjectId);
+          if (targetIndex > 0) {
+            const [targetSubject] = normalizedData.splice(targetIndex, 1);
+            normalizedData = [targetSubject, ...normalizedData];
+          }
+        }
         console.log('📥 [TasksNew] Données normalisées:', normalizedData.map(s => ({
           id: s.id,
           name: s.name,
@@ -152,9 +228,14 @@ export function TasksNew() {
           completedCount: s.tasks.filter((t: Task) => t.completed).length,
         })));
         setSubjects(normalizedData);
-        // Ouvrir la première matière par défaut
+        // Ouvrir la matière du didacticiel ou la première par défaut
         if (normalizedData.length > 0) {
-          setExpandedSubjects([normalizedData[0].id]);
+          const firstSubjectId = normalizedData[0].id;
+          const preferredId =
+            focusSubjectId && normalizedData.some(subject => subject.id === focusSubjectId)
+              ? focusSubjectId
+              : firstSubjectId;
+          setExpandedSubjects([preferredId]);
         }
       }
     } catch (error: any) {
@@ -180,6 +261,24 @@ export function TasksNew() {
       loadSubjects();
     }, [loadSubjects])
   );
+
+  useFocusEffect(
+    React.useCallback(() => {
+      refreshTutorialState();
+    }, [])
+  );
+
+  useEffect(() => {
+    if (tutorialStage !== 'task') return;
+    const focusSubjectId = tutorialSubjectIdRef.current ?? tutorialSubjectId;
+    if (!focusSubjectId) return;
+    const y = subjectPositionsRef.current[focusSubjectId];
+    if (y == null) return;
+    const offset = Math.max(0, y - 120);
+    requestAnimationFrame(() => {
+      scrollViewRef.current?.scrollTo({ y: offset, animated: true });
+    });
+  }, [tutorialStage, tutorialSubjectId, subjects]);
 
   const toggleSubject = (subjectId: string) => {
     setExpandedSubjects(prev =>
@@ -296,6 +395,31 @@ export function TasksNew() {
               // Recharger les données en cas d'erreur
               await loadSubjects();
               Alert.alert(t('error'), t('deleteTaskError'));
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleDeleteSubject = (subjectId: string, subjectName: string) => {
+    if (subjectId === 'no-subject') return;
+    Alert.alert(
+      t('deleteSubject') || 'Supprimer la matière',
+      (t('deleteSubjectConfirmation') || 'Êtes-vous sûr de vouloir supprimer « %s » ? Les tâches seront déplacées sans matière.').replace('%s', subjectName),
+      [
+        { text: t('cancel'), style: 'cancel' },
+        {
+          text: t('delete'),
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await subjectsService.delete(subjectId);
+              setSubjects(prev => prev.filter(s => s.id !== subjectId));
+              await loadSubjects();
+            } catch (error: any) {
+              console.error('[TasksNew] Erreur suppression matière:', error);
+              Alert.alert(t('error'), error?.message || (t('deleteSubjectError') || 'Impossible de supprimer la matière'));
             }
           },
         },
@@ -499,9 +623,11 @@ export function TasksNew() {
 
       for (const subjectData of subjectsToCreate) {
         try {
+          // L'API accepte les coefficients 1-6
+          const coeff = Math.min(6, Math.max(1, subjectData.coefficient));
           const newSubject = await subjectsService.create({
             name: subjectData.name,
-            coefficient: subjectData.coefficient,
+            coefficient: coeff,
             deadline: null,
           });
           createdSubjects.push(newSubject);
@@ -567,11 +693,14 @@ export function TasksNew() {
       const newSubject = await subjectsService.create(subjectData);
       
       console.log('✅ [TasksNew] Matière créée avec succès:', newSubject);
-      
-      // Ajouter la nouvelle matière à la liste
-      setSubjects([...subjects, newSubject]);
+      tutorialSubjectIdRef.current = newSubject.id;
+      setTutorialSubjectId(newSubject.id);
+      // Ajouter la nouvelle matière en tête de liste
+      setSubjects(prev => [newSubject, ...prev.filter(subject => subject.id !== newSubject.id)]);
       // Ouvrir automatiquement la nouvelle matière
-      setExpandedSubjects([...expandedSubjects, newSubject.id]);
+      setExpandedSubjects(prev => Array.from(new Set([newSubject.id, ...prev])));
+      // Remonter en haut pour rendre la nouvelle matière visible
+      scrollViewRef.current?.scrollTo({ y: 0, animated: true });
       
       // Réinitialiser le formulaire
       setNewSubjectName('');
@@ -581,6 +710,11 @@ export function TasksNew() {
       
       // Recharger les matières depuis l'API pour s'assurer d'avoir les dernières données
       await loadSubjects();
+
+      if (tutorialStage === 'subjects') {
+        await setTutorialStage('task');
+        setTutorialStageState('task');
+      }
     } catch (error: any) {
       const errorMessage = error?.message || String(error) || 'Erreur inconnue';
       
@@ -675,6 +809,12 @@ export function TasksNew() {
       setSelectedSubjectForTask(null);
       
       Alert.alert(t('success'), t('taskAddedSuccessfully'));
+
+      if (tutorialStage === 'task') {
+        await setTutorialStage('plan');
+        setTutorialStageState('plan');
+        router.push('/plan-my-day');
+      }
     } catch (error: any) {
       console.error('[TasksNew] Erreur complète:', error);
       console.error('[TasksNew] Type d\'erreur:', typeof error);
@@ -709,6 +849,17 @@ export function TasksNew() {
       setCreatingTask(false);
     }
   };
+
+  useEffect(() => {
+    if (!showAddTaskModal) return;
+    if (selectedSubjectForTask) return;
+    if (tutorialStage !== 'task') return;
+    const fallbackSubjectId =
+      tutorialSubjectId ?? subjects.find(subject => subject.id !== 'no-subject')?.id ?? null;
+    if (fallbackSubjectId) {
+      setSelectedSubjectForTask(fallbackSubjectId);
+    }
+  }, [showAddTaskModal, selectedSubjectForTask, tutorialStage, tutorialSubjectId, subjects]);
 
   const totalTasks = subjects.reduce((acc, s) => {
     const tasks = Array.isArray(s.tasks) ? s.tasks : [];
@@ -757,9 +908,12 @@ export function TasksNew() {
     );
   }
 
+  const firstRealSubjectId = subjects.find(subject => subject.id !== 'no-subject')?.id ?? null;
+
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <ScrollView
+        ref={scrollViewRef}
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
@@ -786,14 +940,26 @@ export function TasksNew() {
 
           {/* Add Subject Buttons */}
           <View style={styles.addSubjectButtonsContainer}>
-            <TouchableOpacity
-              style={styles.addSubjectButton}
-              onPress={() => setShowAddSubjectModal(true)}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="add-circle-outline" size={20} color="#16A34A" />
-              <Text style={styles.addSubjectText}>{t('addSubject')}</Text>
-            </TouchableOpacity>
+            {tutorialStage === 'subjects' ? (
+              <TouchableOpacity
+                ref={addSubjectButtonRef}
+                style={styles.addSubjectButton}
+                onPress={() => setShowAddSubjectModal(true)}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="add-circle-outline" size={20} color="#16A34A" />
+                <Text style={styles.addSubjectText}>{t('addSubject')}</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                style={styles.addSubjectButton}
+                onPress={() => setShowAddSubjectModal(true)}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="add-circle-outline" size={20} color="#16A34A" />
+                <Text style={styles.addSubjectText}>{t('addSubject')}</Text>
+              </TouchableOpacity>
+            )}
             
             <TouchableOpacity
               style={[styles.addSubjectButton, styles.addSubjectButtonImage]}
@@ -832,9 +998,9 @@ export function TasksNew() {
           )}
         </Animated.View>
 
-        {/* Subjects list */}
-        <View style={styles.subjectsContainer}>
-          {subjects.map((subject, index) => {
+          {/* Subjects list */}
+          <View style={styles.subjectsContainer}>
+            {subjects.map((subject, index) => {
             const isExpanded = expandedSubjects.includes(subject.id);
             // S'assurer que tasks est un tableau
             const tasks = Array.isArray(subject.tasks) ? subject.tasks : [];
@@ -848,6 +1014,16 @@ export function TasksNew() {
                 key={subject.id}
                 entering={FadeInDown.delay(200 + index * 50).duration(400)}
                 style={styles.subjectCard}
+                onLayout={(event) => {
+                  subjectPositionsRef.current[subject.id] = event.nativeEvent.layout.y;
+                  const focusSubjectId = tutorialSubjectIdRef.current ?? tutorialSubjectId;
+                  if (tutorialStage === 'task' && focusSubjectId === subject.id) {
+                    const offset = Math.max(0, event.nativeEvent.layout.y - 120);
+                    requestAnimationFrame(() => {
+                      scrollViewRef.current?.scrollTo({ y: offset, animated: true });
+                    });
+                  }
+                }}
               >
                 {/* Subject header */}
                 <TouchableOpacity
@@ -891,11 +1067,22 @@ export function TasksNew() {
                     </View>
                   </View>
 
-                  <Ionicons
-                    name={isExpanded ? 'chevron-up' : 'chevron-down'}
-                    size={20}
-                    color="rgba(0, 0, 0, 0.4)"
-                  />
+                  <View style={styles.subjectHeaderActions}>
+                    {subject.id !== 'no-subject' && (
+                      <TouchableOpacity
+                        style={styles.deleteSubjectButton}
+                        onPress={() => handleDeleteSubject(subject.id, subject.name)}
+                        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                      >
+                        <Ionicons name="trash-outline" size={20} color="#EF4444" />
+                      </TouchableOpacity>
+                    )}
+                    <Ionicons
+                      name={isExpanded ? 'chevron-up' : 'chevron-down'}
+                      size={20}
+                      color="rgba(0, 0, 0, 0.4)"
+                    />
+                  </View>
                 </TouchableOpacity>
 
                 {/* Subject content - expanded */}
@@ -1008,30 +1195,62 @@ export function TasksNew() {
                     </View>
 
                     {/* Add task button - Désactivé pour la matière virtuelle "no-subject" */}
-                    <TouchableOpacity
-                      style={[
-                        styles.addTaskButton,
-                        subject.id === 'no-subject' && styles.addTaskButtonDisabled
-                      ]}
-                      onPress={() => {
-                        if (subject.id === 'no-subject') {
-                          Alert.alert(
-                            t('error'),
-                            'Impossible d\'ajouter une tâche dans "Autres tâches". Veuillez créer une matière d\'abord.'
-                          );
-                          return;
-                        }
-                        setSelectedSubjectForTask(subject.id);
-                        setShowAddTaskModal(true);
-                      }}
-                      activeOpacity={0.8}
-                      disabled={subject.id === 'no-subject'}
-                    >
-                      <View style={styles.addTaskIconContainer}>
-                        <Ionicons name="add" size={16} color="rgba(0, 0, 0, 0.4)" />
-                      </View>
-                      <Text style={styles.addTaskText}>{t('addTask')}</Text>
-                    </TouchableOpacity>
+                    {tutorialStage === 'task' &&
+                    (((tutorialSubjectIdRef.current ?? tutorialSubjectId) &&
+                      subject.id === (tutorialSubjectIdRef.current ?? tutorialSubjectId)) ||
+                      (!(tutorialSubjectIdRef.current ?? tutorialSubjectId) &&
+                        subject.id === firstRealSubjectId)) ? (
+                      <TouchableOpacity
+                        ref={addTaskButtonRef}
+                        style={[
+                          styles.addTaskButton,
+                          subject.id === 'no-subject' && styles.addTaskButtonDisabled
+                        ]}
+                        onPress={() => {
+                          if (subject.id === 'no-subject') {
+                            Alert.alert(
+                              t('error'),
+                              'Impossible d\'ajouter une tâche dans "Autres tâches". Veuillez créer une matière d\'abord.'
+                            );
+                            return;
+                          }
+                          setSelectedSubjectForTask(subject.id);
+                          setShowAddTaskModal(true);
+                        }}
+                        activeOpacity={0.8}
+                        disabled={subject.id === 'no-subject'}
+                      >
+                        <View style={styles.addTaskIconContainer}>
+                          <Ionicons name="add" size={16} color="rgba(0, 0, 0, 0.4)" />
+                        </View>
+                        <Text style={styles.addTaskText}>{t('addTask')}</Text>
+                      </TouchableOpacity>
+                    ) : (
+                      <TouchableOpacity
+                        style={[
+                          styles.addTaskButton,
+                          subject.id === 'no-subject' && styles.addTaskButtonDisabled
+                        ]}
+                        onPress={() => {
+                          if (subject.id === 'no-subject') {
+                            Alert.alert(
+                              t('error'),
+                              'Impossible d\'ajouter une tâche dans "Autres tâches". Veuillez créer une matière d\'abord.'
+                            );
+                            return;
+                          }
+                          setSelectedSubjectForTask(subject.id);
+                          setShowAddTaskModal(true);
+                        }}
+                        activeOpacity={0.8}
+                        disabled={subject.id === 'no-subject'}
+                      >
+                        <View style={styles.addTaskIconContainer}>
+                          <Ionicons name="add" size={16} color="rgba(0, 0, 0, 0.4)" />
+                        </View>
+                        <Text style={styles.addTaskText}>{t('addTask')}</Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
                 )}
               </Animated.View>
@@ -1042,6 +1261,54 @@ export function TasksNew() {
         {/* Bottom spacing */}
         <View style={{ height: 120 }} />
       </ScrollView>
+
+      <Coachmark
+        visible={!tutorialCompleted && tutorialStage === 'subjects'}
+        targetRef={addSubjectButtonRef}
+        text="Ajoute une matiere avec son coef."
+        nextLabel="Ajouter"
+        onNext={() => setShowAddSubjectModal(true)}
+        onSkip={async () => {
+          const hasRealSubject = subjects.some(subject => subject.id !== 'no-subject');
+          if (hasRealSubject) {
+            await setTutorialCompleted(false);
+            await setTutorialStage('task');
+            setTutorialCompletedState(false);
+            setTutorialStageState('task');
+          } else {
+            await setTutorialCompleted(false);
+            await setTutorialStage('plan');
+            setTutorialCompletedState(false);
+            setTutorialStageState('plan');
+            router.push('/plan-my-day');
+          }
+        }}
+      />
+
+      <Coachmark
+        visible={!tutorialCompleted && tutorialStage === 'task'}
+        targetRef={addTaskButtonRef}
+        text="Ajoute une tache de test dans ta matiere."
+        nextLabel="Ajouter"
+        onNext={() => {
+          const fallbackSubjectId =
+            tutorialSubjectIdRef.current ??
+            tutorialSubjectId ??
+            subjects.find(subject => subject.id !== 'no-subject')?.id ??
+            null;
+          if (fallbackSubjectId) {
+            setSelectedSubjectForTask(fallbackSubjectId);
+          }
+          setShowAddTaskModal(true);
+        }}
+        onSkip={async () => {
+          await setTutorialCompleted(false);
+          await setTutorialStage('plan');
+          setTutorialCompletedState(false);
+          setTutorialStageState('plan');
+          router.push('/plan-my-day');
+        }}
+      />
 
       {/* Image Picker Options Modal */}
       <Modal
@@ -1120,6 +1387,11 @@ export function TasksNew() {
                 <Ionicons name="close" size={24} color="#000" />
               </TouchableOpacity>
             </View>
+            {tutorialStage === 'subjects' && (
+              <View style={styles.tutorialHintContainer} pointerEvents="none">
+                <InlineHint text="Donne un nom et un coef, puis valide." />
+              </View>
+            )}
 
             <ScrollView style={styles.modalScrollView} showsVerticalScrollIndicator={false}>
               {/* Subject Name */}
@@ -1248,6 +1520,11 @@ export function TasksNew() {
                 <Ionicons name="close" size={24} color="#000" />
               </TouchableOpacity>
             </View>
+            {tutorialStage === 'task' && (
+              <View style={styles.tutorialHintContainer} pointerEvents="none">
+                <InlineHint text="Ecris une tache simple puis valide." />
+              </View>
+            )}
 
             <ScrollView style={styles.modalScrollView} showsVerticalScrollIndicator={false}>
               {/* Task title input */}
@@ -1529,6 +1806,14 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 12,
   },
+  subjectHeaderActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  deleteSubjectButton: {
+    padding: 8,
+  },
   subjectTitleRow: {
     flexDirection: 'row',
     alignItems: 'baseline',
@@ -1708,6 +1993,18 @@ const styles = StyleSheet.create({
   addSubjectButtonsContainer: {
     marginTop: 16,
     gap: 12,
+  },
+  tutorialHintContainer: {
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  tutorialHighlight: {
+    borderWidth: 2,
+    borderColor: '#16A34A',
+    shadowColor: '#16A34A',
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
   },
   addSubjectButton: {
     flexDirection: 'row',
@@ -2141,4 +2438,3 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
 });
-

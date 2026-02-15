@@ -41,6 +41,9 @@ export class GamificationService {
   // Points accordés par action
   private static readonly POINTS = {
     HABIT_COMPLETED: 10,
+    TASK_COMPLETED: 5,
+    // 1 point de communauté par tranche de 5 minutes de focus
+    DEEPWORK_POINTS_PER_MINUTE: 1 / 5,
     STREAK_BONUS_MULTIPLIER: 0.1, // 10% de bonus par jour de streak
     PERFECT_DAY_BONUS: 20,
     ACHIEVEMENT_BONUS: 50
@@ -244,6 +247,133 @@ export class GamificationService {
     })
 
     // Ajouter les points des succès
+    if (newAchievements.length > 0) {
+      const achievementPoints = newAchievements.reduce((total, achievement) => total + achievement.points, 0)
+      await prisma.userGamification.update({
+        where: { userId },
+        data: {
+          points: {
+            increment: achievementPoints
+          }
+        }
+      })
+    }
+
+    return {
+      pointsEarned,
+      newAchievements,
+      levelUp: newLevel > oldLevel
+    }
+  }
+
+  // Traiter la complétion d'une tâche (points simples, sans streak ni "perfect day")
+  async processTaskCompletion(userId: string, date: Date = new Date()): Promise<{
+    pointsEarned: number
+    newAchievements: Achievement[]
+    levelUp: boolean
+  }> {
+    await this.initializeUserGamification(userId)
+
+    const userGamification = await prisma.userGamification.findUnique({
+      where: { userId }
+    })
+
+    if (!userGamification) {
+      throw new Error("Impossible de récupérer les données de gamification")
+    }
+
+    // Pour l’instant : points fixes par tâche, sans logique de streak
+    let pointsEarned = GamificationService.POINTS.TASK_COMPLETED
+
+    const newPoints = userGamification.points + pointsEarned
+    const oldLevel = userGamification.level
+    const newLevel = this.calculateLevel(newPoints)
+
+    await prisma.userGamification.update({
+      where: { userId },
+      data: {
+        points: newPoints,
+        level: newLevel,
+        lastActivityDate: date
+      }
+    })
+
+    // Vérifier les achievements liés au niveau / points
+    const newAchievements = await this.checkAchievements(userId, {
+      streak: userGamification.currentStreak,
+      oldStreak: userGamification.currentStreak,
+      points: newPoints,
+      levelUp: newLevel > oldLevel,
+      perfectDay: false
+    })
+
+    if (newAchievements.length > 0) {
+      const achievementPoints = newAchievements.reduce((total, achievement) => total + achievement.points, 0)
+      await prisma.userGamification.update({
+        where: { userId },
+        data: {
+          points: {
+            increment: achievementPoints
+          }
+        }
+      })
+    }
+
+    return {
+      pointsEarned,
+      newAchievements,
+      levelUp: newLevel > oldLevel
+    }
+  }
+
+  // Traiter la complétion d'une session de deep work / focus / examen
+  async processDeepWorkCompletion(userId: string, durationMinutes: number, sessionType?: string, completedAt: Date = new Date()): Promise<{
+    pointsEarned: number
+    newAchievements: Achievement[]
+    levelUp: boolean
+  }> {
+    await this.initializeUserGamification(userId)
+
+    const userGamification = await prisma.userGamification.findUnique({
+      where: { userId }
+    })
+
+    if (!userGamification) {
+      throw new Error("Impossible de récupérer les données de gamification")
+    }
+
+    // Base: 1 point par 5 minutes de focus effectif
+    let rawPoints = durationMinutes * GamificationService.POINTS.DEEPWORK_POINTS_PER_MINUTE
+
+    // Bonus léger pour les sessions d'examen si un type spécifique est utilisé
+    if (sessionType && (sessionType === 'exam' || sessionType === 'exam_mode')) {
+      rawPoints *= 1.5
+    }
+
+    const pointsEarned = Math.max(1, Math.round(rawPoints))
+
+    const newPoints = userGamification.points + pointsEarned
+    const oldLevel = userGamification.level
+    const newLevel = this.calculateLevel(newPoints)
+
+    await prisma.userGamification.update({
+      where: { userId },
+      data: {
+        points: newPoints,
+        level: newLevel,
+        lastActivityDate: completedAt
+      }
+    })
+
+    // Vérifier les achievements liés au niveau / points
+    const newAchievements = await this.checkAchievements(userId, {
+      streak: userGamification.currentStreak,
+      oldStreak: userGamification.currentStreak,
+      points: newPoints,
+      levelUp: newLevel > oldLevel,
+      perfectDay: false
+    })
+
     if (newAchievements.length > 0) {
       const achievementPoints = newAchievements.reduce((total, achievement) => total + achievement.points, 0)
       await prisma.userGamification.update({
@@ -473,6 +603,7 @@ export class GamificationService {
       userName: userGamif.user.name || userGamif.user.email.split('@')[0],
       userEmail: userGamif.user.email,
       points: userGamif.points,
+      totalPoints: userGamif.points,
       level: userGamif.level,
       currentStreak: userGamif.currentStreak,
       longestStreak: userGamif.longestStreak,

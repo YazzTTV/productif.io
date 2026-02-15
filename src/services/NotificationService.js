@@ -1,15 +1,12 @@
 import { PrismaClient } from '@prisma/client';
-import WhatsAppService from './whatsappService.js';
 import NotificationLogger from './NotificationLogger.js';
 import NotificationContentBuilder from './NotificationContentBuilder.js';
 import { getNotificationTitle } from './notification-titles.js';
-import fetch from 'node-fetch';
 import { v4 as uuidv4 } from 'uuid';
 
 class NotificationService {
     constructor() {
         this.prisma = new PrismaClient();
-        this.whatsappService = WhatsAppService;
     }
     async processNotifications() {
         try {
@@ -34,7 +31,6 @@ class NotificationService {
                     }
                 }
             });
-            console.log(`🔄 Traitement de ${notifications.length} notifications...`);
             for (const notification of notifications) {
                 try {
                     await this.processNotification(notification);
@@ -50,13 +46,11 @@ class NotificationService {
     }
     async processNotification(notification) {
         const processingId = Math.random().toString(36).substring(7);
-        console.log(`🔵 [${processingId}] DÉBUT processNotification pour notification ${notification.id} - PID: ${process.pid}`);
         NotificationLogger.logNotificationProcessing(notification);
         try {
             const now = new Date();
             
             // 🛡️ PROTECTION ANTI-DOUBLON : Marquer immédiatement comme 'processing' avec vérification atomique
-            console.log(`🔵 [${processingId}] Tentative de claim pour notification ${notification.id}`);
             const claimed = await this.prisma.notificationHistory.updateMany({
                 where: {
                     id: notification.id,
@@ -67,24 +61,15 @@ class NotificationService {
                 }
             });
 
-            console.log(`🔵 [${processingId}] Claim result: ${claimed.count} ligne(s) mises à jour`);
-            
             // Si aucune ligne mise à jour, la notification a déjà été traitée par un autre processus
             if (claimed.count === 0) {
-                console.log(`⚠️ [${processingId}] Notification ${notification.id} déjà en cours de traitement, ignorée`);
                 return;
             }
 
             // Vérifier si l'utilisateur accepte les notifications à cette heure
             if (!notification.user.notificationSettings) {
-                console.log(`⚠️ [${processingId}] Aucune préférence de notification trouvée pour l'utilisateur`);
                 // Continuer quand même l'envoi si les préférences de base sont activées
             } else if (!this.canSendNotification(notification.user.notificationSettings, now)) {
-                console.log(`⏳ Notification reportée :`);
-                console.log(`  - Raison: Hors plage horaire`);
-                console.log(`  - Heure actuelle: ${now.getHours()}h${now.getMinutes()}`);
-                console.log(`  - Plage autorisée: ${notification.user.notificationSettings.startHour}h-${notification.user.notificationSettings.endHour}h`);
-                
                 // Remettre en pending pour traitement ultérieur
                 await this.prisma.notificationHistory.update({
                     where: { id: notification.id },
@@ -93,34 +78,20 @@ class NotificationService {
                 return;
             }
             
-            // Vérifier les canaux de notification disponibles
+            // Vérifier les canaux de notification disponibles (push only)
             const settings = notification.user.notificationSettings;
-            const userPhoneNumber = notification.user.whatsappNumber || settings?.whatsappNumber;
-            const canSendWhatsapp = settings?.whatsappEnabled && !!userPhoneNumber;
             const canSendPush = !!settings?.pushEnabled;
 
-            if (!canSendWhatsapp && !canSendPush) {
-                NotificationLogger.logError('Configuration notification', new Error('Aucun canal disponible pour l\'utilisateur'));
+            if (!canSendPush) {
+                NotificationLogger.logError('Configuration notification', new Error('Aucun canal push disponible pour l\'utilisateur'));
                 await this.prisma.notificationHistory.update({
                     where: { id: notification.id },
                     data: {
                         status: 'failed',
-                        error: 'Aucun canal disponible'
+                        error: 'Aucun canal push disponible'
                     }
                 });
                 return;
-            }
-            
-            if (canSendWhatsapp) {
-                // Système de templates désactivé - tous les messages sont envoyés en texte normal
-                console.log(`🔵 [${processingId}] Envoi WhatsApp pour notification ${notification.id} (type: ${notification.type}, mode: texte normal)`);
-                
-                // Formater le message avec titre
-                const messageContent = this.formatWhatsAppMessage(notification);
-                
-                // Envoyer sans template
-                await this.whatsappService.sendMessage(userPhoneNumber, messageContent, notification.id, null);
-                console.log(`🔵 [${processingId}] WhatsApp envoyé avec succès pour notification ${notification.id}`);
             }
             
             // Envoyer aussi une notification push si activée (iOS et Android)
@@ -147,6 +118,8 @@ class NotificationService {
                     } else if (notification.type === 'FOCUS_CHECK_PREMIUM') {
                         action = 'open_analytics';
                         checkInType = 'focus';
+                    } else if (notification.type === 'JOURNAL_PROMPT') {
+                        action = 'open_journal';
                     }
                     
                     const pushData = {
@@ -159,30 +132,15 @@ class NotificationService {
                         checkInType: checkInType
                     };
                     
-                    console.log(`📤 [${processingId}] Payload push APNs envoyé:`, {
-                        userId: notification.userId,
-                        title,
-                        body,
-                        data: pushData,
-                        hasAssistantMessage: !!notification.assistantMessage,
-                        messageLength: pushData.message?.length || 0
-                    });
-                    
                     const pushResult = await sendPushNotification(notification.userId, {
                         title: title,
                         body: body,
                         sound: 'default',
                         data: pushData
                     });
-                    
-                    if (pushResult.success && pushResult.sent > 0) {
-                        console.log(`📱 [${processingId}] Notification push envoyée avec succès (${pushResult.sent} appareil(s))`);
-                    } else if (pushResult.failed > 0) {
-                        console.log(`⚠️ [${processingId}] Notification push partiellement échouée (${pushResult.failed} échec(s))`);
-                    }
                 } catch (pushError) {
                     console.error(`❌ [${processingId}] Erreur lors de l'envoi de la notification push:`, pushError);
-                    // On continue même si la push échoue, WhatsApp est déjà envoyé
+                    // On continue même si la push échoue
                 }
             }
             
@@ -195,8 +153,6 @@ class NotificationService {
                 }
             });
             
-            console.log(`✅ [${processingId}] Notification ${notification.id} envoyée avec succès`);
-            console.log(`  - Heure d'envoi: ${now.toLocaleTimeString()}`);
         }
         catch (error) {
             NotificationLogger.logError('Traitement de notification', error);
@@ -244,21 +200,6 @@ class NotificationService {
             body = body.substring(0, 197) + '...';
         }
         return body;
-    }
-    formatWhatsAppMessage(notification) {
-        const title = getNotificationTitle(notification.type);
-        let message = '';
-        
-        // Si le contenu commence déjà par le titre, ne pas le dupliquer
-        if (notification.content && notification.content.startsWith(title)) {
-            message = notification.content;
-        } else {
-            message = `${title}\n\n`;
-            message += notification.content;
-        }
-        
-        message += '\n\n_Envoyé via Productif.io_';
-        return message;
     }
     getDayRange(date = new Date()) {
         const start = new Date(date);
@@ -409,7 +350,6 @@ class NotificationService {
             NotificationLogger.logNotificationSettings(user.notificationSettings);
             // Vérifier si la notification peut être envoyée à cette heure
             if (!this.canSendNotification(user.notificationSettings, scheduledFor)) {
-                console.log(`⚠️ La notification ne peut pas être envoyée à cette heure`);
                 return null;
             }
             const { pushTitle = null, pushBody = null, assistantMessage = null } = options || {};
@@ -673,6 +613,29 @@ class NotificationService {
         }
     }
 
+    async scheduleJournalPrompt(userId, date) {
+        try {
+            const content = "📔 Journal du soir\n\nComment s'est passée ta journée ?\nPrends 2 minutes pour noter l'essentiel.";
+
+            const shortTitle = '📔 Journal du soir';
+            const shortBody = "Comment s'est passée ta journée ?";
+
+            await this.createNotification(
+              userId,
+              'JOURNAL_PROMPT',
+              content,
+              date,
+              {
+                pushTitle: shortTitle,
+                pushBody: shortBody,
+                assistantMessage: content,
+              }
+            );
+        } catch (error) {
+            NotificationLogger.logError('Planification de la notification journal', error);
+        }
+    }
+
     // Les fonctions basiques (MOOD_CHECK, STRESS_CHECK, FOCUS_CHECK) ont été supprimées
     // Seules les versions Premium existent maintenant
 
@@ -717,20 +680,16 @@ class NotificationService {
     async scheduleFocusWindow(userId) {
         try {
             const now = new Date();
-            console.log(`\n🎯 [FOCUS_WINDOW] Analyse pour user ${userId} à ${now.toISOString()}`);
-            
             const user = await this.prisma.user.findUnique({
                 where: { id: userId },
                 include: { notificationSettings: true }
             });
             
             if (!user?.notificationSettings?.isEnabled) {
-                console.log(`   ⏭️  [FOCUS_WINDOW] Ignoré: notifications désactivées`);
                 return { skipped: true, reason: 'notifications_disabled' };
             }
             
             if (!this.canSendNotification(user.notificationSettings, now)) {
-                console.log(`   ⏭️  [FOCUS_WINDOW] Ignoré: hors des horaires autorisés`);
                 return { skipped: true, reason: 'outside_allowed_hours' };
             }
 
@@ -738,43 +697,28 @@ class NotificationService {
                 where: { userId, status: 'active' }
             });
             if (activeSession) {
-                console.log(`   ⏭️  [FOCUS_WINDOW] Ignoré: session deep work active (${activeSession.id})`);
                 return { skipped: true, reason: 'active_deep_work_session' };
             }
             
             if (await this.hasNotificationToday(userId, 'FOCUS_WINDOW')) {
-                console.log(`   ⏭️  [FOCUS_WINDOW] Ignoré: notification déjà envoyée aujourd'hui`);
                 return { skipped: true, reason: 'already_sent_today' };
             }
 
             const { start, end } = this.getDayRange(now);
             const tasks = await this.getTasksBetween(userId, start, end);
-            console.log(`   📋 [FOCUS_WINDOW] Tâches trouvées: ${tasks.length}`);
             if (!tasks.length) {
-                console.log(`   ⏭️  [FOCUS_WINDOW] Ignoré: aucune tâche planifiée`);
                 return { skipped: true, reason: 'no_tasks' };
             }
 
             const busy = await this.getBusyPeriods(userId, start, end);
-            console.log(`   📅 [FOCUS_WINDOW] Périodes occupées: ${busy.length}`);
             
             const windowStart = new Date(now);
             const windowEnd = new Date(now.getTime() + 3 * 60 * 60 * 1000);
-            console.log(`   🔍 [FOCUS_WINDOW] Recherche créneau libre entre ${windowStart.toISOString()} et ${windowEnd.toISOString()} (min 25 min)`);
             
             const freeBlock = this.findFirstFreeBlock(busy, windowStart, windowEnd, 25);
             if (!freeBlock) {
-                console.log(`   ⏭️  [FOCUS_WINDOW] Ignoré: aucun créneau libre ≥25 min trouvé`);
-                if (busy.length > 0) {
-                    console.log(`   📊 [FOCUS_WINDOW] Détail périodes occupées:`);
-                    busy.forEach((period, i) => {
-                        console.log(`      ${i + 1}. ${period.start.toISOString()} → ${period.end.toISOString()}`);
-                    });
-                }
                 return { skipped: true, reason: 'no_free_block' };
             }
-
-            console.log(`   ✅ [FOCUS_WINDOW] Créneau libre trouvé: ${freeBlock.start.toISOString()} → ${freeBlock.end.toISOString()} (${freeBlock.durationMinutes} min)`);
 
             const content = "Tu as un créneau libre. Moment parfait pour te concentrer sur une tâche planifiée.";
             const notification = await this.createNotification(userId, 'FOCUS_WINDOW', content, now, {
@@ -783,11 +727,9 @@ class NotificationService {
                 assistantMessage: content
             });
             
-            console.log(`   📨 [FOCUS_WINDOW] ✅ Notification créée: ${notification?.id || 'N/A'}`);
             return { created: true, notification, freeBlock };
             
         } catch (error) {
-            console.error(`   ❌ [FOCUS_WINDOW] Erreur pour user ${userId}:`, error.message);
             NotificationLogger.logError('Planification Focus Window', error);
             return { error: error.message };
         }
@@ -989,117 +931,6 @@ class NotificationService {
         } catch (error) {
             NotificationLogger.logError('Planification Evening Plan', error);
         }
-    }
-}
-
-// Générateur d'ID unique pour chaque notification
-function generateNotificationId() {
-    return `notif_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-}
-
-// Logger avec timestamp précis
-function logWithTimestamp(level, message, data = {}) {
-    const timestamp = new Date().toISOString();
-    const milliseconds = new Date().getMilliseconds().toString().padStart(3, '0');
-    console.log(`[${timestamp}.${milliseconds}] [${level}] ${message}`, data ? JSON.stringify(data) : '');
-}
-
-async function sendWhatsAppMessage(phoneNumber, message, notificationId = null) {
-    const sendId = uuidv4();
-    const startTime = Date.now();
-    
-    logWithTimestamp('INFO', '📱 DÉBUT ENVOI WHATSAPP', {
-        sendId,
-        notificationId,
-        phoneNumber,
-        messageLength: message.length,
-        thread: process.pid
-    });
-
-    try {
-        const requestStart = Date.now();
-        
-        // Préparation de la requête
-        const whatsappPayload = {
-            messaging_product: "whatsapp",
-            to: phoneNumber,
-            type: "text",
-            text: { body: message }
-        };
-
-        logWithTimestamp('DEBUG', '🔄 ENVOI REQUÊTE WHATSAPP - DÉBUT', {
-            sendId,
-            notificationId,
-            url: `${process.env.WHATSAPP_API_URL}/messages`,
-            payload: whatsappPayload
-        });
-
-        const response = await fetch(`${process.env.WHATSAPP_API_URL}/messages`, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(whatsappPayload)
-        });
-
-        const requestDuration = Date.now() - requestStart;
-        const responseText = await response.text();
-        
-        logWithTimestamp('DEBUG', '📬 RÉPONSE WHATSAPP REÇUE', {
-            sendId,
-            notificationId,
-            status: response.status,
-            statusText: response.statusText,
-            requestDuration,
-            responseLength: responseText.length,
-            headers: Object.fromEntries(response.headers.entries())
-        });
-
-        if (!response.ok) {
-            logWithTimestamp('ERROR', '❌ ERREUR RESPONSE WHATSAPP', {
-                sendId,
-                notificationId,
-                status: response.status,
-                response: responseText,
-                requestDuration
-            });
-            throw new Error(`WhatsApp API error: ${response.status} - ${responseText}`);
-        }
-
-        const responseData = JSON.parse(responseText);
-        const totalDuration = Date.now() - startTime;
-
-        logWithTimestamp('SUCCESS', '✅ MESSAGE WHATSAPP ENVOYÉ', {
-            sendId,
-            notificationId,
-            whatsappMessageId: responseData.messages?.[0]?.id,
-            whatsappWaId: responseData.contacts?.[0]?.wa_id,
-            requestDuration,
-            totalDuration,
-            responseData
-        });
-
-        return {
-            success: true,
-            messageId: responseData.messages?.[0]?.id,
-            waId: responseData.contacts?.[0]?.wa_id,
-            sendId,
-            duration: totalDuration
-        };
-
-    } catch (error) {
-        const totalDuration = Date.now() - startTime;
-        
-        logWithTimestamp('ERROR', '❌ ERREUR ENVOI WHATSAPP', {
-            sendId,
-            notificationId,
-            error: error.message,
-            stack: error.stack,
-            totalDuration
-        });
-        
-        throw error;
     }
 }
 

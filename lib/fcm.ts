@@ -1,6 +1,15 @@
 import admin from 'firebase-admin';
 import { prisma } from './prisma';
 
+const LOG_LEVEL = (process.env.LOG_LEVEL || 'warn').toLowerCase();
+const LOG_ORDER: Record<string, number> = { error: 0, warn: 1, success: 2, info: 3, debug: 4 };
+const shouldLog = (level: string) => {
+  if (LOG_LEVEL === 'silent') return false;
+  const current = LOG_ORDER[LOG_LEVEL] ?? LOG_ORDER.warn;
+  const incoming = LOG_ORDER[level] ?? LOG_ORDER.info;
+  return incoming <= current;
+};
+
 // Configuration FCM depuis les variables d'environnement
 const initializeFirebase = async () => {
   // Vérifier si Firebase est déjà initialisé
@@ -27,10 +36,12 @@ const initializeFirebase = async () => {
   // Format: FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY
   if (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_CLIENT_EMAIL && process.env.FIREBASE_PRIVATE_KEY) {
     try {
-      console.log('🔧 Initialisation Firebase avec variables d\'environnement...');
-      console.log(`   - Project ID: ${process.env.FIREBASE_PROJECT_ID}`);
-      console.log(`   - Client Email: ${process.env.FIREBASE_CLIENT_EMAIL}`);
-      console.log(`   - Private Key: ${process.env.FIREBASE_PRIVATE_KEY ? '✅ Présent (' + process.env.FIREBASE_PRIVATE_KEY.length + ' caractères)' : '❌ Manquant'}`);
+      if (shouldLog('info')) {
+        console.log('🔧 Initialisation Firebase avec variables d\'environnement...');
+        console.log(`   - Project ID: ${process.env.FIREBASE_PROJECT_ID}`);
+        console.log(`   - Client Email: ${process.env.FIREBASE_CLIENT_EMAIL}`);
+        console.log(`   - Private Key: ${process.env.FIREBASE_PRIVATE_KEY ? '✅ Présent (' + process.env.FIREBASE_PRIVATE_KEY.length + ' caractères)' : '❌ Manquant'}`);
+      }
       
       return admin.initializeApp({
         credential: admin.credential.cert({
@@ -102,11 +113,13 @@ export async function sendPushNotification(
     });
 
     if (pushTokens.length === 0) {
-      console.log(`⚠️ Aucun token push Android trouvé pour l'utilisateur ${userId}`);
+      if (shouldLog('warn')) console.warn(`⚠️ Aucun token push Android trouvé pour l'utilisateur ${userId}`);
       return { success: true, sent: 0, failed: 0 };
     }
 
-    console.log(`📱 Envoi de notification push à ${pushTokens.length} appareil(s) Android pour l'utilisateur ${userId}`);
+    if (shouldLog('info')) {
+      console.log(`📱 Envoi de notification push à ${pushTokens.length} appareil(s) Android pour l'utilisateur ${userId}`);
+    }
 
     // Convertir toutes les valeurs de data en strings (requis par FCM)
     const stringifyData = (obj: Record<string, any>): Record<string, string> => {
@@ -172,7 +185,9 @@ export async function sendPushNotification(
 
       // Supprimer les tokens invalides de la base de données
       if (invalidTokens.length > 0) {
-        console.log(`   🗑️ Suppression de ${invalidTokens.length} token(s) invalide(s)`);
+        if (shouldLog('info')) {
+          console.log(`   🗑️ Suppression de ${invalidTokens.length} token(s) invalide(s)`);
+        }
         await prisma.pushToken.deleteMany({
           where: {
             token: { in: invalidTokens }
@@ -181,7 +196,7 @@ export async function sendPushNotification(
       }
     }
 
-    if (sent > 0) {
+    if (sent > 0 && shouldLog('info')) {
       console.log(`✅ ${sent} notification(s) push envoyée(s) avec succès pour l'utilisateur ${userId}`);
     }
 
@@ -235,6 +250,6 @@ export function shutdownFirebaseApp(): void {
   if (firebaseApp) {
     admin.app().delete();
     firebaseApp = null;
-    console.log('🔌 Firebase Admin fermé');
+    if (shouldLog('info')) console.log('🔌 Firebase Admin fermé');
   }
 }

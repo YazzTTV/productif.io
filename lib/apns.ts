@@ -1,5 +1,14 @@
-import apn from 'apn';
+import apn from '@parse/node-apn';
 import { prisma } from './prisma';
+
+const LOG_LEVEL = (process.env.LOG_LEVEL || 'warn').toLowerCase();
+const LOG_ORDER: Record<string, number> = { error: 0, warn: 1, success: 2, info: 3, debug: 4 };
+const shouldLog = (level: string) => {
+  if (LOG_LEVEL === 'silent') return false;
+  const current = LOG_ORDER[LOG_LEVEL] ?? LOG_ORDER.warn;
+  const incoming = LOG_ORDER[level] ?? LOG_ORDER.info;
+  return incoming <= current;
+};
 
 // Configuration APNs depuis les variables d'environnement
 const getApnProvider = () => {
@@ -68,11 +77,13 @@ export async function sendPushNotification(
     });
 
     if (pushTokens.length === 0) {
-      console.log(`⚠️ Aucun token push iOS trouvé pour l'utilisateur ${userId}`);
+      if (shouldLog('warn')) console.warn(`⚠️ Aucun token push iOS trouvé pour l'utilisateur ${userId}`);
       return { success: true, sent: 0, failed: 0 };
     }
 
-    console.log(`📱 Envoi de notification push à ${pushTokens.length} appareil(s) iOS pour l'utilisateur ${userId}`);
+    if (shouldLog('info')) {
+      console.log(`📱 Envoi de notification push à ${pushTokens.length} appareil(s) iOS pour l'utilisateur ${userId}`);
+    }
 
     // Préparer la notification
     const notification = new apn.Notification();
@@ -113,7 +124,9 @@ export async function sendPushNotification(
           failure.error === 'Unregistered' ||
           failure.error === 'DeviceTokenNotForTopic'
         )) {
-          console.log(`   🗑️ Suppression du token invalide: ${failure.device}`);
+          if (shouldLog('info')) {
+            console.log(`   🗑️ Suppression du token invalide: ${failure.device}`);
+          }
           prisma.pushToken.deleteMany({
             where: {
               token: failure.device
@@ -125,7 +138,7 @@ export async function sendPushNotification(
       });
     }
 
-    if (sent > 0) {
+    if (sent > 0 && shouldLog('info')) {
       console.log(`✅ ${sent} notification(s) push envoyée(s) avec succès pour l'utilisateur ${userId}`);
     }
 
@@ -174,7 +187,6 @@ export function shutdownApnProvider(): void {
   if (apnProvider) {
     apnProvider.shutdown();
     apnProvider = null;
-    console.log('🔌 Provider APNs fermé');
+    if (shouldLog('info')) console.log('🔌 Provider APNs fermé');
   }
 }
-

@@ -68,18 +68,23 @@ Extrais toutes les tâches mentionnées. Pour chaque tâche:
 === ESTIMATION AUTOMATIQUE de la difficulté et de l'énergie ===
 Si l'utilisateur NE PRÉCISE PAS explicitement la difficulté ou le niveau d'énergie dans sa transcription, ESTIME-les automatiquement selon le type de tâche:
 
-**Niveau d'énergie (energy) - Estimation automatique:**
-- Révision simple, lecture, exercices basiques → 1-2 (faible énergie)
-- Exercices standards, devoirs maison → 2-3 (énergie modérée)
-- Contrôle, examen blanc, projet complexe → 4-5 (haute énergie)
-- Dissertation, mémoire, recherche approfondie → 5 (énergie maximale)
+**Niveau d'énergie (energy) = CONCENTRATION MENTALE requise (PAS l'effort physique):**
+- Sport, entraînement, activité physique → 1 (aucune concentration mentale requise)
+- Révision simple, lecture, exercices basiques → 2 (faible concentration)
+- Exercices standards, devoirs maison → 3 (concentration modérée)
+- Contrôle, examen blanc, projet complexe → 4-5 (haute concentration)
+- Dissertation, mémoire, recherche approfondie → 5 (concentration maximale)
 
 **Priorité (priority) - Estimation automatique:**
+- RÈGLE CLÉ : Les tâches ACADÉMIQUES (révisions, devoirs, cours, examens) ont TOUJOURS une priorité plus élevée que les activités personnelles (sport, loisirs, courses, ménage)
+- Sport, entraînement, activités physiques, loisirs → 1-2 (basse priorité, à faire en fin de journée)
+- Révision générale, lecture de cours → 2-3
+- Devoirs maison, exercices à rendre → 3-4
+- Contrôle, examen, deadline proche → 4-5
 - Si l'utilisateur mentionne "urgent", "important", "prioritaire" → 4-5
 - Si l'utilisateur mentionne "pas urgent", "peut attendre" → 1-2
-- Sinon, estime selon le contexte: contrôle/examen proche → 4-5, révision générale → 2-3
 
-**IMPORTANT:** Si l'utilisateur précise explicitement "facile", "difficile", "urgent", "pas urgent", etc., RESPECTE sa demande. Sinon, ESTIME intelligemment.
+**IMPORTANT:** Si l'utilisateur précise explicitement "facile", "difficile", "urgent", "pas urgent", etc., RESPECTE sa demande. Sinon, ESTIME intelligemment. Le sport et les activités personnelles doivent TOUJOURS être en dernier dans le planning sauf demande explicite.
 
 === RÈGLES pour targetDate (YYYY-MM-DD) - TRÈS IMPORTANT ===
 - "demain", "Demain", "DEMAIN" (au début ou dans la phrase) → ${tomorrowStr} (PAS ${todayStr})
@@ -115,8 +120,10 @@ RÈGLES IMPORTANTES:
 2. Pour priority et energy: 
    - Si l'utilisateur précise explicitement "urgent", "important", "prioritaire", "facile", "difficile", "simple", "complexe", etc. → RESPECTE sa demande
    - Sinon, ESTIME intelligemment selon le type de tâche (révision simple = energy 1-2, contrôle = energy 4-5, etc.)
+   - IMPORTANT: energy = CONCENTRATION MENTALE, pas effort physique. Le sport → energy 1
+   - IMPORTANT: Les tâches académiques ont TOUJOURS une priorité supérieure au sport/loisirs/perso
 
-3. Analyse chaque tâche pour déterminer sa difficulté réelle et son besoin en concentration, même si l'utilisateur ne le précise pas explicitement.`,
+3. Analyse chaque tâche pour déterminer sa difficulté réelle et son besoin en concentration MENTALE, même si l'utilisateur ne le précise pas explicitement.`,
           },
           { role: 'user', content: prompt },
         ],

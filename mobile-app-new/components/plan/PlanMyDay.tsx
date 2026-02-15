@@ -7,10 +7,16 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Audio } from 'expo-av';
 import * as FileSystem from 'expo-file-system';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { taskAssociationService, googleCalendarService, dailyPlanningService, authService, PlanLimits, getAuthToken } from '@/lib/api';
 import { format, addMinutes, setHours, setMinutes, startOfDay, isBefore, getHours, getMinutes } from 'date-fns';
 import { useLanguage } from '@/contexts/LanguageContext';
+import {
+  getTutorialCompleted,
+  getTutorialStage,
+  setTutorialCompleted,
+  setTutorialStage,
+} from '@/tutorial/tutorialStorage';
+import { Coachmark } from '@/tutorial/Coachmark';
 
 type PlanPhase = 'entry' | 'recording' | 'transcription' | 'processing' | 'association' | 'overview';
 
@@ -36,8 +42,12 @@ export function PlanMyDay() {
   const insets = useSafeAreaInsets();
   const { t } = useLanguage();
   const isMountedRef = useRef(true);
+  const typeButtonRef = useRef<TouchableOpacity>(null);
+  const confirmButtonRef = useRef<TouchableOpacity>(null);
   const [phase, setPhase] = useState<PlanPhase>('entry');
   const [transcription, setTranscription] = useState('');
+  const [tutorialStage, setTutorialStageState] = useState<string | null>(null);
+  const [tutorialCompleted, setTutorialCompletedState] = useState(false);
   const [processingStep, setProcessingStep] = useState(0);
   const [isRecording, setIsRecording] = useState(false);
   const [recording, setRecording] = useState<Audio.Recording | null>(null);
@@ -64,6 +74,22 @@ export function PlanMyDay() {
   const [isLoadingCalendar, setIsLoadingCalendar] = useState(false); // État de chargement pour confirmAssociations
   const [planLimits, setPlanLimits] = useState<PlanLimits | null>(null);
   const [planPreviewLimited, setPlanPreviewLimited] = useState(false);
+
+  const refreshTutorialState = async () => {
+    const [completed, stage] = await Promise.all([
+      getTutorialCompleted(),
+      getTutorialStage(),
+    ]);
+    console.log('[Tutorial] PlanMyDay load state', { completed, stage });
+    setTutorialCompletedState(completed);
+    setTutorialStageState(stage);
+  };
+
+  useEffect(() => {
+    refreshTutorialState();
+  }, []);
+
+  // Coachmarks are handled locally in this screen.
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -478,6 +504,7 @@ export function PlanMyDay() {
       setTasks(sortedTasks);
       setPhase('overview');
       console.log('✅ [PlanMyDay] Phase changée vers overview');
+
     } catch (error: any) {
       console.error('❌ [PlanMyDay] Erreur dans confirmAssociations:', error);
       Alert.alert(
@@ -650,7 +677,22 @@ export function PlanMyDay() {
         Alert.alert(
           'Succès',
           `${messages.join(', ')}. Vous les retrouverez dans votre calendrier et dans l'onglet tâches.`,
-          [{ text: 'OK', onPress: () => router.back() }]
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                void (async () => {
+                  if (tutorialStage === 'plan' && !tutorialCompleted) {
+                    await setTutorialStage('focus');
+                    setTutorialStageState('focus');
+                    router.push('/focus');
+                  } else {
+                    router.back();
+                  }
+                })();
+              },
+            },
+          ]
         );
       } else if (result.eventsCreated === 0 && result.eventsFailed > 0) {
         Alert.alert('Erreur', 'Impossible de créer les événements. Vérifiez votre connexion Google Calendar.');
@@ -712,6 +754,7 @@ export function PlanMyDay() {
               </TouchableOpacity>
 
               <TouchableOpacity
+                ref={typeButtonRef}
                 style={styles.typeButton}
                 onPress={() => setPhase('transcription')}
                 activeOpacity={0.7}
@@ -729,6 +772,20 @@ export function PlanMyDay() {
             </TouchableOpacity>
           </Animated.View>
         </ScrollView>
+        <Coachmark
+          visible={!tutorialCompleted && tutorialStage === 'plan' && phase === 'entry'}
+          targetRef={typeButtonRef}
+          text="Planifie ta journee: tape tes taches ici pour generer ton planning."
+          nextLabel="Commencer"
+          onNext={() => setPhase('transcription')}
+          onSkip={async () => {
+            await setTutorialCompleted(false);
+            await setTutorialStage('focus');
+            setTutorialCompletedState(false);
+            setTutorialStageState('focus');
+            router.replace('/focus');
+          }}
+        />
       </View>
     );
   }
@@ -1028,6 +1085,7 @@ export function PlanMyDay() {
           </View>
 
           <TouchableOpacity
+            ref={confirmButtonRef}
             style={[styles.confirmButton, isLoadingCalendar && styles.confirmButtonDisabled]}
             onPress={confirmAssociations}
             activeOpacity={0.8}
@@ -1043,6 +1101,20 @@ export function PlanMyDay() {
             </Text>
           </TouchableOpacity>
         </ScrollView>
+        <Coachmark
+          visible={!tutorialCompleted && tutorialStage === 'plan' && phase === 'association'}
+          targetRef={confirmButtonRef}
+          text="Planifie automatiquement ta journee."
+          nextLabel="Planifier"
+          onNext={confirmAssociations}
+          onSkip={async () => {
+            await setTutorialCompleted(false);
+            await setTutorialStage('focus');
+            setTutorialCompletedState(false);
+            setTutorialStageState('focus');
+            router.replace('/focus');
+          }}
+        />
 
         {/* Subject Picker Modal */}
         <Modal

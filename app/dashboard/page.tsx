@@ -2,6 +2,7 @@ import { redirect } from "next/navigation"
 import { getAuthUser } from "@/lib/auth"
 import { checkPremiumStatus } from "@/lib/premium"
 import { WebDashboard } from "@/components/dashboard/web-dashboard"
+import { getEmailVerificationBlockAt } from "@/lib/email-verification"
 
 export const dynamic = 'force-dynamic'
 
@@ -13,6 +14,13 @@ export default async function DashboardPage() {
   }
 
   try {
+    if (user.emailVerificationSentAt && !user.emailVerifiedAt) {
+      const dueAt = getEmailVerificationBlockAt(user.createdAt)
+      if (new Date() > dueAt) {
+        redirect("/verify-email")
+      }
+    }
+
     // Récupérer le nom de l'utilisateur
     let userName = "Student"
     if (user.name) {
@@ -32,4 +40,3 @@ export default async function DashboardPage() {
     redirect("/login")
   }
 }
-

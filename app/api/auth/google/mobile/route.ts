@@ -115,6 +115,7 @@ export async function POST(req: NextRequest) {
 
     const email = payload.email.toLowerCase()
     const userName = payload.name || "Utilisateur Google"
+    const googleSub = payload.sub
 
     // Vérifier si l'utilisateur existe déjà
     let user = await prisma.user.findUnique({
@@ -128,6 +129,33 @@ export async function POST(req: NextRequest) {
           email,
           name: userName,
           password: "", // Pas de mot de passe pour les utilisateurs Google
+          googleSubject: googleSub ?? undefined,
+          emailVerifiedAt: new Date(),
+          emailVerificationToken: null,
+          emailVerificationExpiresAt: null,
+          emailVerificationSentAt: null,
+        },
+      })
+    } else if (googleSub && !user.googleSubject) {
+      // Mettre à jour googleSubject si on vient de le récupérer
+      user = await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          googleSubject: googleSub,
+          emailVerifiedAt: user.emailVerifiedAt ?? new Date(),
+          emailVerificationToken: null,
+          emailVerificationExpiresAt: null,
+          emailVerificationSentAt: null,
+        },
+      })
+    } else if (!user.emailVerifiedAt) {
+      user = await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          emailVerifiedAt: new Date(),
+          emailVerificationToken: null,
+          emailVerificationExpiresAt: null,
+          emailVerificationSentAt: null,
         },
       })
     }
@@ -238,4 +266,3 @@ async function handleLegacyAuth(accessToken: string, email: string, providedName
     )
   }
 }
-

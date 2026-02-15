@@ -40,6 +40,7 @@ const publicRoutes = [
   "/refund-policy",
   // Landing marketing publique
   "/landing",
+  "/verify-email",
 ]
 
 export async function middleware(request: NextRequest) {

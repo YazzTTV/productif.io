@@ -12,10 +12,18 @@ model User {
   name             String?
   email            String   @unique
   password         String
+  /// Version des tokens JWT pour la révocation côté serveur (RISC, logout global, etc.)
+  tokenVersion     Int      @default(0)
+  /// Identifiant stable Google (sub) pour mapping RISC / Sign-in with Google
+  googleSubject    String?  @unique
   whatsappNumber   String?  @unique
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
   managedCompanyId String?
+  emailVerifiedAt             DateTime?
+  emailVerificationToken      String?
+  emailVerificationExpiresAt  DateTime?
+  emailVerificationSentAt     DateTime?
 
   // Free Trial (deprecated - migration vers freemium)
   trialStartDate DateTime?
@@ -531,6 +539,7 @@ model NotificationSettings {
   nightTime           String                @default("22:00")
   improvementTime     String                @default("08:30")
   recapTime           String                @default("21:00")
+  journalTime         String                @default("21:00")
   timezone            String                @default("Europe/Paris")
   moodEnabled         Boolean               @default(true)
   stressEnabled       Boolean               @default(true)

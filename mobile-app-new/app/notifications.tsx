@@ -27,7 +27,6 @@ interface NotificationPreferences {
   isEnabled: boolean;
   emailEnabled: boolean;
   pushEnabled: boolean;
-  // WhatsApp retiré (plus utilisé)
   startHour: number;
   endHour: number;
   allowedDays: number[];
@@ -50,7 +49,7 @@ interface NotificationPreferences {
   eveningTime: string;
   nightTime: string;
   improvementTime: string;
-  recapTime: string;
+  journalTime: string;
   timezone: string;
   // Questions aléatoires
   moodEnabled: boolean;
@@ -73,8 +72,6 @@ const defaultPreferences: NotificationPreferences = {
   isEnabled: true,
   emailEnabled: true,
   pushEnabled: true,
-  whatsappEnabled: false,
-  whatsappNumber: '',
   startHour: 9,
   endHour: 18,
   allowedDays: [1, 2, 3, 4, 5],
@@ -96,7 +93,7 @@ const defaultPreferences: NotificationPreferences = {
   eveningTime: '18:30',
   nightTime: '21:30',
   improvementTime: '10:00',
-  recapTime: '21:00',
+  journalTime: '21:00',
   timezone: 'Europe/Paris',
   moodEnabled: true,
   stressEnabled: true,
@@ -865,11 +862,11 @@ export default function NotificationsPage() {
               !preferences.isEnabled
             )}
             {renderTimeToggleRow(
-              'Rappel récap analyse',
+              'Journal du soir',
               preferences.recapReminder,
               (v) => updatePreference('recapReminder', v),
-              preferences.recapTime,
-              (value) => updatePreference('recapTime', value),
+              preferences.journalTime,
+              (value) => updatePreference('journalTime', value),
               !preferences.isEnabled
             )}
           </View>

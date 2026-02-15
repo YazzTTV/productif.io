@@ -21,6 +21,10 @@ model User {
   role               String                 @default("USER")
   createdAt          DateTime              @default(now())
   updatedAt          DateTime              @updatedAt
+  emailVerifiedAt             DateTime?
+  emailVerificationToken      String?
+  emailVerificationExpiresAt  DateTime?
+  emailVerificationSentAt     DateTime?
   habits             Habit[]
   missions           Mission[]
   processes          Process[]
@@ -379,6 +383,7 @@ model NotificationSettings {
   nightTime         String   @default("22:00")
   improvementTime   String   @default("08:30")
   recapTime         String   @default("21:00")
+  journalTime       String   @default("21:00")
   timezone          String   @default("Europe/Paris")
   moodEnabled       Boolean  @default(true)
   stressEnabled     Boolean  @default(true)

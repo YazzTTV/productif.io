@@ -1,6 +1,6 @@
-const { MongoClient } = require('mongodb');
-const whatsappService = require('../services/whatsappService');
-const NotificationScheduler = require('../services/NotificationScheduler');
+import { MongoClient } from 'mongodb';
+import whatsappService from '../services/whatsappService.js';
+import NotificationScheduler from '../services/NotificationScheduler.js';
 
 async function testNotificationSystem() {
     const client = new MongoClient(process.env.MONGODB_URI);
@@ -29,7 +29,7 @@ async function testNotificationSystem() {
 
         // 2. Initialiser le planificateur avec le service WhatsApp existant
         console.log('\n⚙️ Création du planificateur...');
-        const scheduler = new NotificationScheduler(whatsappService);
+        const scheduler = new NotificationScheduler();
 
         // 3. Créer une notification de test
         const testMessage = {
