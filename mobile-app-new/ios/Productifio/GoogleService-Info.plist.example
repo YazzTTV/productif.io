@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>API_KEY</key>
-	<string>REDACTED_GOOGLE_API_KEY</string>
+	<string>__FIREBASE_IOS_API_KEY__</string>
 	<key>GCM_SENDER_ID</key>
 	<string>352005974681</string>
 	<key>PLIST_VERSION</key>
@@ -26,9 +26,5 @@
 	<true></true>
 	<key>GOOGLE_APP_ID</key>
 	<string>1:352005974681:ios:5f6aa71395d6abb0d1e608</string>
-	<key>CLIENT_ID</key>
-	<string>738789952398-m6risp9hae6ao11n7s4178nig64largu.apps.googleusercontent.com</string>
-	<key>REVERSED_CLIENT_ID</key>
-	<string>com.googleusercontent.apps.738789952398-m6risp9hae6ao11n7s4178nig64largu</string>
 </dict>
 </plist>

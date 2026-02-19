@@ -49,6 +49,8 @@ firebase-service-account.json
 **/google-services.json
 mobile-app-new/android/app/google-services.json
 android/app/google-services.json
+mobile-app-new/firebase/GoogleService-Info.plist
+mobile-app-new/ios/Productifio/GoogleService-Info.plist
 
 # Keystore files (clés de signature - ne jamais commiter)
 *.keystore

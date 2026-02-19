@@ -45,6 +45,10 @@ ios/build/
 ios/Pods/
 ios/*.xcworkspace
 ios/*.xcodeproj
+ios/Productifio/GoogleService-Info.plist
+
+# Firebase iOS config (contains API keys)
+firebase/GoogleService-Info.plist
 
 # Android
 android/build/

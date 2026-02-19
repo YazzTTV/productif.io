@@ -48,3 +48,18 @@ Join our community of developers creating universal apps.
 
 - [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
 - [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+
+## Firebase iOS config (secret-safe)
+
+`GoogleService-Info.plist` is not tracked in Git.
+
+Generate local files from templates:
+
+```bash
+cd mobile-app-new
+FIREBASE_IOS_API_KEY='AIza...' ./scripts/setup-firebase-ios-config.sh
+```
+
+Generated files:
+- `mobile-app-new/firebase/GoogleService-Info.plist`
+- `mobile-app-new/ios/Productifio/GoogleService-Info.plist`
