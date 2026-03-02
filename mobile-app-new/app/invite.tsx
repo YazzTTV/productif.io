@@ -1,82 +1,144 @@
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, TextInput, Share, Alert, Clipboard } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  ScrollView,
+  TextInput,
+  Share,
+  Alert,
+  ActivityIndicator,
+  RefreshControl,
+} from 'react-native';
+import { Clipboard } from 'react-native';
 import { useRouter } from 'expo-router';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { authService } from '@/lib/api';
+import { apiCall, authService } from '@/lib/api';
 import { useLanguage } from '@/contexts/LanguageContext';
 
-type InviteStep = 'type' | 'message' | 'share';
-type InviteType = 'friend' | 'class' | 'link' | null;
+const ONELINK_BASE_URL = 'https://productif.onelink.me/HCEk';
 
-export default function InviteScreen() {
+interface AffiliateStats {
+  affiliateId: string;
+  referralLink: string;
+  referredUsersCount: number;
+  paidUsersCount: number;
+  revenueTotal: number;
+  revenue30d: number;
+  commissionsPending: number;
+  commissionsEligible: number;
+  commissionsPaid: number;
+}
+
+interface ScoreData {
+  score: number;
+  tier: 'bronze' | 'silver' | 'gold';
+  tierLabel: string;
+  commissionRate: number;
+  nextTier: 'bronze' | 'silver' | 'gold' | null;
+  nextTierLabel: string | null;
+  pointsToNext: number;
+  breakdown: {
+    reach: number;
+    activity: number;
+    revenue: number;
+    trust: number;
+  };
+  thresholds: {
+    bronze: number;
+    silver: number;
+    gold: number;
+  };
+}
+
+const TIER_COLORS = {
+  bronze: { bg: 'rgba(245, 158, 11, 0.12)', text: '#B45309', border: 'rgba(245, 158, 11, 0.3)' },
+  silver: { bg: 'rgba(107, 114, 128, 0.12)', text: '#4B5563', border: 'rgba(107, 114, 128, 0.3)' },
+  gold: { bg: 'rgba(234, 179, 8, 0.12)', text: '#A16207', border: 'rgba(234, 179, 8, 0.3)' },
+};
+
+const TIER_EMOJI = { bronze: '🛡️', silver: '⚡', gold: '🏆' };
+
+export default function AmbassadorScreen() {
   const { t } = useLanguage();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const [step, setStep] = useState<InviteStep>('type');
-  const [inviteType, setInviteType] = useState<InviteType>(null);
-  const [personalMessage, setPersonalMessage] = useState('');
   const [copied, setCopied] = useState(false);
-  const [userName, setUserName] = useState('You');
-  const [userStats, setUserStats] = useState({ streak: 0, xp: 0, focusSessions: 0 });
-  const [inviteLink, setInviteLink] = useState('');
+  const [stats, setStats] = useState<AffiliateStats | null>(null);
+  const [scoreData, setScoreData] = useState<ScoreData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [userName, setUserName] = useState('');
+  const [referralLink, setReferralLink] = useState('');
 
-  // Charger les données utilisateur
-  React.useEffect(() => {
-    const loadUserData = async () => {
-      try {
-        const currentUser = await authService.checkAuth();
-        if (currentUser) {
-          setUserName(currentUser.name || 'You');
-          // Générer le lien d'invitation
-          const link = `https://productif.io/invite/${currentUser.id}`;
-          setInviteLink(link);
-        }
-      } catch (error) {
-        console.error('Erreur chargement utilisateur:', error);
+  const loadData = useCallback(async () => {
+    try {
+      const [user, affiliateData, scoreResult] = await Promise.all([
+        authService.checkAuth(),
+        apiCall<AffiliateStats>('/affiliate/me').catch(() => null),
+        apiCall<ScoreData>('/affiliate/score').catch(() => null),
+      ]);
+
+      if (user) {
+        setUserName(user.name || '');
+        const link = affiliateData?.referralLink ||
+          `${ONELINK_BASE_URL}?af_sub1=${user.id}&pid=ambassador`;
+        setReferralLink(link);
       }
-    };
-    loadUserData();
+
+      if (affiliateData) {
+        setStats(affiliateData);
+      }
+      if (scoreResult) {
+        setScoreData(scoreResult);
+      }
+    } catch (error) {
+      console.error('[Ambassador] Erreur chargement:', error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   }, []);
 
-  const handleSelectType = (type: InviteType) => {
-    setInviteType(type);
-    setStep('message');
-  };
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
-  const handleContinue = () => {
-    setStep('share');
-  };
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    loadData();
+  }, [loadData]);
 
   const handleCopyLink = async () => {
     try {
-      Clipboard.setString(inviteLink);
+      Clipboard.setString(referralLink);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch (error) {
-      Alert.alert(t('error'), t('copyLinkError') || 'Impossible de copier le lien');
+    } catch {
+      Alert.alert('Erreur', 'Impossible de copier le lien');
     }
   };
 
-  const handleShare = async (platform?: string) => {
-    const message = personalMessage || (t('defaultInviteMessage') || 'Join me on Productif.io — a discipline system for serious students.');
-    const fullMessage = `${message}\n\n${inviteLink}`;
+  const handleShare = async () => {
+    const message = userName
+      ? `${userName} t'invite à rejoindre Productif.io — le système de discipline pour les étudiants sérieux.\n\n${referralLink}`
+      : `Rejoins Productif.io — le système de discipline pour les étudiants sérieux.\n\n${referralLink}`;
 
     try {
-      if (platform === 'native') {
-        // Utiliser le share natif
-        const result = await Share.share({
-          message: fullMessage,
-          title: t('inviteTitle') || 'Invitation Productif.io',
-        });
-      } else {
-        // Pour les autres plateformes, on copie juste le lien
-        await handleCopyLink();
-      }
-    } catch (error) {
-      console.error('Erreur partage:', error);
+      await Share.share({
+        message,
+        title: 'Productif.io — Programme Ambassadeur',
+      });
+    } catch {
+      // cancelled
     }
+  };
+
+  const formatCurrency = (amount: number) => {
+    return `${amount.toFixed(2)} €`;
   };
 
   return (
@@ -85,248 +147,258 @@ export default function InviteScreen() {
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#16A34A" />
+        }
       >
         {/* Header */}
         <Animated.View entering={FadeInUp.delay(100).duration(400)} style={styles.header}>
           <TouchableOpacity
             style={styles.backButton}
-            onPress={() => {
-              if (step === 'message') {
-                setStep('type');
-              } else if (step === 'share') {
-                setStep('message');
-              } else {
-                router.back();
-              }
-            }}
+            onPress={() => router.back()}
             activeOpacity={0.7}
           >
             <Ionicons name="arrow-back" size={22} color="#000" />
           </TouchableOpacity>
 
           <View style={styles.headerContent}>
-            <Text style={styles.headerTitle}>{t('invite')}</Text>
+            <Text style={styles.headerTitle}>Programme Ambassadeur</Text>
+            <Text style={styles.headerSubtitle}>
+              Partagez Productif.io et gagnez {scoreData ? `${Math.round(scoreData.commissionRate * 100)}%` : '50%'} de commission sur chaque abonnement.
+            </Text>
           </View>
         </Animated.View>
 
-        {/* Step 1: Choose Invite Type */}
-        {step === 'type' && (
-          <Animated.View
-            entering={FadeInDown.delay(200).duration(400)}
-            style={styles.stepContainer}
-          >
-            <Text style={styles.stepDescription}>
-              {t('inviteDescription') || 'Inviting someone to Productif.io is inviting them into a system.'}
+        {/* Lien de parrainage */}
+        <Animated.View entering={FadeInDown.delay(200).duration(400)}>
+          <View style={styles.linkCard}>
+            <View style={styles.linkHeader}>
+              <Ionicons name="link" size={20} color="#16A34A" />
+              <Text style={styles.linkLabel}>Mon lien de parrainage</Text>
+            </View>
+            <TextInput
+              style={styles.linkInput}
+              value={referralLink}
+              editable={false}
+              selectTextOnFocus
+            />
+            <View style={styles.linkActions}>
+              <TouchableOpacity
+                style={[styles.actionButton, copied && styles.actionButtonActive]}
+                onPress={handleCopyLink}
+                activeOpacity={0.7}
+              >
+                <Ionicons
+                  name={copied ? 'checkmark' : 'copy-outline'}
+                  size={18}
+                  color={copied ? '#16A34A' : '#000'}
+                />
+                <Text style={[styles.actionButtonText, copied && styles.actionButtonTextActive]}>
+                  {copied ? 'Copié' : 'Copier'}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.actionButton}
+                onPress={handleShare}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="share-outline" size={18} color="#000" />
+                <Text style={styles.actionButtonText}>Partager</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Animated.View>
+
+        {/* APS Score & Tier */}
+        {scoreData && (
+          <Animated.View entering={FadeInDown.delay(250).duration(400)}>
+            <View style={styles.scoreCard}>
+              {/* Score header */}
+              <View style={styles.scoreHeader}>
+                <View style={[styles.tierBadgeIcon, { backgroundColor: TIER_COLORS[scoreData.tier].bg }]}>
+                  <Text style={styles.tierEmoji}>{TIER_EMOJI[scoreData.tier]}</Text>
+                </View>
+                <View style={styles.scoreHeaderText}>
+                  <View style={styles.scoreValueRow}>
+                    <Text style={styles.scoreValue}>{scoreData.score}</Text>
+                    <Text style={styles.scoreMax}> / 1000</Text>
+                  </View>
+                  <View style={styles.tierBadgeRow}>
+                    <View style={[styles.tierBadge, {
+                      backgroundColor: TIER_COLORS[scoreData.tier].bg,
+                      borderColor: TIER_COLORS[scoreData.tier].border,
+                    }]}>
+                      <Text style={[styles.tierBadgeText, { color: TIER_COLORS[scoreData.tier].text }]}>
+                        {TIER_EMOJI[scoreData.tier]} {scoreData.tierLabel}
+                      </Text>
+                    </View>
+                    {scoreData.nextTier && (
+                      <Text style={styles.nextTierHint}>
+                        {scoreData.pointsToNext} pts → {scoreData.nextTierLabel}
+                      </Text>
+                    )}
+                  </View>
+                </View>
+                <View style={styles.commissionBlock}>
+                  <Text style={styles.commissionLabel}>Commission</Text>
+                  <Text style={styles.commissionRate}>
+                    {Math.round(scoreData.commissionRate * 100)}%
+                  </Text>
+                </View>
+              </View>
+
+              {/* Progress bar */}
+              <View style={styles.progressBarContainer}>
+                <View style={styles.progressBarBg}>
+                  <View style={[styles.progressBarFill, { width: `${Math.min(100, (scoreData.score / 1000) * 100)}%` }]} />
+                  <View style={[styles.progressMarker, { left: `${(scoreData.thresholds.silver / 1000) * 100}%` }]} />
+                  <View style={[styles.progressMarker, { left: `${(scoreData.thresholds.gold / 1000) * 100}%` }]} />
+                </View>
+                <View style={styles.progressLabels}>
+                  <Text style={[styles.progressLabel, scoreData.tier === 'bronze' && styles.progressLabelActive]}>Explorateur</Text>
+                  <Text style={[styles.progressLabel, styles.progressLabelCenter, scoreData.tier === 'silver' && styles.progressLabelActive]}>Performer</Text>
+                  <Text style={[styles.progressLabel, styles.progressLabelRight, scoreData.tier === 'gold' && styles.progressLabelActive]}>Élite</Text>
+                </View>
+              </View>
+
+              {/* Breakdown */}
+              <View style={styles.breakdownGrid}>
+                <BreakdownBar label="Reach" value={scoreData.breakdown.reach} max={200} color="#3B82F6" icon="eye-outline" />
+                <BreakdownBar label="Activité" value={scoreData.breakdown.activity} max={200} color="#F97316" icon="flame-outline" />
+                <BreakdownBar label="Revenu" value={scoreData.breakdown.revenue} max={500} color="#16A34A" icon="cash-outline" />
+                <BreakdownBar label="Confiance" value={scoreData.breakdown.trust} max={100} color="#8B5CF6" icon="shield-checkmark-outline" />
+              </View>
+
+              {/* Tier cards */}
+              <View style={styles.tierCardsRow}>
+                <MiniTierCard tier="bronze" label="Explorateur" threshold="0" commission="50%" active={scoreData.tier === 'bronze'} />
+                <MiniTierCard tier="silver" label="Performer" threshold="250" commission="50%" active={scoreData.tier === 'silver'} />
+                <MiniTierCard tier="gold" label="Élite" threshold="600" commission="60%" active={scoreData.tier === 'gold'} />
+              </View>
+            </View>
+          </Animated.View>
+        )}
+
+        {/* Stats */}
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="small" color="#16A34A" />
+          </View>
+        ) : stats ? (
+          <Animated.View entering={FadeInDown.delay(300).duration(400)} style={styles.statsSection}>
+            <Text style={styles.sectionTitle}>Mes performances</Text>
+
+            <View style={styles.statsGrid}>
+              <View style={styles.statCard}>
+                <Text style={styles.statValue}>{stats.referredUsersCount}</Text>
+                <Text style={styles.statLabel}>Inscrits</Text>
+              </View>
+              <View style={styles.statCard}>
+                <Text style={styles.statValue}>{stats.paidUsersCount}</Text>
+                <Text style={styles.statLabel}>Abonnés</Text>
+              </View>
+            </View>
+
+            <View style={styles.revenueCard}>
+              <View style={styles.revenueRow}>
+                <Text style={styles.revenueLabel}>Revenu total généré</Text>
+                <Text style={styles.revenueValue}>{formatCurrency(stats.revenueTotal)}</Text>
+              </View>
+              <View style={styles.revenueDivider} />
+              <View style={styles.revenueRow}>
+                <Text style={styles.revenueLabel}>Revenu 30 derniers jours</Text>
+                <Text style={styles.revenueValue}>{formatCurrency(stats.revenue30d)}</Text>
+              </View>
+            </View>
+
+            <Text style={styles.sectionTitle}>Mes commissions</Text>
+
+            <View style={styles.commissionsCard}>
+              <View style={styles.commissionRow}>
+                <View style={styles.commissionDot}>
+                  <View style={[styles.dot, { backgroundColor: '#F59E0B' }]} />
+                </View>
+                <Text style={styles.commissionLabel}>En attente</Text>
+                <Text style={styles.commissionValue}>
+                  {formatCurrency(stats.commissionsPending)}
+                </Text>
+              </View>
+              <View style={styles.commissionRow}>
+                <View style={styles.commissionDot}>
+                  <View style={[styles.dot, { backgroundColor: '#16A34A' }]} />
+                </View>
+                <Text style={styles.commissionLabel}>Disponible</Text>
+                <Text style={[styles.commissionValue, { color: '#16A34A' }]}>
+                  {formatCurrency(stats.commissionsEligible)}
+                </Text>
+              </View>
+              <View style={styles.commissionRow}>
+                <View style={styles.commissionDot}>
+                  <View style={[styles.dot, { backgroundColor: '#6B7280' }]} />
+                </View>
+                <Text style={styles.commissionLabel}>Déjà payé</Text>
+                <Text style={styles.commissionValue}>
+                  {formatCurrency(stats.commissionsPaid)}
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.infoCard}>
+              <Ionicons name="information-circle-outline" size={18} color="rgba(0,0,0,0.4)" />
+              <Text style={styles.infoText}>
+                Les commissions deviennent disponibles 14 jours après le paiement pour couvrir les éventuels remboursements.
+              </Text>
+            </View>
+          </Animated.View>
+        ) : (
+          <Animated.View entering={FadeInDown.delay(300).duration(400)} style={styles.emptyState}>
+            <Ionicons name="people-outline" size={48} color="rgba(0,0,0,0.2)" />
+            <Text style={styles.emptyTitle}>Aucun filleul pour le moment</Text>
+            <Text style={styles.emptyDescription}>
+              Partagez votre lien pour commencer à parrainer des utilisateurs et gagner des commissions.
             </Text>
-
-            {/* Friend Invite */}
-            <TouchableOpacity
-              style={styles.inviteOptionCard}
-              onPress={() => handleSelectType('friend')}
-              activeOpacity={0.7}
-            >
-              <View style={styles.inviteOptionContent}>
-                <View style={[styles.inviteOptionIcon, { backgroundColor: 'rgba(22, 163, 74, 0.1)' }]}>
-                  <Ionicons name="person-add" size={24} color="#16A34A" />
-                </View>
-                <View style={styles.inviteOptionText}>
-                  <Text style={styles.inviteOptionTitle}>{t('friendInvite') || 'Friend Invite'}</Text>
-                  <Text style={styles.inviteOptionDescription}>
-                    {t('friendInviteDescription') || 'One-to-one accountability. Shared progress view.'}
-                  </Text>
-                  <Text style={styles.inviteOptionQuote}>
-                    {t('friendInviteQuote') || '"Study with someone who takes discipline seriously."'}
-                  </Text>
-                </View>
-              </View>
-            </TouchableOpacity>
-
-            {/* Class / Study Group */}
-            <TouchableOpacity
-              style={styles.inviteOptionCard}
-              onPress={() => handleSelectType('class')}
-              activeOpacity={0.7}
-            >
-              <View style={styles.inviteOptionContent}>
-                <View style={[styles.inviteOptionIcon, { backgroundColor: 'rgba(22, 163, 74, 0.1)' }]}>
-                  <Ionicons name="school" size={24} color="#16A34A" />
-                </View>
-                <View style={styles.inviteOptionText}>
-                  <Text style={styles.inviteOptionTitle}>{t('classInvite') || 'Class / Study Group'}</Text>
-                  <Text style={styles.inviteOptionDescription}>
-                    {t('classInviteDescription') || 'Small groups (5–30 max). Private by invite code.'}
-                  </Text>
-                  <Text style={styles.inviteOptionQuote}>
-                    {t('classInviteQuote') || '"Turn your class into a focused group."'}
-                  </Text>
-                </View>
-              </View>
-            </TouchableOpacity>
-
-            {/* Open Link */}
-            <TouchableOpacity
-              style={styles.inviteOptionCard}
-              onPress={() => handleSelectType('link')}
-              activeOpacity={0.7}
-            >
-              <View style={styles.inviteOptionContent}>
-                <View style={[styles.inviteOptionIcon, { backgroundColor: 'rgba(0, 0, 0, 0.05)' }]}>
-                  <Ionicons name="people" size={24} color="rgba(0, 0, 0, 0.6)" />
-                </View>
-                <View style={styles.inviteOptionText}>
-                  <Text style={styles.inviteOptionTitle}>{t('openLink') || 'Open Link'}</Text>
-                  <Text style={styles.inviteOptionDescription}>
-                    {t('openLinkDescription') || 'Shareable invite link. Requires acceptance.'}
-                  </Text>
-                  <Text style={styles.inviteOptionQuote}>
-                    {t('openLinkQuote') || 'Limited to prevent spam.'}
-                  </Text>
-                </View>
-              </View>
-            </TouchableOpacity>
           </Animated.View>
         )}
 
-        {/* Step 2: Personal Message */}
-        {step === 'message' && (
-          <Animated.View
-            entering={FadeInDown.delay(200).duration(400)}
-            style={styles.stepContainer}
-          >
-            <View style={styles.messageCard}>
-              <Text style={styles.messagePrompt}>
-                {inviteType === 'friend' && (t('whyInviteFriend') || 'Why are you inviting them?')}
-                {inviteType === 'class' && (t('whatBringsGroup') || 'What brings this group together?')}
-                {inviteType === 'link' && (t('addPersonalNote') || 'Add a personal note (optional)')}
-              </Text>
-
-              <TextInput
-                style={styles.messageInput}
-                value={personalMessage}
-                onChangeText={setPersonalMessage}
-                placeholder={
-                  inviteType === 'friend'
-                    ? (t('friendPlaceholder') || 'We both need structure.')
-                    : inviteType === 'class'
-                    ? (t('classPlaceholder') || 'Same exams, same pressure.')
-                    : (t('linkPlaceholder') || "Let's stay consistent together.")
-                }
-                placeholderTextColor="rgba(0, 0, 0, 0.4)"
-                multiline
-                numberOfLines={4}
-              />
-
-              <Text style={styles.messageHint}>
-                {t('inviteHint') || 'This makes the invitation feel intentional, not automated.'}
-              </Text>
-            </View>
-
-            {/* Preview */}
-            <View style={styles.previewCard}>
-              <Text style={styles.previewLabel}>Preview</Text>
-              <View style={styles.previewContent}>
-                <View style={styles.previewAvatar}>
-                  <Text style={styles.previewAvatarText}>{userName.charAt(0)}</Text>
-                </View>
-                <View>
-                  <Text style={styles.previewName}>{userName}</Text>
-                  <Text style={styles.previewStats}>{userStats.streak}d streak</Text>
-                </View>
-              </View>
-              {personalMessage ? (
-                <Text style={styles.previewMessage}>"{personalMessage}"</Text>
-              ) : null}
-            </View>
-
-            <TouchableOpacity
-              style={styles.continueButton}
-              onPress={handleContinue}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.continueButtonText}>{t('continue')}</Text>
-            </TouchableOpacity>
-          </Animated.View>
-        )}
-
-        {/* Step 3: Share Options */}
-        {step === 'share' && (
-          <Animated.View
-            entering={FadeInDown.delay(200).duration(400)}
-            style={styles.stepContainer}
-          >
-            <Text style={styles.sharePrompt}>{t('chooseHowToShare') || 'Choose how to share'}</Text>
-
-            {/* Link Display */}
-            <View style={styles.linkCard}>
-              <Text style={styles.linkLabel}>{t('yourInviteLink') || 'Your invite link'}</Text>
-              <TextInput
-                style={styles.linkInput}
-                value={inviteLink}
-                editable={false}
-                selectTextOnFocus
-              />
-            </View>
-
-            {/* Copy Link */}
-            <TouchableOpacity
-              style={[
-                styles.shareOptionCard,
-                copied && styles.shareOptionCardCopied
-              ]}
-              onPress={handleCopyLink}
-              activeOpacity={0.7}
-            >
-              <View style={styles.shareOptionContent}>
-                <View style={[
-                  styles.shareOptionIcon,
-                  copied && { backgroundColor: 'rgba(22, 163, 74, 0.1)' }
-                ]}>
-                  {copied ? (
-                    <Ionicons name="checkmark" size={24} color="#16A34A" />
-                  ) : (
-                    <Ionicons name="copy" size={24} color="rgba(0, 0, 0, 0.6)" />
-                  )}
-                </View>
-                <View style={styles.shareOptionText}>
-                  <Text style={styles.shareOptionTitle}>
-                    {copied ? t('linkCopied') : t('copyLink')}
-                  </Text>
-                  <Text style={styles.shareOptionDescription}>
-                    {copied ? (t('shareAnywhere') || 'Share anywhere you want') : (t('shareViaApp') || 'Share via any app')}
-                  </Text>
-                </View>
-              </View>
-            </TouchableOpacity>
-
-            {/* Native Share */}
-            <TouchableOpacity
-              style={styles.shareOptionCard}
-              onPress={() => handleShare('native')}
-              activeOpacity={0.7}
-            >
-              <View style={styles.shareOptionContent}>
-                <View style={styles.shareOptionIcon}>
-                  <Ionicons name="share-social" size={24} color="rgba(0, 0, 0, 0.6)" />
-                </View>
-                <View style={styles.shareOptionText}>
-                  <Text style={styles.shareOptionTitle}>Share</Text>
-                  <Text style={styles.shareOptionDescription}>Use your device's share menu</Text>
-                </View>
-              </View>
-            </TouchableOpacity>
-
-            {/* Note */}
-            <View style={styles.noteCard}>
-              <Text style={styles.noteText}>
-                No public sharing. Invitations are private and intentional.
-              </Text>
-            </View>
-          </Animated.View>
-        )}
-
-        {/* Bottom spacing */}
         <View style={{ height: 120 }} />
       </ScrollView>
+    </View>
+  );
+}
+
+function BreakdownBar({ label, value, max, color, icon }: {
+  label: string; value: number; max: number; color: string; icon: string;
+}) {
+  return (
+    <View style={styles.breakdownItem}>
+      <View style={styles.breakdownHeader}>
+        <Ionicons name={icon as any} size={14} color="rgba(0,0,0,0.35)" />
+        <Text style={styles.breakdownLabel}>{label}</Text>
+        <Text style={styles.breakdownValue}>{value}/{max}</Text>
+      </View>
+      <View style={styles.breakdownBarBg}>
+        <View style={[styles.breakdownBarFill, { width: `${(value / max) * 100}%`, backgroundColor: color }]} />
+      </View>
+    </View>
+  );
+}
+
+function MiniTierCard({ tier, label, threshold, commission, active }: {
+  tier: 'bronze' | 'silver' | 'gold'; label: string; threshold: string; commission: string; active: boolean;
+}) {
+  return (
+    <View style={[
+      styles.miniTierCard,
+      active && {
+        backgroundColor: TIER_COLORS[tier].bg,
+        borderColor: TIER_COLORS[tier].border,
+      },
+    ]}>
+      <Text style={styles.miniTierEmoji}>{TIER_EMOJI[tier]}</Text>
+      <Text style={[styles.miniTierLabel, active && { fontWeight: '700', color: '#000' }]}>{label}</Text>
+      <Text style={styles.miniTierInfo}>{threshold}+ pts</Text>
+      <Text style={[styles.miniTierCommission, active && { color: '#16A34A' }]}>{commission}</Text>
+      {active && <View style={styles.miniTierActiveDot} />}
     </View>
   );
 }
@@ -344,7 +416,7 @@ const styles = StyleSheet.create({
     paddingTop: 16,
   },
   header: {
-    marginBottom: 32,
+    marginBottom: 24,
     gap: 16,
   },
   backButton: {
@@ -355,224 +427,396 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(0, 0, 0, 0.05)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 8,
   },
   headerContent: {
     flex: 1,
   },
   headerTitle: {
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: '600',
-    letterSpacing: -1.2,
+    letterSpacing: -1,
     color: '#000000',
-    marginBottom: 4,
-  },
-  stepContainer: {
-    gap: 16,
-  },
-  stepDescription: {
-    fontSize: 14,
-    color: 'rgba(0, 0, 0, 0.4)',
-    marginBottom: 24,
-  },
-  inviteOptionCard: {
-    padding: 24,
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.05)',
-    backgroundColor: '#FFFFFF',
-    marginBottom: 12,
-  },
-  inviteOptionContent: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 16,
-  },
-  inviteOptionIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  inviteOptionText: {
-    flex: 1,
-  },
-  inviteOptionTitle: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#000000',
-    marginBottom: 4,
-  },
-  inviteOptionDescription: {
-    fontSize: 14,
-    color: 'rgba(0, 0, 0, 0.6)',
     marginBottom: 8,
   },
-  inviteOptionQuote: {
-    fontSize: 14,
-    color: 'rgba(0, 0, 0, 0.4)',
-    fontStyle: 'italic',
+  headerSubtitle: {
+    fontSize: 15,
+    color: 'rgba(0, 0, 0, 0.5)',
+    lineHeight: 22,
   },
-  messageCard: {
-    padding: 24,
-    borderRadius: 24,
+  linkCard: {
+    padding: 20,
+    borderRadius: 20,
     borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.05)',
-    backgroundColor: '#FFFFFF',
-    marginBottom: 16,
+    borderColor: 'rgba(22, 163, 74, 0.15)',
+    backgroundColor: 'rgba(22, 163, 74, 0.03)',
+    marginBottom: 24,
   },
-  messagePrompt: {
-    fontSize: 16,
-    color: 'rgba(0, 0, 0, 0.6)',
-    marginBottom: 16,
-  },
-  messageInput: {
-    width: '100%',
-    padding: 16,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.1)',
-    backgroundColor: '#FFFFFF',
-    fontSize: 16,
-    color: '#000000',
-    minHeight: 100,
-    textAlignVertical: 'top',
-  },
-  messageHint: {
-    fontSize: 14,
-    color: 'rgba(0, 0, 0, 0.4)',
-    marginTop: 12,
-  },
-  previewCard: {
-    padding: 24,
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: 'rgba(22, 163, 74, 0.2)',
-    backgroundColor: 'rgba(22, 163, 74, 0.05)',
-    marginBottom: 16,
-  },
-  previewLabel: {
-    fontSize: 14,
-    color: 'rgba(0, 0, 0, 0.4)',
-    marginBottom: 12,
-  },
-  previewContent: {
+  linkHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 8,
     marginBottom: 12,
   },
-  previewAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(22, 163, 74, 0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  previewAvatarText: {
-    fontSize: 18,
+  linkLabel: {
+    fontSize: 14,
     fontWeight: '500',
     color: '#16A34A',
   },
-  previewName: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#000000',
-  },
-  previewStats: {
-    fontSize: 14,
-    color: 'rgba(0, 0, 0, 0.6)',
-  },
-  previewMessage: {
-    fontSize: 16,
-    color: 'rgba(0, 0, 0, 0.8)',
-    fontStyle: 'italic',
-  },
-  continueButton: {
-    width: '100%',
-    backgroundColor: '#16A34A',
-    paddingVertical: 16,
-    borderRadius: 24,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  continueButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  sharePrompt: {
-    fontSize: 16,
-    color: 'rgba(0, 0, 0, 0.6)',
-    marginBottom: 16,
-  },
-  linkCard: {
-    padding: 16,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.05)',
-    backgroundColor: 'rgba(0, 0, 0, 0.05)',
-    marginBottom: 16,
-  },
-  linkLabel: {
-    fontSize: 12,
-    color: 'rgba(0, 0, 0, 0.4)',
-    marginBottom: 8,
-  },
   linkInput: {
-    fontSize: 14,
-    color: 'rgba(0, 0, 0, 0.8)',
-  },
-  shareOptionCard: {
-    padding: 24,
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.05)',
-    backgroundColor: '#FFFFFF',
+    fontSize: 13,
+    color: 'rgba(0, 0, 0, 0.7)',
+    backgroundColor: 'rgba(0, 0, 0, 0.03)',
+    borderRadius: 12,
+    padding: 12,
     marginBottom: 12,
   },
-  shareOptionCardCopied: {
-    borderColor: 'rgba(22, 163, 74, 0.2)',
-    backgroundColor: 'rgba(22, 163, 74, 0.05)',
+  linkActions: {
+    flexDirection: 'row',
+    gap: 10,
   },
-  shareOptionContent: {
+  actionButton: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.08)',
+    backgroundColor: '#FFFFFF',
+  },
+  actionButtonActive: {
+    borderColor: 'rgba(22, 163, 74, 0.3)',
+    backgroundColor: 'rgba(22, 163, 74, 0.05)',
+  },
+  actionButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#000',
+  },
+  actionButtonTextActive: {
+    color: '#16A34A',
+  },
+  loadingContainer: {
+    paddingVertical: 40,
+    alignItems: 'center',
+  },
+  statsSection: {
     gap: 16,
   },
-  shareOptionIcon: {
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#000',
+    letterSpacing: -0.5,
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  statCard: {
+    flex: 1,
+    padding: 20,
+    borderRadius: 16,
+    backgroundColor: 'rgba(0, 0, 0, 0.02)',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.04)',
+    alignItems: 'center',
+  },
+  statValue: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#000',
+    letterSpacing: -1,
+  },
+  statLabel: {
+    fontSize: 13,
+    color: 'rgba(0, 0, 0, 0.5)',
+    marginTop: 4,
+  },
+  revenueCard: {
+    padding: 20,
+    borderRadius: 16,
+    backgroundColor: 'rgba(0, 0, 0, 0.02)',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.04)',
+  },
+  revenueRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  revenueLabel: {
+    fontSize: 14,
+    color: 'rgba(0, 0, 0, 0.6)',
+  },
+  revenueValue: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#000',
+  },
+  revenueDivider: {
+    height: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.06)',
+    marginVertical: 14,
+  },
+  commissionsCard: {
+    padding: 20,
+    borderRadius: 16,
+    backgroundColor: 'rgba(0, 0, 0, 0.02)',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.04)',
+    gap: 14,
+  },
+  commissionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  commissionDot: {
+    width: 24,
+    alignItems: 'center',
+  },
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  commissionLabel: {
+    flex: 1,
+    fontSize: 14,
+    color: 'rgba(0, 0, 0, 0.6)',
+    marginLeft: 8,
+  },
+  commissionValue: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#000',
+  },
+  infoCard: {
+    flexDirection: 'row',
+    padding: 14,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0, 0, 0, 0.03)',
+    gap: 10,
+    alignItems: 'flex-start',
+  },
+  infoText: {
+    flex: 1,
+    fontSize: 13,
+    color: 'rgba(0, 0, 0, 0.5)',
+    lineHeight: 18,
+  },
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: 48,
+    gap: 12,
+  },
+  emptyTitle: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#000',
+  },
+  emptyDescription: {
+    fontSize: 14,
+    color: 'rgba(0, 0, 0, 0.5)',
+    textAlign: 'center',
+    lineHeight: 20,
+    paddingHorizontal: 24,
+  },
+
+  // APS Score styles
+  scoreCard: {
+    padding: 20,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.06)',
+    backgroundColor: '#FFFFFF',
+    marginBottom: 24,
+    gap: 20,
+  },
+  scoreHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  tierBadgeIcon: {
     width: 48,
     height: 48,
-    borderRadius: 16,
-    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+    borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  shareOptionText: {
+  tierEmoji: {
+    fontSize: 22,
+  },
+  scoreHeaderText: {
     flex: 1,
   },
-  shareOptionTitle: {
-    fontSize: 16,
+  scoreValueRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+  },
+  scoreValue: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#000',
+    letterSpacing: -1,
+  },
+  scoreMax: {
+    fontSize: 14,
+    color: 'rgba(0, 0, 0, 0.3)',
     fontWeight: '500',
-    color: '#000000',
-    marginBottom: 4,
   },
-  shareOptionDescription: {
-    fontSize: 14,
-    color: 'rgba(0, 0, 0, 0.6)',
+  tierBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 4,
   },
-  noteCard: {
-    padding: 16,
-    backgroundColor: 'rgba(0, 0, 0, 0.05)',
-    borderRadius: 16,
-    marginTop: 8,
+  tierBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 20,
+    borderWidth: 1,
   },
-  noteText: {
-    fontSize: 14,
-    color: 'rgba(0, 0, 0, 0.6)',
+  tierBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  nextTierHint: {
+    fontSize: 11,
+    color: 'rgba(0, 0, 0, 0.35)',
+  },
+  commissionBlock: {
+    alignItems: 'flex-end',
+  },
+  commissionLabel: {
+    fontSize: 11,
+    color: 'rgba(0, 0, 0, 0.4)',
+  },
+  commissionRate: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#16A34A',
+    letterSpacing: -0.5,
+  },
+
+  progressBarContainer: {
+    gap: 6,
+  },
+  progressBarBg: {
+    height: 8,
+    backgroundColor: 'rgba(0, 0, 0, 0.06)',
+    borderRadius: 4,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  progressBarFill: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    bottom: 0,
+    borderRadius: 4,
+    backgroundColor: '#16A34A',
+  },
+  progressMarker: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    width: 2,
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+  },
+  progressLabels: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  progressLabel: {
+    fontSize: 10,
+    color: 'rgba(0, 0, 0, 0.3)',
+    fontWeight: '500',
+  },
+  progressLabelCenter: {
     textAlign: 'center',
   },
-});
+  progressLabelRight: {
+    textAlign: 'right',
+  },
+  progressLabelActive: {
+    color: '#000',
+    fontWeight: '600',
+  },
 
+  breakdownGrid: {
+    gap: 12,
+  },
+  breakdownItem: {
+    gap: 6,
+  },
+  breakdownHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  breakdownLabel: {
+    flex: 1,
+    fontSize: 12,
+    color: 'rgba(0, 0, 0, 0.5)',
+    fontWeight: '500',
+  },
+  breakdownValue: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#000',
+  },
+  breakdownBarBg: {
+    height: 4,
+    backgroundColor: 'rgba(0, 0, 0, 0.06)',
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  breakdownBarFill: {
+    height: '100%',
+    borderRadius: 2,
+  },
+
+  tierCardsRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  miniTierCard: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.06)',
+    backgroundColor: 'rgba(0, 0, 0, 0.02)',
+    alignItems: 'center',
+    gap: 4,
+  },
+  miniTierEmoji: {
+    fontSize: 18,
+  },
+  miniTierLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: 'rgba(0, 0, 0, 0.6)',
+  },
+  miniTierInfo: {
+    fontSize: 10,
+    color: 'rgba(0, 0, 0, 0.35)',
+  },
+  miniTierCommission: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: 'rgba(0, 0, 0, 0.7)',
+  },
+  miniTierActiveDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#16A34A',
+    marginTop: 2,
+  },
+});

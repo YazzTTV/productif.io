@@ -109,7 +109,7 @@ const defaultPreferences: NotificationPreferences = {
 export default function NotificationsPage() {
   const router = useRouter();
   const { t } = useLanguage();
-  const { permissionStatus, requestPermissions, expoPushToken } = usePushNotifications();
+  const { permissionStatus, requestPermissions, expoPushToken } = usePushNotifications({ enableResponseHandling: false });
   const [preferences, setPreferences] = useState<NotificationPreferences>(defaultPreferences);
   const [originalPreferences, setOriginalPreferences] = useState<NotificationPreferences>(defaultPreferences);
   const [isLoading, setIsLoading] = useState(true);

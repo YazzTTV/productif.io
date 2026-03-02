@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -13,7 +13,7 @@ import Animated, {
   FadeInDown,
   FadeIn,
 } from 'react-native-reanimated';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -31,10 +31,21 @@ const promptChips = [
 export default function TasksAwarenessScreen() {
   const { t } = useLanguage();
   const insets = useSafeAreaInsets();
+  const params = useLocalSearchParams<{ initialText?: string }>();
   const { saveResponse } = useOnboardingData();
   const [tasks, setTasks] = useState('');
   const [isRecording, setIsRecording] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const lastAppliedInitialTextRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const initialText = typeof params.initialText === 'string' ? params.initialText.trim() : '';
+    if (!initialText) return;
+    if (lastAppliedInitialTextRef.current === initialText) return;
+
+    setTasks(initialText);
+    lastAppliedInitialTextRef.current = initialText;
+  }, [params.initialText]);
 
   const handleChipClick = (chipKey: string) => {
     const chipText = t(chipKey) || chipKey;
@@ -65,6 +76,18 @@ export default function TasksAwarenessScreen() {
       if (!result || !result.tasks) {
         throw new Error('Aucune tâche créée par l\'API');
       }
+
+      const extractedTasks = Array.isArray(result.tasks)
+        ? result.tasks.filter((task: any) => (task?.title || task?.name))
+        : [];
+
+      if (extractedTasks.length === 0) {
+        Alert.alert(
+          t('retry') || 'Retry',
+          "Je n'ai pas réussi à détecter des tâches. Ajoute un peu plus de détails puis réessaie."
+        );
+        return;
+      }
       
       // Sauvegarder les tâches brutes
       await saveResponse('rawTasks', tasks.trim());
@@ -74,7 +97,7 @@ export default function TasksAwarenessScreen() {
       router.push({
         pathname: '/(onboarding-new)/task-clarification',
         params: {
-          tasks: JSON.stringify(result.tasks || []),
+          tasks: JSON.stringify(extractedTasks),
           rawInput: tasks.trim(),
         },
       });
@@ -310,4 +333,3 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
 });
-

@@ -8,13 +8,19 @@ import { StripeProvider } from '@stripe/stripe-react-native';
 import 'react-native-reanimated';
 import { CopilotProvider } from 'react-native-copilot';
 import { TutorialTooltip } from '@/tutorial/TutorialTooltip';
+import { SuperwallProvider } from 'expo-superwall';
+import SuperwallExpoModule from 'expo-superwall';
+import * as Linking from 'expo-linking';
 
 import { ThemeProvider, useTheme } from '@/contexts/ThemeContext';
 import { LanguageProvider } from '@/contexts/LanguageContext';
 import Constants from 'expo-constants';
 import '@/utils/suppressWarnings'; // Supprimer les warnings NativeEventEmitter
 import { usePushNotifications } from '@/hooks/usePushNotifications';
+import { useSuperwallUserSync } from '@/hooks/useSuperwallUserSync';
 import { initAppCheck } from '@/lib/appCheck';
+import { useAppsFlyer, flushQueuedAttribution } from '@/hooks/useAppsFlyer';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Stripe publishable key - from environment variables or app.json extra config
 const STRIPE_PUBLISHABLE_KEY = 
@@ -28,8 +34,46 @@ function AppContent() {
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
   });
   
-  // Initialiser les notifications push au démarrage
   usePushNotifications();
+  useSuperwallUserSync();
+  useAppsFlyer();
+
+  useEffect(() => {
+    const onUrl = async (event: { url: string }) => {
+      try {
+        await SuperwallExpoModule?.handleDeepLink?.(event.url);
+      } catch (e) {
+        console.log('[DeepLink] Superwall error (non-fatal):', e);
+      }
+
+      // Capturer af_sub1 depuis les URL scheme (productifio://ref?af_sub1=...)
+      // pour permettre l'attribution même sans passer par AppsFlyer OneLink
+      try {
+        const parsed = Linking.parse(event.url);
+        const afSub1 = parsed.queryParams?.af_sub1 as string | undefined;
+        if (afSub1) {
+          console.log('[DeepLink] af_sub1 détecté:', afSub1);
+          const queueData = {
+            af_sub1: afSub1,
+            media_source: (parsed.queryParams?.media_source as string) || 'direct_link',
+            campaign: (parsed.queryParams?.campaign as string) || null,
+          };
+          await AsyncStorage.setItem('af_attribution_queue', JSON.stringify(queueData));
+          // Laisser le temps au TokenStorage de charger le token depuis AsyncStorage
+          setTimeout(() => flushQueuedAttribution(), 2000);
+        }
+      } catch (e) {
+        console.log('[DeepLink] Parse error (non-fatal):', e);
+      }
+    };
+
+    Linking.getInitialURL().then((url) => {
+      if (url) onUrl({ url });
+    });
+
+    const subscription = Linking.addEventListener('url', onUrl);
+    return () => subscription.remove();
+  }, []);
 
   if (!loaded) {
     return null;
@@ -281,25 +325,28 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <StripeProvider publishableKey={STRIPE_PUBLISHABLE_KEY}>
-        <ThemeProvider>
-          <LanguageProvider>
-            <CopilotProvider
-              animated
-              overlay="svg"
-              tooltipComponent={TutorialTooltip}
-              labels={{
-                next: 'Suivant',
-                previous: 'Retour',
-                skip: 'Passer',
-                finish: 'Terminer',
-              }}
-            >
-              <AppContent />
-            </CopilotProvider>
-          </LanguageProvider>
-        </ThemeProvider>
-      </StripeProvider>
+      <SuperwallProvider apiKeys={{ ios: 'pk_IYwjtBwdEBaR5WiSz8YQR' }}>
+        <StripeProvider publishableKey={STRIPE_PUBLISHABLE_KEY}>
+          <ThemeProvider>
+            <LanguageProvider>
+              <CopilotProvider
+                animated
+                overlay="view"
+                backdropColor="rgba(55, 65, 81, 0.72)"
+                tooltipComponent={TutorialTooltip}
+                labels={{
+                  next: 'Suivant',
+                  previous: 'Retour',
+                  skip: 'Passer',
+                  finish: 'Terminer',
+                }}
+              >
+                <AppContent />
+              </CopilotProvider>
+            </LanguageProvider>
+          </ThemeProvider>
+        </StripeProvider>
+      </SuperwallProvider>
     </GestureHandlerRootView>
   );
 }

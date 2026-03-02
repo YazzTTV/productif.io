@@ -1,7 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import NotificationLogger from './NotificationLogger';
 
-const shouldLog = (level: string) => NotificationLogger.shouldLog(level);
+const shouldLog = (level: 'error' | 'warn' | 'success' | 'info' | 'debug') => NotificationLogger.shouldLog(level);
 
 class NotificationContentBuilder {
     private prisma: PrismaClient;

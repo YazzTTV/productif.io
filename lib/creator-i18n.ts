@@ -1,0 +1,203 @@
+type Locale = "fr" | "en"
+
+export function getCreatorLocale(): Locale {
+  if (typeof window === "undefined") return "fr"
+  return (localStorage.getItem("creator_locale") as Locale) || "fr"
+}
+
+export function setCreatorLocale(locale: Locale) {
+  if (typeof window !== "undefined") {
+    localStorage.setItem("creator_locale", locale)
+  }
+}
+
+const t_map = {
+  // --- /createur LP ---
+  "lp.badge": { fr: "Programme Créateur", en: "Creator Program" },
+  "lp.hero.title1": { fr: "Crée du contenu viral avec", en: "Create viral content with" },
+  "lp.hero.sub": { fr: "Nous recherchons les meilleurs créateurs TikTok pour produire du contenu authentique qui inspire les étudiants.", en: "We're looking for the best TikTok creators to produce authentic content that inspires students." },
+  "lp.hero.sub2": { fr: "Si tu es créatif, que tu adores repérer les tendances et donner vie à tes idées, tu es au bon endroit.", en: "If you're creative, love spotting trends, and bringing ideas to life — you're in the right place." },
+  "lp.cta": { fr: "Devenir créateur", en: "Become a creator" },
+  "lp.already": { fr: "Déjà créateur ? Se connecter", en: "Already a creator? Log in" },
+  "lp.mySpace": { fr: "Mon espace créateur", en: "My creator space" },
+  "lp.rating": { fr: "Déjà adopté par", en: "Already adopted by" },
+  "lp.students": { fr: "élèves", en: "students" },
+  "lp.value.title1": { fr: "Une opportunité idéale pour", en: "An ideal opportunity to" },
+  "lp.value.progress": { fr: "progresser", en: "grow" },
+  "lp.value.andBe": { fr: "et être", en: "and get" },
+  "lp.value.paid": { fr: "rémunéré", en: "paid" },
+  "lp.value.sub": { fr: "en faisant ce que tu aimes.", en: "doing what you love." },
+  "lp.commission.title": { fr: "50% de commission", en: "50% commission" },
+  "lp.commission.desc": { fr: "Gagne la moitié de chaque abonnement généré via ton lien. Pas de plafond. Certains créateurs gagnent des milliers d'euros par mois.", en: "Earn half of every subscription generated through your link. No cap. Some creators earn thousands of euros per month." },
+  "lp.hour.title": { fr: "1 heure par jour", en: "1 hour per day" },
+  "lp.hour.desc": { fr: "Travaille à ton rythme. Crée du contenu quand tu veux, d'où tu veux. Total flexibilité.", en: "Work at your own pace. Create content whenever and wherever you want. Total flexibility." },
+  "lp.tracking.title": { fr: "Tracking en temps réel", en: "Real-time tracking" },
+  "lp.tracking.desc": { fr: "Suis tes performances, tes inscrits et tes commissions en direct depuis ton espace créateur dédié.", en: "Track your performance, sign-ups, and commissions live from your dedicated creator space." },
+  "lp.creators": { fr: "créateurs ont déjà collaboré avec nous", en: "creators have already collaborated with us" },
+  "lp.howItWorks": { fr: "Clique et postule", en: "Click and apply" },
+  "lp.howItWorks.sub": { fr: "Travaille 1 heure par jour et gagne des milliers d'euros par mois. Remplis simplement le formulaire pour déposer ta candidature.", en: "Work 1 hour per day and earn thousands of euros per month. Simply fill out the form to submit your application." },
+  "lp.step1.title": { fr: "Crée ton compte", en: "Create your account" },
+  "lp.step1.desc": { fr: "Inscris-toi sur Productif.io en quelques secondes. C'est gratuit.", en: "Sign up on Productif.io in seconds. It's free." },
+  "lp.step2.title": { fr: "Obtiens ton lien unique", en: "Get your unique link" },
+  "lp.step2.desc": { fr: "Accède à ton espace créateur et copie ton lien de parrainage personnalisé.", en: "Access your creator space and copy your personalized referral link." },
+  "lp.step3.title": { fr: "Crée du contenu", en: "Create content" },
+  "lp.step3.desc": { fr: "Produis du contenu engageant sur TikTok, Instagram, YouTube... Les formats sont libres.", en: "Produce engaging content on TikTok, Instagram, YouTube... Any format works." },
+  "lp.step4.title": { fr: "Gagne des commissions", en: "Earn commissions" },
+  "lp.step4.desc": { fr: "Chaque abonnement via ton lien te rapporte 50%. Suis tes gains en temps réel.", en: "Every subscription through your link earns you 50%. Track your earnings in real time." },
+  "lp.ctaContent": { fr: "Devenir créateur de contenu", en: "Become a content creator" },
+  "lp.adopted": { fr: "Adopté par 3 563 000 élèves", en: "Adopted by 3,563,000 students" },
+  "lp.testimonials": { fr: "Avis des", en: "Reviews from" },
+  "lp.creatorsWord": { fr: "Créateurs", en: "Creators" },
+  "lp.faq": { fr: "Questions fréquentes", en: "FAQ" },
+  "lp.faq1.q": { fr: "Faut-il avoir de l'expérience ?", en: "Do I need experience?" },
+  "lp.faq1.a": { fr: "Pas nécessairement. On cherche avant tout des personnes créatives et motivées qui comprennent TikTok et les formats courts. Si tu sais créer du contenu engageant, c'est tout ce qu'il faut.", en: "Not necessarily. We primarily look for creative and motivated people who understand TikTok and short-form content. If you can create engaging content, that's all it takes." },
+  "lp.faq2.q": { fr: "Est-ce une collaboration rémunérée ?", en: "Is this a paid collaboration?" },
+  "lp.faq2.a": { fr: "Oui ! Tu gagnes 50% de commission sur chaque abonnement généré via ton lien. Plus tu crées du contenu performant, plus tu gagnes. Certains créateurs gagnent plusieurs milliers d'euros par mois.", en: "Yes! You earn 50% commission on every subscription generated through your link. The more performing content you create, the more you earn. Some creators earn several thousand euros per month." },
+  "lp.faq3.q": { fr: "Que se passe-t-il après l'envoi du formulaire ?", en: "What happens after submitting the form?" },
+  "lp.faq3.a": { fr: "Tu crées ton compte sur Productif.io, tu obtiens ton lien de parrainage unique, et tu peux commencer immédiatement à créer du contenu et générer des commissions. Tout est automatique.", en: "You create your account on Productif.io, get your unique referral link, and can immediately start creating content and generating commissions. Everything is automatic." },
+  "lp.faq4.q": { fr: "Comment suis-je payé(e) ?", en: "How do I get paid?" },
+  "lp.faq4.a": { fr: "Les commissions sont calculées automatiquement. Après une période de vérification de 14 jours (pour couvrir les remboursements), tes commissions deviennent disponibles pour le retrait.", en: "Commissions are calculated automatically. After a 14-day verification period (to cover refunds), your commissions become available for withdrawal." },
+  "lp.finalCta.title": { fr: "Prêt(e) à rejoindre l'aventure ?", en: "Ready to join the adventure?" },
+  "lp.finalCta.sub": { fr: "Crée ton compte, obtiens ton lien unique et commence à gagner des commissions dès aujourd'hui.", en: "Create your account, get your unique link, and start earning commissions today." },
+  "lp.privacy": { fr: "Confidentialité", en: "Privacy" },
+  "lp.terms": { fr: "CGU", en: "Terms" },
+  "lp.cgv": { fr: "CGV", en: "Sales Terms" },
+  "lp.rights": { fr: "Tous droits réservés.", en: "All rights reserved." },
+
+  // Testimonials (same in both)
+  "lp.t1": { fr: "Même si la plupart d'entre nous ne se sont jamais rencontrés en vrai, l'ambiance est super personnelle — on se sent comme dans une vraie communauté.", en: "Even though most of us have never met in real life, the vibe is super personal — it feels like a real community." },
+  "lp.t2": { fr: "Que des good vibes du début à la fin.", en: "Nothing but good vibes from start to finish." },
+  "lp.t3": { fr: "Peu importe ton nombre de vues ou d'abonnés, tout le monde est traité de la même manière.", en: "No matter how many views or followers you have, everyone is treated the same way." },
+  "lp.t4": { fr: "Les gens sont vraiment sympas et toujours prêts à aider.", en: "People are really nice and always willing to help." },
+  "lp.t5": { fr: "On veille les uns sur les autres — c'est génial de partager autant d'idées, de conseils et de brouillons.", en: "We look out for each other — it's great to share so many ideas, tips, and drafts." },
+  "lp.t6": { fr: "Tu peux poser n'importe quelle question sans te sentir bête — il y a une vraie confiance et beaucoup de soutien.", en: "You can ask any question without feeling stupid — there's real trust and a lot of support." },
+
+  // --- /createur/apply ---
+  "apply.header": { fr: "Candidature Créateur", en: "Creator Application" },
+  "apply.cancel": { fr: "Annuler", en: "Cancel" },
+  "apply.step": { fr: "Étape", en: "Step" },
+  "apply.of": { fr: "sur", en: "of" },
+  "apply.step1.title": { fr: "Qui es-tu ?", en: "Who are you?" },
+  "apply.step2.title": { fr: "Ton profil créateur", en: "Your creator profile" },
+  "apply.step3.title": { fr: "Ta motivation", en: "Your motivation" },
+  "apply.firstName": { fr: "Prénom / pseudo créateur", en: "First name / creator alias" },
+  "apply.firstName.placeholder": { fr: "Ton prénom ou pseudo", en: "Your first name or alias" },
+  "apply.email": { fr: "Email", en: "Email" },
+  "apply.email.placeholder": { fr: "ton@email.com", en: "your@email.com" },
+  "apply.country": { fr: "Pays", en: "Country" },
+  "apply.platform": { fr: "Plateforme principale", en: "Main platform" },
+  "apply.handle": { fr: "@username", en: "@username" },
+  "apply.handle.placeholder": { fr: "tonpseudo", en: "yourhandle" },
+  "apply.followers": { fr: "Nombre d'abonnés", en: "Follower count" },
+  "apply.motivation.label": { fr: "Pourquoi tu veux rejoindre Productif.io ?", en: "Why do you want to join Productif.io?" },
+  "apply.motivation.placeholder": { fr: "Dis-nous en quelques mots ce qui te motive...", en: "Tell us in a few words what motivates you..." },
+  "apply.motivation.count": { fr: "caractères — minimum 10", en: "characters — minimum 10" },
+  "apply.motivation.error": { fr: "Dis-nous en un peu plus (10 caractères min.)", en: "Tell us a bit more (10 characters min.)" },
+  "apply.recap": { fr: "Récap", en: "Summary" },
+  "apply.recap.name": { fr: "Prénom", en: "First name" },
+  "apply.recap.email": { fr: "Email", en: "Email" },
+  "apply.recap.country": { fr: "Pays", en: "Country" },
+  "apply.recap.platform": { fr: "Plateforme", en: "Platform" },
+  "apply.recap.handle": { fr: "Handle", en: "Handle" },
+  "apply.recap.followers": { fr: "Abonnés", en: "Followers" },
+  "apply.back": { fr: "Retour", en: "Back" },
+  "apply.continue": { fr: "Continuer", en: "Continue" },
+  "apply.submit": { fr: "Envoyer ma candidature", en: "Submit my application" },
+  "apply.submitting": { fr: "Envoi...", en: "Sending..." },
+  "apply.error.connection": { fr: "Erreur de connexion. Réessaie.", en: "Connection error. Try again." },
+  "apply.success.title": { fr: "Candidature envoyée !", en: "Application submitted!" },
+  "apply.success.thanks": { fr: "Merci", en: "Thank you" },
+  "apply.success.sub": { fr: "Plus qu'une étape — choisis ton mot de passe pour accéder à ton espace créateur.", en: "One more step — choose your password to access your creator space." },
+  "apply.password": { fr: "Mot de passe", en: "Password" },
+  "apply.password.placeholder": { fr: "Minimum 6 caractères", en: "Minimum 6 characters" },
+  "apply.password.error": { fr: "Le mot de passe doit contenir au moins 6 caractères", en: "Password must be at least 6 characters" },
+  "apply.createAccount": { fr: "Paramétrer mon compte", en: "Set up my account" },
+  "apply.creatingAccount": { fr: "Création du compte...", en: "Creating account..." },
+  "apply.later": { fr: "Plus tard", en: "Later" },
+  "apply.backToCreator": { fr: "Retour à la page créateur", en: "Back to creator page" },
+
+  // --- /ambassador dashboard ---
+  "amb.title": { fr: "Espace Créateur", en: "Creator Space" },
+  "amb.welcome1": { fr: "Bienvenue dans votre", en: "Welcome to your" },
+  "amb.welcome2": { fr: "Espace Créateur", en: "Creator Space" },
+  "amb.commissionText1": { fr: "Partagez Productif.io et gagnez", en: "Share Productif.io and earn" },
+  "amb.commissionText2": { fr: "de commission", en: "commission" },
+  "amb.commissionText3": { fr: "sur chaque abonnement.", en: "on every subscription." },
+  "amb.referralLink": { fr: "Mon lien de parrainage", en: "My referral link" },
+  "amb.loading": { fr: "Chargement...", en: "Loading..." },
+  "amb.copy": { fr: "Copier", en: "Copy" },
+  "amb.copied": { fr: "Copié !", en: "Copied!" },
+  "amb.share": { fr: "Partager", en: "Share" },
+  "amb.refresh": { fr: "Rafraîchir", en: "Refresh" },
+  "amb.signups": { fr: "Inscrits", en: "Sign-ups" },
+  "amb.signupsSub": { fr: "Utilisateurs référés", en: "Referred users" },
+  "amb.paidUsers": { fr: "Abonnés payants", en: "Paid subscribers" },
+  "amb.conversion": { fr: "de conversion", en: "conversion" },
+  "amb.totalRevenue": { fr: "Revenu total", en: "Total revenue" },
+  "amb.sinceStart": { fr: "Depuis le début", en: "Since the beginning" },
+  "amb.revenue30d": { fr: "Revenu 30j", en: "Revenue 30d" },
+  "amb.last30d": { fr: "30 derniers jours", en: "Last 30 days" },
+  "amb.commissions": { fr: "Mes commissions", en: "My commissions" },
+  "amb.pending": { fr: "En attente", en: "Pending" },
+  "amb.pendingSub": { fr: "Période de vérification de 14 jours", en: "14-day verification period" },
+  "amb.available": { fr: "Disponible", en: "Available" },
+  "amb.availableSub": { fr: "Prêt à être retiré", en: "Ready to withdraw" },
+  "amb.paid": { fr: "Déjà payé", en: "Already paid" },
+  "amb.paidSub": { fr: "Total des commissions versées", en: "Total commissions paid out" },
+  "amb.commissionInfo": { fr: "Les commissions deviennent disponibles 14 jours après le paiement pour couvrir les éventuels remboursements.", en: "Commissions become available 14 days after payment to cover potential refunds." },
+  "amb.commissionRate": { fr: "Taux de commission :", en: "Commission rate:" },
+  "amb.referrals": { fr: "Mes filleuls", en: "My referrals" },
+  "amb.noReferrals.title": { fr: "Aucun filleul pour le moment", en: "No referrals yet" },
+  "amb.noReferrals.desc": { fr: "Partagez votre lien de parrainage pour commencer à parrainer des utilisateurs et gagner des commissions.", en: "Share your referral link to start referring users and earning commissions." },
+  "amb.email": { fr: "Email", en: "Email" },
+  "amb.signupDate": { fr: "Inscription", en: "Sign-up" },
+  "amb.status": { fr: "Statut", en: "Status" },
+  "amb.revenue": { fr: "Revenu", en: "Revenue" },
+  "amb.commission": { fr: "Commission", en: "Commission" },
+  "amb.premium": { fr: "Premium", en: "Premium" },
+  "amb.free": { fr: "Gratuit", en: "Free" },
+  "amb.loadMore": { fr: "Voir plus", en: "Load more" },
+  "amb.loadingMore": { fr: "Chargement...", en: "Loading..." },
+
+  // Score section
+  "score.commission": { fr: "Commission", en: "Commission" },
+  "score.reach": { fr: "Reach", en: "Reach" },
+  "score.activity": { fr: "Activité", en: "Activity" },
+  "score.revenue": { fr: "Revenu", en: "Revenue" },
+  "score.trust": { fr: "Confiance", en: "Trust" },
+  "score.reach.tip": { fr: "Basé sur la taille de ton audience déclarée. Plus tu as d'abonnés, plus ton potentiel de reach est élevé.", en: "Based on your declared audience size. The more followers you have, the higher your reach potential." },
+  "score.activity.tip": { fr: "Nombre d'utilisateurs que tu as référés ces 30 derniers jours. Reflète ton effort de création de contenu.", en: "Number of users you've referred in the last 30 days. Reflects your content creation effort." },
+  "score.revenue.tip": { fr: "Revenus générés par tes filleuls sur les 30 derniers jours. C'est le facteur le plus important de ton score.", en: "Revenue generated by your referrals over the last 30 days. This is the most important factor in your score." },
+  "score.trust.tip": { fr: "Bonus basé sur : vérification manuelle, taux de conversion, ancienneté du compte et absence de fraude.", en: "Bonus based on: manual verification, conversion rate, account age, and no fraud detected." },
+  "score.explorer": { fr: "Explorateur", en: "Explorer" },
+  "score.performer": { fr: "Performer", en: "Performer" },
+  "score.elite": { fr: "Élite", en: "Elite" },
+  "score.current": { fr: "Actuel", en: "Current" },
+  "score.pts": { fr: "pts", en: "pts" },
+
+  // Tier perks
+  "tier.bronze.p1": { fr: "Lien affilié", en: "Affiliate link" },
+  "tier.bronze.p2": { fr: "Dashboard basique", en: "Basic dashboard" },
+  "tier.bronze.p3": { fr: "Ressources créateurs", en: "Creator resources" },
+  "tier.silver.p1": { fr: "Assets premium", en: "Premium assets" },
+  "tier.silver.p2": { fr: "Early features", en: "Early features" },
+  "tier.silver.p3": { fr: "Badge social", en: "Social badge" },
+  "tier.gold.p1": { fr: "Commission boostée", en: "Boosted commission" },
+  "tier.gold.p2": { fr: "Support prioritaire", en: "Priority support" },
+  "tier.gold.p3": { fr: "Codes promo perso", en: "Custom promo codes" },
+
+  // Share text
+  "share.title": { fr: "Productif.io — Programme Créateur", en: "Productif.io — Creator Program" },
+  "share.text": { fr: "Rejoins Productif.io — le système de discipline pour les étudiants sérieux.", en: "Join Productif.io — the discipline system for serious students." },
+} as const
+
+export type CreatorKey = keyof typeof t_map
+
+export function useCreatorLocale() {
+  // This is a simple helper, actual state is managed in each component
+  return { getLocale: getCreatorLocale, setLocale: setCreatorLocale }
+}
+
+export function ct(key: CreatorKey, locale: Locale): string {
+  return t_map[key]?.[locale] ?? key
+}

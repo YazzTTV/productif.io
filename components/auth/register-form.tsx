@@ -29,7 +29,7 @@ export function RegisterForm() {
 
   // Récupérer l'email depuis les paramètres URL
   useEffect(() => {
-    const emailParam = searchParams.get('email')
+    const emailParam = searchParams?.get('email')
     if (emailParam) {
       setEmail(emailParam)
     }
@@ -513,4 +513,3 @@ export function RegisterForm() {
     </div>
   )
 }
-

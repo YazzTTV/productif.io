@@ -21,7 +21,7 @@ function AuthCallbackContent() {
         .then((res) => {
           if (res.ok) {
             // Récupérer l'URL de redirection depuis les paramètres ou utiliser le dashboard par défaut
-            const redirectUrl = searchParams.get("callbackUrl") || "/dashboard"
+            const redirectUrl = searchParams?.get("callbackUrl") || "/dashboard"
             
             // Si on vient de l'onboarding, continuer l'onboarding
             if (redirectUrl === "/onboarding") {
@@ -66,4 +66,3 @@ export default function AuthCallbackPage() {
     </Suspense>
   )
 }
-

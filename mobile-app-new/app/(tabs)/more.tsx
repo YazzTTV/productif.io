@@ -545,8 +545,27 @@ export default function SettingsScreen() {
           </View>
         </Animated.View>
 
-        {/* Help & Support Section */}
+        {/* Ambassador Section */}
         <Animated.View entering={FadeInDown.delay(500).duration(400)}>
+          <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <TouchableOpacity
+              style={styles.settingButton}
+              onPress={() => router.push('/invite')}
+            >
+              <View style={styles.settingButtonLeft}>
+                <Ionicons name="gift" size={24} color="#00C27A" />
+                <View style={styles.settingButtonContent}>
+                  <Text style={[styles.settingButtonText, { color: colors.text }]}>Programme ambassadeur</Text>
+                  <Text style={styles.settingButtonSubtext}>Parrainez et gagnez des commissions</Text>
+                </View>
+              </View>
+              <Ionicons name="chevron-forward" size={24} color="#9CA3AF" />
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
+
+        {/* Help & Support Section */}
+        <Animated.View entering={FadeInDown.delay(600).duration(400)}>
           <Text style={styles.sectionTitle}>{t('helpSupportUpper')}</Text>
           <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <TouchableOpacity
@@ -573,7 +592,7 @@ export default function SettingsScreen() {
         </Animated.View>
 
         {/* Logout Button */}
-        <Animated.View entering={FadeInDown.delay(600).duration(400)}>
+        <Animated.View entering={FadeInDown.delay(700).duration(400)}>
           <TouchableOpacity
             style={styles.logoutButton}
             onPress={handleLogout}

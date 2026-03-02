@@ -59,7 +59,9 @@ class ApiService {
   async login(email: string, password: string) {
     const response = await this.api.post('/api/auth/login', { email, password });
     this.token = response.data.token;
-    await Storage.set({ key: 'auth_token', value: this.token });
+    if (this.token) {
+      await Storage.set({ key: 'auth_token', value: this.token });
+    }
     return response.data;
   }
 

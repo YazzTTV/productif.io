@@ -9,6 +9,9 @@ PODS:
     - GoogleUtilities/Environment (~> 8.0)
     - GoogleUtilities/UserDefaults (~> 8.0)
     - PromisesObjC (~> 2.4)
+  - AppsFlyerFramework (6.17.8):
+    - AppsFlyerFramework/Main (= 6.17.8)
+  - AppsFlyerFramework/Main (6.17.8)
   - boost (1.84.0)
   - DoubleConversion (1.1.6)
   - EXApplication (6.1.5):
@@ -1776,6 +1779,9 @@ PODS:
     - React-jsiexecutor
     - React-RCTFBReactNativeSpec
     - ReactCommon/turbomodule/core
+  - react-native-appsflyer (6.17.8):
+    - AppsFlyerFramework (= 6.17.8)
+    - React
   - react-native-safe-area-context (5.4.0):
     - DoubleConversion
     - glog
@@ -2670,6 +2676,12 @@ PODS:
     - StripeUICore (= 24.12.1)
   - StripeUICore (24.12.1):
     - StripeCore (= 24.12.1)
+  - Superscript (1.0.12)
+  - SuperwallExpo (1.0.3):
+    - ExpoModulesCore
+    - SuperwallKit (= 4.12.10)
+  - SuperwallKit (4.12.10):
+    - Superscript (= 1.0.12)
   - Yoga (0.0.0)
 
 DEPENDENCIES:
@@ -2750,6 +2762,7 @@ DEPENDENCIES:
   - React-logger (from `../node_modules/react-native/ReactCommon/logger`)
   - React-Mapbuffer (from `../node_modules/react-native/ReactCommon`)
   - React-microtasksnativemodule (from `../node_modules/react-native/ReactCommon/react/nativemodule/microtasks`)
+  - react-native-appsflyer (from `../node_modules/react-native-appsflyer`)
   - react-native-safe-area-context (from `../node_modules/react-native-safe-area-context`)
   - react-native-webview (from `../node_modules/react-native-webview`)
   - React-NativeModulesApple (from `../node_modules/react-native/ReactCommon/react/nativemodule/core/platform/ios`)
@@ -2793,12 +2806,14 @@ DEPENDENCIES:
   - RNScreens (from `../node_modules/react-native-screens`)
   - RNSVG (from `../node_modules/react-native-svg`)
   - "stripe-react-native (from `../node_modules/@stripe/stripe-react-native`)"
+  - SuperwallExpo (from `../node_modules/expo-superwall/ios`)
   - Yoga (from `../node_modules/react-native/ReactCommon/yoga`)
 
 SPEC REPOS:
   trunk:
     - AppAuth
     - AppCheckCore
+    - AppsFlyerFramework
     - Firebase
     - FirebaseAppCheck
     - FirebaseAppCheckInterop
@@ -2825,6 +2840,8 @@ SPEC REPOS:
     - StripePaymentSheet
     - StripePaymentsUI
     - StripeUICore
+    - Superscript
+    - SuperwallKit
 
 EXTERNAL SOURCES:
   boost:
@@ -2970,6 +2987,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native/ReactCommon"
   React-microtasksnativemodule:
     :path: "../node_modules/react-native/ReactCommon/react/nativemodule/microtasks"
+  react-native-appsflyer:
+    :path: "../node_modules/react-native-appsflyer"
   react-native-safe-area-context:
     :path: "../node_modules/react-native-safe-area-context"
   react-native-webview:
@@ -3056,12 +3075,15 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native-svg"
   stripe-react-native:
     :path: "../node_modules/@stripe/stripe-react-native"
+  SuperwallExpo:
+    :path: "../node_modules/expo-superwall/ios"
   Yoga:
     :path: "../node_modules/react-native/ReactCommon/yoga"
 
 SPEC CHECKSUMS:
   AppAuth: 1c1a8afa7e12f2ec3a294d9882dfa5ab7d3cb063
   AppCheckCore: cc8fd0a3a230ddd401f326489c99990b013f0c4f
+  AppsFlyerFramework: 63577b60d6b9fcdab60135289979e7d1c9ec79b9
   boost: 7e761d76ca2ce687f7cc98e698152abd03a18f90
   DoubleConversion: cb417026b2400c8f53ae97020b2be961b59470cb
   EXApplication: 1e06972201838375ca1ec1ba34d586a98a5dc718
@@ -3146,6 +3168,7 @@ SPEC CHECKSUMS:
   React-logger: 1426d04b594a2e68b0ac2add21d45422d06397a3
   React-Mapbuffer: 70a29536f84ddffca4a91097651d2b8f194f7c67
   React-microtasksnativemodule: ff05e894231c44c21135d1d23a82b87656d98eeb
+  react-native-appsflyer: 7f8aeb0f26fc2444d1bf766f39f92a876002b816
   react-native-safe-area-context: 562163222d999b79a51577eda2ea8ad2c32b4d06
   react-native-webview: 520bcb79c3f2af91e157cdd695732a34ab5f25c8
   React-NativeModulesApple: d94850b316446b0c39a82eb278d6efaa1a634055
@@ -3202,6 +3225,9 @@ SPEC CHECKSUMS:
   StripePaymentSheet: b0c28bbb9b0704cdacd54facb84654d841202cec
   StripePaymentsUI: 9b84384e81adc9c24f599f1a8991fb52c767fc62
   StripeUICore: 186f245526e86ab02578abcc6bb6d27cc34084c6
+  Superscript: 00e98fcd78a2cefa33b658d4a16756b535eabd2c
+  SuperwallExpo: f5ebe00c33862c53a52cf24a0bca4d52d7934130
+  SuperwallKit: 9bdeb59a3e062364fce2c1faaf196597bf81890e
   Yoga: dc7c21200195acacb62fa920c588e7c2106de45e
 
 PODFILE CHECKSUM: e0e0145bc37110306bf67ad55f3bb5a68e43bcd9

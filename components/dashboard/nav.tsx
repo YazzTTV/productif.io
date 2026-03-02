@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useState, useEffect } from "react"
-import { LayoutDashboard, CheckSquare, Clock, BarChart, Settings, FolderKanban, Heart, Target, Book, Users, Building2, LineChart, Trophy, Mail, Bot, Lock, ClipboardList } from "lucide-react"
+import { LayoutDashboard, CheckSquare, Clock, BarChart, Settings, FolderKanban, Heart, Target, Book, Users, Building2, LineChart, Trophy, Mail, Bot, Lock, ClipboardList, Gift } from "lucide-react"
 import { buttonVariants } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { cn } from "@/lib/utils"
@@ -509,6 +509,23 @@ export function DashboardNav({ viewAsMode = false, viewAsUserId, onNavItemClick 
         </>
       )}
       
+      {!viewAsMode && (
+        <Link
+          href="/dashboard/ambassador"
+          className={cn(
+            buttonVariants({
+              variant: isActive("/dashboard/ambassador") ? "secondary" : "ghost",
+              size: "default",
+            }),
+            "justify-start w-full"
+          )}
+          onClick={handleNavClick}
+        >
+          <Gift className="mr-2 h-4 w-4" />
+          <span className="truncate">Programme Ambassadeur</span>
+        </Link>
+      )}
+
       {showSettings && (
         <div className="mt-4">
           <div className="px-3">

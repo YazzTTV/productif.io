@@ -11,10 +11,18 @@ export default function AssistantScreen() {
   const { t } = useLanguage();
   const params = useLocalSearchParams();
   const router = useRouter();
-  const checkInType = params.checkInType as 'mood' | 'stress' | 'focus' | undefined;
+  const checkInTypeParam = params.checkInType as 'mood' | 'stress' | 'focus' | undefined;
+  const [initialCheckInType] = useState<'mood' | 'stress' | 'focus' | undefined>(checkInTypeParam);
   
   // Si on arrive depuis une notification avec checkInType, afficher directement Analytics
-  const [activeTab, setActiveTab] = useState<TabType>(checkInType ? 'analytics' : 'assistant');
+  const [activeTab, setActiveTab] = useState<TabType>(initialCheckInType ? 'analytics' : 'assistant');
+
+  // Nettoyer le param après consommation pour éviter les redirections persistantes
+  useEffect(() => {
+    if (checkInTypeParam) {
+      router.setParams({ checkInType: undefined } as any);
+    }
+  }, [checkInTypeParam, router]);
 
   // Gérer le bouton retour Android pour éviter l'erreur GO_BACK
   useEffect(() => {
@@ -66,7 +74,7 @@ export default function AssistantScreen() {
       {activeTab === 'assistant' ? (
         <AIConductorNew />
       ) : (
-        <AnalyticsScreen checkInType={checkInType} isActive={activeTab === 'analytics'} />
+        <AnalyticsScreen checkInType={initialCheckInType} isActive={activeTab === 'analytics'} />
       )}
     </View>
   );

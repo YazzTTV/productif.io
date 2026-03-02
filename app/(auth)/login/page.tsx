@@ -12,8 +12,8 @@ function LoginContent() {
   
   // Si on vient de l'onboarding, rediriger vers l'onboarding
   useEffect(() => {
-    const fromOnboarding = searchParams.get('from') === 'onboarding'
-    const callbackUrl = searchParams.get('callbackUrl')
+    const fromOnboarding = searchParams?.get('from') === 'onboarding'
+    const callbackUrl = searchParams?.get('callbackUrl')
     
     if (fromOnboarding || callbackUrl === '/onboarding') {
       router.replace('/onboarding')

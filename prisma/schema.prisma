@@ -81,6 +81,26 @@ model User {
   googleCalendarToken     GoogleCalendarToken?
   appleCalendarConnection AppleCalendarConnection?
   subjects                Subject[]
+
+  // Attribution / Affiliation
+  referredBy          String?   // af_sub1 = ID de l'affilié
+  attributionSource   String?   // media_source (e.g. "partner_inv", "influencer")
+  attributionProvider String?   // "appsflyer" | "branch" | "adjust" — pérenne multi-provider
+  attributionData     Json?     // Données brutes de conversion
+  attributedAt        DateTime?
+  installId           String?   // UUID device pour détection anti-fraude
+
+  subscriptionEvents  SubscriptionEvent[]
+  commissionsReceived CommissionLedger[] @relation("CommissionReferredUser")
+  creatorApplication  CreatorApplication?
+
+  // Ambassador scoring
+  ambassadorTier      String?   // bronze, silver, gold
+  ambassadorScore     Int?      // APS 0-1000
+  ambassadorVerified  Boolean   @default(false)
+  ambassadorScoredAt  DateTime?
+
+  @@index([referredBy])
 }
 
 model Company {
@@ -922,4 +942,71 @@ model ScanCapture {
   @@index([sessionId])
   @@index([status])
   @@map("scan_captures")
+}
+
+model SubscriptionEvent {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  eventName     String   // subscription_start, renewal, cancellation, refund, trial_start, trial_conversion, expiration
+  productId     String?
+  transactionId String?  @unique
+  price         Float?
+  currency      String?  @default("EUR")
+  provider      String   @default("superwall") // superwall | stripe
+  rawPayload    Json?
+  createdAt     DateTime @default(now())
+
+  commissions CommissionLedger[]
+
+  @@index([userId])
+  @@index([eventName])
+  @@index([transactionId])
+  @@map("subscription_events")
+}
+
+model CommissionLedger {
+  id                  String             @id @default(cuid())
+  affiliateId         String             // = referredBy (l'ID utilisateur de l'affilié)
+  referredUserId      String
+  referredUser        User               @relation("CommissionReferredUser", fields: [referredUserId], references: [id], onDelete: Cascade)
+  subscriptionEventId String?
+  subscriptionEvent   SubscriptionEvent? @relation(fields: [subscriptionEventId], references: [id])
+  amountGross         Float
+  currency            String             @default("EUR")
+  commissionRate      Float              @default(0.20)
+  commissionAmount    Float
+  status              String             @default("pending") // pending, eligible, paid, reversed
+  eligibleAt          DateTime?
+  paidAt              DateTime?
+  reversedAt          DateTime?
+  reverseReason       String?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+
+  @@index([affiliateId])
+  @@index([status])
+  @@index([referredUserId])
+  @@map("commission_ledger")
+}
+
+model CreatorApplication {
+  id              String   @id @default(cuid())
+  firstName       String
+  email           String   @unique
+  country         String
+  platform        String
+  handle          String
+  followers       String
+  motivation      String
+  status          String   @default("pending") // pending, accepted, rejected
+  reviewedAt      DateTime?
+  userId          String?  @unique
+  user            User?    @relation(fields: [userId], references: [id])
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([status])
+  @@index([email])
+  @@map("creator_applications")
 }

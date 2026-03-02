@@ -103,7 +103,7 @@ export async function POST(req: NextRequest) {
         let reminderMessage = `⏰ *Rappel :* Plus que ${accessCheck.trialDaysLeft} jour${accessCheck.trialDaysLeft > 1 ? 's' : ''} d'essai gratuit !\n\n`
         reminderMessage += `Pense à t'abonner : ${process.env.NEXT_PUBLIC_APP_URL}/upgrade`
         
-        await sendWhatsAppMessage(phoneNumber, reminderMessage)
+        await whatsappService.sendMessage(phoneNumber, reminderMessage)
         await TrialService.recordNotificationSent(user.id, `whatsapp-reminder-${today}`, 'whatsapp')
       }
     }
@@ -123,7 +123,7 @@ export async function POST(req: NextRequest) {
         console.log('🎙️ Message vocal transcrit traité comme conversation:', messageText)
       } else {
         // Erreur de transcription, répondre avec un message d'erreur
-        await sendWhatsAppMessage(
+        await whatsappService.sendMessage(
           phoneNumber,
           "❌ Je n'ai pas pu transcrire ton message vocal. Réessaye dans quelques instants."
         )
@@ -191,7 +191,7 @@ export async function POST(req: NextRequest) {
           userContext
         )
 
-        await sendWhatsAppMessage(phoneNumber, conversationalResponse)
+        await whatsappService.sendMessage(phoneNumber, conversationalResponse)
 
         // Log de l'interaction
         await logInteraction(user.id, messageText, intent, {
@@ -204,7 +204,7 @@ export async function POST(req: NextRequest) {
         // Envoyer la réponse générée par l'action (seulement si elle n'est pas vide)
         // Certains handlers (comme help.handler) envoient déjà le message directement
         if (result.response && result.response.trim().length > 0) {
-          await sendWhatsAppMessage(phoneNumber, result.response)
+          await whatsappService.sendMessage(phoneNumber, result.response)
         }
 
         // Log de l'interaction
@@ -303,5 +303,4 @@ async function logInteraction(
     console.error('Erreur log interaction:', error);
   }
 }
-
 

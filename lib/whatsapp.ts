@@ -79,4 +79,8 @@ class WhatsAppService {
 }
 
 // Créer une instance unique du service
-export const whatsappService = new WhatsAppService(); 
+export const whatsappService = new WhatsAppService();
+
+export async function sendWhatsAppMessage(to: string, message: string) {
+    return whatsappService.sendMessage(to, message);
+}

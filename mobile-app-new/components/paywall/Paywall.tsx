@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Alert, Linking } from 'react-native';
 import { useRouter } from 'expo-router';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
@@ -13,7 +13,7 @@ interface PaywallProps {
 }
 
 export function Paywall({ onClose, source }: PaywallProps) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [selectedPlan, setSelectedPlan] = useState<'annual' | 'monthly'>('annual');
@@ -124,13 +124,17 @@ export function Paywall({ onClose, source }: PaywallProps) {
                 <ActivityIndicator color="#FFFFFF" />
               ) : (
                 <>
-                  <Text style={styles.planPricePrimary}>€3.25 {t('perMonth')}</Text>
-                  <Text style={styles.planSubtextPrimary}>
-                    {t('billedPerYear') || 'Billed €39 per year (–60%)'}
-                  </Text>
+                  <Text style={styles.planPricePrimary}>€39 {t('perYear') || '/year'}</Text>
+                  <Text style={styles.planSubtextPrimary}>{`(€3.25 ${t('perMonth')})`}</Text>
                 </>
               )}
             </TouchableOpacity>
+
+            <Text style={styles.planLabel}>
+              {language === 'fr'
+                ? 'Productif Premium — abonnement annuel'
+                : 'Productif Premium — annual subscription'}
+            </Text>
 
             {/* MONTHLY PLAN - SECONDARY */}
             <TouchableOpacity
@@ -145,6 +149,18 @@ export function Paywall({ onClose, source }: PaywallProps) {
                 <Text style={styles.planPriceSecondary}>€7.99 {t('perMonth')}</Text>
               )}
             </TouchableOpacity>
+
+            <Text style={styles.planLabel}>
+              {language === 'fr'
+                ? 'Productif Premium — abonnement mensuel'
+                : 'Productif Premium — monthly subscription'}
+            </Text>
+
+            <Text style={styles.autoRenewText}>
+              {language === 'fr'
+                ? 'L’abonnement est renouvelé automatiquement sauf annulation au moins 24 h avant la fin de la période.'
+                : 'Subscription automatically renews unless canceled at least 24 hours before the end of the period.'}
+            </Text>
           </Animated.View>
 
           {/* Footer */}
@@ -157,6 +173,22 @@ export function Paywall({ onClose, source }: PaywallProps) {
             >
               <Text style={styles.continueFreeText}>{t('continueFree') || 'Continue with free version'}</Text>
             </TouchableOpacity>
+
+            <View style={styles.legalLinksContainer}>
+              <TouchableOpacity
+                onPress={() => Linking.openURL('https://www.productif.io/privacy-policy')}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.legalLinkText}>Privacy Policy</Text>
+              </TouchableOpacity>
+              <Text style={styles.legalSeparator}> | </Text>
+              <TouchableOpacity
+                onPress={() => Linking.openURL('https://www.apple.com/legal/internet-services/itunes/dev/stdeula/')}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.legalLinkText}>Terms of Use</Text>
+              </TouchableOpacity>
+            </View>
           </Animated.View>
         </View>
       </ScrollView>
@@ -267,6 +299,19 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#000000',
   },
+  planLabel: {
+    marginTop: 4,
+    fontSize: 12,
+    color: 'rgba(0, 0, 0, 0.5)',
+    textAlign: 'center',
+  },
+  autoRenewText: {
+    marginTop: 8,
+    fontSize: 11,
+    lineHeight: 14,
+    color: 'rgba(0, 0, 0, 0.5)',
+    textAlign: 'center',
+  },
   footerSection: {
     alignItems: 'center',
     gap: 12,
@@ -279,5 +324,18 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: 'rgba(0, 0, 0, 0.4)',
   },
+  legalLinksContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  legalLinkText: {
+    fontSize: 12,
+    color: 'rgba(0, 0, 0, 0.45)',
+    textDecorationLine: 'underline',
+  },
+  legalSeparator: {
+    fontSize: 12,
+    color: 'rgba(0, 0, 0, 0.45)',
+  },
 });
-

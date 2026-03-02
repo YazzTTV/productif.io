@@ -1,9 +1,10 @@
 import cron from 'node-cron'
+import type { ScheduledTask } from 'node-cron'
 import { prisma } from '@/lib/prisma'
 import { triggerScheduledCheckIn } from '@/lib/agent/handlers/behavior.handler'
 
 export class BehaviorCheckInScheduler {
-  private cronJobs: Map<string, cron.ScheduledTask> = new Map()
+  private cronJobs: Map<string, ScheduledTask> = new Map()
 
   async start() {
     console.log('BehaviorCheckInScheduler démarrage...')

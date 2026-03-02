@@ -6,9 +6,10 @@ import { Button } from "@/components/ui/button"
 import { ArrowLeft } from "lucide-react"
 import { ProjectForm } from "@/components/projects/project-form"
 
-export default function NewProjectPage() {
+export default async function NewProjectPage() {
   // Vérifier l'authentification côté serveur
-  const token = cookies().get("auth_token")?.value
+  const cookieStore = await cookies()
+  const token = cookieStore.get("auth_token")?.value
 
   if (!token) {
     redirect("/login")
@@ -35,4 +36,3 @@ export default function NewProjectPage() {
     </div>
   )
 }
-

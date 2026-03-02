@@ -2,7 +2,7 @@ import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
 class NotificationLogger {
-    private static shouldLog(level: 'error' | 'warn' | 'success' | 'info' | 'debug') {
+    static shouldLog(level: 'error' | 'warn' | 'success' | 'info' | 'debug') {
         const configured = (process.env.LOG_LEVEL || 'warn').toLowerCase();
         if (configured === 'silent') return false;
         const order: Record<string, number> = { error: 0, warn: 1, success: 2, info: 3, debug: 4 };

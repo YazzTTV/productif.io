@@ -287,13 +287,19 @@ export default function Home() {
             </div>
           </motion.div>
 
-          {/* Language Toggle Button */}
+          {/* Top-right buttons */}
           <motion.div
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.6 }}
-            className="absolute top-8 right-6 md:right-12"
+            className="absolute top-8 right-6 md:right-12 flex items-center gap-3"
           >
+            <button
+              onClick={() => router.push('/createur')}
+              className="bg-[#16a34a]/10 text-[#16a34a] rounded-2xl px-4 py-2.5 border border-[#16a34a]/20 flex items-center gap-2 hover:bg-[#16a34a]/15 transition-colors font-medium text-sm"
+            >
+              Devenir créateur
+            </button>
             <button
               onClick={toggleLanguage}
               className="bg-white rounded-2xl px-4 py-2.5 shadow-sm border border-black/[0.05] flex items-center gap-2 hover:bg-gray-50 transition-colors font-medium text-sm text-gray-900"

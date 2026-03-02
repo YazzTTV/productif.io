@@ -1,5 +1,5 @@
 import { PrismaClient } from '@prisma/client';
-import { generateApiToken } from '../../../lib/api-token.ts'
+import { generateApiToken } from '../../../lib/api-token'
 
 interface ConversationState {
   userId: string;

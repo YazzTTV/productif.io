@@ -9,7 +9,8 @@ import { TimeEntryForm } from "@/components/time/time-entry-form"
 
 export default async function EditTimeEntryPage({ params }: { params: { id: string } }) {
   // Vérifier l'authentification côté serveur
-  const token = cookies().get("auth_token")?.value
+  const cookieStore = await cookies()
+  const token = cookieStore.get("auth_token")?.value
 
   if (!token) {
     redirect("/login")
@@ -103,4 +104,3 @@ export default async function EditTimeEntryPage({ params }: { params: { id: stri
     </div>
   )
 }
-

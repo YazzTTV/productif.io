@@ -92,12 +92,14 @@ export async function sendPushNotification(
       body: payload.body
     };
     notification.sound = payload.sound || 'default';
-    notification.badge = payload.badge;
+    if (typeof payload.badge === 'number') {
+      notification.badge = payload.badge;
+    }
     notification.topic = process.env.APNS_BUNDLE_ID || 'io.productif.app';
     notification.payload = payload.data || {};
     
     if (payload.category) {
-      notification.category = payload.category;
+      (notification as any).category = payload.category;
     }
 
     // Expiration (1 heure)
@@ -119,11 +121,11 @@ export async function sendPushNotification(
         console.error(`   - Token: ${failure.device}, Erreur: ${failure.error}`);
         
         // Si le token est invalide, le supprimer de la base
-        if (failure.error && (
-          failure.error === 'BadDeviceToken' ||
-          failure.error === 'Unregistered' ||
-          failure.error === 'DeviceTokenNotForTopic'
-        )) {
+        const errorText =
+          typeof failure.error === 'string'
+            ? failure.error
+            : failure.response?.reason || String(failure.error || '');
+        if (errorText.includes('BadDeviceToken') || errorText.includes('Unregistered') || errorText.includes('DeviceTokenNotForTopic')) {
           if (shouldLog('info')) {
             console.log(`   🗑️ Suppression du token invalide: ${failure.device}`);
           }

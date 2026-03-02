@@ -12,7 +12,7 @@ import {
 
 export async function POST(req: Request) {
   try {
-    const { name, email, password, company } = await req.json()
+    const { name, email, password, company, creatorFlow } = await req.json()
 
     // Validation simple
     const rawEmail = typeof email === "string" ? email : ""
@@ -99,9 +99,17 @@ export async function POST(req: Request) {
           userId: user.id,
           language: 'fr',
           currentStep: 1,
-          completed: false
+          completed: !!creatorFlow,
         }
       })
+
+      // Si inscription depuis le flow créateur, lier la candidature au user
+      if (creatorFlow) {
+        await prisma.creatorApplication.updateMany({
+          where: { email: normalizedEmail, userId: null },
+          data: { userId: user.id },
+        })
+      }
       
       // Créer un token JWT pour l'authentification
       const token = await createToken({

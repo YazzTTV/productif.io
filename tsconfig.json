@@ -45,6 +45,25 @@
   "exclude": [
     "node_modules",
     "mobile-app-new",
-    "mobile-app"
+    "mobile-app",
+    "scripts",
+    "Discipline System Design",
+    "Productif.io Design App (1)",
+    "productif.io design app for computer",
+    "app/api/debug/**",
+    "app/api/companies/**",
+    "app/api/waitlist/**",
+    "app/dashboard/admin/**",
+    "app/onboarding/page.old.tsx",
+    "components/features-section.tsx",
+    "components/pricing-section.tsx",
+    "components/testimonials-section.tsx",
+    "components/dashboard/new-dashboard.tsx",
+    "components/dashboard/overview-metrics.tsx",
+    "components/dashboard/recent-tasks.tsx",
+    "components/dashboard-section.tsx",
+    "components/trial/**",
+    "lib/i18n.tsx",
+    "lib/utils/TextNormalizer.ts"
   ]
 }

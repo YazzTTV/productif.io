@@ -40,6 +40,7 @@ const publicRoutes = [
   "/refund-policy",
   // Landing marketing publique
   "/landing",
+  "/createur",
   "/verify-email",
 ]
 

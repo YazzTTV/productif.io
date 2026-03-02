@@ -31,6 +31,7 @@ export default function TaskClarificationScreen() {
   const params = useLocalSearchParams();
   const { saveResponse } = useOnboardingData();
   const [tasks, setTasks] = useState<ClarifiedTask[]>([]);
+  const rawInput = typeof params.rawInput === 'string' ? params.rawInput : '';
 
   useEffect(() => {
     try {
@@ -45,7 +46,7 @@ export default function TaskClarificationScreen() {
           priority: task.priority === 4 || task.priority === 'high' || false,
           dueDate: task.dueDate,
         }));
-        setTasks(clarifiedTasks);
+        setTasks(clarifiedTasks.filter(task => task.title.trim().length > 0));
       }
     } catch (error) {
       console.error('Erreur lors du parsing des tâches:', error);
@@ -81,6 +82,13 @@ export default function TaskClarificationScreen() {
       params: {
         tasks: JSON.stringify(tasks),
       },
+    });
+  };
+
+  const handleBackToInput = () => {
+    router.replace({
+      pathname: '/(onboarding-new)/tasks-awareness',
+      params: rawInput ? { initialText: rawInput } : {},
     });
   };
 
@@ -171,6 +179,15 @@ export default function TaskClarificationScreen() {
           ) : (
             <View style={styles.emptyState}>
               <Text style={styles.emptyText}>No tasks extracted yet...</Text>
+              <TouchableOpacity
+                onPress={handleBackToInput}
+                style={styles.backButton}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.backButtonText}>
+                  {t('back') || 'Back'}
+                </Text>
+              </TouchableOpacity>
             </View>
           )}
         </View>
@@ -178,19 +195,27 @@ export default function TaskClarificationScreen() {
 
       {/* Fixed bottom CTA */}
       <View style={styles.footer}>
-        <TouchableOpacity
-          onPress={handleContinue}
-          disabled={tasks.length === 0}
-          style={[
-            styles.continueButton,
-            tasks.length === 0 && styles.continueButtonDisabled,
-          ]}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.continueButtonText}>
-            {t('buildIdealDay') || 'Build my ideal day'}
-          </Text>
-        </TouchableOpacity>
+        {tasks.length > 0 ? (
+          <TouchableOpacity
+            onPress={handleContinue}
+            style={styles.continueButton}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.continueButtonText}>
+              {t('buildIdealDay') || 'Build my ideal day'}
+            </Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            onPress={handleBackToInput}
+            style={[styles.continueButton, styles.secondaryButton]}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.continueButtonText, styles.secondaryButtonText]}>
+              {t('back') || 'Back'}
+            </Text>
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );
@@ -286,6 +311,20 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 16,
     color: 'rgba(0, 0, 0, 0.4)',
+    marginBottom: 16,
+  },
+  backButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.15)',
+    backgroundColor: '#FFFFFF',
+  },
+  backButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#000000',
   },
   footer: {
     position: 'absolute',
@@ -306,13 +345,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  continueButtonDisabled: {
-    opacity: 0.4,
-  },
   continueButtonText: {
     fontSize: 18,
     fontWeight: '600',
     color: '#FFFFFF',
   },
+  secondaryButton: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.15)',
+  },
+  secondaryButtonText: {
+    color: '#000000',
+  },
 });
-

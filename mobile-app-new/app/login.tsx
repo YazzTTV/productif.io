@@ -19,6 +19,7 @@ import { signInWithGoogle } from '@/lib/googleAuth';
 import { signInWithApple, isAppleSignInAvailable } from '@/lib/appleAuth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { flushQueuedAttribution } from '@/hooks/useAppsFlyer';
 
 export default function LoginScreen() {
   const { t } = useLanguage();
@@ -58,10 +59,8 @@ export default function LoginScreen() {
       );
       
       if (response.success) {
-        // Marquer la session comme persistante
+        flushQueuedAttribution();
         await AsyncStorage.setItem('onboarding_completed', 'true');
-        // Attendre que toutes les interactions UI soient terminées avant de naviguer
-        // Cela évite l'erreur "Unable to find viewState" sur Android
         InteractionManager.runAfterInteractions(() => {
           setTimeout(() => {
             router.replace('/(tabs)');
@@ -95,9 +94,8 @@ export default function LoginScreen() {
       const response = await authService.login({ email, password });
       
       if (response.success) {
-        // Marquer la session comme persistante pour éviter une déconnexion à la fermeture
+        flushQueuedAttribution();
         await AsyncStorage.setItem('onboarding_completed', 'true');
-        // Attendre que toutes les interactions UI soient terminées avant de naviguer
         InteractionManager.runAfterInteractions(() => {
           setTimeout(() => {
             router.replace('/(tabs)');
@@ -131,10 +129,8 @@ export default function LoginScreen() {
       if (!isMountedRef.current) return;
       
       if (response.success) {
-        // Marquer la session comme persistante
+        flushQueuedAttribution();
         await AsyncStorage.setItem('onboarding_completed', 'true');
-        // Attendre que toutes les interactions UI soient terminées avant de naviguer
-        // Cela évite l'erreur "Unable to find viewState" sur Android
         InteractionManager.runAfterInteractions(() => {
           setTimeout(() => {
             if (isMountedRef.current) {

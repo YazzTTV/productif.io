@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { Prisma } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
 import { getAuthUserFromRequest } from "@/lib/auth"
 
@@ -103,24 +104,24 @@ export async function POST(req: NextRequest) {
           firstName: null,
           studentType: null,
           studyLevel: null,
-          goals: null,
+          goals: Prisma.JsonNull,
           pressureLevel: null,
           currentSituation: null,
-          dailyStruggles: null,
+          dailyStruggles: Prisma.JsonNull,
           mentalLoad: null,
           focusQuality: null,
           satisfaction: null,
           overthinkTasks: null,
           shouldDoMore: null,
-          wantToChange: null,
+          wantToChange: Prisma.JsonNull,
           timeHorizon: null,
           rawTasks: null,
-          clarifiedTasks: null,
-          idealDay: null,
+          clarifiedTasks: Prisma.JsonNull,
+          idealDay: Prisma.JsonNull,
           whatsappNumber: null,
           whatsappConsent: false,
           offer: null,
-          utmParams: null,
+          utmParams: Prisma.JsonNull,
           emailFallback: null,
           billingCycle: null,
         },
@@ -162,4 +163,3 @@ export async function POST(req: NextRequest) {
     )
   }
 }
-

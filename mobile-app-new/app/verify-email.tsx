@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { authService } from '@/lib/api';
 import { useLanguage } from '@/contexts/LanguageContext';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function VerifyEmailScreen() {
   const { t } = useLanguage();
@@ -11,6 +12,7 @@ export default function VerifyEmailScreen() {
   const router = useRouter();
   const [isResending, setIsResending] = useState(false);
   const [isChecking, setIsChecking] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const intervalRef = React.useRef<NodeJS.Timeout | null>(null);
 
   const handleResend = async () => {
@@ -73,6 +75,34 @@ export default function VerifyEmailScreen() {
     }
   };
 
+  const handleLogout = async () => {
+    if (isLoggingOut) return;
+
+    Alert.alert(
+      t('logout'),
+      t('logoutConfirm'),
+      [
+        { text: t('cancel'), style: 'cancel' },
+        {
+          text: t('logout'),
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setIsLoggingOut(true);
+              await authService.logout();
+              await AsyncStorage.removeItem('onboarding_completed');
+              router.replace('/(onboarding-new)/connection');
+            } catch (error) {
+              await AsyncStorage.removeItem('onboarding_completed');
+              router.replace('/(onboarding-new)/connection');
+              setIsLoggingOut(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   React.useEffect(() => {
     intervalRef.current = setInterval(() => {
       autoCheck().catch(() => {});
@@ -125,6 +155,20 @@ export default function VerifyEmailScreen() {
           <Text style={styles.linkText}>
             {t('openMailbox', undefined, 'Ouvrir ma boîte mail')}
           </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.logoutButton}
+          onPress={handleLogout}
+          disabled={isLoggingOut}
+        >
+          {isLoggingOut ? (
+            <ActivityIndicator color="#EF4444" />
+          ) : (
+            <Text style={styles.logoutText}>
+              {t('disconnectButton', undefined, 'Se déconnecter')}
+            </Text>
+          )}
         </TouchableOpacity>
       </View>
     </View>
@@ -183,6 +227,19 @@ const styles = StyleSheet.create({
   },
   linkText: {
     color: '#10B981',
+    fontWeight: '600',
+  },
+  logoutButton: {
+    marginTop: 8,
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#FCA5A5',
+    backgroundColor: '#FEF2F2',
+  },
+  logoutText: {
+    color: '#B91C1C',
     fontWeight: '600',
   },
 });

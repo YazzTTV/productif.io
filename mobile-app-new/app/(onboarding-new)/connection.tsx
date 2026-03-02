@@ -23,6 +23,7 @@ import { signInWithApple, isAppleSignInAvailable } from '@/lib/appleAuth';
 import { authService } from '@/lib/api';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { flushQueuedAttribution } from '@/hooks/useAppsFlyer';
 
 export default function ConnectionScreen() {
   const { t } = useLanguage();
@@ -58,26 +59,22 @@ export default function ConnectionScreen() {
       if (!isMountedRef.current) return;
       
       if (response.success) {
-        // Vérifier si c'est un nouvel utilisateur ou un utilisateur existant
-        // Un nouvel utilisateur a un message contenant "créé" ou une date de création très récente
+        // Flush l'attribution AppsFlyer en queue (si elle existait avant le login)
+        flushQueuedAttribution();
+
         const isNewUser = response.message?.includes('créé') || 
           (response.user?.createdAt && 
-           new Date().getTime() - new Date(response.user.createdAt).getTime() < 5000); // Créé il y a moins de 5 secondes
+           new Date().getTime() - new Date(response.user.createdAt).getTime() < 5000);
         
-        // Marquer l'onboarding comme complété si c'est un utilisateur existant
         if (!isNewUser) {
           await AsyncStorage.setItem('onboarding_completed', 'true');
         }
         
-        // Attendre que toutes les interactions UI soient terminées avant de naviguer
-        // Cela évite l'erreur "Unable to find viewState" sur Android
         InteractionManager.runAfterInteractions(() => {
           setTimeout(() => {
             if (isNewUser) {
-              // Nouvel utilisateur → continuer l'onboarding
               router.replace('/(onboarding-new)/value-awareness');
             } else {
-              // Utilisateur existant → aller au dashboard
               router.replace('/(tabs)');
             }
           }, 100);
@@ -119,17 +116,16 @@ export default function ConnectionScreen() {
       if (!isMountedRef.current) return;
       
       if (response.success) {
-        // Vérifier si c'est un nouvel utilisateur ou un utilisateur existant
+        flushQueuedAttribution();
+
         const isNewUser = response.message?.includes('créé') || 
           (response.user?.createdAt && 
            new Date().getTime() - new Date(response.user.createdAt).getTime() < 5000);
         
-        // Marquer l'onboarding comme complété si c'est un utilisateur existant
         if (!isNewUser) {
           await AsyncStorage.setItem('onboarding_completed', 'true');
         }
         
-        // Attendre que toutes les interactions UI soient terminées avant de naviguer
         InteractionManager.runAfterInteractions(() => {
           setTimeout(() => {
             if (isNewUser) {
@@ -173,7 +169,7 @@ export default function ConnectionScreen() {
       if (isLogin) {
         const response = await authService.login({ email, password });
         if (response.success) {
-          // Attendre que toutes les interactions UI soient terminées avant de naviguer
+          flushQueuedAttribution();
           InteractionManager.runAfterInteractions(() => {
             setTimeout(() => {
               router.replace('/(tabs)');
@@ -183,19 +179,18 @@ export default function ConnectionScreen() {
           Alert.alert(t('error', undefined, 'Erreur'), response.message || t('connectionInvalidCredentials', undefined, 'Email ou mot de passe incorrect'));
         }
       } else {
-        // Pour l'inscription, on utilise l'email comme nom par défaut
         const name = email.split('@')[0] || 'User';
         const response = await authService.signup({ name, email, password });
         if (response.success) {
-          // Attendre que toutes les interactions UI soient terminées avant de naviguer
+          flushQueuedAttribution();
           InteractionManager.runAfterInteractions(() => {
             setTimeout(() => {
               router.replace('/(onboarding-new)/value-awareness');
             }, 100);
           });
-    } else {
+        } else {
           Alert.alert(t('error', undefined, 'Erreur'), response.message || t('connectionSignupFailed', undefined, 'Échec de la création du compte'));
-    }
+        }
       }
     } catch (error) {
       console.error('Erreur lors de l\'authentification:', error);

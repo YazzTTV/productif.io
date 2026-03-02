@@ -1,9 +1,10 @@
 import cron from 'node-cron'
+import type { ScheduledTask } from 'node-cron'
 import { prisma } from '@/lib/prisma'
 import { whatsappService } from '@/lib/whatsapp'
 
 export class MorningInsightsScheduler {
-  private cronJob: cron.ScheduledTask | null = null
+  private cronJob: ScheduledTask | null = null
 
   start() {
     // Vérifie chaque minute, envoie aux utilisateurs à leur heure configurée (Europe/Paris)
@@ -131,5 +132,4 @@ export class MorningInsightsScheduler {
 }
 
 export const morningInsightsScheduler = new MorningInsightsScheduler()
-
 

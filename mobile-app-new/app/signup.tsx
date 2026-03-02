@@ -16,6 +16,7 @@ import { router } from 'expo-router';
 import { authService, onboardingService, getAuthToken } from '@/lib/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { flushQueuedAttribution } from '@/hooks/useAppsFlyer';
 
 export default function SignupScreen() {
   const { t } = useLanguage();
@@ -62,11 +63,10 @@ export default function SignupScreen() {
       });
       
       if (response.success && response.token) {
-        // Le token est déjà sauvegardé automatiquement dans authService.signup()
-        // Mais on le sauvegarde explicitement pour être sûr qu'il est bien mis à jour
         await authService.setToken(response.token);
+        flushQueuedAttribution();
         
-        console.log('✅ [SIGNUP] Compte créé avec succès');
+        console.log('[SIGNUP] Compte créé avec succès');
         console.log('👤 [SIGNUP] User ID:', response.user?.id);
         console.log('📧 [SIGNUP] Email:', response.user?.email);
         console.log('🔑 [SIGNUP] Token présent:', response.token ? 'oui' : 'non');

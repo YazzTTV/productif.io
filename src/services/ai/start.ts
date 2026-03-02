@@ -21,7 +21,7 @@ import { WhatsAppService } from './WhatsAppService';
 import { VoiceTranscriptionService } from './VoiceTranscriptionService';
 import { SpecialHabitsHandler } from './SpecialHabitsHandler';
 import express, { Request, Response } from 'express';
-import { generateApiToken } from '../../../lib/api-token.ts';
+import { generateApiToken } from '../../../lib/api-token';
 import { calendarEventScheduler } from '../../../lib/calendar/CalendarEventScheduler';
 
 const app = express();
@@ -202,7 +202,7 @@ async function startAIService() {
         });
 
         // Route pour recevoir les messages WhatsApp
-        app.post('/webhook', async (req: Request, res: Response) => {
+        app.post('/webhook', (async (req: Request, res: Response) => {
             console.log('📩 Requête webhook POST reçue:', JSON.stringify(req.body, null, 2));
             
             try {
@@ -1093,7 +1093,7 @@ async function startAIService() {
                 console.error('❌ Erreur lors du traitement du webhook:', error);
                 res.sendStatus(500);
             }
-        });
+        }) as any);
 
         // Démarrer le CalendarEventScheduler pour les rappels et post-checks
         calendarEventScheduler.start();

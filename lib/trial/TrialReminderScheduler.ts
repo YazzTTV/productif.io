@@ -1,9 +1,10 @@
 import cron from 'node-cron';
+import type { ScheduledTask } from 'node-cron';
 import { TrialService } from './TrialService';
 import { sendWhatsAppMessage } from '@/lib/whatsapp';
 
 export class TrialReminderScheduler {
-  private cronJob: cron.ScheduledTask | null = null;
+  private cronJob: ScheduledTask | null = null;
 
   start() {
     // Vérifier tous les jours à 10h00
@@ -100,4 +101,3 @@ export class TrialReminderScheduler {
 }
 
 export const trialReminderScheduler = new TrialReminderScheduler();
-

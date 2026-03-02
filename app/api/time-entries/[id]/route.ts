@@ -5,7 +5,8 @@ import { prisma } from "@/lib/prisma"
 
 // Fonction utilitaire pour vérifier l'authentification
 async function getAuthUser() {
-  const token = cookies().get("auth_token")?.value
+  const cookieStore = await cookies()
+  const token = cookieStore.get("auth_token")?.value
 
   if (!token) {
     return null
@@ -89,7 +90,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       return NextResponse.json({ error: "Non autorisé" }, { status: 403 })
     }
 
-    const { startTime, endTime, duration, note, taskId, projectId } = await req.json()
+    const { startTime, endTime, taskId, projectId } = await req.json()
 
     const updatedTimeEntry = await prisma.timeEntry.update({
       where: {
@@ -98,8 +99,6 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       data: {
         startTime: startTime ? new Date(startTime) : undefined,
         endTime: endTime ? new Date(endTime) : null,
-        duration,
-        note,
         taskId: taskId || null,
         projectId: projectId || null,
       },
@@ -148,4 +147,3 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
     return NextResponse.json({ error: "Erreur lors de la suppression de l'entrée de temps" }, { status: 500 })
   }
 }
-

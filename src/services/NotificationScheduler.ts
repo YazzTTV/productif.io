@@ -1,8 +1,8 @@
 import { ScheduledTask } from 'node-cron'
 import cron from 'node-cron'
 import { PrismaClient } from '@prisma/client'
-import NotificationService from './NotificationService.ts'
-import NotificationLogger from './NotificationLogger.ts'
+import NotificationService from './NotificationService'
+import NotificationLogger from './NotificationLogger'
 import EventManager, { NotificationPreferencesUpdateEvent } from '../../lib/EventManager.js'
 
 class NotificationScheduler {

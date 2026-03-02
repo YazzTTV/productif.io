@@ -280,7 +280,9 @@ export async function POST(request: NextRequest) {
                 console.log(`🔄 Notification du scheduler pour l'utilisateur ${userId}...`);
 
                 // En prod, on notifie uniquement le scheduler Railway (SCHEDULER_URL)
-                const bases = [process.env.SCHEDULER_URL].filter((v, i, a) => v && a.indexOf(v) === i);
+                const bases: string[] = [process.env.SCHEDULER_URL].filter(
+                    (v, i, a): v is string => Boolean(v) && a.indexOf(v) === i
+                );
                 if (bases.length === 0) {
                     console.log('⚠️ SCHEDULER_URL manquant, notification scheduler ignorée.');
                     return;

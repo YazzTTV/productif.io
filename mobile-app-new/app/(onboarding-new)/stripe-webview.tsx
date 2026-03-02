@@ -10,10 +10,17 @@ import { router, useLocalSearchParams } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { onboardingService } from '@/lib/api';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { logSubscriptionEvent } from '@/lib/appsflyerEvents';
+
+const PLAN_PRICES: Record<string, number> = {
+  monthly: 9.99,
+  annual: 59.99,
+};
 
 export default function StripeWebViewScreen() {
   const params = useLocalSearchParams();
   const checkoutUrl = params.checkoutUrl as string;
+  const plan = (params.plan as string) || 'annual';
   const [isLoading, setIsLoading] = useState(true);
   const { t } = useLanguage();
 
@@ -31,16 +38,22 @@ export default function StripeWebViewScreen() {
   };
 
   const handlePaymentSuccess = async () => {
+    // Tracker l'achat dans AppsFlyer pour l'attribution d'affiliation
+    const billingType = (plan === 'monthly' ? 'monthly' : 'annual') as 'monthly' | 'annual';
+    logSubscriptionEvent({
+      revenue: PLAN_PRICES[billingType] ?? PLAN_PRICES.annual,
+      plan: billingType,
+    });
+
     // Marquer l'onboarding comme terminé dans l'API
     try {
       await onboardingService.saveOnboardingData({
         completed: true,
-        currentStep: 10, // Étape finale
+        currentStep: 10,
       });
-      console.log('✅ Onboarding marqué comme terminé dans l\'API (paiement réussi)');
+      console.log('[Stripe] Onboarding marqué comme terminé (paiement réussi)');
     } catch (error) {
-      console.error('❌ Erreur lors de la sauvegarde:', error);
-      // Ne pas bloquer le flux
+      console.error('[Stripe] Erreur lors de la sauvegarde:', error);
     }
     
     await AsyncStorage.setItem('onboarding_completed', 'true');

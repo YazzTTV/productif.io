@@ -4,7 +4,7 @@ import { deleteSession, removeAuthCookie } from "@/lib/auth"
 
 export async function POST(request: Request) {
   try {
-    const cookieStore = cookies()
+    const cookieStore = await cookies()
     const token = cookieStore.get("auth_token")?.value
 
     if (token) {
@@ -20,4 +20,3 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Erreur lors de la déconnexion" }, { status: 500 })
   }
 }
-

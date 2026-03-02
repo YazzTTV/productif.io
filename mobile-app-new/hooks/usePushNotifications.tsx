@@ -26,7 +26,12 @@ try {
   console.warn('⚠️ [PushNotifications] Module natif expo-notifications non disponible. Les notifications push nécessitent un build natif.');
 }
 
-export function usePushNotifications() {
+type UsePushNotificationsOptions = {
+  enableResponseHandling?: boolean;
+};
+
+export function usePushNotifications(options: UsePushNotificationsOptions = {}) {
+  const { enableResponseHandling = true } = options;
   const [expoPushToken, setExpoPushToken] = useState<string | null>(null);
   const [notification, setNotification] = useState<any | null>(null);
   const [permissionStatus, setPermissionStatus] = useState<string | null>(null);
@@ -34,6 +39,7 @@ export function usePushNotifications() {
   const responseListener = useRef<any | null>(null);
   const isMountedRef = useRef(true);
   const navigationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handledResponseKeysRef = useRef<Set<string>>(new Set());
 
   const requestPermissions = async (): Promise<boolean> => {
     // Si le module n'est pas disponible, retourner false
@@ -138,9 +144,28 @@ export function usePushNotifications() {
       return;
     }
     
+    const clearLastNotificationResponse = async () => {
+      try {
+        const notificationsAny = Notifications as any;
+        if (notificationsAny?.clearLastNotificationResponseAsync) {
+          await notificationsAny.clearLastNotificationResponseAsync();
+        }
+      } catch (error) {
+        console.error('❌ Erreur clearLastNotificationResponseAsync:', error);
+      }
+    };
+
     // Fonction partagée pour gérer un tap sur notification
     const handleNotificationResponse = (response: any) => {
       console.log('👆 Notification tapée - Réponse complète:', JSON.stringify(response, null, 2));
+      const requestIdentifier = response?.notification?.request?.identifier || 'unknown';
+      const actionIdentifier = response?.actionIdentifier || 'default';
+      const responseKey = `${requestIdentifier}:${actionIdentifier}`;
+      if (handledResponseKeysRef.current.has(responseKey)) {
+        console.log('ℹ️ Notification déjà traitée, skip:', responseKey);
+        return;
+      }
+      handledResponseKeysRef.current.add(responseKey);
       
       // Chercher les données dans plusieurs endroits possibles (APNs natif vs Expo)
       const content = response.notification.request.content;
@@ -255,7 +280,8 @@ export function usePushNotifications() {
           }
           try {
             console.log('🚀 Navigation vers /focus');
-            router.replace('/focus' as any);
+            router.push('/focus' as any);
+            void clearLastNotificationResponse();
             console.log('✅ Navigation vers Focus déclenchée avec succès');
           } catch (navError) {
             console.error('❌ Erreur de navigation vers Focus:', navError);
@@ -283,10 +309,11 @@ export function usePushNotifications() {
           }
           try {
             console.log('🚀 Navigation vers /(tabs)/assistant avec checkInType pour Analytics');
-            router.replace({
+            router.push({
               pathname: '/(tabs)/assistant',
               params: { checkInType: checkInTypeFromNotification },
             } as any);
+            void clearLastNotificationResponse();
             console.log('✅ Navigation vers Analytics déclenchée avec succès');
           } catch (navError) {
             console.error('❌ Erreur de navigation vers Analytics:', navError);
@@ -312,7 +339,8 @@ export function usePushNotifications() {
           }
           try {
             console.log('🚀 Navigation vers /daily-journal');
-            router.replace('/daily-journal' as any);
+            router.push('/daily-journal' as any);
+            void clearLastNotificationResponse();
             console.log('✅ Navigation vers Daily Journal déclenchée avec succès');
           } catch (navError) {
             console.error('❌ Erreur de navigation vers Daily Journal:', navError);
@@ -345,11 +373,12 @@ export function usePushNotifications() {
           }
           try {
             console.log('🚀 Navigation vers /(tabs)/assistant avec preset');
-            // Utiliser replace pour éviter les problèmes de stack de navigation
-            router.replace({
+            // Utiliser push pour conserver un retour propre vers le dashboard
+            router.push({
               pathname: '/(tabs)/assistant',
               params: { preset: presetValue },
             } as any);
+            void clearLastNotificationResponse();
             console.log('✅ Navigation déclenchée avec succès');
           } catch (navError) {
             console.error('❌ Erreur de navigation vers /(tabs)/assistant:', navError);
@@ -396,30 +425,33 @@ export function usePushNotifications() {
       }
     });
 
-    // Listener pour les notifications reçues pendant que l'app est ouverte
-    notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
-      if (!isMountedRef.current) return;
-      console.log('📱 Notification reçue:', notification);
-      setNotification(notification);
-    });
+    if (enableResponseHandling) {
+      // Listener pour les notifications reçues pendant que l'app est ouverte
+      notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
+        if (!isMountedRef.current) return;
+        console.log('📱 Notification reçue:', notification);
+        setNotification(notification);
+      });
 
-    // Listener pour les notifications sur lesquelles l'utilisateur a tapé
-    responseListener.current = Notifications.addNotificationResponseReceivedListener(
-      handleNotificationResponse
-    );
+      // Listener pour les notifications sur lesquelles l'utilisateur a tapé
+      responseListener.current = Notifications.addNotificationResponseReceivedListener(
+        handleNotificationResponse
+      );
 
-    // Gérer aussi le cas où l'app est lancée à partir d'une notification déjà tapée (cold start)
-    (async () => {
-      try {
-        const lastResponse = await Notifications.getLastNotificationResponseAsync();
-        if (lastResponse) {
-          console.log('📥 Dernière réponse de notification au démarrage:', lastResponse);
-          handleNotificationResponse(lastResponse);
+      // Gérer aussi le cas où l'app est lancée à partir d'une notification déjà tapée (cold start)
+      (async () => {
+        try {
+          const lastResponse = await Notifications.getLastNotificationResponseAsync();
+          if (lastResponse) {
+            console.log('📥 Dernière réponse de notification au démarrage:', lastResponse);
+            handleNotificationResponse(lastResponse);
+            await clearLastNotificationResponse();
+          }
+        } catch (error) {
+          console.error('❌ Erreur lors de la récupération de la dernière notification:', error);
         }
-      } catch (error) {
-        console.error('❌ Erreur lors de la récupération de la dernière notification:', error);
-      }
-    })();
+      })();
+    }
 
     return () => {
       // Marquer comme démonté pour éviter les mises à jour d'état
