@@ -9,7 +9,7 @@ const plans = [
   {
     id: 'monthly',
     name: 'Mensuel',
-    price: 14.99,
+    price: 7.99,
     popular: false,
     features: [
       '✅ Sessions Deep Work illimitées',
@@ -23,12 +23,12 @@ const plans = [
   {
     id: 'yearly',
     name: 'Annuel',
-    price: 9.99,
+    price: 4.92,
     popular: true,
-    savings: '€60',
+    savings: '40%',
     features: [
       '✅ Tout du plan mensuel',
-      '✅ Économisez 60€ par an',
+      '✅ 59€ par an, soit 40% d\'économie',
       '✅ Support prioritaire',
       '✅ Accès anticipé aux nouvelles fonctionnalités',
       '✅ Badge exclusif communauté',

@@ -25,8 +25,8 @@ export function FonctionnalitesCTA() {
           {/* Monthly */}
           <div className="rounded-2xl border bg-white p-6 shadow-sm hover:shadow-md transition-shadow">
             <div className="text-sm font-medium text-gray-600">Monthly</div>
-            <div className="mt-1 text-4xl font-bold tracking-tight">€14.99<span className="text-base font-medium">/mo</span></div>
-            <div className="text-xs text-muted-foreground">Billed monthly</div>
+            <div className="mt-1 text-4xl font-bold tracking-tight">€7.99<span className="text-base font-medium">/mo</span></div>
+            <div className="text-xs text-muted-foreground">Billed monthly, 7-day free trial</div>
             <ul className="space-y-4 my-6">
               <li className="flex items-start gap-3 text-sm text-gray-700">
                 <CheckCircle2 className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
@@ -52,8 +52,8 @@ export function FonctionnalitesCTA() {
           <div className="relative rounded-2xl border bg-white p-6 shadow-sm ring-1 ring-green-200 hover:shadow-md transition-shadow">
             <div className="absolute right-4 top-4 text-xs px-2 py-1 rounded-full bg-green-100 text-green-700">Most popular</div>
             <div className="text-sm font-medium text-gray-600">Yearly</div>
-            <div className="mt-1 text-4xl font-bold tracking-tight">€9.99<span className="text-base font-medium">/mo</span><span className="ml-2 text-xs inline-block rounded bg-green-100 text-green-700 px-2 py-0.5">save €60</span></div>
-            <div className="text-xs text-muted-foreground">Billed yearly</div>
+            <div className="mt-1 text-4xl font-bold tracking-tight">€4.92<span className="text-base font-medium">/mo</span><span className="ml-2 text-xs inline-block rounded bg-green-100 text-green-700 px-2 py-0.5">save 40%</span></div>
+            <div className="text-xs text-muted-foreground">Billed €59 yearly, 7-day free trial</div>
             <ul className="space-y-4 my-6">
               <li className="flex items-start gap-3 text-sm text-gray-700">
                 <CheckCircle2 className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />

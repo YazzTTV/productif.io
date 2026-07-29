@@ -3,6 +3,7 @@
  */
 
 import OpenAI from 'openai'
+import { notifyOpenAiQuotaExhausted } from './openaiAlert'
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -159,6 +160,10 @@ RÈGLES IMPORTANTES:
       }
     } catch (error: any) {
       console.error('Erreur analyse tâches:', error)
+      // Prévenir sur quota épuisé : sinon la panne est totalement muette côté
+      // exploitant. Volontairement non attendu pour ne pas retarder la réponse
+      // d'erreur rendue à l'utilisateur.
+      void notifyOpenAiQuotaExhausted(error, 'TaskAnalysisService.analyzeTasks')
       throw new Error(`Erreur lors de l'analyse: ${error.message}`)
     }
   }

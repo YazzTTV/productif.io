@@ -380,7 +380,7 @@ export function SettingsForm({ user }: SettingsFormProps) {
                 {billingPeriod === 'monthly' ? (
                   <>
                     <div className="flex items-baseline gap-2">
-                      <span className="text-white text-4xl font-bold">€14.99</span>
+                      <span className="text-white text-4xl font-bold">€7.99</span>
                       <span className="text-white/80 text-base">/month</span>
                     </div>
                     <p className="text-white/70 text-sm mt-1">{t('flexibleBilling')}</p>
@@ -388,7 +388,7 @@ export function SettingsForm({ user }: SettingsFormProps) {
                 ) : (
                   <>
                     <div className="flex items-baseline gap-2">
-                      <span className="text-white text-4xl font-bold">€9.99</span>
+                      <span className="text-white text-4xl font-bold">€4.92</span>
                       <span className="text-white/80 text-base">/month</span>
                     </div>
                     <div className="flex items-center gap-2 mt-1">

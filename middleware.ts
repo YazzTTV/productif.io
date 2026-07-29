@@ -40,6 +40,9 @@ const publicRoutes = [
   "/refund-policy",
   // Landing marketing publique
   "/landing",
+  // Landing de campagne TikTok / Instagram : doit rester accessible sans compte,
+  // c'est le point de chute du trafic publicitaire.
+  "/mode-examen",
   "/createur",
   "/verify-email",
 ]

@@ -32,8 +32,8 @@ export interface LockedFeature {
 
 const PLAN_LIMITS: Record<PlanId, PlanLimits> = {
   free: {
-    focusPerDay: 1,
-    focusMaxDurationMinutes: 30,
+    focusPerDay: 2,
+    focusMaxDurationMinutes: 25,
     maxHabits: 3,
     planMyDayMode: "preview",
     maxPlanMyDayEvents: 3,
@@ -62,6 +62,13 @@ const PREMIUM_TIERS = new Set(["pro", "premium", "starter", "enterprise", "paid"
  * Derive the plan from the user record without introducing a migration.
  * - Active subscription OR premium tier => premium
  * - Default => free
+ *
+ * Les achats passent desormais uniquement par Superwall (StoreKit), qui met a
+ * jour subscriptionStatus / subscriptionTier via le webhook. La condition
+ * stripeSubscriptionId est conservee volontairement pour ne pas retirer l'acces
+ * aux abonnes Stripe historiques : on a coupe les nouvelles ventes Stripe, pas
+ * les abonnements deja payes. A ne retirer qu'apres verification en base qu'il
+ * ne reste aucun abonne Stripe actif.
  */
 export function resolvePlan(user: Pick<User, "subscriptionStatus" | "subscriptionTier" | "stripeSubscriptionId">): PlanId {
   if (

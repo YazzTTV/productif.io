@@ -1,26 +1,14 @@
-import { MultiStepForm } from "./multi-step-form"
-import { Header } from "@/components/header"
+import { redirect } from "next/navigation"
 
+/**
+ * Seconde entrée du tunnel waitlist, fermée avec la première (juillet 2026).
+ *
+ * Cette page n'était liée depuis aucune autre, mais son URL restait publique et
+ * elle déclenchait le même paiement de 1 € via /api/waitlist/payment, avec la
+ * même promesse de tarif préférentiel à vie. Voir app/waitlist/page.tsx.
+ *
+ * Le formulaire multi-étapes reste dans ./multi-step-form.tsx, non monté.
+ */
 export default function InscriptionPage() {
-  return (
-    <main className="min-h-screen bg-white">
-      <Header />
-      <div className="container mx-auto px-4 py-12">
-        <div className="max-w-2xl mx-auto">
-          <div className="text-center mb-8">
-            <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-              Rejoignez la waitlist exclusive
-            </h1>
-            <p className="text-gray-600 text-lg">
-              Sécurisez votre accès à Productif.io avec un tarif préférentiel à vie
-            </p>
-          </div>
-          
-          <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-8">
-            <MultiStepForm />
-          </div>
-        </div>
-      </div>
-    </main>
-  )
-} 
+  redirect('/pricing')
+}

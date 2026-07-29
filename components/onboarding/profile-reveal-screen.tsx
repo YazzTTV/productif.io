@@ -208,18 +208,18 @@ export function ProfileRevealScreen({
                 </p>
                 <div className="flex items-center gap-2">
                   <span className="text-base text-green-600 bg-green-50 px-3 py-1 rounded-full font-medium">
-                    {isFr ? "💰 Économisez 60$/an" : "💰 Save $60/year"}
+                    {isFr ? "💰 40% d'économie" : "💰 Save 40%"}
                   </span>
                 </div>
               </div>
               <div className="flex items-center gap-4">
                 <div className="text-right">
-                  <p className="text-gray-900 text-3xl font-bold">$9.99</p>
+                  <p className="text-gray-900 text-3xl font-bold">4,92€</p>
                   <p className="text-base text-gray-500">
                     {isFr ? "par mois" : "per month"}
                   </p>
                   <p className="text-sm text-gray-400">
-                    {isFr ? "facturé annuellement" : "billed annually"}
+                    {isFr ? "59€ facturés annuellement" : "€59 billed annually"}
                   </p>
                 </div>
                 <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center ${
@@ -257,7 +257,7 @@ export function ProfileRevealScreen({
               </div>
               <div className="flex items-center gap-4">
                 <div className="text-right">
-                  <p className="text-gray-900 text-3xl font-bold">$14.99</p>
+                  <p className="text-gray-900 text-3xl font-bold">7,99€</p>
                   <p className="text-base text-gray-500">
                     {isFr ? "par mois" : "per month"}
                   </p>

@@ -129,14 +129,14 @@ export function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
                       {isFr ? 'Plan Annuel' : 'Annual Plan'}
                     </span>
                     <div className="flex items-center gap-2">
-                      <span className="text-2xl font-bold text-gray-900">9,99€</span>
+                      <span className="text-2xl font-bold text-gray-900">4,92€</span>
                       <span className="text-gray-600">/ {isFr ? 'mois' : 'month'}</span>
                     </div>
                   </div>
                   <div className="flex items-center gap-2 text-sm">
                     <Zap className="w-4 h-4 text-[#00C27A]" />
                     <span className="text-[#00C27A] font-medium">
-                      {isFr ? 'Économisez 60€ par an' : 'Save €60 per year'}
+                      {isFr ? "59€ par an, soit 40% d'économie" : '€59 per year, save 40%'}
                     </span>
                   </div>
                 </div>

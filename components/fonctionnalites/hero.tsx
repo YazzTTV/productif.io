@@ -34,9 +34,9 @@ export function FonctionnalitesHero() {
             Productif.io gives you a smart dashboard that centralizes all your tasks, habits, and goals,
             providing a clear view of your day without cognitive overload.
           </p>
-          <Button 
+          <Button
             className="bg-green-500 hover:bg-green-600 text-white"
-            onClick={() => window.location.href = '/waitlist'}
+            onClick={() => window.location.href = '/pricing'}
           >
             Try for free
           </Button>
