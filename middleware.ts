@@ -43,6 +43,12 @@ const publicRoutes = [
   // Landing de campagne TikTok / Instagram : doit rester accessible sans compte,
   // c'est le point de chute du trafic publicitaire.
   "/mode-examen",
+  // Tunnel waitlist fermé : ces deux routes ne servent plus qu'à rediriger vers
+  // /pricing. Elles doivent rester publiques pour que la redirection s'exécute,
+  // sinon le middleware renvoie vers /login et quiconque a un ancien lien
+  // (email, publicité, favori) reçoit un mur de connexion au lieu de l'offre.
+  "/waitlist",
+  "/inscription",
   "/createur",
   "/verify-email",
 ]
