@@ -11,6 +11,12 @@ Productifio IAM.json
 /.next/
 /out/
 
+# expo (etat local de dev, identifiants d'appareil)
+.expo/
+
+# macOS
+.DS_Store
+
 # production
 /build
 
