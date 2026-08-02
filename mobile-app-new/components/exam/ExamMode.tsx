@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { selectExamTasks, TaskForExam } from '@/utils/taskSelection';
 import { subjectsService, authService } from '@/lib/api';
 import { checkPremiumStatus } from '@/utils/premium';
+import { getRestorableFocusSession } from '@/utils/focusSession';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useExamSettings } from '@/hooks/useExamSettings';
 
@@ -45,6 +46,15 @@ export function ExamMode() {
 
   const checkExamModeAccess = async () => {
     try {
+      // Une session focus est encore en cours : on y retourne au lieu de
+      // proposer d'en démarrer une nouvelle. Vérifié avant l'appel réseau, pour
+      // que la reprise ne dépende pas de la connexion.
+      const runningFocus = await getRestorableFocusSession();
+      if (runningFocus) {
+        router.replace('/focus');
+        return;
+      }
+
       // Vérifier le statut Premium via l'API
       const user = await authService.checkAuth();
       

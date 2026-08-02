@@ -3,6 +3,7 @@ import { View, ActivityIndicator } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import { getAuthToken } from '@/lib/api';
+import { getRestorableFocusSession } from '@/utils/focusSession';
 
 export default function Entry() {
   const [booting, setBooting] = useState(true);
@@ -18,6 +19,18 @@ export default function Entry() {
         if (token) {
           // Préserver la session : si token présent, on considère l'onboarding comme fait
           await AsyncStorage.setItem('onboarding_completed', 'true');
+
+          // Une session focus encore en cours reprend la main sur le dashboard.
+          // C'est indispensable depuis que le bouclier survit à la mort de
+          // l'app : sans ça, l'utilisateur relance l'app, voit son écran
+          // d'accueil habituel, et n'a aucun moyen de comprendre pourquoi ses
+          // applications sont bloquées ni d'y mettre fin.
+          const runningFocus = await getRestorableFocusSession();
+          if (runningFocus) {
+            router.replace('/focus');
+            return;
+          }
+
           router.replace('/(tabs)');
           return;
         }

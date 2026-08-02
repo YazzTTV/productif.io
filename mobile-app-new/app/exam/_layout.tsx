@@ -26,11 +26,17 @@ export default function ExamLayout() {
           headerShown: false,
         }} 
       />
-      <Stack.Screen 
-        name="summary" 
-        options={{ 
+      <Stack.Screen
+        name="summary"
+        options={{
           headerShown: false,
-        }} 
+        }}
+      />
+      <Stack.Screen
+        name="blocked-apps"
+        options={{
+          headerShown: false,
+        }}
       />
     </Stack>
   );

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { View, Text, TouchableOpacity, StyleSheet, Dimensions, ScrollView, PanResponder, Modal, Alert, BackHandler, Platform } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
+import { View, Text, TouchableOpacity, StyleSheet, Dimensions, ScrollView, PanResponder, Modal, Alert, BackHandler, Platform, Switch } from 'react-native';
 import Animated, { 
   useSharedValue, 
   useAnimatedStyle, 
@@ -17,6 +18,8 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { assistantService, authService, tasksService } from '@/lib/api';
 import { selectExamTasks, TaskForExam } from '@/utils/taskSelection';
 import { useDailyStructureSettings } from '@/hooks/useDailyStructureSettings';
+import { useSuperwall } from '@/hooks/useSuperwall';
+import { SUPERWALL_EVENTS } from '@/lib/superwallEvents';
 import { Coachmark } from '@/tutorial/Coachmark';
 import {
   getTutorialCompleted,
@@ -24,6 +27,27 @@ import {
   setTutorialCompleted,
   setTutorialStage,
 } from '@/tutorial/tutorialStorage';
+import { hasActiveRealExamSession } from '@/utils/examSession';
+import {
+  BLOCKED_APPS_SELECTION_ID,
+  getActiveBlock,
+  getAuthorizationStatus as getBlockingAuthorizationStatus,
+  getBlockedSelectionCount,
+  isAppBlockingSupported,
+  requestAuthorization as requestBlockingAuthorization,
+  startBlocking,
+  stopBlocking,
+} from '@/utils/appBlocking';
+import { DeviceActivitySelectionViewPersisted } from 'react-native-device-activity';
+import {
+  clearFocusSession,
+  getRestorableFocusSession,
+  saveFocusSession,
+} from '@/utils/focusSession';
+import {
+  startFocusLiveActivity,
+  stopFocusLiveActivity,
+} from '@/utils/liveActivity';
 const { width } = Dimensions.get('window');
 const RING_SIZE = Math.min(width * 0.65, 260);
 const STROKE_WIDTH = 8;
@@ -409,6 +433,7 @@ export default function FocusScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { t } = useLanguage();
+  const { triggerEvent } = useSuperwall();
   const params = useLocalSearchParams();
   const { settings: dailyStructure } = useDailyStructureSettings();
   const startButtonRef = useRef<TouchableOpacity>(null);
@@ -428,6 +453,128 @@ export default function FocusScreen() {
   const [tutorialStage, setTutorialStageState] = useState<string | null>(null);
   const [tutorialCompleted, setTutorialCompletedState] = useState(false);
   const [maxFocusDuration, setMaxFocusDuration] = useState<number | null>(null);
+
+  // Blocage des applications distrayantes pendant la session.
+  const blockingSupported = isAppBlockingSupported();
+  const [blockAppsEnabled, setBlockAppsEnabled] = useState(false);
+  const [blockedCount, setBlockedCount] = useState(0);
+
+  const [showBlockedAppsPicker, setShowBlockedAppsPicker] = useState(false);
+  const [requestingBlockingAuth, setRequestingBlockingAuth] = useState(false);
+  const [blockingAuthStatus, setBlockingAuthStatus] = useState(() =>
+    isAppBlockingSupported() ? getBlockingAuthorizationStatus() : 'unsupported'
+  );
+
+  // L'utilisateur a-t-il touché l'interrupteur lui-même ? Sans cette trace, le
+  // rafraîchissement au retour d'écran écrasait son choix à chaque fois.
+  const blockAppsTouchedRef = useRef(false);
+
+  // Dans une ref et non dans le state : la Live Activity doit pouvoir être
+  // arrêtée depuis des callbacks mémoïsés sans les faire se recréer.
+  const liveActivityIdRef = useRef<string | null>(null);
+
+  const refreshBlockingState = useCallback(() => {
+    if (!blockingSupported) return;
+    const count = getBlockedSelectionCount();
+    const status = getBlockingAuthorizationStatus();
+    setBlockedCount(count);
+    setBlockingAuthStatus(status);
+    if (!blockAppsTouchedRef.current) {
+      setBlockAppsEnabled(count > 0 && status === 'approved');
+    }
+  }, [blockingSupported]);
+
+  // Blocage survivant à une app tuée : le bouclier vit dans l'extension, l'état
+  // de session non. On le retrouve pour pouvoir l'afficher et y mettre fin.
+  const [orphanBlockExpiresAt, setOrphanBlockExpiresAt] = useState<number | null>(null);
+
+  const refreshOrphanBlock = useCallback(async () => {
+    if (!blockingSupported) return;
+    const record = await getActiveBlock();
+    // Une session en cours dans cet écran gère déjà son propre bouclier.
+    setOrphanBlockExpiresAt(record && phase !== 'active' ? record.expiresAt : null);
+  }, [blockingSupported, phase]);
+
+  useFocusEffect(
+    useCallback(() => {
+      refreshBlockingState();
+      refreshOrphanBlock();
+    }, [refreshBlockingState, refreshOrphanBlock])
+  );
+
+  const handleStopOrphanBlock = useCallback(async () => {
+    await stopBlocking('manual_stop_orphan');
+    stopFocusLiveActivity(liveActivityIdRef.current);
+    liveActivityIdRef.current = null;
+    await clearFocusSession();
+    setOrphanBlockExpiresAt(null);
+    refreshBlockingState();
+  }, [refreshBlockingState]);
+
+  /**
+   * Reprise d'une session interrompue par la mort de l'app.
+   *
+   * Ne tourne qu'une fois, au montage, et uniquement si l'écran est encore à
+   * l'état initial : sans ce garde-fou, revenir sur l'écran pendant une session
+   * en cours la relancerait par-dessus elle-même.
+   */
+  const sessionRestoredRef = useRef(false);
+  useEffect(() => {
+    if (sessionRestoredRef.current) return;
+    sessionRestoredRef.current = true;
+
+    (async () => {
+      const restored = await getRestorableFocusSession();
+      if (!restored) return;
+
+      console.log(
+        `[appBlocking] session focus restauree, ${restored.remainingSeconds}s restantes`
+      );
+
+      // La Live Activity survit à la mort de l'app : on récupère son
+      // identifiant plutôt que d'en démarrer une seconde, sinon l'utilisateur
+      // se retrouverait avec deux comptes à rebours concurrents.
+      liveActivityIdRef.current = restored.liveActivityId ?? null;
+
+      setSelectedDuration(restored.durationMinutes);
+      setSessionId(restored.sessionId);
+      setCurrentTaskIndex(restored.taskIndex);
+      setTimeLeft(restored.remainingSeconds);
+      setPhase('active');
+      setIsRunning(true);
+    })();
+  }, []);
+
+  /**
+   * La sélection vit dans une modale et non dans un écran dédié : une route
+   * séparée passait par le Stack du groupe `exam`, dont `preview` est la
+   * première route déclarée, et la navigation n'aboutissait pas. Une modale
+   * supprime le routeur de l'équation et évite en plus de faire quitter à
+   * l'utilisateur son écran de démarrage de session.
+   */
+  const openBlockedAppsPicker = useCallback(async () => {
+    if (!blockingSupported) return;
+
+    if (getBlockingAuthorizationStatus() !== 'approved') {
+      setRequestingBlockingAuth(true);
+      try {
+        await requestBlockingAuthorization();
+      } finally {
+        setRequestingBlockingAuth(false);
+      }
+      const status = getBlockingAuthorizationStatus();
+      setBlockingAuthStatus(status);
+      if (status !== 'approved') {
+        Alert.alert(
+          t('blockApps'),
+          status === 'denied' ? t('blockAppsDenied') : t('blockAppsPermissionExplainer')
+        );
+        return;
+      }
+    }
+
+    setShowBlockedAppsPicker(true);
+  }, [blockingSupported, t]);
   
   const currentTask = tasks[currentTaskIndex] || { id: '', title: '', subject: '', completed: false };
   const completedCount = tasks.filter(t => t.completed).length;
@@ -465,11 +612,35 @@ export default function FocusScreen() {
   }, []);
 
   useEffect(() => {
-    if (!maxFocusDuration) return;
-    if (selectedDuration > maxFocusDuration) {
-      setSelectedDuration(maxFocusDuration);
-    }
+    let cancelled = false;
+    (async () => {
+      const exam = await hasActiveRealExamSession();
+      if (cancelled || exam) return;
+      if (!maxFocusDuration) return;
+      if (selectedDuration > maxFocusDuration) {
+        setSelectedDuration(maxFocusDuration);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [maxFocusDuration, selectedDuration]);
+
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      (async () => {
+        const exam = await hasActiveRealExamSession();
+        if (cancelled || exam) return;
+        if (maxFocusDuration && selectedDuration > maxFocusDuration) {
+          setSelectedDuration(maxFocusDuration);
+        }
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }, [maxFocusDuration, selectedDuration]),
+  );
 
   useEffect(() => {
     if (tutorialCompleted) return;
@@ -590,11 +761,17 @@ export default function FocusScreen() {
 
   const handleStartFocus = async () => {
     try {
+      const bypassPlanLimits = await hasActiveRealExamSession();
       const effectiveDuration =
-        maxFocusDuration && selectedDuration > maxFocusDuration
-          ? maxFocusDuration
-          : selectedDuration;
-      if (effectiveDuration !== selectedDuration) {
+        bypassPlanLimits ||
+        !maxFocusDuration ||
+        selectedDuration <= maxFocusDuration
+          ? selectedDuration
+          : maxFocusDuration;
+      if (
+        !bypassPlanLimits &&
+        effectiveDuration !== selectedDuration
+      ) {
         setSelectedDuration(effectiveDuration);
         Alert.alert(
           'Focus limité',
@@ -610,7 +787,7 @@ export default function FocusScreen() {
       }
 
       const startLocally = () => {
-        setTimeLeft(effectiveDuration * 60);
+        setTimeLeft(Math.round(effectiveDuration * 60));
         setPhase('active');
         setIsRunning(true);
         setCurrentTaskIndex(0);
@@ -650,6 +827,28 @@ export default function FocusScreen() {
         setSessionId(result.session.id);
         console.log('✅ [Focus] Nouvelle session démarrée:', result.session.id);
       }
+
+      // Le blocage ne conditionne jamais le démarrage : une session sans
+      // bouclier reste une session de focus.
+      if (blockAppsEnabled) {
+        await startBlocking(result?.session?.id || `focus_${Date.now()}`, effectiveDuration);
+      }
+
+      const startedAt = Date.now();
+      const endsAt = startedAt + effectiveDuration * 60 * 1000;
+      const liveActivityId = startFocusLiveActivity(endsAt, currentTask?.title);
+      liveActivityIdRef.current = liveActivityId;
+
+      // Persistée avant l'affichage : si l'app meurt juste après, la session
+      // doit être retrouvable, sinon l'utilisateur revient bloqué sans session.
+      await saveFocusSession({
+        sessionId: result?.session?.id ?? null,
+        startedAt,
+        durationMinutes: effectiveDuration,
+        taskIndex: 0,
+        liveActivityId,
+      });
+
       startLocally();
     } catch (error: any) {
       // Si l'erreur indique qu'une session est déjà en cours, on continue quand même localement
@@ -674,13 +873,18 @@ export default function FocusScreen() {
         error?.locked === true;
       
       console.log('🔍 [Focus] isPlanLocked:', isPlanLocked);
-      
+
       const startLocally = () => {
-        setTimeLeft(selectedDuration * 60);
+        setTimeLeft(Math.round(selectedDuration * 60));
         setPhase('active');
         setIsRunning(true);
         setCurrentTaskIndex(0);
       };
+
+      if (isPlanLocked && (await hasActiveRealExamSession())) {
+        startLocally();
+        return;
+      }
 
       // Si c'est une erreur de limite Premium, bloquer et afficher l'alerte
       if (isPlanLocked) {
@@ -689,7 +893,15 @@ export default function FocusScreen() {
           errorMessage || '1 session Focus par jour en freemium. Passez en Premium pour continuer.',
           [
             { text: 'Plus tard', style: 'cancel' },
-            { text: 'Passer en Premium', onPress: () => router.push('/paywall') }
+            {
+              text: 'Passer en Premium',
+              onPress: () =>
+                triggerEvent(SUPERWALL_EVENTS.FEATURE_LOCKED, {
+                  params: { source: 'focus_limit' },
+                  // CTA explicite : doit toujours afficher le paywall.
+                  bypassCooldown: true,
+                }),
+            }
           ]
         );
         setPhase('intro');
@@ -783,6 +995,13 @@ export default function FocusScreen() {
   }, [progress, phase]);
 
   const handleComplete = useCallback(async () => {
+    // Levée du bouclier avant tout le reste : si un appel réseau échoue
+    // ensuite, l'utilisateur ne doit pas rester avec ses apps bloquées.
+    await stopBlocking('focus_completed');
+    stopFocusLiveActivity(liveActivityIdRef.current);
+    liveActivityIdRef.current = null;
+    await clearFocusSession();
+
     if (sessionId) {
       try {
         await assistantService.endDeepWorkSession(sessionId, 'complete');
@@ -790,15 +1009,25 @@ export default function FocusScreen() {
         console.log('Session terminée localement');
       }
     }
+    await triggerEvent(SUPERWALL_EVENTS.FOCUS_COMPLETED, {
+      params: { source: 'focus_screen' },
+      requireNonPremium: false,
+      bypassCooldown: true,
+    });
     if (!tutorialCompleted && tutorialStage === 'habits') {
       router.replace('/review-habits');
       return;
     }
     // Toujours revenir au dashboard après une session
     router.replace('/(tabs)');
-  }, [sessionId, router, tutorialCompleted, tutorialStage]);
+  }, [sessionId, router, tutorialCompleted, tutorialStage, triggerEvent]);
 
   const handleExit = useCallback(async () => {
+    await stopBlocking('focus_exited');
+    stopFocusLiveActivity(liveActivityIdRef.current);
+    liveActivityIdRef.current = null;
+    await clearFocusSession();
+
     if (phase === 'active') {
       // Arrêter le timer
       if (intervalRef.current) {
@@ -923,6 +1152,64 @@ export default function FocusScreen() {
                 </View>
               </Animated.View>
 
+              {/* Blocage encore actif alors qu'aucune session ne tourne ici */}
+              {orphanBlockExpiresAt !== null && (
+                <Animated.View entering={FadeInDown.delay(400).duration(400)} style={introStyles.orphanBlockCard}>
+                  <Text style={introStyles.orphanBlockTitle}>{t('blockStillActive')}</Text>
+                  <Text style={introStyles.orphanBlockSubtitle}>
+                    {t('blockStillActiveUntil')}{' '}
+                    {new Date(orphanBlockExpiresAt).toLocaleTimeString('fr-FR', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </Text>
+                  <TouchableOpacity
+                    style={introStyles.orphanBlockButton}
+                    onPress={handleStopOrphanBlock}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={introStyles.orphanBlockButtonText}>{t('blockStopNow')}</Text>
+                  </TouchableOpacity>
+                </Animated.View>
+              )}
+
+              {/* Blocage des applications */}
+              {blockingSupported && (
+                <Animated.View entering={FadeInDown.delay(450).duration(400)} style={introStyles.blockAppsCard}>
+                  <View style={introStyles.blockAppsInfo}>
+                    <Text style={introStyles.blockAppsTitle}>{t('blockApps')}</Text>
+                    <Text style={introStyles.blockAppsSubtitle}>
+                      {blockedCount > 0
+                        ? `${blockedCount} ${t('blockAppsSelected')}`
+                        : t('blockAppsNoSelection')}
+                    </Text>
+                    <TouchableOpacity
+                      onPress={openBlockedAppsPicker}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <Text style={introStyles.blockAppsLink}>
+                        {blockedCount > 0 ? t('blockAppsEdit') : t('blockAppsChoose')}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                  <Switch
+                    value={blockAppsEnabled}
+                    onValueChange={next => {
+                      blockAppsTouchedRef.current = true;
+                      // Jamais grisé : un interrupteur inerte n'explique rien.
+                      // Sans sélection, l'activer ouvre le sélecteur.
+                      if (next && blockedCount === 0) {
+                        openBlockedAppsPicker();
+                        return;
+                      }
+                      setBlockAppsEnabled(next);
+                    }}
+                    trackColor={{ false: 'rgba(0, 0, 0, 0.1)', true: '#16A34A' }}
+                    thumbColor="#FFFFFF"
+                  />
+                </Animated.View>
+              )}
+
               {/* Start button */}
               <Animated.View entering={FadeInDown.delay(500).duration(400)} style={introStyles.startButtonContainer}>
                 <TouchableOpacity
@@ -951,6 +1238,50 @@ export default function FocusScreen() {
             router.replace('/review-habits');
           }}
         />
+
+        {/* Sélection des applications à bloquer */}
+        <Modal
+          visible={showBlockedAppsPicker}
+          animationType="slide"
+          presentationStyle="pageSheet"
+          onRequestClose={() => {
+            setShowBlockedAppsPicker(false);
+            refreshBlockingState();
+          }}
+        >
+          <View style={blockPickerStyles.container}>
+            <View style={blockPickerStyles.header}>
+              <Text style={blockPickerStyles.title}>{t('blockApps')}</Text>
+              <TouchableOpacity
+                onPress={() => {
+                  setShowBlockedAppsPicker(false);
+                  refreshBlockingState();
+                }}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+              >
+                <Ionicons name="close" size={26} color="#000" />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={blockPickerStyles.count}>
+              {blockedCount > 0
+                ? `${blockedCount} ${t('blockAppsSelected')}`
+                : t('blockAppsNoSelection')}
+            </Text>
+
+            <DeviceActivitySelectionViewPersisted
+              style={blockPickerStyles.picker}
+              familyActivitySelectionId={BLOCKED_APPS_SELECTION_ID}
+              headerText={t('blockAppsPickerHeader')}
+              footerText={t('blockAppsPickerFooter')}
+              onSelectionChange={event => {
+                const { applicationCount, categoryCount, webDomainCount } =
+                  event.nativeEvent;
+                setBlockedCount(applicationCount + categoryCount + webDomainCount);
+              }}
+            />
+          </View>
+        </Modal>
 
         {/* Session Settings Modal */}
         <SessionSettingsModal
@@ -1076,6 +1407,37 @@ export default function FocusScreen() {
     </View>
   );
 }
+
+const blockPickerStyles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    paddingTop: 20,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 24,
+    paddingBottom: 12,
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#000',
+  },
+  count: {
+    fontSize: 13,
+    color: 'rgba(0, 0, 0, 0.4)',
+    paddingHorizontal: 24,
+    paddingBottom: 12,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  picker: {
+    flex: 1,
+  },
+});
 
 const introStyles = StyleSheet.create({
   container: {
@@ -1215,6 +1577,70 @@ const introStyles = StyleSheet.create({
   },
   presetButtonTextActive: {
     color: '#FFFFFF',
+  },
+  orphanBlockCard: {
+    width: '100%',
+    maxWidth: 400,
+    padding: 16,
+    marginBottom: 16,
+    borderRadius: 16,
+    backgroundColor: 'rgba(22, 163, 74, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(22, 163, 74, 0.25)',
+  },
+  orphanBlockTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#000',
+    marginBottom: 4,
+  },
+  orphanBlockSubtitle: {
+    fontSize: 13,
+    color: 'rgba(0, 0, 0, 0.6)',
+    marginBottom: 12,
+  },
+  orphanBlockButton: {
+    alignSelf: 'flex-start',
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    borderRadius: 20,
+    backgroundColor: '#16A34A',
+  },
+  orphanBlockButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  blockAppsCard: {
+    width: '100%',
+    maxWidth: 400,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    marginBottom: 16,
+    borderRadius: 16,
+    backgroundColor: 'rgba(0, 0, 0, 0.02)',
+  },
+  blockAppsInfo: {
+    flex: 1,
+    marginRight: 16,
+  },
+  blockAppsTitle: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#000',
+    marginBottom: 4,
+  },
+  blockAppsSubtitle: {
+    fontSize: 12,
+    color: 'rgba(0, 0, 0, 0.4)',
+  },
+  blockAppsLink: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#16A34A',
+    marginTop: 6,
   },
   startButtonContainer: {
     width: '100%',

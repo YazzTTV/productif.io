@@ -1,12 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Switch, ActivityIndicator } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { selectExamTasks, TaskForExam } from '@/utils/taskSelection';
 import { saveExamSession, getActiveExamSession } from '@/utils/examSession';
-import { checkPremiumStatus } from '@/utils/premium';
+import { hasExamModeAccess } from '@/utils/premium';
+import {
+  getAuthorizationStatus,
+  getBlockedSelectionCount,
+  isAppBlockingSupported,
+  startBlocking,
+} from '@/utils/appBlocking';
 import { useLanguage } from '@/contexts/LanguageContext';
 
 const MIN_DURATION = 25;
@@ -24,28 +30,52 @@ export default function ExamSetupScreen() {
   const [nextTasks, setNextTasks] = useState<TaskForExam[]>([]);
   const [loading, setLoading] = useState(true);
   const [starting, setStarting] = useState(false);
+  const [blockAppsEnabled, setBlockAppsEnabled] = useState(false);
+  const [blockedCount, setBlockedCount] = useState(0);
+
+  const blockingSupported = isAppBlockingSupported();
+
+  // Relu à chaque retour sur l'écran : l'utilisateur peut modifier sa sélection
+  // dans l'écran dédié puis revenir ici.
+  useFocusEffect(
+    React.useCallback(() => {
+      if (!blockingSupported) return;
+      const count = getBlockedSelectionCount();
+      setBlockedCount(count);
+      setBlockAppsEnabled(count > 0 && getAuthorizationStatus() === 'approved');
+    }, [blockingSupported])
+  );
 
   useEffect(() => {
-    checkActiveSession();
-    loadTasks();
-    checkAccess();
+    // Séquencé volontairement : en parallèle, loadTasks pouvait lever le
+    // spinner et rendre l'écran utilisable avant la réponse de checkAccess,
+    // laissant un compte gratuit démarrer une vraie session sur réseau lent.
+    (async () => {
+      const allowed = await checkAccess();
+      if (!allowed) return;
+      if (await checkActiveSession()) return;
+      await loadTasks();
+    })();
   }, []);
 
-  const checkActiveSession = async () => {
+  const checkActiveSession = async (): Promise<boolean> => {
     const activeSession = await getActiveExamSession();
     if (activeSession) {
       router.replace({
         pathname: '/exam/session',
         params: { sessionId: activeSession.sessionId },
       });
+      return true;
     }
+    return false;
   };
 
-  const checkAccess = async () => {
-    const status = await checkPremiumStatus();
-    if (!status.isPremium) {
+  const checkAccess = async (): Promise<boolean> => {
+    const allowed = await hasExamModeAccess();
+    if (!allowed) {
       router.replace('/exam/preview');
     }
+    return allowed;
   };
 
   const loadTasks = async () => {
@@ -69,9 +99,15 @@ export default function ExamSetupScreen() {
 
     setStarting(true);
     try {
+      // Revérifié au moment de l'action : l'écran a pu rester ouvert, et c'est
+      // ici qu'on crée une vraie session (non démo) avec durée et hardMode libres.
+      if (!(await checkAccess())) {
+        return;
+      }
+
       const sessionId = `exam_${Date.now()}`;
       const allTaskIds = [primaryTask.id, ...nextTasks.map(t => t.id)].filter(Boolean);
-      
+
       await saveExamSession({
         sessionId,
         startedAt: Date.now(),
@@ -81,7 +117,14 @@ export default function ExamSetupScreen() {
         currentTaskIndex: 0,
         plannedTaskIds: allTaskIds,
         completedTaskIds: [],
+        isDemo: false,
       });
+
+      // Le blocage est un bonus, pas une condition : une session sans bouclier
+      // reste une session de révision. On ne la fait donc jamais échouer ici.
+      if (blockAppsEnabled) {
+        await startBlocking(sessionId, duration);
+      }
 
       router.push({
         pathname: '/exam/session',
@@ -218,6 +261,34 @@ export default function ExamSetupScreen() {
 
         {/* Options */}
         <Animated.View entering={FadeInDown.delay(500).duration(400)} style={styles.section}>
+          {blockingSupported && (
+            <View style={styles.optionItem}>
+              <View style={styles.optionContent}>
+                <Text style={styles.optionTitle}>{t('blockApps')}</Text>
+                <Text style={styles.optionDescription}>
+                  {blockedCount > 0
+                    ? `${blockedCount} ${t('blockAppsSelected')}`
+                    : t('blockAppsNoSelection')}
+                </Text>
+                <TouchableOpacity
+                  onPress={() => router.push('/exam/blocked-apps')}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Text style={styles.optionLink}>
+                    {blockedCount > 0 ? t('blockAppsEdit') : t('blockAppsChoose')}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              <Switch
+                value={blockAppsEnabled}
+                onValueChange={setBlockAppsEnabled}
+                disabled={blockedCount === 0}
+                trackColor={{ false: 'rgba(0, 0, 0, 0.1)', true: '#16A34A' }}
+                thumbColor="#FFFFFF"
+              />
+            </View>
+          )}
+
           <View style={styles.optionItem}>
             <View style={styles.optionContent}>
               <Text style={styles.optionTitle}>{t('hardMode')}</Text>
@@ -502,6 +573,12 @@ const styles = StyleSheet.create({
   optionDescription: {
     fontSize: 12,
     color: 'rgba(0, 0, 0, 0.4)',
+  },
+  optionLink: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#16A34A',
+    marginTop: 6,
   },
   ctaSection: {
     marginTop: 8,

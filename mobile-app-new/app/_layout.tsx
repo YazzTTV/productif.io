@@ -4,29 +4,21 @@ import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { StripeProvider } from '@stripe/stripe-react-native';
 import 'react-native-reanimated';
 import { CopilotProvider } from 'react-native-copilot';
 import { TutorialTooltip } from '@/tutorial/TutorialTooltip';
-import { SuperwallProvider } from 'expo-superwall';
-import SuperwallExpoModule from 'expo-superwall';
+import SuperwallExpoModule, { SuperwallProvider } from 'expo-superwall';
 import * as Linking from 'expo-linking';
 
 import { ThemeProvider, useTheme } from '@/contexts/ThemeContext';
 import { LanguageProvider } from '@/contexts/LanguageContext';
-import Constants from 'expo-constants';
 import '@/utils/suppressWarnings'; // Supprimer les warnings NativeEventEmitter
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { useSuperwallUserSync } from '@/hooks/useSuperwallUserSync';
 import { initAppCheck } from '@/lib/appCheck';
 import { useAppsFlyer, flushQueuedAttribution } from '@/hooks/useAppsFlyer';
+import { useBlockingReconciliation } from '@/hooks/useBlockingReconciliation';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
-// Stripe publishable key - from environment variables or app.json extra config
-const STRIPE_PUBLISHABLE_KEY = 
-  process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY || 
-  Constants.expoConfig?.extra?.stripePublishableKey || 
-  'pk_test_51...'; // Replace with your actual test key
 
 function AppContent() {
   const { actualTheme } = useTheme();
@@ -37,6 +29,7 @@ function AppContent() {
   usePushNotifications();
   useSuperwallUserSync();
   useAppsFlyer();
+  useBlockingReconciliation();
 
   useEffect(() => {
     const onUrl = async (event: { url: string }) => {
@@ -326,26 +319,24 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SuperwallProvider apiKeys={{ ios: 'pk_IYwjtBwdEBaR5WiSz8YQR' }}>
-        <StripeProvider publishableKey={STRIPE_PUBLISHABLE_KEY}>
-          <ThemeProvider>
-            <LanguageProvider>
-              <CopilotProvider
-                animated
-                overlay="view"
-                backdropColor="rgba(55, 65, 81, 0.72)"
-                tooltipComponent={TutorialTooltip}
-                labels={{
-                  next: 'Suivant',
-                  previous: 'Retour',
-                  skip: 'Passer',
-                  finish: 'Terminer',
-                }}
-              >
-                <AppContent />
-              </CopilotProvider>
-            </LanguageProvider>
-          </ThemeProvider>
-        </StripeProvider>
+        <ThemeProvider>
+          <LanguageProvider>
+            <CopilotProvider
+              animated
+              overlay="view"
+              backdropColor="rgba(55, 65, 81, 0.72)"
+              tooltipComponent={TutorialTooltip}
+              labels={{
+                next: 'Suivant',
+                previous: 'Retour',
+                skip: 'Passer',
+                finish: 'Terminer',
+              }}
+            >
+              <AppContent />
+            </CopilotProvider>
+          </LanguageProvider>
+        </ThemeProvider>
       </SuperwallProvider>
     </GestureHandlerRootView>
   );

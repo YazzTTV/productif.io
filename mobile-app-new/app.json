@@ -10,6 +10,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "io.productif.app",
+      "appleTeamId": "NGAU42SNSX",
       "googleServicesFile": "./firebase/GoogleService-Info.plist",
       "buildNumber": "2",
       "infoPlist": {
@@ -104,7 +105,14 @@
           "photosPermission": "Nous avons besoin d'accéder à vos photos pour analyser les images de matières.",
           "cameraPermission": "Nous avons besoin d'accéder à votre appareil photo pour photographier vos listes de matières."
         }
-      ]
+      ],
+      [
+        "react-native-device-activity",
+        {
+          "appGroup": "group.io.productif.app"
+        }
+      ],
+      "expo-live-activity"
     ],
     "experiments": {
       "typedRoutes": false
