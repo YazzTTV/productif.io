@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   ScrollView,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
 import Animated, {
   FadeInDown,
@@ -16,13 +15,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { onboardingService , paymentService } from '@/lib/api';
+import { onboardingService } from '@/lib/api';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSuperwall } from '@/hooks/useSuperwall';
+import { SUPERWALL_EVENTS } from '@/lib/superwallEvents';
 
 export default function ProfileRevealScreen() {
   const { t } = useLanguage();
   const insets = useSafeAreaInsets();
-  const [selectedPlan, setSelectedPlan] = useState<'monthly' | 'annual'>('annual');
+  const { triggerEvent } = useSuperwall();
   const [isLoading, setIsLoading] = useState(false);
 
   // Profil exemple
@@ -32,55 +33,33 @@ export default function ProfileRevealScreen() {
 
   const handleStartTrial = async () => {
     setIsLoading(true);
-    
+
     try {
-      const billingType = selectedPlan === 'annual' ? 'annual' : 'monthly';
-      
-      // Sauvegarder le plan sélectionné dans l'API
+      // L'onboarding est marqué terminé AVANT le paywall : si l'utilisateur
+      // ferme le paywall sans acheter, il arrive quand même dans l'app en
+      // plan gratuit au lieu de rester bloqué sur cet écran.
       try {
         await onboardingService.saveOnboardingData({
-          billingCycle: billingType,
-          currentStep: 9,
+          completed: true,
+          currentStep: 10,
         });
       } catch (error) {
-        console.error('❌ Erreur lors de la sauvegarde du plan:', error);
-      }
-      
-      // Créer la session Stripe via l'API
-      const { url } = await paymentService.createCheckoutSession(billingType);
-      
-      if (!url) {
-        throw new Error(t('paymentNoSessionUrl', undefined, 'Aucune URL de session retournée'));
+        console.error('❌ Erreur lors de la sauvegarde de l\'onboarding:', error);
       }
 
-      // Rediriger directement vers la WebView Stripe
-      router.push({
-        pathname: '/(onboarding-new)/stripe-webview',
-        params: { checkoutUrl: url, plan: selectedPlan }
+      await AsyncStorage.setItem('onboarding_completed', 'true');
+
+      // Prix, offres et éligibilité à l'essai sont pilotés par Superwall.
+      await triggerEvent(SUPERWALL_EVENTS.CAMPAIGN_TRIGGER, {
+        params: { source: 'onboarding_profile_reveal' },
+        requireNonPremium: false,
+        bypassCooldown: true,
       });
     } catch (error: any) {
-      console.error('Erreur lors de la création de la session Stripe:', error);
-      
-      if (error?.message?.includes('authenticated') || error?.message?.includes('Non authentifié')) {
-        Alert.alert(
-          t('loginRequiredTitle', undefined, 'Connexion requise'),
-          t('loginRequiredMessage', undefined, 'Vous devez être connecté pour continuer. Veuillez vous connecter ou créer un compte.'),
-          [
-            { text: t('cancel', undefined, 'Annuler'), style: 'cancel' },
-            { 
-              text: t('loginButton', undefined, 'Se connecter'), 
-              onPress: () => router.push('/login')
-            }
-          ]
-        );
-      } else {
-        Alert.alert(
-          t('error', undefined, 'Erreur'),
-          error?.message || t('paymentSessionError', undefined, 'Une erreur est survenue lors de la création de la session de paiement. Veuillez réessayer.')
-        );
-      }
+      console.error('Erreur lors de l\'affichage du paywall:', error);
     } finally {
       setIsLoading(false);
+      router.replace('/(tabs)');
     }
   };
 
@@ -95,6 +74,11 @@ export default function ProfileRevealScreen() {
     }
     
     await AsyncStorage.setItem('onboarding_completed', 'true');
+    await triggerEvent(SUPERWALL_EVENTS.ONBOARDING_COMPLETED, {
+      params: { source: 'profile_reveal_skip' },
+      requireNonPremium: false,
+      bypassCooldown: true,
+    });
     router.replace('/(tabs)');
   };
 
@@ -148,97 +132,28 @@ export default function ProfileRevealScreen() {
           </View>
         </Animated.View>
 
-        {/* Pricing Section */}
-        <Animated.View entering={FadeInDown.delay(600).duration(400)}>
-          <Text style={styles.pricingTitle}>
-            {t('choosePlan') || 'Choose your plan'}
-          </Text>
-
-          {/* Annual Plan */}
-          <TouchableOpacity
-            onPress={() => setSelectedPlan('annual')}
-            style={[
-              styles.planButton,
-              selectedPlan === 'annual' && styles.planButtonSelected,
-            ]}
-            activeOpacity={0.8}
-          >
-            {selectedPlan === 'annual' && (
-            <View style={styles.bestValueBadge}>
-                <Text style={styles.bestValueText}>⭐ {t('bestValue') || 'Best value'}</Text>
-            </View>
-            )}
-            <View style={styles.planContent}>
-              <View style={styles.planLeft}>
-                <Text style={styles.planName}>{t('annualPlan') || 'Annual'}</Text>
-                <View style={styles.saveBadge}>
-                  <Text style={styles.saveText}>💰 {t('savePerYear') || 'Save 33%'}</Text>
-                </View>
-              </View>
-              <View style={styles.planRight}>
-                <View style={styles.priceBox}>
-                  <Text style={styles.price}>$9.99</Text>
-                  <Text style={styles.priceUnit}>{t('perMonth') || '/month'}</Text>
-                </View>
-                <View style={[
-                  styles.radioButton,
-                  selectedPlan === 'annual' && styles.radioButtonSelected,
-                ]}>
-                  {selectedPlan === 'annual' && (
-                    <Ionicons name="checkmark" size={16} color="#FFFFFF" />
-                  )}
-                </View>
-              </View>
-            </View>
-          </TouchableOpacity>
-
-          {/* Monthly Plan */}
-          <TouchableOpacity
-            onPress={() => setSelectedPlan('monthly')}
-            style={[
-              styles.planButton,
-              selectedPlan === 'monthly' && styles.planButtonSelected,
-            ]}
-            activeOpacity={0.8}
-          >
-            <View style={styles.planContent}>
-              <View style={styles.planLeft}>
-                <Text style={styles.planName}>{t('monthlyPlan') || 'Monthly'}</Text>
-                <Text style={styles.planFlexible}>{t('flexibleBilling') || 'Flexible billing'}</Text>
-              </View>
-              <View style={styles.planRight}>
-                <View style={styles.priceBox}>
-                  <Text style={styles.price}>$14.99</Text>
-                  <Text style={styles.priceUnit}>{t('perMonth') || '/month'}</Text>
-                </View>
-                <View style={[
-                  styles.radioButton,
-                  selectedPlan === 'monthly' && styles.radioButtonSelected,
-                ]}>
-                  {selectedPlan === 'monthly' && (
-                    <Ionicons name="checkmark" size={16} color="#FFFFFF" />
-                  )}
-                </View>
-              </View>
-            </View>
-          </TouchableOpacity>
-        </Animated.View>
-
-        {/* Trial Benefits */}
+        {/* Ce que fait le système. Pas de prix ici : c'est Superwall qui les
+            porte, et lui seul connaît l'éligibilité réelle à l'essai. */}
         <Animated.View entering={FadeInDown.delay(700).duration(400)}>
           <View style={styles.trialBox}>
             <View style={styles.trialHeader}>
               <Ionicons name="flash" size={20} color="#16A34A" />
-              <Text style={styles.trialTitle}>{t('freeTrial') || '7-day free trial'}</Text>
+              <Text style={styles.trialTitle}>
+                {t('notAboutMotivation', undefined, "Ce n'est pas une question de motivation")}
+              </Text>
             </View>
             <View style={styles.trialBenefits}>
               <View style={styles.trialBenefit}>
                 <Ionicons name="checkmark-circle" size={16} color="#16A34A" />
-                <Text style={styles.trialBenefitText}>{t('cancelAnytime') || 'Cancel anytime'}</Text>
+                <Text style={styles.trialBenefitText}>
+                  {t('planBuildsItself', undefined, 'Ton planning se construit tout seul')}
+                </Text>
               </View>
               <View style={styles.trialBenefit}>
                 <Ionicons name="checkmark-circle" size={16} color="#16A34A" />
-                <Text style={styles.trialBenefitText}>{t('noCommitment') || 'No commitment'}</Text>
+                <Text style={styles.trialBenefitText}>
+                  {t('phoneBlocksItself', undefined, "Ton téléphone se bloque jusqu'à la fin du bloc")}
+                </Text>
               </View>
             </View>
           </View>
@@ -257,7 +172,9 @@ export default function ProfileRevealScreen() {
               ) : (
                 <>
                   <Ionicons name="flash" size={20} color="#FFFFFF" />
-                <Text style={styles.startTrialText}>{t('startFreeTrial') || 'Start free trial'}</Text>
+                <Text style={styles.startTrialText}>
+                  {t('unlockProductif', undefined, 'Débloquer productif.io')}
+                </Text>
                 </>
               )}
           </TouchableOpacity>

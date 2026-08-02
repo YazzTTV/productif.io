@@ -24,16 +24,25 @@ async function isDuplicate(transactionId: string): Promise<boolean> {
 /**
  * Log un événement d'abonnement dans AppsFlyer pour l'attribution de revenu.
  * Déduplication automatique par transactionId.
+ *
+ * `revenue` est optionnel : côté client, Superwall ne communique pas le prix
+ * payé (PaywallInfo.products n'expose que l'id et les entitlements). Envoyer un
+ * montant supposé faussait le ROAS, on préfère donc un événement sans revenu.
+ * Le montant réel n'existe que dans le webhook Superwall côté serveur
+ * (data.priceInPurchasedCurrency + currencyCode) : c'est de là qu'il faut
+ * envoyer le revenu en S2S si on veut un ROAS exploitable.
  */
 export async function logSubscriptionEvent(params: {
-  revenue: number;
+  revenue?: number;
   currency?: string;
-  plan: 'monthly' | 'annual';
+  plan?: 'monthly' | 'annual';
+  productId?: string;
   transactionId?: string;
 }) {
-  const { revenue, currency = 'EUR', plan, transactionId } = params;
+  const { revenue, currency = 'EUR', plan, productId, transactionId } = params;
 
-  const txId = transactionId || `sub_${plan}_${Date.now()}`;
+  const contentId = productId || `pro_${plan || 'unknown'}`;
+  const txId = transactionId || `sub_${contentId}_${Date.now()}`;
   if (await isDuplicate(txId)) {
     console.log('[AppsFlyer] af_subscribe déjà envoyé pour:', txId);
     return;
@@ -44,10 +53,9 @@ export async function logSubscriptionEvent(params: {
   appsFlyer.logEvent(
     'af_subscribe',
     {
-      af_revenue: revenue,
-      af_currency: currency,
+      ...(revenue !== undefined && { af_revenue: revenue, af_currency: currency }),
       af_content_type: 'subscription',
-      af_content_id: `pro_${plan}`,
+      af_content_id: contentId,
       af_order_id: txId,
       ...(userId && { customer_user_id: userId }),
     },

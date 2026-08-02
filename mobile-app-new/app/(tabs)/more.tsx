@@ -26,6 +26,8 @@ import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useSuperwall } from '@/hooks/useSuperwall';
+import { SUPERWALL_EVENTS } from '@/lib/superwallEvents';
 
 const { width } = Dimensions.get('window');
 
@@ -73,8 +75,8 @@ const ShimmerEffect = () => {
 export default function SettingsScreen() {
   const { theme, setTheme: setThemeContext, actualTheme, colors } = useTheme();
   const { language, setLanguage, t } = useLanguage();
+  const { triggerEvent } = useSuperwall();
   const [notifications, setNotifications] = useState(true);
-  const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'annual'>('monthly');
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -88,6 +90,17 @@ export default function SettingsScreen() {
       isMountedRef.current = false;
     };
   }, []);
+
+  // L'achat passe par Superwall (StoreKit). Ce bouton ne fait qu'ouvrir le
+  // paywall : prix, offre rentrée et éligibilité à l'essai sont pilotés côté
+  // dashboard Superwall.
+  const handleUpgradePress = async () => {
+    await triggerEvent(SUPERWALL_EVENTS.CAMPAIGN_TRIGGER, {
+      params: { source: 'settings_premium_card' },
+      bypassCooldown: true,
+      forcePaywallInExamMode: true,
+    });
+  };
 
   const loadUserData = async () => {
     try {
@@ -240,75 +253,6 @@ export default function SettingsScreen() {
                 </View>
                 <Text style={styles.premiumSubtitle}>{t('premiumSubtitle')}</Text>
 
-                {/* Billing Toggle */}
-                <View style={styles.billingToggle}>
-                  <TouchableOpacity
-                    onPress={() => setBillingPeriod('monthly')}
-                    style={[
-                      styles.billingButton,
-                      billingPeriod === 'monthly' && styles.billingButtonActive,
-                    ]}
-                  >
-                    <Text style={[
-                      styles.billingButtonText,
-                      billingPeriod === 'monthly' && styles.billingButtonTextActive,
-                    ]}>
-                      {t('billingMonthly')}
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={() => setBillingPeriod('annual')}
-                    style={[
-                      styles.billingButton,
-                      billingPeriod === 'annual' && styles.billingButtonActive,
-                    ]}
-                  >
-                    <Text style={[
-                      styles.billingButtonText,
-                      billingPeriod === 'annual' && styles.billingButtonTextActive,
-                    ]}>
-                      {t('billingAnnual')}
-                    </Text>
-                    {billingPeriod !== 'annual' && (
-                      <View style={styles.saveBadge}>
-                        <Text style={styles.saveBadgeText}>-20%</Text>
-                      </View>
-                    )}
-                  </TouchableOpacity>
-                </View>
-
-                {/* Savings Info */}
-                {billingPeriod === 'annual' && (
-                  <Animated.View entering={FadeInDown.duration(300)} style={styles.savingsInfo}>
-                    <Text style={styles.savingsEmoji}>🎉</Text>
-                    <View style={styles.savingsText}>
-                      <Text style={styles.savingsAmount}>{t('savePerYearAmount')}</Text>
-                      <Text style={styles.savingsDetail}>{t('savePercentage')}</Text>
-                    </View>
-                    <View style={styles.bestDealBadge}>
-                      <Text style={styles.bestDealText}>{t('bestDeal')}</Text>
-                    </View>
-                  </Animated.View>
-                )}
-
-                {/* Limited Spots */}
-                <View style={styles.limitedSpots}>
-                  <Text style={styles.limitedSpotsText}>{t('limitedSpots')}</Text>
-                  <Text style={styles.limitedSpotsEmoji}>🔥</Text>
-                </View>
-                <View style={styles.spotsBar}>
-                  {[...Array(10)].map((_, i) => (
-                    <View
-                      key={i}
-                      style={[
-                        styles.spotsDot,
-                        i < 7 && styles.spotsDotFilled,
-                      ]}
-                    />
-                  ))}
-                </View>
-                <Text style={styles.limitedSpotsSubtext}>{t('limitedSpotsSubtext')}</Text>
-
                 {/* Features */}
                 <View style={styles.features}>
                   {[t('feature1'), t('feature2'), t('feature3')].map((feature, i) => (
@@ -319,38 +263,17 @@ export default function SettingsScreen() {
                   ))}
                 </View>
 
-                {/* Pricing */}
-                <View style={styles.pricing}>
-                  <Text style={styles.price}>
-                    {billingPeriod === 'monthly' ? '14,99€' : '9,99€'}
-                  </Text>
-                  <Text style={styles.priceUnit}>{t('pricePerMonth')}</Text>
-                </View>
-                {billingPeriod === 'annual' && (
-                  <Text style={styles.pricingDetail}>{t('annualBilled')}</Text>
-                )}
-                {billingPeriod === 'monthly' && (
-                  <Text style={styles.pricingDetail}>{t('monthlyBilling')}</Text>
-                )}
-
-                {/* CTA Button */}
+                {/* Ni prix ni offre ici : c'est Superwall qui les porte, et lui
+                    seul connaît l'éligibilité réelle à l'essai. */}
                 <TouchableOpacity
                   style={styles.ctaButton}
                   activeOpacity={0.8}
-                  onPress={() => router.push('/upgrade')}
+                  onPress={handleUpgradePress}
                 >
                   <Text style={styles.ctaText}>
-                    {billingPeriod === 'monthly' 
-                      ? t('ctaMonthly')
-                      : t('ctaAnnual')}
+                    {t('seePlans', undefined, 'Voir les offres')}
                   </Text>
                 </TouchableOpacity>
-
-                <Text style={styles.offerExpires}>
-                  ⏰ {billingPeriod === 'monthly' 
-                    ? t('offerExpireMonthly')
-                    : t('offerExpireAnnual')}
-                </Text>
               </View>
             </LinearGradient>
           </View>

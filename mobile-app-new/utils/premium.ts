@@ -27,6 +27,28 @@ export async function checkPremiumStatus(): Promise<PremiumStatus> {
   }
 }
 
+/**
+ * Accès au Mode Examen, déterminé par le serveur.
+ *
+ * Fail-closed : toute incertitude (non authentifié, réseau HS, réponse
+ * dégradée, exception) refuse l'accès. Ne jamais dériver ce droit de la
+ * présence d'une session examen en stockage local, qui est falsifiable.
+ */
+export async function hasExamModeAccess(): Promise<boolean> {
+  try {
+    const user = await authService.checkAuth();
+    if (!user) return false;
+    if (user.planLimits) {
+      return user.planLimits.examModeEnabled === true;
+    }
+    // planLimits absent (réponse dégradée) : on retombe sur le statut premium.
+    return user.isPremium === true;
+  } catch (error) {
+    console.error('Error checking exam mode access:', error);
+    return false;
+  }
+}
+
 export async function setPremiumStatus(plan: 'annual' | 'monthly' | 'free'): Promise<void> {
   try {
     await AsyncStorage.setItem(SELECTED_PLAN_KEY, plan);

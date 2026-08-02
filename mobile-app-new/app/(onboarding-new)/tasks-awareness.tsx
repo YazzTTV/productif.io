@@ -20,6 +20,24 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { tasksService } from '@/lib/api';
 import { useOnboardingData } from '@/hooks/useOnboardingData';
 
+/**
+ * Découpe le texte brut en tâches quand l'analyse IA est indisponible.
+ *
+ * Sert de repli : cette étape était un cul-de-sac. Quand l'IA échouait (crédit
+ * OpenAI épuisé le 29 juillet 2026), l'utilisateur voyait une alerte et restait
+ * bloqué ici sans jamais atteindre l'app. On préfère perdre le découpage
+ * intelligent que perdre l'utilisateur, et on conserve sa saisie plutôt que de
+ * la jeter.
+ */
+function splitRawTasks(raw: string): { title: string }[] {
+  return raw
+    .split(/\r?\n|[;•]|(?:^|\s)-\s+|,(?=\s*[A-Za-zÀ-ÿ])/g)
+    .map((part) => part.trim().replace(/^[-*•\s]+/, ''))
+    .filter((part) => part.length > 1)
+    .slice(0, 10)
+    .map((title) => ({ title }));
+}
+
 const promptChips = [
   'classesLectures',
   'deadlines',
@@ -61,52 +79,80 @@ export default function TasksAwarenessScreen() {
   const handleContinue = async () => {
     if (!tasks.trim() || isLoading) return;
 
+    const rawInput = tasks.trim();
     setIsLoading(true);
-    try {
-      // L'API gère les dates relatives dans le userInput (aujourd'hui, demain, mercredi, etc.)
-      // On n'a pas besoin de passer une date spécifique, l'API va extraire les dates du texte
-      console.log('📤 Envoi des tâches à l\'API:', tasks.trim());
-      
-      // Appeler l'API pour créer les tâches intelligemment
-      // L'API va analyser le texte et extraire les dates (aujourd'hui, demain, mercredi, etc.)
-      const result = await tasksService.planTomorrow(tasks.trim());
-      
-      console.log('📥 Réponse de l\'API:', result);
-      
-      if (!result || !result.tasks) {
-        throw new Error('Aucune tâche créée par l\'API');
-      }
 
-      const extractedTasks = Array.isArray(result.tasks)
-        ? result.tasks.filter((task: any) => (task?.title || task?.name))
-        : [];
-
-      if (extractedTasks.length === 0) {
-        Alert.alert(
-          t('retry') || 'Retry',
-          "Je n'ai pas réussi à détecter des tâches. Ajoute un peu plus de détails puis réessaie."
-        );
-        return;
-      }
-      
-      // Sauvegarder les tâches brutes
-      await saveResponse('rawTasks', tasks.trim());
+    // Poursuit l'onboarding avec la liste de tâches fournie. Utilisé aussi bien
+    // par le chemin normal que par le repli, pour qu'il n'existe qu'une seule
+    // sortie de cet écran et qu'aucun cas d'erreur ne puisse rester bloqué.
+    const goToClarification = async (extractedTasks: { title?: string; name?: string }[]) => {
+      await saveResponse('rawTasks', rawInput);
       await saveResponse('currentStep', 9);
-      
-      // Passer les tâches créées à l'écran suivant
       router.push({
         pathname: '/(onboarding-new)/task-clarification',
         params: {
           tasks: JSON.stringify(extractedTasks),
-          rawInput: tasks.trim(),
+          rawInput,
         },
       });
+    };
+
+    try {
+      // L'API gère les dates relatives dans le userInput (aujourd'hui, demain, mercredi, etc.)
+      // On n'a pas besoin de passer une date spécifique, l'API va extraire les dates du texte
+      console.log('📤 Envoi des tâches à l\'API:', rawInput);
+
+      // Appeler l'API pour créer les tâches intelligemment
+      // L'API va analyser le texte et extraire les dates (aujourd'hui, demain, mercredi, etc.)
+      const result = await tasksService.planTomorrow(rawInput);
+
+      console.log('📥 Réponse de l\'API:', result);
+
+      const extractedTasks = Array.isArray(result?.tasks)
+        ? result.tasks.filter((task: any) => (task?.title || task?.name))
+        : [];
+
+      if (extractedTasks.length === 0) {
+        // L'IA a répondu mais n'a rien trouvé : on découpe nous-mêmes plutôt
+        // que de renvoyer l'utilisateur à sa saisie.
+        const fallbackTasks = splitRawTasks(rawInput);
+        if (fallbackTasks.length === 0) {
+          Alert.alert(
+            t('retry') || 'Retry',
+            "Je n'ai pas réussi à détecter des tâches. Ajoute un peu plus de détails puis réessaie."
+          );
+          return;
+        }
+        console.warn('⚠️ Aucune tâche extraite par l\'IA, repli sur le découpage local');
+        await goToClarification(fallbackTasks);
+        return;
+      }
+
+      await goToClarification(extractedTasks);
     } catch (error) {
-      console.error('Erreur lors de la création des tâches:', error);
-      Alert.alert(
-        'Erreur',
-        error instanceof Error ? error.message : 'Une erreur est survenue lors de la création des tâches'
-      );
+      // L'analyse IA est indisponible (quota OpenAI, panne réseau, timeout).
+      // On ne bloque pas l'onboarding : l'utilisateur garde sa saisie, perd
+      // seulement le découpage intelligent, et peut corriger à l'écran suivant.
+      console.error('Erreur lors de la création des tâches, repli local:', error);
+      const fallbackTasks = splitRawTasks(rawInput);
+
+      if (fallbackTasks.length === 0) {
+        Alert.alert(
+          'Erreur',
+          error instanceof Error ? error.message : 'Une erreur est survenue lors de la création des tâches'
+        );
+        return;
+      }
+
+      try {
+        await goToClarification(fallbackTasks);
+      } catch (fallbackError) {
+        console.error('Échec du repli local:', fallbackError);
+        Alert.alert(
+          'Erreur',
+          'Une erreur est survenue lors de la création des tâches'
+        );
+      }
     } finally {
       setIsLoading(false);
     }

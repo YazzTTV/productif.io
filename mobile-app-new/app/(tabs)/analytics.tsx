@@ -16,6 +16,8 @@ import { behaviorService, authService, PlanLimits } from '@/lib/api';
 import { format, parseISO, subDays } from 'date-fns';
 import { fr, enUS, es as esLocale } from 'date-fns/locale';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useSuperwall } from '@/hooks/useSuperwall';
+import { SUPERWALL_EVENTS } from '@/lib/superwallEvents';
 
 const { width } = Dimensions.get('window');
 
@@ -41,6 +43,7 @@ export default function AnalyticsScreen({ checkInType: propCheckInType, isActive
   const checkInType = (propCheckInType || params.checkInType) as CheckInType | undefined;
   const hasLoadedRef = useRef(false);
   const { t, language } = useLanguage();
+  const { triggerEvent } = useSuperwall();
   const locale = language === 'en' ? enUS : language === 'es' ? esLocale : fr;
 
   const [loading, setLoading] = useState(true);
@@ -133,7 +136,15 @@ export default function AnalyticsScreen({ checkInType: propCheckInType, isActive
           t('analyticsPremiumMessage', undefined, 'Analytics détaillés réservés au plan Premium. Débloquez plus de jours d\'historique.'),
           [
             { text: t('later', undefined, 'Plus tard') },
-            { text: t('upgrade', undefined, 'Passer en Premium'), onPress: () => router.push('/paywall') }
+            {
+              text: t('upgrade', undefined, 'Passer en Premium'),
+              onPress: () =>
+                triggerEvent(SUPERWALL_EVENTS.FEATURE_LOCKED, {
+                  params: { source: 'analytics_alert_upgrade' },
+                  // CTA explicite : doit toujours afficher le paywall.
+                  bypassCooldown: true,
+                }),
+            }
           ]
         );
       } else if ((error.message && error.message.includes('réseau')) || error.message.includes('timeout')) {
@@ -349,7 +360,16 @@ export default function AnalyticsScreen({ checkInType: propCheckInType, isActive
                 )}
               </Text>
             </View>
-            <TouchableOpacity style={styles.planNoticeButton} onPress={() => router.push('/paywall')}>
+            <TouchableOpacity
+              style={styles.planNoticeButton}
+              onPress={() =>
+                triggerEvent(SUPERWALL_EVENTS.FEATURE_LOCKED, {
+                  params: { source: 'analytics_inline_upgrade' },
+                  // CTA explicite : doit toujours afficher le paywall.
+                  bypassCooldown: true,
+                })
+              }
+            >
               <Text style={styles.planNoticeButtonText}>
                 {t('upgrade', undefined, 'Upgrade')}
               </Text>

@@ -1,12 +1,18 @@
-import { Stack , router, useSegments } from 'expo-router';
+import { Stack, router, useSegments, usePathname } from 'expo-router';
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { View, ActivityIndicator } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 
+/** Écrans du groupe (onboarding-new) qu’on doit pouvoir ouvrir après `onboarding_completed=true` (ex. didacticiel → sync calendrier). */
+const SKIP_COMPLETED_ONBOARDING_REDIRECT = new Set([
+  'calendar-sync',
+]);
+
 export default function OnboardingNewLayout() {
   const [isChecking, setIsChecking] = useState(true);
   const segments = useSegments();
+  const pathname = usePathname();
   const isMountedRef = useRef(true);
   const isNavigatingRef = useRef(false);
 
@@ -16,9 +22,14 @@ export default function OnboardingNewLayout() {
       return false;
     }
     
-    // Ne pas rediriger si on est sur stripe-webview ou stripe-checkout (pour permettre les paiements)
     const currentRoute = segments[segments.length - 1];
-    if (currentRoute === 'stripe-webview' || currentRoute === 'stripe-checkout') {
+    const allowIncompleteSegment =
+      pathname != null &&
+      [...SKIP_COMPLETED_ONBOARDING_REDIRECT].some((name) => pathname.includes(name));
+    if (
+      (currentRoute && SKIP_COMPLETED_ONBOARDING_REDIRECT.has(currentRoute)) ||
+      allowIncompleteSegment
+    ) {
       return false;
     }
     
@@ -37,7 +48,7 @@ export default function OnboardingNewLayout() {
       console.error('Error checking onboarding status:', error);
       return false;
     }
-  }, [segments]);
+  }, [segments, pathname]);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -58,16 +69,21 @@ export default function OnboardingNewLayout() {
   // Vérifier à chaque fois que l'écran est focus (mais pas si on est déjà en train de naviguer)
   useFocusEffect(
     useCallback(() => {
-      // Ne pas vérifier l'onboarding si on est sur stripe-webview ou stripe-checkout
       const currentRoute = segments[segments.length - 1];
-      if (currentRoute === 'stripe-webview' || currentRoute === 'stripe-checkout') {
+      const allowIncompleteSegment =
+        pathname != null &&
+        [...SKIP_COMPLETED_ONBOARDING_REDIRECT].some((name) => pathname.includes(name));
+      if (
+        (currentRoute && SKIP_COMPLETED_ONBOARDING_REDIRECT.has(currentRoute)) ||
+        allowIncompleteSegment
+      ) {
         return;
       }
       
       // Réinitialiser le flag de navigation quand on revient sur cet écran
       isNavigatingRef.current = false;
       checkOnboardingStatus();
-    }, [checkOnboardingStatus, segments])
+    }, [checkOnboardingStatus, segments, pathname])
   );
 
   // Afficher un loader pendant la vérification
@@ -145,20 +161,6 @@ export default function OnboardingNewLayout() {
       />
       <Stack.Screen 
         name="profile-reveal" 
-        options={{
-          gestureEnabled: false,
-          animation: 'none',
-        }}
-      />
-      <Stack.Screen 
-        name="stripe-webview" 
-        options={{
-          gestureEnabled: false,
-          animation: 'none',
-        }}
-      />
-      <Stack.Screen 
-        name="stripe-checkout" 
         options={{
           gestureEnabled: false,
           animation: 'none',

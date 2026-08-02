@@ -13,10 +13,10 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
-import { router } from 'expo-router';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
-import { paymentService } from '@/lib/api';
+import { useSuperwall } from '@/hooks/useSuperwall';
+import { SUPERWALL_EVENTS } from '@/lib/superwallEvents';
 
 interface UpgradeModalProps {
   isOpen: boolean;
@@ -28,25 +28,22 @@ const { width } = Dimensions.get('window');
 export function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
   const { t } = useLanguage();
   const { colors } = useTheme();
-  const [selectedPlan, setSelectedPlan] = useState<'monthly' | 'annual'>('annual');
+  const { triggerEvent } = useSuperwall();
   const [isLoading, setIsLoading] = useState(false);
 
   const handleUpgrade = async () => {
     setIsLoading(true);
     try {
-      const billingType = selectedPlan === 'annual' ? 'annual' : 'monthly';
-      const { url } = await paymentService.createCheckoutSession(billingType);
-      
-      if (url) {
-        // Rediriger vers la WebView Stripe
-        router.push({
-          pathname: '/(onboarding-new)/stripe-webview',
-          params: { checkoutUrl: url, plan: selectedPlan }
-        });
-        onClose();
-      }
+      // L'achat passe par Superwall (StoreKit). Prix et offres sont pilotés
+      // côté dashboard, jamais dans ce composant.
+      onClose();
+      await triggerEvent(SUPERWALL_EVENTS.FEATURE_LOCKED, {
+        params: { source: 'upgrade_modal' },
+        bypassCooldown: true,
+        forcePaywallInExamMode: true,
+      });
     } catch (error: any) {
-      console.error('Erreur lors de la création de la session Stripe:', error);
+      console.error('Erreur lors de l\'affichage du paywall:', error);
       Alert.alert(
         'Erreur',
         error?.message || 'Une erreur est survenue. Veuillez réessayer.'
@@ -144,23 +141,12 @@ export function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
                 </Animated.View>
               </View>
 
-              {/* Pricing highlight */}
+              {/* Pas de prix ici : Superwall porte les tarifs et les offres. */}
               <Animated.View entering={FadeInDown.delay(400)} style={[styles.pricingCard, { backgroundColor: '#00C27A10', borderColor: '#00C27A30' }]}>
-                <View style={styles.pricingHeader}>
-                  <Text style={[styles.pricingLabel, { color: colors.text }]}>
-                    {t('annualPlan')}
-                  </Text>
-                  <View style={styles.pricingAmount}>
-                    <Text style={[styles.pricingPrice, { color: colors.text }]}>9,99€</Text>
-                    <Text style={[styles.pricingPeriod, { color: colors.textSecondary }]}>
-                      / {t('month')}
-                    </Text>
-                  </View>
-                </View>
                 <View style={styles.pricingBadge}>
                   <Ionicons name="flash" size={16} color="#00C27A" />
                   <Text style={styles.pricingBadgeText}>
-                    {t('save60PerYear')}
+                    {t('systemNotMotivation', undefined, 'Un système, pas de la motivation')}
                   </Text>
                 </View>
               </Animated.View>

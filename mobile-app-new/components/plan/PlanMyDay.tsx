@@ -17,6 +17,8 @@ import {
   setTutorialStage,
 } from '@/tutorial/tutorialStorage';
 import { Coachmark } from '@/tutorial/Coachmark';
+import { useSuperwall } from '@/hooks/useSuperwall';
+import { SUPERWALL_EVENTS } from '@/lib/superwallEvents';
 
 type PlanPhase = 'entry' | 'recording' | 'transcription' | 'processing' | 'association' | 'overview';
 
@@ -41,6 +43,7 @@ export function PlanMyDay() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { t } = useLanguage();
+  const { triggerEvent } = useSuperwall();
   const isMountedRef = useRef(true);
   const typeButtonRef = useRef<TouchableOpacity>(null);
   const confirmButtonRef = useRef<TouchableOpacity>(null);
@@ -730,7 +733,16 @@ export function PlanMyDay() {
                   Accédez à une version limitée (max {planLimits.maxPlanMyDayEvents ?? 3} tâches). Passez en Premium pour tout planifier.
                 </Text>
               </View>
-              <TouchableOpacity style={styles.planLimitButton} onPress={() => router.push('/paywall')}>
+              <TouchableOpacity
+                style={styles.planLimitButton}
+                onPress={() =>
+                  triggerEvent(SUPERWALL_EVENTS.FEATURE_LOCKED, {
+                    params: { source: 'plan_my_day_preview_entry' },
+                    // CTA explicite : doit toujours afficher le paywall.
+                    bypassCooldown: true,
+                  })
+                }
+              >
                 <Text style={styles.planLimitButtonText}>Passer en Premium</Text>
               </TouchableOpacity>
             </View>
@@ -962,7 +974,16 @@ export function PlanMyDay() {
               <Text style={styles.planLimitNoticeText}>
                 Aperçu: seules {planLimits?.maxPlanMyDayEvents ?? 3} tâches sont incluses. Passez en Premium pour le plan complet.
               </Text>
-              <TouchableOpacity style={styles.planLimitButton} onPress={() => router.push('/paywall')}>
+              <TouchableOpacity
+                style={styles.planLimitButton}
+                onPress={() =>
+                  triggerEvent(SUPERWALL_EVENTS.FEATURE_LOCKED, {
+                    params: { source: 'plan_my_day_preview_association' },
+                    // CTA explicite : doit toujours afficher le paywall.
+                    bypassCooldown: true,
+                  })
+                }
+              >
                 <Text style={styles.planLimitButtonText}>Upgrade</Text>
               </TouchableOpacity>
             </View>

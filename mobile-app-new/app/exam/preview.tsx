@@ -1,33 +1,46 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Modal, Alert } from 'react-native';
-import { useRouter } from 'expo-router';
+import React, { useEffect, useRef, useCallback } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'react-native';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { checkPremiumStatus } from '@/utils/premium';
-import { Paywall } from '@/components/paywall/Paywall';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { saveExamSession } from '@/utils/examSession';
 import { selectExamTasks } from '@/utils/taskSelection';
+import { useSuperwall } from '@/hooks/useSuperwall';
+import { SUPERWALL_EVENTS } from '@/lib/superwallEvents';
 
 export default function ExamPreviewScreen() {
   const { t } = useLanguage();
   const router = useRouter();
+  const params = useLocalSearchParams<{ afterDemo?: string }>();
   const insets = useSafeAreaInsets();
-  const [isPremium, setIsPremium] = useState(false);
-  const [showPaywall, setShowPaywall] = useState(false);
+  const { triggerEvent } = useSuperwall();
+  const afterDemoTokenHandledRef = useRef<string | null>(null);
+
+  const openExamSuperwall = useCallback(
+    async (source: string) => {
+      await triggerEvent(SUPERWALL_EVENTS.FEATURE_LOCKED, {
+        params: { source },
+        bypassCooldown: true,
+      });
+    },
+    [triggerEvent],
+  );
 
   useEffect(() => {
-    checkPremium();
-  }, []);
-
-  const checkPremium = async () => {
-    const status = await checkPremiumStatus();
-    setIsPremium(status.isPremium);
-  };
+    const token = params.afterDemo;
+    if (!token) return;
+    if (afterDemoTokenHandledRef.current === token) return;
+    afterDemoTokenHandledRef.current = token;
+    const t = setTimeout(() => {
+      openExamSuperwall('exam_preview_after_demo');
+    }, 400);
+    return () => clearTimeout(t);
+  }, [params.afterDemo, openExamSuperwall]);
 
   const handleUnlock = () => {
-    setShowPaywall(true);
+    openExamSuperwall('exam_preview_unlock_button');
   };
 
   const handleStartDemo = async () => {
@@ -45,7 +58,7 @@ export default function ExamPreviewScreen() {
           t('noTasksForDemo'),
           [
             { text: t('cancel'), style: 'cancel' },
-            { text: t('unlockExamMode'), onPress: () => setShowPaywall(true) }
+            { text: t('unlockExamMode'), onPress: () => openExamSuperwall('exam_preview_no_tasks_alert') }
           ]
         );
         return;
@@ -64,6 +77,7 @@ export default function ExamPreviewScreen() {
         currentTaskIndex: 0,
         plannedTaskIds: taskIds, // Utiliser les vraies tâches
         completedTaskIds: [],
+        isDemo: true,
       });
 
       // Rediriger vers la page de session avec le paramètre demo
@@ -77,13 +91,8 @@ export default function ExamPreviewScreen() {
     } catch (error) {
       console.error('Error starting demo:', error);
       // En cas d'erreur, afficher le paywall
-      setShowPaywall(true);
+      openExamSuperwall('exam_preview_demo_error');
     }
-  };
-
-  const handlePaywallClose = () => {
-    setShowPaywall(false);
-    checkPremium();
   };
 
   return (
@@ -180,15 +189,6 @@ export default function ExamPreviewScreen() {
 
         <View style={{ height: 40 }} />
       </ScrollView>
-
-      {/* Paywall Modal */}
-      <Modal
-        visible={showPaywall}
-        animationType="slide"
-        onRequestClose={handlePaywallClose}
-      >
-        <Paywall onClose={handlePaywallClose} source="exam-preview" />
-      </Modal>
     </View>
   );
 }

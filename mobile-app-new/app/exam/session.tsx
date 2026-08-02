@@ -5,7 +5,8 @@ import Animated, { FadeIn, FadeOut, SlideInRight, SlideOutLeft } from 'react-nat
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle } from 'react-native-svg';
-import { getActiveExamSession, clearExamSession, calculateTimeRemaining, saveExamSession, ExamSession } from '@/utils/examSession';
+import { getActiveExamSession, clearExamSession, calculateTimeRemaining, saveExamSession, isDemoSession, ExamSession } from '@/utils/examSession';
+import { hasExamModeAccess } from '@/utils/premium';
 import { tasksService, subjectsService } from '@/lib/api';
 import { useLanguage } from '@/contexts/LanguageContext';
 
@@ -72,7 +73,19 @@ export default function ExamSessionScreen() {
         router.replace('/exam/setup');
         return;
       }
-      
+
+      // Garde d'accès. Cet écran délivre la fonctionnalité premium, il ne peut
+      // pas se contenter de la présence d'une session en stockage local :
+      // une vraie session (non démo) exige un plan premium. Fail-closed.
+      if (!isDemoSession(activeSession)) {
+        const hasAccess = await hasExamModeAccess();
+        if (!hasAccess) {
+          await clearExamSession();
+          router.replace('/exam/preview');
+          return;
+        }
+      }
+
       // Vérifier si c'est une session de démo
       const isDemo = activeSession.sessionId.startsWith('exam_demo_') || params.demo === 'true';
       
@@ -324,7 +337,10 @@ export default function ExamSessionScreen() {
             text: t('unlockExamMode'),
             onPress: async () => {
               await clearExamSession();
-              router.replace('/paywall');
+              router.replace({
+                pathname: '/exam/preview',
+                params: { afterDemo: String(Date.now()) },
+              });
             },
           },
         ]
@@ -371,7 +387,10 @@ export default function ExamSessionScreen() {
           {
             text: t('unlockExamMode'),
             onPress: () => {
-              router.replace('/paywall');
+              router.replace({
+                pathname: '/exam/preview',
+                params: { afterDemo: String(Date.now()) },
+              });
             },
           },
         ]

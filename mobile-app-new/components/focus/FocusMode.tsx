@@ -13,6 +13,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { assistantService } from '@/lib/api';
+import { useSuperwall } from '@/hooks/useSuperwall';
+import { SUPERWALL_EVENTS } from '@/lib/superwallEvents';
+import { hasActiveRealExamSession } from '@/utils/examSession';
 
 const { width } = Dimensions.get('window');
 const RING_SIZE = Math.min(width * 0.65, 260);
@@ -36,6 +39,7 @@ export function FocusMode({
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { t } = useLanguage();
+  const { triggerEvent } = useSuperwall();
   
   const totalSeconds = duration * 60;
   const [timeLeft, setTimeLeft] = useState(totalSeconds);
@@ -71,17 +75,25 @@ export function FocusMode({
           error?.locked === true;
         
         if (isPlanLocked) {
+          if (await hasActiveRealExamSession()) {
+            return;
+          }
           Alert.alert(
             'Focus limité',
             errorMessage || '1 session Focus par jour en freemium. Passez en Premium pour continuer.',
             [
               { text: 'Plus tard', style: 'cancel' },
-              { text: 'Passer en Premium', onPress: () => router.push('/paywall') }
+              {
+                text: 'Passer en Premium',
+                onPress: () =>
+                  triggerEvent(SUPERWALL_EVENTS.FEATURE_LOCKED, {
+                    params: { source: 'focus_mode_limit' },
+                  }),
+              }
             ]
           );
           setIsRunning(false);
         } else {
-          // Autres erreurs : afficher un message générique
           Alert.alert(
             'Erreur',
             errorMessage || 'Impossible de démarrer la session Focus',
@@ -131,9 +143,14 @@ export function FocusMode({
         console.log('Session terminée localement');
       }
     }
+    await triggerEvent(SUPERWALL_EVENTS.FOCUS_COMPLETED, {
+      params: { source: 'focus_mode_component' },
+      requireNonPremium: false,
+      bypassCooldown: true,
+    });
 
     onComplete?.(timeSpent);
-  }, [sessionId, timeLeft, totalSeconds, onComplete]);
+  }, [sessionId, timeLeft, totalSeconds, onComplete, triggerEvent]);
 
   const handleExit = useCallback(async () => {
     // Annuler la session si on quitte tôt

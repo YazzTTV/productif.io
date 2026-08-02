@@ -14,6 +14,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { apiCall } from '@/lib/api';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useSuperwall } from '@/hooks/useSuperwall';
+import { SUPERWALL_EVENTS } from '@/lib/superwallEvents';
 
 const { width } = Dimensions.get('window');
 
@@ -47,6 +49,7 @@ const LEVEL_COLORS = {
 
 export default function LeaderboardScreen() {
   const { t } = useLanguage();
+  const { triggerEvent } = useSuperwall();
   const [data, setData] = useState<LeaderboardData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -84,7 +87,15 @@ export default function LeaderboardScreen() {
           t('leaderboardPremiumMessage', undefined, 'Le classement global est réservé au plan Premium. Débloquez cette fonctionnalité pour comparer votre progression avec la communauté mondiale.'),
           [
             { text: t('later', undefined, 'Plus tard'), style: 'cancel' },
-            { text: t('upgrade', undefined, 'Passer en Premium'), onPress: () => router.push('/paywall') }
+            {
+              text: t('upgrade', undefined, 'Passer en Premium'),
+              onPress: () =>
+                triggerEvent(SUPERWALL_EVENTS.FEATURE_LOCKED, {
+                  params: { source: 'leaderboard_alert_upgrade' },
+                  // CTA explicite : doit toujours afficher le paywall.
+                  bypassCooldown: true,
+                }),
+            }
           ]
         );
         setError('Leaderboard Premium - Upgrade requis');
