@@ -7,6 +7,7 @@ import Image from "next/image"
 import Link from "next/link"
 import {
   ArrowRight,
+  ArrowUp,
   Star,
   Users,
   TrendingUp,
@@ -15,6 +16,8 @@ import {
   CheckCircle2,
   ChevronDown,
   Quote,
+  Minus,
+  Plus,
 } from "lucide-react"
 import { ct, getCreatorLocale, setCreatorLocale } from "@/lib/creator-i18n"
 
@@ -31,6 +34,88 @@ function RevealOnScroll({ children, delay = 0 }: { children: React.ReactNode; de
     >
       {children}
     </motion.div>
+  )
+}
+
+const PREMIUM_PRICE = 9.99
+const COMMISSION_RATE = 0.5
+
+function EarningsEstimator({ locale }: { locale: "fr" | "en" }) {
+  const [referrals, setReferrals] = useState(7)
+  const monthlyEarning = referrals * (PREMIUM_PRICE * COMMISSION_RATE)
+  const annualEarning = monthlyEarning * 12
+
+  const formatAmount = (n: number) =>
+    new Intl.NumberFormat(locale === "fr" ? "fr-FR" : "en-US", {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(n)
+
+  return (
+    <section className="py-24 px-6">
+      <div className="max-w-2xl mx-auto">
+        <RevealOnScroll>
+          <h2 className="text-2xl md:text-3xl font-medium text-gray-900 text-center mb-8">
+            {ct("lp.estimator.title", locale)
+              .split(/(50%|Productif\.io)/)
+              .map((part, i) =>
+                part === "50%" || part === "Productif.io" ? (
+                  <span key={i} className="text-[#16a34a] font-semibold">{part}</span>
+                ) : (
+                  part
+                )
+              )}
+          </h2>
+        </RevealOnScroll>
+        <RevealOnScroll>
+          <div className="bg-white rounded-2xl border border-black/[0.04] p-8 shadow-sm">
+            <h3 className="text-lg font-semibold text-gray-900 mb-6">
+              {ct("lp.estimator.cardTitle", locale)}
+            </h3>
+            <div className="flex items-center gap-3 mb-6">
+              <label className="text-sm font-medium text-gray-700 shrink-0">
+                {ct("lp.estimator.referrals", locale)}
+              </label>
+              <div className="flex items-center gap-2 flex-1 max-w-[200px]">
+                <input
+                  type="number"
+                  min={0}
+                  value={referrals}
+                  onChange={(e) => setReferrals(Math.min(9999, Math.max(0, parseInt(e.target.value) || 0)))}
+                  className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 bg-gray-50 text-gray-900 font-medium text-center"
+                />
+                <button
+                  type="button"
+                  onClick={() => setReferrals((n) => Math.max(0, n - 1))}
+                  className="w-12 h-12 rounded-full border border-gray-200 bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-600 transition-colors shrink-0"
+                >
+                  <Minus className="h-5 w-5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setReferrals((n) => Math.min(9999, n + 1))}
+                  className="w-12 h-12 rounded-full bg-[#16a34a] hover:bg-[#15803d] flex items-center justify-center text-white transition-colors shrink-0"
+                >
+                  <Plus className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+            <div className="space-y-1">
+              <div className="text-3xl md:text-4xl font-bold text-gray-900">
+                {formatAmount(annualEarning)} € {ct("lp.estimator.perYear", locale)}
+              </div>
+              <div className="flex items-center gap-1.5 text-[#16a34a] font-medium">
+                <ArrowUp className="h-4 w-4" />
+                {formatAmount(monthlyEarning)} € {ct("lp.estimator.perMonth", locale)}
+              </div>
+            </div>
+            <p className="text-sm text-gray-500 mt-4">
+              {ct("lp.estimator.note", locale)}
+            </p>
+          </div>
+        </RevealOnScroll>
+      </div>
+    </section>
   )
 }
 
@@ -279,6 +364,9 @@ export default function CreateurPage() {
           </RevealOnScroll>
         </div>
       </section>
+
+      {/* Earnings estimator */}
+      <EarningsEstimator locale={locale} />
 
       {/* How it works */}
       <section className="py-24 px-6">

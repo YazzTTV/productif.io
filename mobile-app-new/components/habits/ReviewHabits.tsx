@@ -24,6 +24,8 @@ import {
   setTutorialStage,
   TutorialStage,
 } from '@/tutorial/tutorialStorage';
+import { useSuperwall } from '@/hooks/useSuperwall';
+import { SUPERWALL_EVENTS } from '@/lib/superwallEvents';
 
 interface Habit {
   id: string;
@@ -33,6 +35,7 @@ interface Habit {
   daysOfWeek?: string[];
   category?: 'MORNING' | 'DAY' | 'EVENING' | 'ANTI';
   order?: number;
+  currentStreak?: number;
   entries?: {
     id: string;
     date: string;
@@ -45,6 +48,7 @@ export function ReviewHabits() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { t } = useLanguage();
+  const { triggerEvent } = useSuperwall();
   const addHabitButtonRef = useRef<TouchableOpacity>(null);
   const [habits, setHabits] = useState<Habit[]>([]);
   const [loading, setLoading] = useState(true);
@@ -107,6 +111,7 @@ export function ReviewHabits() {
     const habit = habits.find(h => h.id === habitId);
     const entry = habit?.entries?.find(e => format(new Date(e.date), 'yyyy-MM-dd') === dateString);
     const currentCompleted = entry?.completed ?? false;
+    const streakBefore = habit?.currentStreak ?? 0;
     const newCompleted = !currentCompleted;
     
     // Optimistic update - mise à jour immédiate de l'UI
@@ -136,6 +141,13 @@ export function ReviewHabits() {
     // Appel API en arrière-plan
     try {
       await habitsService.complete(habitId, dateString, currentCompleted);
+      if (!currentCompleted && streakBefore === 0) {
+        await triggerEvent(SUPERWALL_EVENTS.STREAK_STARTED, {
+          params: { source: 'review_habits_toggle', habitId },
+          requireNonPremium: false,
+          bypassCooldown: true,
+        });
+      }
     } catch (error) {
       console.error('❌ Erreur lors du toggle:', error);
       // Rollback en cas d'erreur

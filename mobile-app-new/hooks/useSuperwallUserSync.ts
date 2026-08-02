@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { Platform } from 'react-native';
 import { useUser } from 'expo-superwall';
 import { authService } from '@/lib/api';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -7,6 +8,7 @@ export function useSuperwallUserSync() {
   const { identify, update, signOut } = useUser();
   const { language } = useLanguage();
   const lastUserId = useRef<string | null>(null);
+  const normalizedLanguage = language.toLowerCase().startsWith('fr') ? 'fr' : 'en';
 
   useEffect(() => {
     let cancelled = false;
@@ -28,11 +30,12 @@ export function useSuperwallUserSync() {
             email: user.email,
             plan: user.plan ?? 'free',
             isPremium: user.isPremium ?? false,
-            language,
+            language: normalizedLanguage,
             createdAt: user.createdAt,
+            appPlatform: Platform.OS,
           });
         } else if (lastUserId.current) {
-          signOut();
+          await signOut();
           lastUserId.current = null;
         }
       } catch {
@@ -43,5 +46,5 @@ export function useSuperwallUserSync() {
     syncUser();
 
     return () => { cancelled = true; };
-  }, [language]);
+  }, [normalizedLanguage, identify, signOut, update]);
 }

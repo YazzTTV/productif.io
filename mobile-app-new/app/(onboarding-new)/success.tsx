@@ -21,6 +21,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { authService } from '@/lib/api';
 import { useOnboardingData } from '@/hooks/useOnboardingData';
+import { useSuperwall } from '@/hooks/useSuperwall';
+import { SUPERWALL_EVENTS } from '@/lib/superwallEvents';
 import { setTutorialCompleted, setTutorialStage } from '@/tutorial/tutorialStorage';
 
 const AnimatedView = Animated.createAnimatedComponent(View);
@@ -30,6 +32,7 @@ export default function SuccessScreen() {
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams();
   const { saveResponse, forceSync } = useOnboardingData();
+  const { triggerEvent } = useSuperwall();
   const [firstName, setFirstName] = useState('');
 
   // Animation pour les cercles concentriques
@@ -100,6 +103,11 @@ export default function SuccessScreen() {
     await saveResponse('completed', true);
     await forceSync(); // Forcer la synchronisation finale avec le backend
     await AsyncStorage.setItem('onboarding_completed', 'true');
+    await triggerEvent(SUPERWALL_EVENTS.ONBOARDING_COMPLETED, {
+      params: { source: 'onboarding_success_start_focus' },
+      requireNonPremium: false,
+      bypassCooldown: true,
+    });
     await setTutorialCompleted(false);
     await setTutorialStage('calendar');
     console.log('[Tutorial] Success -> set stage calendar');
@@ -108,6 +116,11 @@ export default function SuccessScreen() {
 
   const handleViewCalendar = async () => {
     // TODO: Ouvrir le calendrier natif ou l'app
+    await triggerEvent(SUPERWALL_EVENTS.ONBOARDING_COMPLETED, {
+      params: { source: 'onboarding_success_view_calendar' },
+      requireNonPremium: false,
+      bypassCooldown: true,
+    });
     await setTutorialCompleted(false);
     await setTutorialStage('calendar');
     console.log('[Tutorial] Success -> set stage calendar (view calendar)');

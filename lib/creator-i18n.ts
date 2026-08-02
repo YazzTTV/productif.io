@@ -64,6 +64,14 @@ const t_map = {
   "lp.cgv": { fr: "CGV", en: "Sales Terms" },
   "lp.rights": { fr: "Tous droits réservés.", en: "All rights reserved." },
 
+  // Earnings estimator
+  "lp.estimator.title": { fr: "Gagnez 50% de commission récurrente à vie en promouvant Productif.io dès aujourd'hui !", en: "Earn 50% recurring lifetime commissions by promoting Productif.io today!" },
+  "lp.estimator.cardTitle": { fr: "Estimez vos gains en promouvant Productif.io :", en: "Estimate your earnings promoting Productif.io:" },
+  "lp.estimator.referrals": { fr: "Nombre de filleuls", en: "Number of referrals" },
+  "lp.estimator.perYear": { fr: "/an", en: "/year" },
+  "lp.estimator.perMonth": { fr: "chaque mois", en: "every month" },
+  "lp.estimator.note": { fr: "*calculé sur l'abonnement premium à 9,99 € (taux de commission 50 %)", en: "*calculated on the €9.99 premium subscription (50% commission rate)" },
+
   // Testimonials (same in both)
   "lp.t1": { fr: "Même si la plupart d'entre nous ne se sont jamais rencontrés en vrai, l'ambiance est super personnelle — on se sent comme dans une vraie communauté.", en: "Even though most of us have never met in real life, the vibe is super personal — it feels like a real community." },
   "lp.t2": { fr: "Que des good vibes du début à la fin.", en: "Nothing but good vibes from start to finish." },

@@ -12,6 +12,8 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useOnboardingData } from '@/hooks/useOnboardingData';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { useDailyStructureSettings } from '@/hooks/useDailyStructureSettings';
+import { useSuperwall } from '@/hooks/useSuperwall';
+import { SUPERWALL_EVENTS } from '@/lib/superwallEvents';
 
 type SettingsView = 'main' | 'editProfile' | 'dailyStructure' | 'notifications';
 
@@ -25,6 +27,7 @@ export function SettingsNew() {
   const { getResponse, saveResponse, responses } = useOnboardingData();
   const { requestPermissions, permissionStatus } = usePushNotifications();
   const { settings: dailyStructure, saveSettings: saveDailyStructure } = useDailyStructureSettings();
+  const { triggerEvent } = useSuperwall();
   const [view, setView] = useState<SettingsView>('main');
   const [savedFeedback, setSavedFeedback] = useState(false);
   const [emailVerificationRequired, setEmailVerificationRequired] = useState(false);
@@ -1092,7 +1095,11 @@ export function SettingsNew() {
           <Text style={styles.sectionLabel}>{t('subscription') || 'Subscription'}</Text>
           <TouchableOpacity
             style={styles.subscriptionCard}
-            onPress={() => router.push('/paywall')}
+            onPress={() =>
+              triggerEvent(SUPERWALL_EVENTS.FEATURE_LOCKED, {
+                params: { source: 'settings_subscription' },
+              })
+            }
             activeOpacity={0.7}
           >
             <View style={styles.subscriptionContent}>

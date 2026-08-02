@@ -19,6 +19,9 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useOnboardingData } from '@/hooks/useOnboardingData';
+import { useSuperwall } from '@/hooks/useSuperwall';
+import { SUPERWALL_EVENTS } from '@/lib/superwallEvents';
+import { setTutorialCompleted, setTutorialStage } from '@/tutorial/tutorialStorage';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
 interface TimelineBlock {
@@ -32,7 +35,8 @@ export default function IdealDayScreen() {
   const { t } = useLanguage();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams();
-  const { saveResponse } = useOnboardingData();
+  const { saveResponse, forceSync } = useOnboardingData();
+  const { triggerEvent } = useSuperwall();
   const [priorities, setPriorities] = useState<string[]>([]);
   const [timeline, setTimeline] = useState<TimelineBlock[]>([]);
   const [isEditing, setIsEditing] = useState(false);
@@ -134,7 +138,17 @@ export default function IdealDayScreen() {
     });
   };
 
-  const handleStartFocus = () => {
+  const handleStartFocus = async () => {
+    await saveResponse('completed', true);
+    await forceSync();
+    await AsyncStorage.setItem('onboarding_completed', 'true');
+    await triggerEvent(SUPERWALL_EVENTS.ONBOARDING_COMPLETED, {
+      params: { source: 'ideal_day_start_focus' },
+      requireNonPremium: false,
+      bypassCooldown: true,
+    });
+    await setTutorialCompleted(false);
+    await setTutorialStage('calendar');
     router.replace('/(tabs)');
   };
 

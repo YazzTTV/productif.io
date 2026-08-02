@@ -7,6 +7,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { gamificationService, authService } from '@/lib/api';
 import { useLanguage } from '@/contexts/LanguageContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useSuperwall } from '@/hooks/useSuperwall';
+import { SUPERWALL_EVENTS } from '@/lib/superwallEvents';
 
 type LeaderboardTab = 'friends' | 'class' | 'global';
 
@@ -32,6 +34,7 @@ interface Group {
 export function LeaderboardEnhanced() {
   const { t } = useLanguage();
   const router = useRouter();
+  const { triggerEvent } = useSuperwall();
   const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState<LeaderboardTab>('friends');
   const [selectedUser, setSelectedUser] = useState<LeaderboardUser | null>(null);
@@ -236,8 +239,9 @@ export function LeaderboardEnhanced() {
 
   const handleTabPress = (tab: LeaderboardTab) => {
     if (!isPremium && tab === 'global') {
-      // Navigate to paywall
-      router.push('/paywall');
+      triggerEvent(SUPERWALL_EVENTS.FEATURE_LOCKED, {
+        params: { source: 'leaderboard_enhanced_global_tab' },
+      });
       return;
     }
     setActiveTab(tab);

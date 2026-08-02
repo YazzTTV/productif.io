@@ -25,6 +25,8 @@ import { useTranslation } from '@/hooks/useTranslation';
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 import { Select } from '@/components/ui/Select';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useSuperwall } from '@/hooks/useSuperwall';
+import { SUPERWALL_EVENTS } from '@/lib/superwallEvents';
 
 interface Habit {
   id: string;
@@ -74,6 +76,7 @@ export default function HabitsManagerScreen() {
   const { colors } = useTheme();
   const t = useTranslation();
   const router = useRouter();
+  const { triggerEvent } = useSuperwall();
   const [habits, setHabits] = useState<Habit[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -154,10 +157,18 @@ export default function HabitsManagerScreen() {
         return entryDate === dateString;
       });
       const currentCompleted = todayEntry?.completed || false;
+      const currentStreak = habit.currentStreak ?? 0;
 
       await habitsService.complete(habitId, dateString, currentCompleted);
       await fetchHabits();
       dashboardEvents.emit(DASHBOARD_DATA_CHANGED);
+      if (!currentCompleted && currentStreak === 0) {
+        await triggerEvent(SUPERWALL_EVENTS.STREAK_STARTED, {
+          params: { source: 'habits_toggle', habitId },
+          requireNonPremium: false,
+          bypassCooldown: true,
+        });
+      }
     } catch (error) {
       console.error('Erreur lors de la mise à jour:', error);
       Alert.alert(t('error'), t('habitsUpdateError', undefined, 'Impossible de mettre à jour l\'habitude'));

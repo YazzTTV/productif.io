@@ -31,6 +31,12 @@ import Animated, {
   FadeIn,
 } from 'react-native-reanimated';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useSuperwall } from '@/hooks/useSuperwall';
+import { SUPERWALL_EVENTS } from '@/lib/superwallEvents';
+import {
+  markUserFirstActionTriggered,
+  shouldTriggerUserFirstAction,
+} from '@/lib/superwallFirstAction';
 
 interface Task {
   id: string;
@@ -221,6 +227,7 @@ const TaskCard: React.FC<TaskCardProps & { index?: number }> = ({ task, onToggle
 export default function TasksScreen() {
   const router = useRouter();
   const { t } = useLanguage();
+  const { triggerEvent } = useSuperwall();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -507,6 +514,7 @@ export default function TasksScreen() {
       return;
     }
 
+    const fireUserFirstAction = await shouldTriggerUserFirstAction();
     setCreating(true);
     try {
       // Convertir les valeurs comme sur l'app web
@@ -538,6 +546,14 @@ export default function TasksScreen() {
       fetchTasks(); // Recharger les tâches
       // Notifier le dashboard
       dashboardEvents.emit(DASHBOARD_DATA_CHANGED);
+      if (fireUserFirstAction) {
+        await triggerEvent(SUPERWALL_EVENTS.USER_FIRST_ACTION, {
+          params: { source: 'tasks_first_creation' },
+          requireNonPremium: false,
+          bypassCooldown: true,
+        });
+        await markUserFirstActionTriggered();
+      }
       
       Alert.alert(
         t('success', undefined, 'Succès'),

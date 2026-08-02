@@ -65,5 +65,6 @@
     "components/trial/**",
     "lib/i18n.tsx",
     "lib/utils/TextNormalizer.ts"
-  ]
+  ],
+  "extends": "expo/tsconfig.base"
 }

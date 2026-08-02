@@ -42,6 +42,28 @@ interface GroupMember {
   totalPoints: number;
 }
 
+/** Évite de rouvrir le modal email à chaque `loadData` après « Plus tard » (persistant par compte). */
+const EMAIL_VERIFY_MODAL_SNOOZE_UNTIL_PREFIX = 'email_verify_modal_snoozed_until:';
+
+function emailVerifySnoozeKey(userId: string) {
+  return `${EMAIL_VERIFY_MODAL_SNOOZE_UNTIL_PREFIX}${userId}`;
+}
+
+async function getEmailVerifyModalSnoozeUntil(userId: string): Promise<number | null> {
+  const raw = await AsyncStorage.getItem(emailVerifySnoozeKey(userId));
+  if (!raw) return null;
+  const n = parseInt(raw, 10);
+  return Number.isFinite(n) ? n : null;
+}
+
+async function snoozeEmailVerifyModal(userId: string, hours = 24) {
+  const until = Date.now() + hours * 60 * 60 * 1000;
+  await AsyncStorage.setItem(emailVerifySnoozeKey(userId), String(until));
+}
+
+async function clearEmailVerifyModalSnooze(userId: string) {
+  await AsyncStorage.removeItem(emailVerifySnoozeKey(userId));
+}
 
 export function DashboardEnhanced() {
   const { t } = useLanguage();
@@ -186,10 +208,19 @@ export function DashboardEnhanced() {
         }
         if (needsVerification) {
           setEmailVerificationDueAt(user.emailVerificationDueAt ?? null);
-          setShowEmailVerificationModal(true);
+          const snoozeUntil =
+            user.id != null
+              ? await getEmailVerifyModalSnoozeUntil(user.id)
+              : null;
+          const snoozeActive =
+            snoozeUntil != null && Date.now() < snoozeUntil;
+          setShowEmailVerificationModal(!snoozeActive);
         } else {
           setEmailVerificationDueAt(null);
           setShowEmailVerificationModal(false);
+          if (user.id) {
+            await clearEmailVerifyModalSnooze(user.id);
+          }
         }
       }
 
@@ -294,6 +325,9 @@ export function DashboardEnhanced() {
       const needsVerification = user?.emailVerificationRequired ?? !isVerified;
       if (!needsVerification) {
         setShowEmailVerificationModal(false);
+        if (user?.id) {
+          await clearEmailVerifyModalSnooze(user.id);
+        }
         Alert.alert(
           t('success', undefined, 'Succès'),
           t('emailVerifiedSuccess', undefined, 'Merci, ton email est vérifié.')
@@ -318,6 +352,9 @@ export function DashboardEnhanced() {
     const needsVerification = user?.emailVerificationRequired ?? !isVerified;
     if (!needsVerification) {
       setShowEmailVerificationModal(false);
+      if (user?.id) {
+        await clearEmailVerifyModalSnooze(user.id);
+      }
     }
   };
 
@@ -677,7 +714,17 @@ export function DashboardEnhanced() {
             <View style={styles.emailModalActions}>
               <TouchableOpacity
                 style={styles.emailModalButton}
-                onPress={() => setShowEmailVerificationModal(false)}
+                onPress={async () => {
+                  try {
+                    const u = await authService.checkAuth();
+                    if (u?.id) {
+                      await snoozeEmailVerifyModal(u.id);
+                    }
+                  } catch {
+                    // best-effort snooze
+                  }
+                  setShowEmailVerificationModal(false);
+                }}
               >
                 <Text style={styles.emailModalButtonText}>
                   {t('later', undefined, 'Plus tard')}

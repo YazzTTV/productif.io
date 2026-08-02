@@ -25,6 +25,8 @@ import Svg, { Circle } from 'react-native-svg';
 import { HabitNoteModal } from '@/components/habits/HabitNoteModal';
 import Reanimated, { FadeInDown } from 'react-native-reanimated';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useSuperwall } from '@/hooks/useSuperwall';
+import { SUPERWALL_EVENTS } from '@/lib/superwallEvents';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = width - 32; // 16px padding on each side
@@ -55,6 +57,7 @@ interface Habit {
     rating?: number;
     note?: string;
   }[];
+  currentStreak?: number;
 }
 
 interface HabitCardProps {
@@ -416,6 +419,7 @@ const HabitCard: React.FC<HabitCardProps> = ({
 
 export default function HabitsScreen() {
   const { t } = useLanguage();
+  const { triggerEvent } = useSuperwall();
   const [habits, setHabits] = useState<Habit[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -470,6 +474,9 @@ export default function HabitsScreen() {
     const dateString = format(date, 'yyyy-MM-dd');
     console.log(`🔄 Toggle (optimiste) habitude ${habitId} pour ${dateString}, actuellement: ${currentCompleted}`);
 
+    const habitBefore = habits.find((h) => h.id === habitId);
+    const streakBefore = habitBefore?.currentStreak ?? 0;
+
     setUpdatingHabits(prev => new Set([...prev, habitId]));
 
     // Snapshot pour rollback en cas d'échec
@@ -493,6 +500,13 @@ export default function HabitsScreen() {
       console.log('✅ Réponse API:', response);
       // Notifier le dashboard
       dashboardEvents.emit(DASHBOARD_DATA_CHANGED);
+      if (!currentCompleted && streakBefore === 0) {
+        await triggerEvent(SUPERWALL_EVENTS.STREAK_STARTED, {
+          params: { source: 'habits_tab_toggle', habitId },
+          requireNonPremium: false,
+          bypassCooldown: true,
+        });
+      }
     } catch (error) {
       console.error('❌ Erreur lors de la mise à jour (rollback):', error);
       Alert.alert(t('error'), t('updateHabitError'));

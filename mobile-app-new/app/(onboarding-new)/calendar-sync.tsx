@@ -18,14 +18,17 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { connectGoogleCalendar, connectAppleCalendar, createAppleCalendarEvent } from '@/lib/calendarAuth';
-import { googleCalendarService } from '@/lib/api';
+import { googleCalendarService, onboardingService } from '@/lib/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getTutorialStage, setTutorialCompleted, setTutorialStage } from '@/tutorial/tutorialStorage';
+import { useSuperwall } from '@/hooks/useSuperwall';
+import { SUPERWALL_EVENTS } from '@/lib/superwallEvents';
 
 export default function CalendarSyncScreen() {
   const { t } = useLanguage();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams();
+  const { triggerEvent } = useSuperwall();
   const [isConnecting, setIsConnecting] = useState(false);
   const [isCreatingEvents, setIsCreatingEvents] = useState(false);
 
@@ -235,7 +238,23 @@ export default function CalendarSyncScreen() {
     }
   };
 
-  const handleSkip = () => {
+  const handleSkip = async () => {
+    try {
+      await onboardingService.saveOnboardingData({
+        completed: true,
+        currentStep: 11,
+      });
+    } catch {
+      // best-effort
+    }
+    await AsyncStorage.setItem('onboarding_completed', 'true');
+    await triggerEvent(SUPERWALL_EVENTS.ONBOARDING_COMPLETED, {
+      params: { source: 'calendar_sync_skip' },
+      requireNonPremium: false,
+      bypassCooldown: true,
+    });
+    await setTutorialCompleted(false);
+    await setTutorialStage('calendar');
     router.replace('/(tabs)');
   };
 
