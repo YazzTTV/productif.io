@@ -726,6 +726,27 @@ export const subjectsService = {
     });
   },
 
+  // Créer plusieurs chapitres d'un coup dans une matière
+  async bulkAddTasks(
+    subjectId: string,
+    titles: string[],
+    options?: { estimatedMinutes?: number; priority?: number }
+  ): Promise<{
+    success: boolean;
+    createdCount: number;
+    skippedCount: number;
+    tasks: any[];
+  }> {
+    return await apiCall(`/subjects/${subjectId}/tasks/bulk`, {
+      method: 'POST',
+      body: JSON.stringify({
+        titles,
+        estimatedMinutes: options?.estimatedMinutes,
+        priority: options?.priority,
+      }),
+    });
+  },
+
   // Analyser une image pour extraire les matières
   async analyzeImage(imageUri: string): Promise<{
     success: boolean;
@@ -811,82 +832,11 @@ export const projectsService = {
   },
 };
 
-// Service de paiement Stripe
-export const paymentService = {
-  // Créer un PaymentIntent pour Apple Pay / Google Pay
-  async createPaymentIntent(billingType: 'monthly' | 'annual'): Promise<{
-    clientSecret: string;
-    customerId: string;
-    amount: number;
-    currency: string;
-  }> {
-    const user = await authService.checkAuth();
-    if (!user?.id) {
-      throw new Error('User not authenticated');
-    }
-    
-    return await apiCall('/stripe/create-payment-intent', {
-      method: 'POST',
-      body: JSON.stringify({
-        userId: user.id,
-        billingType,
-      }),
-    });
-  },
-
-  // Créer une session de checkout Stripe
-  async createCheckoutSession(billingType: 'monthly' | 'annual'): Promise<{
-    url: string;
-  }> {
-    // Vérifier que l'utilisateur est authentifié
-    const user = await authService.checkAuth();
-    if (!user?.id) {
-      throw new Error('User not authenticated');
-    }
-    
-    console.log('💳 [PAYMENT] Création de session checkout:', {
-      billingType,
-      userId: user.id,
-      billingTypeType: typeof billingType
-    });
-    
-    // Envoyer le userId dans le body comme fallback (le serveur utilisera le token en priorité)
-    const result = await apiCall('/stripe/create-checkout-session', {
-      method: 'POST',
-      body: JSON.stringify({
-        userId: user.id, // Fallback si le token ne fonctionne pas
-        billingType,
-      }),
-    });
-    
-    console.log('💳 [PAYMENT] Session créée:', result);
-    return result;
-  },
-
-  // Confirmer l'abonnement après paiement
-  async confirmSubscription(
-    paymentMethodId: string,
-    billingType: 'monthly' | 'annual'
-  ): Promise<{
-    success: boolean;
-    subscriptionId: string;
-    status: string;
-  }> {
-    const user = await authService.checkAuth();
-    if (!user?.id) {
-      throw new Error('User not authenticated');
-    }
-    
-    return await apiCall('/stripe/confirm-subscription', {
-      method: 'POST',
-      body: JSON.stringify({
-        userId: user.id,
-        paymentMethodId,
-        billingType,
-      }),
-    });
-  },
-};
+// Les achats in-app passent uniquement par Superwall (StoreKit).
+// L'ancien service de paiement Stripe a été retiré : vendre un abonnement via
+// une WebView Stripe depuis une app iOS enfreint la guideline App Store 3.1.1,
+// et les prix qu'il affichait ne correspondaient à aucun produit réel.
+// Les routes serveur /api/stripe/* restent en place pour le web.
 
 // Types pour l'onboarding (nouveau design)
 export interface OnboardingDataInput {

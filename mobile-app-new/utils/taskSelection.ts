@@ -1,4 +1,5 @@
 import { subjectsService, getAuthToken } from '@/lib/api';
+import { calculatePriorityScore } from '@/utils/priorityScore';
 
 export interface TaskForExam {
   id: string;
@@ -24,69 +25,6 @@ export interface Subject {
     priority: 'high' | 'medium' | 'low';
     completed: boolean;
   }>;
-}
-
-/**
- * Calculate priority score for a task
- * Combines:
- * 1. Subject coefficient (higher = more important)
- * 2. Subject deadline proximity (closer = more urgent)
- * 
- * Formula:
- * priorityScore = (coefficient * 100) + deadlineUrgencyScore
- *                + priorityMultiplier + estimatedTime
- */
-function calculatePriorityScore(
-  task: any,
-  subject: Subject
-): number {
-  // Base score from coefficient (coefficient * 100)
-  // Higher coefficient = higher base score
-  let score = subject.coefficient * 100;
-
-  // Deadline urgency score (closer deadline = higher score)
-  if (subject.deadline) {
-    try {
-      const deadlineDate = new Date(subject.deadline);
-      const now = new Date();
-      const daysUntilDeadline = Math.ceil(
-        (deadlineDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
-      );
-
-      // If deadline is in the past, give it a high urgency score
-      if (daysUntilDeadline < 0) {
-        score += 500; // Very high score for overdue deadlines
-      } else if (daysUntilDeadline <= 7) {
-        // Within 7 days: high urgency
-        score += 400 - (daysUntilDeadline * 30); // 400 to 190
-      } else if (daysUntilDeadline <= 30) {
-        // Within 30 days: medium urgency
-        score += 200 - (daysUntilDeadline - 7) * 5; // 200 to 85
-      } else if (daysUntilDeadline <= 90) {
-        // Within 90 days: low urgency
-        score += 80 - (daysUntilDeadline - 30) * 1; // 80 to 20
-      } else {
-        // More than 90 days: minimal urgency
-        score += 10;
-      }
-    } catch (error) {
-      console.error('Error parsing deadline:', error);
-      // If deadline parsing fails, just use coefficient
-    }
-  }
-
-  // Priority multiplier
-  const priorityMultiplier = {
-    high: 1.5,
-    medium: 1.0,
-    low: 0.5,
-  };
-  score *= priorityMultiplier[task.priority] || 1.0;
-
-  // Estimated time (longer tasks get slightly more weight)
-  score += (task.estimatedTime || 0) * 0.1;
-
-  return score;
 }
 
 /**

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getAuthUserFromRequest } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { priorityIntToLabel } from "@/lib/tasks"
 
 export async function GET(req: NextRequest) {
   try {
@@ -87,13 +88,7 @@ export async function GET(req: NextRequest) {
         // Convertir estimatedMinutes en estimatedTime
         estimatedTime: task.estimatedMinutes || 30,
         // Convertir priority (Int) en 'high' | 'medium' | 'low'
-        priority: task.priority === null || task.priority === undefined
-          ? 'medium'
-          : task.priority >= 8
-          ? 'high'
-          : task.priority >= 5
-          ? 'medium'
-          : 'low',
+        priority: priorityIntToLabel(task.priority),
       })),
     }))
 
@@ -188,13 +183,7 @@ export async function POST(req: NextRequest) {
       tasks: subject.tasks.map(task => ({
         ...task,
         estimatedTime: task.estimatedMinutes || 30,
-        priority: task.priority === null || task.priority === undefined
-          ? 'medium'
-          : task.priority >= 8
-          ? 'high'
-          : task.priority >= 5
-          ? 'medium'
-          : 'low',
+        priority: priorityIntToLabel(task.priority),
       })),
     }
     

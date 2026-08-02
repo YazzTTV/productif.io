@@ -19,6 +19,25 @@ const energyMappings = {
   "3": "Extrême"
 };
 
+/**
+ * Traduit la priorité stockée (Int) vers le format attendu par le mobile.
+ *
+ * L'échelle de stockage est 0-4 partout où l'on écrit : le web utilise P0-P4,
+ * et le mobile envoie high=4, medium=3, low=2. Les seuils historiques de
+ * `/api/subjects` étaient >= 8 et >= 5, calibrés pour une échelle 0-10 qui
+ * n'existe nulle part, si bien que toute tâche relisait "low". Le tri du Mode
+ * Examen multipliait donc chaque tâche par le même coefficient 0,5 et sa
+ * composante priorité ne servait à rien.
+ */
+export function priorityIntToLabel(
+  priority: number | null | undefined
+): "high" | "medium" | "low" {
+  if (priority === null || priority === undefined) return "medium"
+  if (priority >= 4) return "high"
+  if (priority >= 3) return "medium"
+  return "low"
+}
+
 // Fonction pour calculer l'ordre des tâches
 export function calculateTaskOrder(priority: string, energyLevel: string): number {
   const priorityScores = {

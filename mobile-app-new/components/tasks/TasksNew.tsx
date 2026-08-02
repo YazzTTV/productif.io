@@ -18,6 +18,18 @@ import {
 } from '@/tutorial/tutorialStorage';
 import { InlineHint } from '@/tutorial/InlineHint';
 import { Coachmark } from '@/tutorial/Coachmark';
+import { useSuperwall } from '@/hooks/useSuperwall';
+import {
+  assignPriorityTiers,
+  calculatePriorityScore,
+  PriorityTier,
+  TIER_COLORS,
+} from '@/utils/priorityScore';
+import { SUPERWALL_EVENTS } from '@/lib/superwallEvents';
+import {
+  markUserFirstActionTriggered,
+  shouldTriggerUserFirstAction,
+} from '@/lib/superwallFirstAction';
 
 interface Task {
   id: string;
@@ -106,6 +118,7 @@ export function TasksNew() {
   const params = useLocalSearchParams();
   const insets = useSafeAreaInsets();
   const { t, language } = useLanguage();
+  const { triggerEvent } = useSuperwall();
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [expandedSubjects, setExpandedSubjects] = useState<string[]>([]);
   const [expandedTasks, setExpandedTasks] = useState<string[]>([]);
@@ -122,6 +135,10 @@ export function TasksNew() {
   const [newTaskEstimatedTime, setNewTaskEstimatedTime] = useState(30);
   const [newTaskPriority, setNewTaskPriority] = useState<'high' | 'medium' | 'low'>('medium');
   const [creatingTask, setCreatingTask] = useState(false);
+  const [showBulkImportModal, setShowBulkImportModal] = useState(false);
+  const [selectedSubjectForBulk, setSelectedSubjectForBulk] = useState<string | null>(null);
+  const [bulkImportText, setBulkImportText] = useState('');
+  const [importingChapters, setImportingChapters] = useState(false);
   const [analyzingImage, setAnalyzingImage] = useState(false);
   const [showImagePickerOptions, setShowImagePickerOptions] = useState(false);
   const [planningWeek, setPlanningWeek] = useState(false);
@@ -768,6 +785,7 @@ export function TasksNew() {
 
     try {
       setCreatingTask(true);
+      const fireUserFirstAction = await shouldTriggerUserFirstAction();
       const selectedSubject = subjects.find(s => s.id === selectedSubjectForTask);
       
       // Vérifier que la matière existe vraiment (pas une matière virtuelle)
@@ -797,7 +815,16 @@ export function TasksNew() {
       const newTask = await tasksService.create(taskData);
       
       console.log('✅ [TasksNew] Tâche créée avec succès:', newTask);
-      
+
+      if (fireUserFirstAction) {
+        await triggerEvent(SUPERWALL_EVENTS.USER_FIRST_ACTION, {
+          params: { source: 'tasks_new_first_creation' },
+          requireNonPremium: false,
+          bypassCooldown: true,
+        });
+        await markUserFirstActionTriggered();
+      }
+
       // Recharger les matières pour afficher la nouvelle tâche
       await loadSubjects();
       
@@ -872,6 +899,98 @@ export function TasksNew() {
     },
     0
   );
+
+  // Palier de couleur par chapitre, calculé sur l'ensemble des matières et non
+  // matière par matière : l'utilisateur veut savoir par quoi commencer ce soir,
+  // pas quel chapitre est le plus urgent à l'intérieur d'une matière déjà
+  // secondaire. Même fonction de score que le tri du Mode Examen.
+  const priorityTiers = React.useMemo(() => {
+    const scored: Array<{ id: string; score: number }> = [];
+
+    for (const subject of subjects) {
+      if (subject.id === 'no-subject') continue;
+      const subjectTasks = Array.isArray(subject.tasks) ? subject.tasks : [];
+
+      for (const task of subjectTasks) {
+        if (task.completed) continue;
+        scored.push({
+          id: task.id,
+          score: calculatePriorityScore(task, {
+            coefficient: subject.coefficient,
+            deadline: subject.deadline ?? null,
+          }),
+        });
+      }
+    }
+
+    return assignPriorityTiers(scored);
+  }, [subjects]);
+
+  const getTierLabel = (tier: PriorityTier) => {
+    switch (tier) {
+      case 'critical':
+        return t('tierCritical');
+      case 'important':
+        return t('tierImportant');
+      default:
+        return t('tierLater');
+    }
+  };
+
+  const handleBulkImport = async () => {
+    if (!selectedSubjectForBulk || selectedSubjectForBulk === 'no-subject') {
+      Alert.alert(t('error'), t('noSubjectSelected'));
+      return;
+    }
+
+    const titles = bulkImportText
+      .split('\n')
+      .map(line => line.trim())
+      .filter(Boolean);
+
+    if (titles.length === 0) {
+      Alert.alert(t('error'), t('bulkImportEmpty'));
+      return;
+    }
+
+    try {
+      setImportingChapters(true);
+      const fireUserFirstAction = await shouldTriggerUserFirstAction();
+
+      const result = await subjectsService.bulkAddTasks(selectedSubjectForBulk, titles);
+
+      if (fireUserFirstAction && result.createdCount > 0) {
+        await triggerEvent(SUPERWALL_EVENTS.USER_FIRST_ACTION, {
+          params: { source: 'tasks_new_bulk_import' },
+          requireNonPremium: false,
+          bypassCooldown: true,
+        });
+        await markUserFirstActionTriggered();
+      }
+
+      await loadSubjects();
+
+      setBulkImportText('');
+      setShowBulkImportModal(false);
+      setSelectedSubjectForBulk(null);
+
+      // Les doublons sont ignorés en silence côté serveur : sans ce message,
+      // un import rejoué donnerait l'impression que rien ne s'est passé.
+      const message =
+        result.skippedCount > 0
+          ? `${result.createdCount} ${t('chaptersImported')} · ${result.skippedCount} ${t('chaptersSkipped')}`
+          : `${result.createdCount} ${t('chaptersImported')}`;
+
+      Alert.alert(t('success'), message);
+    } catch (error: any) {
+      const errorMessage =
+        error?.errorData?.error || error?.message || t('bulkImportError');
+      console.error('[TasksNew] Erreur import en masse:', error);
+      Alert.alert(t('error'), errorMessage);
+    } finally {
+      setImportingChapters(false);
+    }
+  };
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
@@ -1099,6 +1218,7 @@ export function TasksNew() {
                     <View style={styles.tasksList}>
                       {tasks.map((task, taskIndex) => {
                         const isTaskExpanded = expandedTasks.includes(task.id);
+                        const tier = priorityTiers.get(task.id);
 
                         return (
                           <View
@@ -1106,6 +1226,12 @@ export function TasksNew() {
                             style={[
                               styles.taskCard,
                               task.completed && styles.taskCardCompleted,
+                              !task.completed && tier
+                                ? {
+                                    borderLeftWidth: 4,
+                                    borderLeftColor: TIER_COLORS[tier],
+                                  }
+                                : null,
                             ]}
                           >
                             <View style={styles.taskHeader}>
@@ -1139,9 +1265,15 @@ export function TasksNew() {
                                     <Ionicons name="time-outline" size={14} color="rgba(0, 0, 0, 0.6)" />
                                     <Text style={styles.taskTimeText}>{task.estimatedTime} min</Text>
                                   </View>
-                                  <Text style={[styles.taskPriority, { color: getPriorityColor(task.priority) }]}>
-                                    {getPriorityLabel(task.priority)}
-                                  </Text>
+                                  {!task.completed && tier ? (
+                                    <Text style={[styles.taskPriority, { color: TIER_COLORS[tier] }]}>
+                                      {getTierLabel(tier)}
+                                    </Text>
+                                  ) : (
+                                    <Text style={[styles.taskPriority, { color: getPriorityColor(task.priority) }]}>
+                                      {getPriorityLabel(task.priority)}
+                                    </Text>
+                                  )}
                                 </View>
                               </View>
 
@@ -1249,6 +1381,22 @@ export function TasksNew() {
                           <Ionicons name="add" size={16} color="rgba(0, 0, 0, 0.4)" />
                         </View>
                         <Text style={styles.addTaskText}>{t('addTask')}</Text>
+                      </TouchableOpacity>
+                    )}
+
+                    {subject.id !== 'no-subject' && (
+                      <TouchableOpacity
+                        style={styles.bulkImportButton}
+                        onPress={() => {
+                          setSelectedSubjectForBulk(subject.id);
+                          setShowBulkImportModal(true);
+                        }}
+                        activeOpacity={0.8}
+                      >
+                        <View style={styles.addTaskIconContainer}>
+                          <Ionicons name="list-outline" size={16} color="rgba(0, 0, 0, 0.4)" />
+                        </View>
+                        <Text style={styles.addTaskText}>{t('importChapters')}</Text>
                       </TouchableOpacity>
                     )}
                   </View>
@@ -1487,6 +1635,73 @@ export function TasksNew() {
                   <ActivityIndicator size="small" color="#FFFFFF" />
                 ) : (
                   <Text style={styles.submitButtonText}>{t('addSubject')}</Text>
+                )}
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Bulk Import Chapters Modal */}
+      <Modal
+        visible={showBulkImportModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowBulkImportModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { paddingBottom: insets.bottom + 24 }]}>
+            <View style={styles.modalHeader}>
+              <View style={styles.modalHeaderContent}>
+                <Text style={styles.modalTitle}>{t('importChaptersTitle')}</Text>
+                <Text style={styles.modalSubtitle}>{t('importChaptersSubtitle')}</Text>
+                {selectedSubjectForBulk && (
+                  <Text style={styles.modalSubjectName}>
+                    {t('forSubject')}{' '}
+                    <Text style={styles.modalSubjectNameBold}>
+                      {subjects.find(s => s.id === selectedSubjectForBulk)?.name}
+                    </Text>
+                  </Text>
+                )}
+              </View>
+              <TouchableOpacity
+                onPress={() => setShowBulkImportModal(false)}
+                style={styles.closeButton}
+              >
+                <Ionicons name="close" size={24} color="#000" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.modalScrollView} showsVerticalScrollIndicator={false}>
+              <View style={styles.formGroup}>
+                <TextInput
+                  style={styles.bulkImportInput}
+                  placeholder={t('importChaptersPlaceholder')}
+                  value={bulkImportText}
+                  onChangeText={setBulkImportText}
+                  multiline
+                  textAlignVertical="top"
+                  autoFocus
+                />
+                <Text style={styles.formHint}>
+                  {bulkImportText.split('\n').filter(line => line.trim()).length}{' '}
+                  {t('chaptersDetected')}
+                </Text>
+              </View>
+
+              <TouchableOpacity
+                style={[
+                  styles.submitButton,
+                  (!bulkImportText.trim() || importingChapters) && styles.submitButtonDisabled,
+                ]}
+                onPress={handleBulkImport}
+                disabled={!bulkImportText.trim() || importingChapters}
+                activeOpacity={0.8}
+              >
+                {importingChapters ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.submitButtonText}>{t('importChapters')}</Text>
                 )}
               </TouchableOpacity>
             </ScrollView>
@@ -2269,6 +2484,16 @@ const styles = StyleSheet.create({
     fontSize: 16,
     backgroundColor: '#FFFFFF',
   },
+  bulkImportInput: {
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.1)',
+    borderRadius: 16,
+    padding: 16,
+    fontSize: 16,
+    lineHeight: 24,
+    minHeight: 220,
+    backgroundColor: '#FFFFFF',
+  },
   coefficientContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -2348,6 +2573,17 @@ const styles = StyleSheet.create({
   addTaskButtonDisabled: {
     opacity: 0.5,
     borderColor: 'rgba(0, 0, 0, 0.05)',
+  },
+  bulkImportButton: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    marginTop: 8,
+    borderRadius: 16,
+    backgroundColor: 'rgba(0, 0, 0, 0.03)',
   },
   addTaskIconContainer: {
     width: 24,
