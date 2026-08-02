@@ -25,10 +25,14 @@ android {
 
     signingConfigs {
         release {
-            storeFile file("../keystore-productif.jks")
-            storePassword System.getenv("LEGACY_STORE_PASSWORD")
-            keyAlias "productif"
-            keyPassword System.getenv("LEGACY_KEY_PASSWORD")
+            // Generation Capacitor abandonnee. Les identifiants ne sont plus
+            // en clair ici : ils viennent de ~/.gradle/gradle.properties.
+            if (project.hasProperty('PRODUCTIF_LEGACY_STORE_FILE')) {
+                storeFile file(PRODUCTIF_LEGACY_STORE_FILE)
+                storePassword PRODUCTIF_LEGACY_STORE_PASSWORD
+                keyAlias PRODUCTIF_LEGACY_KEY_ALIAS
+                keyPassword PRODUCTIF_LEGACY_KEY_PASSWORD
+            }
         }
     }
 

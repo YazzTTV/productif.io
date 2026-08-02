@@ -65,6 +65,9 @@ mobile-app-new/ios/Productifio/GoogleService-Info.plist
 # Keystore files (clés de signature - ne jamais commiter)
 *.keystore
 *.jks
+# exception : keystore de debug Android, public par conception (mot de passe "android")
+!mobile-app-new/android/app/debug.keystore
+*.jks
 **/productif-upload.keystore
 productif-upload.keystore
 

@@ -222,13 +222,13 @@ Une fois tout rempli :
 
 ⚠️ **CRITIQUE** : Garde ton keystore en sécurité !
 
-- **Emplacement** : `android/app/productif-upload.keystore`
-- **Mot de passe** : `***MOT_DE_PASSE_RETIRE***`
+- **Emplacement** : `android/app/productif-upload.keystore` (jamais commité)
+- **Mot de passe** : dans `~/.gradle/gradle.properties`, jamais dans le dépôt
 - **Alias** : `productif`
 
 **Sauvegarde** :
-1. Fais une copie du keystore dans un endroit sécurisé
-2. Sauvegarde aussi `android/gradle.properties` (contient les mots de passe)
+1. Fais une copie du keystore dans un endroit sécurisé (gestionnaire de mots de passe, pas le dépôt)
+2. Sauvegarde aussi `~/.gradle/gradle.properties` (contient les mots de passe)
 3. Si tu perds le keystore, tu ne pourras **PAS** mettre à jour l'app sur le Play Store
 
 ---
