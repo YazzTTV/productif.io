@@ -151,6 +151,9 @@ export function TasksNew() {
   const [editingDayTask, setEditingDayTask] = useState<{ id: string; title: string } | null>(null);
   const [editingDayDraft, setEditingDayDraft] = useState<Date | null>(null);
   const [savingDay, setSavingDay] = useState(false);
+  // Meme brouillon pour la deadline de matiere, dont le selecteur souffrait du
+  // meme defaut : ce modal a lui aussi autoFocus, donc le clavier le masquait.
+  const [subjectDateDraft, setSubjectDateDraft] = useState<Date | null>(null);
   const [creatingTask, setCreatingTask] = useState(false);
   const [showBulkImportModal, setShowBulkImportModal] = useState(false);
   const [selectedSubjectForBulk, setSelectedSubjectForBulk] = useState<string | null>(null);
@@ -1767,7 +1770,11 @@ export function TasksNew() {
                 <Text style={styles.formLabel}>{t('deadlineOptional')}</Text>
                 <TouchableOpacity
                   style={styles.dateButton}
-                  onPress={() => setShowDatePicker(true)}
+                  onPress={() => {
+                    Keyboard.dismiss();
+                    setSubjectDateDraft(newSubjectDeadline);
+                    setShowDatePicker(true);
+                  }}
                 >
                   <Ionicons name="calendar-outline" size={20} color="#16A34A" />
                   <Text style={styles.dateButtonText}>
@@ -1786,21 +1793,9 @@ export function TasksNew() {
                 </TouchableOpacity>
               </View>
 
-              {/* Date Picker */}
-              {showDatePicker && (
-                <DateTimePicker
-                  value={newSubjectDeadline || new Date()}
-                  mode="date"
-                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                  onChange={(event, selectedDate) => {
-                    setShowDatePicker(Platform.OS === 'ios');
-                    if (selectedDate) {
-                      setNewSubjectDeadline(selectedDate);
-                    }
-                  }}
-                  minimumDate={new Date()}
-                />
-              )}
+              {/* Le selecteur n'est PAS rendu ici : ce modal a autoFocus sur le
+                  nom, donc le clavier recouvre le bas de la feuille et le
+                  masquait. Il est en surcouche, plus bas. */}
 
               {/* Submit Button */}
               <TouchableOpacity
@@ -1820,6 +1815,61 @@ export function TasksNew() {
               </TouchableOpacity>
             </ScrollView>
           </View>
+
+          {/* Selecteur de date d'examen, en surcouche du modal */}
+          {showDatePicker && Platform.OS === 'ios' && (
+            <View style={styles.datePickerOverlay}>
+              <View style={styles.datePickerCard}>
+                <Text style={styles.datePickerTitle}>{t('deadlineOptional')}</Text>
+                <DateTimePicker
+                  value={subjectDateDraft || new Date()}
+                  mode="date"
+                  display="spinner"
+                  locale={language}
+                  themeVariant="light"
+                  style={styles.datePickerSpinner}
+                  minimumDate={new Date()}
+                  onChange={(event, selectedDate) => {
+                    if (selectedDate) setSubjectDateDraft(selectedDate);
+                  }}
+                />
+                <View style={styles.datePickerActions}>
+                  <TouchableOpacity
+                    style={styles.datePickerCancel}
+                    onPress={() => setShowDatePicker(false)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.datePickerCancelText}>{t('cancel')}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.datePickerConfirm}
+                    onPress={() => {
+                      setNewSubjectDeadline(subjectDateDraft || new Date());
+                      setShowDatePicker(false);
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.datePickerConfirmText}>{t('confirm')}</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          )}
+
+          {showDatePicker && Platform.OS !== 'ios' && (
+            <DateTimePicker
+              value={subjectDateDraft || new Date()}
+              mode="date"
+              display="default"
+              minimumDate={new Date()}
+              onChange={(event, selectedDate) => {
+                setShowDatePicker(false);
+                if (event.type === 'set' && selectedDate) {
+                  setNewSubjectDeadline(selectedDate);
+                }
+              }}
+            />
+          )}
         </View>
       </Modal>
 
