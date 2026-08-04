@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Modal, TextInput, Platform, Alert, ActivityIndicator, Image } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Modal, TextInput, Platform, Alert, ActivityIndicator, Image, Keyboard } from 'react-native';
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
@@ -143,6 +143,8 @@ export function TasksNew() {
   const [newTaskPriority, setNewTaskPriority] = useState<'high' | 'medium' | 'low'>('medium');
   const [newTaskScheduledFor, setNewTaskScheduledFor] = useState<Date | null>(null);
   const [showTaskDatePicker, setShowTaskDatePicker] = useState(false);
+  // Valeur en cours de choix, pour qu'Annuler ne modifie rien
+  const [taskDateDraft, setTaskDateDraft] = useState<Date | null>(null);
   const [creatingTask, setCreatingTask] = useState(false);
   const [showBulkImportModal, setShowBulkImportModal] = useState(false);
   const [selectedSubjectForBulk, setSelectedSubjectForBulk] = useState<string | null>(null);
@@ -921,6 +923,7 @@ export function TasksNew() {
       setNewTaskTitle('');
       setNewTaskScheduledFor(null);
       setShowTaskDatePicker(false);
+      setTaskDateDraft(null);
       setNewTaskEstimatedTime(30);
       setNewTaskPriority('medium');
       setShowAddTaskModal(false);
@@ -1941,7 +1944,13 @@ export function TasksNew() {
                 <Text style={styles.formLabel}>{t('taskScheduledForLabel')}</Text>
                 <TouchableOpacity
                   style={styles.dateButton}
-                  onPress={() => setShowTaskDatePicker(true)}
+                  onPress={() => {
+                    // Le champ titre a autoFocus, donc le clavier recouvre le bas
+                    // de la feuille. Sans ce dismiss, le selecteur s'ouvre derriere.
+                    Keyboard.dismiss();
+                    setTaskDateDraft(newTaskScheduledFor);
+                    setShowTaskDatePicker(true);
+                  }}
                   activeOpacity={0.7}
                 >
                   <Ionicons name="calendar-outline" size={18} color="rgba(0, 0, 0, 0.5)" />
@@ -1966,19 +1975,9 @@ export function TasksNew() {
                 </TouchableOpacity>
               </View>
 
-              {showTaskDatePicker && (
-                <DateTimePicker
-                  value={newTaskScheduledFor || new Date()}
-                  mode="date"
-                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                  onChange={(event, selectedDate) => {
-                    setShowTaskDatePicker(Platform.OS === 'ios');
-                    if (selectedDate) {
-                      setNewTaskScheduledFor(selectedDate);
-                    }
-                  }}
-                />
-              )}
+              {/* Le selecteur de date n'est PAS rendu ici : dans cette feuille
+                  ancree en bas, il tomberait derriere le clavier. Il est en
+                  surcouche au-dessus du modal, plus bas dans ce fichier. */}
 
               {/* Submit Button */}
               <TouchableOpacity
@@ -2000,6 +1999,63 @@ export function TasksNew() {
               <Text style={styles.modalFooterText}>{t('youCanAlwaysAdjustLater')}</Text>
             </ScrollView>
           </View>
+
+          {/* Selecteur de jour de travail, en surcouche du modal plutot qu'un
+              Modal imbrique : sur iOS l'imbrication de Modal est capricieuse, et
+              une surcouche absolue passe forcement au-dessus de la feuille et du
+              clavier. Sur Android, DateTimePicker est deja un dialogue natif,
+              donc on ne dessine pas de carte autour. */}
+          {showTaskDatePicker && Platform.OS === 'ios' && (
+            <View style={styles.datePickerOverlay}>
+              <View style={styles.datePickerCard}>
+                <Text style={styles.datePickerTitle}>{t('taskScheduledForLabel')}</Text>
+                <DateTimePicker
+                  value={taskDateDraft || new Date()}
+                  mode="date"
+                  display="spinner"
+                  locale={language}
+                  themeVariant="light"
+                  style={styles.datePickerSpinner}
+                  onChange={(event, selectedDate) => {
+                    if (selectedDate) setTaskDateDraft(selectedDate);
+                  }}
+                />
+                <View style={styles.datePickerActions}>
+                  <TouchableOpacity
+                    style={styles.datePickerCancel}
+                    onPress={() => setShowTaskDatePicker(false)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.datePickerCancelText}>{t('cancel')}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.datePickerConfirm}
+                    onPress={() => {
+                      setNewTaskScheduledFor(taskDateDraft || new Date());
+                      setShowTaskDatePicker(false);
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.datePickerConfirmText}>{t('confirm')}</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          )}
+
+          {showTaskDatePicker && Platform.OS !== 'ios' && (
+            <DateTimePicker
+              value={taskDateDraft || new Date()}
+              mode="date"
+              display="default"
+              onChange={(event, selectedDate) => {
+                setShowTaskDatePicker(false);
+                if (event.type === 'set' && selectedDate) {
+                  setNewTaskScheduledFor(selectedDate);
+                }
+              }}
+            />
+          )}
         </View>
       </Modal>
 
@@ -2825,6 +2881,67 @@ const styles = StyleSheet.create({
   },
   dateButtonTextPlaceholder: {
     color: 'rgba(0, 0, 0, 0.35)',
+  },
+  // Surcouche du selecteur de jour : couvre toute la zone du modal, donc passe
+  // au-dessus de la feuille ancree en bas et du clavier.
+  datePickerOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+  },
+  datePickerCard: {
+    width: '100%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 20,
+  },
+  datePickerTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#000',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  datePickerSpinner: {
+    alignSelf: 'stretch',
+    height: 200,
+  },
+  datePickerActions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 8,
+  },
+  datePickerCancel: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: 16,
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+  },
+  datePickerCancelText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: 'rgba(0, 0, 0, 0.6)',
+  },
+  datePickerConfirm: {
+    flex: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: 16,
+    backgroundColor: '#16A34A',
+  },
+  datePickerConfirmText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
   submitButton: {
     backgroundColor: '#16A34A',
