@@ -1424,6 +1424,37 @@ export function TasksNew() {
                                       {getPriorityLabel(task.priority)}
                                     </Text>
                                   )}
+
+                                  {/* Jour de travail : seul point d'edition d'une
+                                      tache. Place ici et non dans taskActions,
+                                      ou il volait la largeur du bouton focus. */}
+                                  {!task.completed && (
+                                    <TouchableOpacity
+                                      style={styles.taskDayChip}
+                                      onPress={() => openDayEditor(task)}
+                                      activeOpacity={0.7}
+                                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                                    >
+                                      <Ionicons
+                                        name="calendar-outline"
+                                        size={13}
+                                        color={task.scheduledFor ? '#B45309' : 'rgba(0, 0, 0, 0.45)'}
+                                      />
+                                      <Text
+                                        style={[
+                                          styles.taskDayChipText,
+                                          task.scheduledFor && styles.taskDayChipTextSet,
+                                        ]}
+                                        numberOfLines={1}
+                                      >
+                                        {task.scheduledFor
+                                          ? format(new Date(task.scheduledFor), 'EEE d MMM', {
+                                              locale: dateLocale,
+                                            })
+                                          : t('taskSetDay')}
+                                      </Text>
+                                    </TouchableOpacity>
+                                  )}
                                 </View>
                               </View>
 
@@ -1462,31 +1493,6 @@ export function TasksNew() {
                                 </TouchableOpacity>
                               )}
                               
-                              {/* Jour de travail : seul point d'edition d'une tache */}
-                              <TouchableOpacity
-                                style={styles.taskDayButton}
-                                onPress={() => openDayEditor(task)}
-                                activeOpacity={0.7}
-                              >
-                                <Ionicons
-                                  name="calendar-outline"
-                                  size={16}
-                                  color={task.scheduledFor ? '#B45309' : 'rgba(0, 0, 0, 0.4)'}
-                                />
-                                <Text
-                                  style={[
-                                    styles.taskDayButtonText,
-                                    task.scheduledFor && styles.taskDayButtonTextSet,
-                                  ]}
-                                >
-                                  {task.scheduledFor
-                                    ? format(new Date(task.scheduledFor), 'EEE d MMM', {
-                                        locale: dateLocale,
-                                      })
-                                    : t('taskSetDay')}
-                                </Text>
-                              </TouchableOpacity>
-
                               {/* Delete button */}
                               <TouchableOpacity
                                 style={styles.deleteTaskButton}
@@ -2624,7 +2630,9 @@ const styles = StyleSheet.create({
   taskMeta: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
+    flexWrap: 'wrap',
+    columnGap: 14,
+    rowGap: 8,
   },
   taskTime: {
     flexDirection: 'row',
@@ -3060,21 +3068,21 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#EF4444',
   },
-  taskDayButton: {
+  taskDayChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 12,
-    backgroundColor: 'rgba(0, 0, 0, 0.04)',
+    gap: 5,
+    paddingVertical: 4,
+    paddingHorizontal: 9,
+    borderRadius: 9,
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
   },
-  taskDayButtonText: {
+  taskDayChipText: {
     fontSize: 12,
     fontWeight: '500',
-    color: 'rgba(0, 0, 0, 0.45)',
+    color: 'rgba(0, 0, 0, 0.5)',
   },
-  taskDayButtonTextSet: {
+  taskDayChipTextSet: {
     color: '#B45309',
     fontWeight: '600',
   },
