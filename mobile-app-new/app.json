@@ -12,7 +12,7 @@
       "bundleIdentifier": "io.productif.app",
       "appleTeamId": "NGAU42SNSX",
       "googleServicesFile": "./firebase/GoogleService-Info.plist",
-      "buildNumber": "3",
+      "buildNumber": "4",
       "infoPlist": {
         "NSCameraUsageDescription": "We need access to your camera to allow you to take photos for your tasks and journal entries.",
         "NSPhotoLibraryUsageDescription": "We need access to your photo library to let you select images for your tasks and journal entries.",
