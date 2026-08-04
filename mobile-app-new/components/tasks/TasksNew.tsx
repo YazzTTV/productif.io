@@ -6,8 +6,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as ImagePicker from 'expo-image-picker';
-import { subjectsService, tasksService, weeklyPlanningService } from '@/lib/api';
+import {
+  subjectsService,
+  tasksService,
+  weeklyPlanningService,
+  catchUpService,
+  type CatchUpPlan,
+} from '@/lib/api';
 import { format } from 'date-fns';
+import { fr, es, enUS } from 'date-fns/locale';
 import { useLanguage } from '@/contexts/LanguageContext';
 import {
   getTutorialCompleted,
@@ -134,6 +141,8 @@ export function TasksNew() {
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [newTaskEstimatedTime, setNewTaskEstimatedTime] = useState(30);
   const [newTaskPriority, setNewTaskPriority] = useState<'high' | 'medium' | 'low'>('medium');
+  const [newTaskScheduledFor, setNewTaskScheduledFor] = useState<Date | null>(null);
+  const [showTaskDatePicker, setShowTaskDatePicker] = useState(false);
   const [creatingTask, setCreatingTask] = useState(false);
   const [showBulkImportModal, setShowBulkImportModal] = useState(false);
   const [selectedSubjectForBulk, setSelectedSubjectForBulk] = useState<string | null>(null);
@@ -144,6 +153,11 @@ export function TasksNew() {
   const [planningWeek, setPlanningWeek] = useState(false);
   const [weeklyPlan, setWeeklyPlan] = useState<any>(null);
   const [showPlanPreview, setShowPlanPreview] = useState(false);
+  // Rattrapage des blocs non faits
+  const [catchUpPlan, setCatchUpPlan] = useState<CatchUpPlan | null>(null);
+  const [catchUpCanApply, setCatchUpCanApply] = useState(true);
+  const [showCatchUpPreview, setShowCatchUpPreview] = useState(false);
+  const [applyingCatchUp, setApplyingCatchUp] = useState(false);
   const [tutorialSubjectId, setTutorialSubjectId] = useState<string | null>(null);
   const tutorialSubjectIdRef = useRef<string | null>(null);
   const addSubjectButtonRef = useRef<TouchableOpacity>(null);
@@ -277,6 +291,26 @@ export function TasksNew() {
     React.useCallback(() => {
       loadSubjects();
     }, [loadSubjects])
+  );
+
+  // Y a-t-il des blocs non faits a rattraper ? Silencieux en cas d'echec :
+  // c'est une suggestion, pas une fonction dont depend l'ecran.
+  const loadCatchUp = React.useCallback(async () => {
+    try {
+      const result = await catchUpService.preview();
+      if (result?.success) {
+        setCatchUpPlan(result.plan);
+        setCatchUpCanApply(result.canApply !== false);
+      }
+    } catch (error) {
+      console.warn('[catchUp] apercu indisponible:', error);
+    }
+  }, []);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      loadCatchUp();
+    }, [loadCatchUp])
   );
 
   useFocusEffect(
@@ -633,6 +667,57 @@ export function TasksNew() {
     }
   };
 
+  // Les noms de jours suivent la langue de l'app : c'est ce qui rend la
+  // redistribution lisible d'un coup d'oeil ("jeu" -> "sam").
+  const dateLocale = language === 'fr' ? fr : language === 'es' ? es : enUS;
+  const formatDay = (iso: string) => format(new Date(iso), 'EEE d MMM', { locale: dateLocale });
+  // Construit ici plutot que dans la traduction : "2h05" au lieu de "2h5".
+  const formatDuration = (minutes: number) => {
+    const hours = Math.floor(minutes / 60);
+    const rest = minutes % 60;
+    if (hours === 0) return `${rest} min`;
+    if (rest === 0) return `${hours}h`;
+    return `${hours}h${String(rest).padStart(2, '0')}`;
+  };
+
+  const handleApplyCatchUp = async () => {
+    // Le gratuit voit la redistribution mais ne l'applique pas : c'est le
+    // moment ou la valeur est deja demontree a l'ecran.
+    if (!catchUpCanApply) {
+      await triggerEvent(SUPERWALL_EVENTS.FEATURE_LOCKED, {
+        params: { source: 'tasks_catch_up' },
+      });
+      return;
+    }
+
+    try {
+      setApplyingCatchUp(true);
+      const result = await catchUpService.apply();
+
+      if (result.success) {
+        setShowCatchUpPreview(false);
+        setCatchUpPlan(null);
+        await Promise.all([loadSubjects(), loadCatchUp()]);
+        Alert.alert(t('success'), result.message);
+      } else {
+        Alert.alert(t('error'), t('catchUpError'));
+      }
+    } catch (error: any) {
+      console.error('Erreur rattrapage:', error);
+      // 403 = plan gratuit. On rouvre le paywall au lieu d'afficher une erreur.
+      if (typeof error?.message === 'string' && error.message.includes('premium')) {
+        setCatchUpCanApply(false);
+        await triggerEvent(SUPERWALL_EVENTS.FEATURE_LOCKED, {
+          params: { source: 'tasks_catch_up' },
+        });
+      } else {
+        Alert.alert(t('error'), error?.message || t('catchUpError'));
+      }
+    } finally {
+      setApplyingCatchUp(false);
+    }
+  };
+
   const createSubjectsFromAnalysis = async (subjectsToCreate: { name: string; coefficient: number; ue?: string | null }[]) => {
     try {
       setSaving(true);
@@ -807,6 +892,8 @@ export function TasksNew() {
         estimatedMinutes: newTaskEstimatedTime,
         priority: priorityMap[newTaskPriority],
         subjectId: selectedSubjectForTask, // Sera validé côté serveur
+        // Jour de travail optionnel. Envoye seulement s'il est renseigne.
+        ...(newTaskScheduledFor ? { scheduledFor: newTaskScheduledFor.toISOString() } : {}),
         // Ne pas envoyer 'subject' car ce n'est pas un champ de la base de données
       };
 
@@ -827,9 +914,13 @@ export function TasksNew() {
 
       // Recharger les matières pour afficher la nouvelle tâche
       await loadSubjects();
+      // Une tache posee sur un jour passe change l'etat du rattrapage
+      await loadCatchUp();
       
       // Réinitialiser le formulaire
       setNewTaskTitle('');
+      setNewTaskScheduledFor(null);
+      setShowTaskDatePicker(false);
       setNewTaskEstimatedTime(30);
       setNewTaskPriority('medium');
       setShowAddTaskModal(false);
@@ -1116,6 +1207,30 @@ export function TasksNew() {
             </TouchableOpacity>
           )}
         </Animated.View>
+
+        {/* Rattrapage : visible seulement s'il y a vraiment des blocs en retard */}
+        {catchUpPlan && catchUpPlan.moves.length > 0 && (
+          <Animated.View entering={FadeInDown.delay(150).duration(400)}>
+            <TouchableOpacity
+              style={styles.catchUpBanner}
+              onPress={() => setShowCatchUpPreview(true)}
+              activeOpacity={0.85}
+            >
+              <View style={styles.catchUpBannerIcon}>
+                <Ionicons name="refresh-outline" size={20} color="#B45309" />
+              </View>
+              <View style={styles.catchUpBannerContent}>
+                <Text style={styles.catchUpBannerTitle}>
+                  {catchUpPlan.moves.length === 1
+                    ? t('catchUpBannerTitleOne')
+                    : t('catchUpBannerTitle', { count: catchUpPlan.moves.length })}
+                </Text>
+                <Text style={styles.catchUpBannerSubtitle}>{t('catchUpBannerSubtitle')}</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color="#B45309" />
+            </TouchableOpacity>
+          </Animated.View>
+        )}
 
           {/* Subjects list */}
           <View style={styles.subjectsContainer}>
@@ -1820,6 +1935,51 @@ export function TasksNew() {
                 </View>
               </View>
 
+              {/* Jour de travail. Optionnel, mais c'est ce qui alimente le
+                  rattrapage : une tache sans jour ne peut pas etre "pas faite". */}
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>{t('taskScheduledForLabel')}</Text>
+                <TouchableOpacity
+                  style={styles.dateButton}
+                  onPress={() => setShowTaskDatePicker(true)}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="calendar-outline" size={18} color="rgba(0, 0, 0, 0.5)" />
+                  <Text
+                    style={[
+                      styles.dateButtonText,
+                      !newTaskScheduledFor && styles.dateButtonTextPlaceholder,
+                    ]}
+                  >
+                    {newTaskScheduledFor
+                      ? format(newTaskScheduledFor, 'EEEE d MMMM', { locale: dateLocale })
+                      : t('taskScheduledForPlaceholder')}
+                  </Text>
+                  {newTaskScheduledFor && (
+                    <TouchableOpacity
+                      onPress={() => setNewTaskScheduledFor(null)}
+                      style={styles.clearDateButton}
+                    >
+                      <Ionicons name="close-circle" size={20} color="rgba(0, 0, 0, 0.4)" />
+                    </TouchableOpacity>
+                  )}
+                </TouchableOpacity>
+              </View>
+
+              {showTaskDatePicker && (
+                <DateTimePicker
+                  value={newTaskScheduledFor || new Date()}
+                  mode="date"
+                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                  onChange={(event, selectedDate) => {
+                    setShowTaskDatePicker(Platform.OS === 'ios');
+                    if (selectedDate) {
+                      setNewTaskScheduledFor(selectedDate);
+                    }
+                  }}
+                />
+              )}
+
               {/* Submit Button */}
               <TouchableOpacity
                 style={[
@@ -1938,6 +2098,129 @@ export function TasksNew() {
                 </TouchableOpacity>
               </View>
             )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* Rattrapage des blocs non faits */}
+      <Modal
+        visible={showCatchUpPreview}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowCatchUpPreview(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { paddingBottom: insets.bottom + 24, maxHeight: '90%' }]}>
+            <View style={styles.modalHeader}>
+              <View>
+                <Text style={styles.modalTitle}>{t('catchUpTitle')}</Text>
+                <Text style={styles.modalSubtitle}>
+                  {t('catchUpSummary', {
+                    count: catchUpPlan?.moves.length ?? 0,
+                    duration: formatDuration(catchUpPlan?.summary.totalMinutes ?? 0),
+                    days: catchUpPlan?.summary.daysUsed ?? 0,
+                  })}
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setShowCatchUpPreview(false)}
+                style={styles.closeButton}
+              >
+                <Ionicons name="close" size={24} color="#000" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.modalScrollView} showsVerticalScrollIndicator={false}>
+              {/* Ou part chaque bloc */}
+              <View style={styles.catchUpSection}>
+                <Text style={styles.catchUpSectionTitle}>{t('catchUpMovesTitle')}</Text>
+                {catchUpPlan?.moves.map((move) => (
+                  <View key={move.taskId} style={styles.catchUpMoveCard}>
+                    <View style={styles.catchUpMoveHeader}>
+                      <Text style={styles.catchUpMoveTitle} numberOfLines={2}>
+                        {move.title}
+                      </Text>
+                      {move.subjectName && (
+                        <View style={styles.catchUpMoveBadge}>
+                          <Text style={styles.catchUpMoveBadgeText}>{move.subjectName}</Text>
+                        </View>
+                      )}
+                    </View>
+                    <View style={styles.catchUpMoveDates}>
+                      <Text style={styles.catchUpMoveFrom}>{formatDay(move.from)}</Text>
+                      <Ionicons name="arrow-forward" size={14} color="#B45309" />
+                      <Text style={styles.catchUpMoveTo}>{formatDay(move.to)}</Text>
+                      <Text style={styles.catchUpMoveMinutes}>{move.minutes} min</Text>
+                    </View>
+                    {move.deadlinePassed && (
+                      <Text style={styles.catchUpMoveWarning}>{t('catchUpDeadlinePassed')}</Text>
+                    )}
+                    {move.overCapacity && !move.deadlinePassed && (
+                      <Text style={styles.catchUpMoveWarning}>{t('catchUpOverCapacity')}</Text>
+                    )}
+                  </View>
+                ))}
+              </View>
+
+              {/* La charge par jour : c'est ce qui montre que c'est reparti */}
+              <View style={styles.catchUpSection}>
+                <Text style={styles.catchUpSectionTitle}>{t('catchUpLoadTitle')}</Text>
+                {catchUpPlan?.days.map((day) => {
+                  const capacity = day.capacityMinutes || 1;
+                  const beforeRatio = Math.min(1, day.minutesBefore / capacity);
+                  const addedRatio = Math.min(
+                    1 - beforeRatio,
+                    Math.max(0, day.minutesAfter - day.minutesBefore) / capacity
+                  );
+                  return (
+                    <View key={day.date} style={styles.catchUpDayRow}>
+                      <Text style={styles.catchUpDayLabel}>{formatDay(day.date)}</Text>
+                      <View style={styles.catchUpDayBarTrack}>
+                        <View
+                          style={[styles.catchUpDayBarBefore, { flex: beforeRatio }]}
+                        />
+                        <View
+                          style={[styles.catchUpDayBarAdded, { flex: addedRatio }]}
+                        />
+                        <View style={{ flex: Math.max(0, 1 - beforeRatio - addedRatio) }} />
+                      </View>
+                      <Text style={styles.catchUpDayMinutes}>{day.minutesAfter} min</Text>
+                    </View>
+                  );
+                })}
+              </View>
+            </ScrollView>
+
+            <View style={styles.planActions}>
+              <TouchableOpacity
+                style={styles.planCancelButton}
+                onPress={() => setShowCatchUpPreview(false)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.planCancelText}>{t('cancel')}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.catchUpApplyButton}
+                onPress={handleApplyCatchUp}
+                activeOpacity={0.8}
+                disabled={applyingCatchUp}
+              >
+                {applyingCatchUp ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <>
+                    <Ionicons
+                      name={catchUpCanApply ? 'checkmark' : 'lock-closed'}
+                      size={18}
+                      color="#FFFFFF"
+                    />
+                    <Text style={styles.planApplyText}>
+                      {catchUpCanApply ? t('catchUpApply') : t('catchUpUnlock')}
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -2540,6 +2823,9 @@ const styles = StyleSheet.create({
   clearDateButton: {
     marginLeft: 'auto',
   },
+  dateButtonTextPlaceholder: {
+    color: 'rgba(0, 0, 0, 0.35)',
+  },
   submitButton: {
     backgroundColor: '#16A34A',
     borderRadius: 16,
@@ -2672,5 +2958,151 @@ const styles = StyleSheet.create({
     color: 'rgba(0, 0, 0, 0.3)',
     textAlign: 'center',
     marginTop: 8,
+  },
+
+  // Rattrapage des blocs non faits. Ambre volontairement : ni le vert des
+  // actions normales, ni un rouge d'erreur. C'est un rappel, pas une faute.
+  catchUpBanner: {
+    marginHorizontal: 20,
+    marginBottom: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    backgroundColor: '#FFFBEB',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+  },
+  catchUpBannerIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#FEF3C7',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  catchUpBannerContent: {
+    flex: 1,
+  },
+  catchUpBannerTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#78350F',
+  },
+  catchUpBannerSubtitle: {
+    fontSize: 13,
+    color: '#B45309',
+    marginTop: 2,
+  },
+  catchUpSection: {
+    marginBottom: 24,
+  },
+  catchUpSectionTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: 'rgba(0, 0, 0, 0.5)',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 12,
+  },
+  catchUpMoveCard: {
+    padding: 14,
+    borderRadius: 14,
+    backgroundColor: '#FAFAFA',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.06)',
+    marginBottom: 10,
+  },
+  catchUpMoveHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  catchUpMoveTitle: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#000',
+  },
+  catchUpMoveBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
+    backgroundColor: '#FEF3C7',
+  },
+  catchUpMoveBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#92400E',
+  },
+  catchUpMoveDates: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 10,
+  },
+  catchUpMoveFrom: {
+    fontSize: 13,
+    color: 'rgba(0, 0, 0, 0.4)',
+    textDecorationLine: 'line-through',
+  },
+  catchUpMoveTo: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#B45309',
+  },
+  catchUpMoveMinutes: {
+    marginLeft: 'auto',
+    fontSize: 12,
+    color: 'rgba(0, 0, 0, 0.4)',
+  },
+  catchUpMoveWarning: {
+    marginTop: 8,
+    fontSize: 12,
+    color: '#B45309',
+  },
+  catchUpDayRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 8,
+  },
+  catchUpDayLabel: {
+    width: 76,
+    fontSize: 12,
+    color: 'rgba(0, 0, 0, 0.55)',
+  },
+  catchUpDayBarTrack: {
+    flex: 1,
+    flexDirection: 'row',
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: 'rgba(0, 0, 0, 0.06)',
+    overflow: 'hidden',
+  },
+  catchUpDayBarBefore: {
+    backgroundColor: 'rgba(0, 0, 0, 0.25)',
+  },
+  catchUpDayBarAdded: {
+    backgroundColor: '#F59E0B',
+  },
+  catchUpDayMinutes: {
+    width: 56,
+    textAlign: 'right',
+    fontSize: 12,
+    color: 'rgba(0, 0, 0, 0.4)',
+  },
+  catchUpApplyButton: {
+    flex: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 16,
+    backgroundColor: '#B45309',
   },
 });

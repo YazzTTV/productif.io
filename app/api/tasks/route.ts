@@ -278,7 +278,7 @@ export async function POST(request: NextRequest) {
     const authUserId = user.id
     
     // Récupérer le body de la requête
-    const { title, description, priority, energyLevel, dueDate, projectId, userId, processDescription, processId, subjectId, estimatedMinutes } = await request.json()
+    const { title, description, priority, energyLevel, dueDate, projectId, userId, processDescription, processId, subjectId, estimatedMinutes, scheduledFor } = await request.json()
     
     // Si un userId est fourni (différent de l'utilisateur authentifié), vérifier les droits
     let targetUserId = authUserId
@@ -448,6 +448,11 @@ export async function POST(request: NextRequest) {
         processId: finalProcessId,
         subjectId: subjectId || null,
         estimatedMinutes: estimatedMinutes || null,
+        // Poser un jour de travail sans passer par Google Calendar. Sans ca,
+        // scheduledFor n'etait ecrit que par les chemins couples a l'agenda, et
+        // le rattrapage des blocs non faits ne pouvait jamais se declencher.
+        scheduledFor: scheduledFor ? new Date(scheduledFor) : null,
+        schedulingStatus: scheduledFor ? "scheduled" : undefined,
         completed: false,
         userId: targetUserId,
         order,

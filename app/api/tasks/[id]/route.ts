@@ -123,7 +123,8 @@ export async function PATCH(
     }
 
     const userId = user.id
-    const { title, description, priority, energyLevel, dueDate, projectId, completed } = await request.json()
+    const body = await request.json()
+    const { title, description, priority, energyLevel, dueDate, projectId, completed } = body
 
     // Récupérer les informations de l'utilisateur pour vérifier son rôle
     const userInfo = await prisma.user.findUnique({
@@ -223,7 +224,16 @@ export async function PATCH(
         dueDate: dueDate ? new Date(dueDate) : null,
         projectId: projectId || null,
         completed,
-        order
+        order,
+        // Ecrit seulement si l'appelant a envoye la cle, pour qu'une mise a jour
+        // partielle (cocher une tache) n'efface pas le jour planifie. Envoyer
+        // explicitement null deplanifie.
+        ...("scheduledFor" in body
+          ? {
+              scheduledFor: body.scheduledFor ? new Date(body.scheduledFor) : null,
+              schedulingStatus: body.scheduledFor ? "scheduled" : "draft",
+            }
+          : {}),
       }
     })
 

@@ -4,12 +4,20 @@ export type PlanId = "free" | "premium"
 
 export type PlanMyDayMode = "preview" | "full"
 
+/**
+ * Rattrapage des blocs non faits : "preview" laisse voir la redistribution
+ * proposee mais pas l'appliquer, "full" l'applique. Meme logique que
+ * planMyDayMode : le gratuit voit la valeur avant de payer.
+ */
+export type CatchUpMode = "preview" | "full"
+
 export interface PlanLimits {
   focusPerDay: number | null
   focusMaxDurationMinutes: number | null
   maxHabits: number | null
   planMyDayMode: PlanMyDayMode
   maxPlanMyDayEvents: number | null
+  catchUpMode: CatchUpMode
   allowGlobalLeaderboard: boolean
   analyticsRetentionDays: number | null
   historyDepthDays: number | null
@@ -37,6 +45,7 @@ const PLAN_LIMITS: Record<PlanId, PlanLimits> = {
     maxHabits: 3,
     planMyDayMode: "preview",
     maxPlanMyDayEvents: 3,
+    catchUpMode: "preview",
     allowGlobalLeaderboard: false,
     analyticsRetentionDays: 7,
     historyDepthDays: 7,
@@ -48,6 +57,7 @@ const PLAN_LIMITS: Record<PlanId, PlanLimits> = {
     maxHabits: null,
     planMyDayMode: "full",
     maxPlanMyDayEvents: null,
+    catchUpMode: "full",
     allowGlobalLeaderboard: true,
     analyticsRetentionDays: null,
     historyDepthDays: null,

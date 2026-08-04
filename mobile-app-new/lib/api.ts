@@ -44,6 +44,7 @@ export interface PlanLimits {
   maxHabits: number | null;
   planMyDayMode: 'preview' | 'full';
   maxPlanMyDayEvents: number | null;
+  catchUpMode: 'preview' | 'full';
   allowGlobalLeaderboard: boolean;
   analyticsRetentionDays: number | null;
   historyDepthDays: number | null;
@@ -1117,6 +1118,89 @@ export const weeklyPlanningService = {
       body: JSON.stringify({
         weekStart,
         apply: true,
+      }),
+    });
+  },
+};
+
+export interface CatchUpMove {
+  taskId: string;
+  title: string;
+  subjectId: string | null;
+  subjectName: string | null;
+  from: string;
+  to: string;
+  minutes: number;
+  overCapacity: boolean;
+  deadlinePassed: boolean;
+}
+
+export interface CatchUpDayLoad {
+  date: string;
+  minutesBefore: number;
+  minutesAfter: number;
+  capacityMinutes: number;
+}
+
+export interface CatchUpPlan {
+  moves: CatchUpMove[];
+  days: CatchUpDayLoad[];
+  summary: {
+    taskCount: number;
+    totalMinutes: number;
+    horizonDays: number;
+    daysUsed: number;
+    overCapacityCount: number;
+    deadlinePassedCount: number;
+    capacityMinutes: number;
+  };
+}
+
+/**
+ * Rattrapage des blocs non faits. Ne depend pas de Google Calendar, contrairement
+ * a weeklyPlanningService : le decalage s'ecrit sur les taches elles-memes.
+ * Le fuseau du telephone est envoye a chaque appel, sinon le serveur (en UTC)
+ * classe mal les blocs de fin de soiree.
+ */
+export const catchUpService = {
+  // Apercu : ne modifie rien, sert a afficher la redistribution proposee
+  async preview(options?: {
+    horizonDays?: number;
+    dailyCapacityMinutes?: number;
+  }): Promise<{
+    success: boolean;
+    plan: CatchUpPlan;
+    canApply: boolean;
+    planLimits: PlanLimits;
+  }> {
+    const params = new URLSearchParams({
+      tzOffset: String(new Date().getTimezoneOffset()),
+    });
+    if (options?.horizonDays) params.set('horizonDays', String(options.horizonDays));
+    if (options?.dailyCapacityMinutes) {
+      params.set('dailyCapacityMinutes', String(options.dailyCapacityMinutes));
+    }
+    return await apiCall(`/planning/catch-up?${params.toString()}`);
+  },
+
+  // Appliquer : ecrit les nouvelles dates. Premium uniquement (403 sinon).
+  async apply(options?: {
+    horizonDays?: number;
+    dailyCapacityMinutes?: number;
+  }): Promise<{
+    success: boolean;
+    applied: boolean;
+    plan: CatchUpPlan;
+    tasksMoved: number;
+    calendarEventsMoved: number;
+    message: string;
+  }> {
+    return await apiCall('/planning/catch-up', {
+      method: 'POST',
+      body: JSON.stringify({
+        tzOffset: new Date().getTimezoneOffset(),
+        horizonDays: options?.horizonDays,
+        dailyCapacityMinutes: options?.dailyCapacityMinutes,
       }),
     });
   },
