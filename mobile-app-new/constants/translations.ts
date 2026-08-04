@@ -623,6 +623,9 @@ export const translations = {
     noTasksLeft: 'Aucune tâche restante',
     addTask: 'Ajouter une tâche',
     // Rattrapage des blocs non faits
+    taskSetDay: 'Choisir un jour',
+    taskDayRemove: 'Retirer le jour',
+    taskDayUpdateError: 'Impossible de changer le jour',
     taskScheduledForLabel: 'Jour de travail (optionnel)',
     taskScheduledForPlaceholder: 'Aucun jour choisi',
     catchUpBannerTitleOne: '1 bloc pas fait',
@@ -1679,6 +1682,9 @@ export const translations = {
     noTasksLeft: 'No tasks left',
     addTask: 'Add task',
     // Catch-up for blocks that were not done
+    taskSetDay: 'Pick a day',
+    taskDayRemove: 'Remove day',
+    taskDayUpdateError: 'Could not change the day',
     taskScheduledForLabel: 'Work day (optional)',
     taskScheduledForPlaceholder: 'No day picked',
     catchUpBannerTitleOne: '1 block not done',
@@ -2664,6 +2670,9 @@ export const translations = {
     allTasksComplete: 'Todas las tareas completadas',
     addTask: 'Agregar tarea',
     // Recuperación de los bloques no hechos
+    taskSetDay: 'Elegir un día',
+    taskDayRemove: 'Quitar el día',
+    taskDayUpdateError: 'No se pudo cambiar el día',
     taskScheduledForLabel: 'Día de trabajo (opcional)',
     taskScheduledForPlaceholder: 'Ningún día elegido',
     catchUpBannerTitleOne: '1 bloque sin hacer',

@@ -45,6 +45,8 @@ interface Task {
   priority: 'high' | 'medium' | 'low';
   completed: boolean;
   details?: string;
+  // Jour de travail. Alimente le rattrapage des blocs non faits.
+  scheduledFor?: string | null;
 }
 
 interface Subject {
@@ -145,6 +147,10 @@ export function TasksNew() {
   const [showTaskDatePicker, setShowTaskDatePicker] = useState(false);
   // Valeur en cours de choix, pour qu'Annuler ne modifie rien
   const [taskDateDraft, setTaskDateDraft] = useState<Date | null>(null);
+  // Changement de jour sur une tache DEJA creee (l'app n'avait aucune edition)
+  const [editingDayTask, setEditingDayTask] = useState<{ id: string; title: string } | null>(null);
+  const [editingDayDraft, setEditingDayDraft] = useState<Date | null>(null);
+  const [savingDay, setSavingDay] = useState(false);
   const [creatingTask, setCreatingTask] = useState(false);
   const [showBulkImportModal, setShowBulkImportModal] = useState(false);
   const [selectedSubjectForBulk, setSelectedSubjectForBulk] = useState<string | null>(null);
@@ -680,6 +686,32 @@ export function TasksNew() {
     if (hours === 0) return `${rest} min`;
     if (rest === 0) return `${hours}h`;
     return `${hours}h${String(rest).padStart(2, '0')}`;
+  };
+
+  // Changer le jour de travail d'une tache existante. L'app n'avait aucun moyen
+  // d'editer une tache, donc le message "a deplacer a la main si besoin" du
+  // rattrapage donnait un conseil impossible a suivre.
+  const openDayEditor = (task: Task) => {
+    Keyboard.dismiss();
+    setEditingDayDraft(task.scheduledFor ? new Date(task.scheduledFor) : new Date());
+    setEditingDayTask({ id: task.id, title: task.title });
+  };
+
+  const saveTaskDay = async (day: Date | null) => {
+    if (!editingDayTask) return;
+    try {
+      setSavingDay(true);
+      await tasksService.updateTask(editingDayTask.id, {
+        scheduledFor: day ? day.toISOString() : null,
+      });
+      setEditingDayTask(null);
+      await Promise.all([loadSubjects(), loadCatchUp()]);
+    } catch (error: any) {
+      console.error('Erreur changement de jour:', error);
+      Alert.alert(t('error'), error?.message || t('taskDayUpdateError'));
+    } finally {
+      setSavingDay(false);
+    }
   };
 
   const handleApplyCatchUp = async () => {
@@ -1430,6 +1462,31 @@ export function TasksNew() {
                                 </TouchableOpacity>
                               )}
                               
+                              {/* Jour de travail : seul point d'edition d'une tache */}
+                              <TouchableOpacity
+                                style={styles.taskDayButton}
+                                onPress={() => openDayEditor(task)}
+                                activeOpacity={0.7}
+                              >
+                                <Ionicons
+                                  name="calendar-outline"
+                                  size={16}
+                                  color={task.scheduledFor ? '#B45309' : 'rgba(0, 0, 0, 0.4)'}
+                                />
+                                <Text
+                                  style={[
+                                    styles.taskDayButtonText,
+                                    task.scheduledFor && styles.taskDayButtonTextSet,
+                                  ]}
+                                >
+                                  {task.scheduledFor
+                                    ? format(new Date(task.scheduledFor), 'EEE d MMM', {
+                                        locale: dateLocale,
+                                      })
+                                    : t('taskSetDay')}
+                                </Text>
+                              </TouchableOpacity>
+
                               {/* Delete button */}
                               <TouchableOpacity
                                 style={styles.deleteTaskButton}
@@ -2280,6 +2337,85 @@ export function TasksNew() {
           </View>
         </View>
       </Modal>
+
+      {/* Changer le jour de travail d'une tache existante */}
+      <Modal
+        visible={editingDayTask !== null}
+        animationType="fade"
+        transparent={true}
+        onRequestClose={() => setEditingDayTask(null)}
+      >
+        <View style={styles.datePickerOverlay}>
+          <View style={styles.datePickerCard}>
+            <Text style={styles.datePickerTitle}>{t('taskScheduledForLabel')}</Text>
+            <Text style={styles.datePickerSubtitle} numberOfLines={2}>
+              {editingDayTask?.title}
+            </Text>
+
+            {Platform.OS === 'ios' ? (
+              <DateTimePicker
+                value={editingDayDraft || new Date()}
+                mode="date"
+                display="spinner"
+                locale={language}
+                themeVariant="light"
+                style={styles.datePickerSpinner}
+                onChange={(event, selectedDate) => {
+                  if (selectedDate) setEditingDayDraft(selectedDate);
+                }}
+              />
+            ) : (
+              <DateTimePicker
+                value={editingDayDraft || new Date()}
+                mode="date"
+                display="default"
+                onChange={(event, selectedDate) => {
+                  if (event.type === 'set' && selectedDate) {
+                    saveTaskDay(selectedDate);
+                  } else {
+                    setEditingDayTask(null);
+                  }
+                }}
+              />
+            )}
+
+            {Platform.OS === 'ios' && (
+              <>
+                <View style={styles.datePickerActions}>
+                  <TouchableOpacity
+                    style={styles.datePickerCancel}
+                    onPress={() => setEditingDayTask(null)}
+                    activeOpacity={0.7}
+                    disabled={savingDay}
+                  >
+                    <Text style={styles.datePickerCancelText}>{t('cancel')}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.datePickerConfirm}
+                    onPress={() => saveTaskDay(editingDayDraft || new Date())}
+                    activeOpacity={0.8}
+                    disabled={savingDay}
+                  >
+                    {savingDay ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <Text style={styles.datePickerConfirmText}>{t('confirm')}</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+                <TouchableOpacity
+                  style={styles.datePickerRemove}
+                  onPress={() => saveTaskDay(null)}
+                  activeOpacity={0.7}
+                  disabled={savingDay}
+                >
+                  <Text style={styles.datePickerRemoveText}>{t('taskDayRemove')}</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -2907,6 +3043,40 @@ const styles = StyleSheet.create({
     color: '#000',
     textAlign: 'center',
     marginBottom: 4,
+  },
+  datePickerSubtitle: {
+    fontSize: 13,
+    color: 'rgba(0, 0, 0, 0.5)',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  datePickerRemove: {
+    alignItems: 'center',
+    paddingVertical: 12,
+    marginTop: 4,
+  },
+  datePickerRemoveText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#EF4444',
+  },
+  taskDayButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0, 0, 0, 0.04)',
+  },
+  taskDayButtonText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: 'rgba(0, 0, 0, 0.45)',
+  },
+  taskDayButtonTextSet: {
+    color: '#B45309',
+    fontWeight: '600',
   },
   datePickerSpinner: {
     alignSelf: 'stretch',
