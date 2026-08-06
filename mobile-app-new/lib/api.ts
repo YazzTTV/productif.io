@@ -357,9 +357,36 @@ export async function apiCall<T>(
 }
 
 // Service d'authentification
+/**
+ * Cache mémoire de checkAuth().
+ *
+ * checkAuth est appelé depuis 28 endroits (un par écran, au montage) et faisait
+ * un aller-retour réseau à chaque fois : changer d'onglet relançait /auth/me.
+ * C'est la principale cause du "j'appuie et ça charge".
+ *
+ * Deux mécanismes :
+ *  - une durée de vie courte (45 s), pour que le statut premium ou le plan
+ *    remontent vite après un achat sans jamais servir de données très périmées
+ *  - une déduplication des appels concurrents : si cinq écrans se montent en
+ *    même temps, une seule requête part et tout le monde attend la même promesse
+ *
+ * Le cache est vidé à la connexion, à la déconnexion et sur demande explicite
+ * (invalidateAuthCache), pour qu'un changement de compte ou un achat ne laisse
+ * jamais un état obsolète à l'écran.
+ */
+const AUTH_CACHE_TTL_MS = 45_000;
+let authCache: { user: User | null; at: number } | null = null;
+let authInFlight: Promise<User | null> | null = null;
+
+export function invalidateAuthCache(): void {
+  authCache = null;
+  authInFlight = null;
+}
+
 export const authService = {
   // Enregistrer un token (utilisé après OAuth)
   async setToken(token: string): Promise<void> {
+    invalidateAuthCache();
     await TokenStorage.getInstance().setToken(token)
   },
   // Connexion
@@ -371,6 +398,7 @@ export const authService = {
 
     // Stocker le token si présent dans la réponse
     if (response.success && response.token) {
+      invalidateAuthCache();
       await TokenStorage.getInstance().setToken(response.token);
     }
 
@@ -400,6 +428,7 @@ export const authService = {
 
     // Stocker le token si présent dans la réponse
     if (response.success && response.token) {
+      invalidateAuthCache();
       await TokenStorage.getInstance().setToken(response.token);
       console.log('✅ [SIGNUP] Nouveau token sauvegardé après inscription');
       console.log('👤 [SIGNUP] User ID du nouveau token:', response.user?.id);
@@ -429,6 +458,7 @@ export const authService = {
         method: 'POST',
       });
     } finally {
+      invalidateAuthCache();
       await TokenStorage.getInstance().clearToken();
     }
   },
@@ -445,6 +475,7 @@ export const authService = {
 
     // Stocker le token si présent dans la réponse
     if (response.success && response.token) {
+      invalidateAuthCache();
       await TokenStorage.getInstance().setToken(response.token);
     }
 
@@ -464,20 +495,39 @@ export const authService = {
 
     // Stocker le token si présent dans la réponse
     if (response.success && response.token) {
+      invalidateAuthCache();
       await TokenStorage.getInstance().setToken(response.token);
     }
 
     return response;
   },
 
-  // Vérifier l'état de connexion
-  async checkAuth(): Promise<User | null> {
-    try {
-      const response = await apiCall<{ user: User }>('/auth/me');
-      return response.user;
-    } catch (error) {
-      return null;
+  // Vérifier l'état de connexion. Voir la note sur le cache plus haut.
+  async checkAuth(options?: { force?: boolean }): Promise<User | null> {
+    if (options?.force) invalidateAuthCache();
+
+    const now = Date.now();
+    if (authCache && now - authCache.at < AUTH_CACHE_TTL_MS) {
+      return authCache.user;
     }
+    // Un appel est déjà en vol : on s'y raccroche au lieu d'en lancer un second.
+    if (authInFlight) return authInFlight;
+
+    authInFlight = (async () => {
+      try {
+        const response = await apiCall<{ user: User }>('/auth/me');
+        authCache = { user: response.user, at: Date.now() };
+        return response.user;
+      } catch (error) {
+        // On ne met PAS l'échec en cache : une coupure réseau passagère ne doit
+        // pas faire croire pendant 45 s que l'utilisateur est déconnecté.
+        return null;
+      } finally {
+        authInFlight = null;
+      }
+    })();
+
+    return authInFlight;
   },
 
   // Récupérer le statut du trial
