@@ -6,57 +6,63 @@ const prisma = new PrismaClient();
 
 export async function POST(req: NextRequest) {
   try {
-    // Extract the authorization token from headers
+    // Authentification OBLIGATOIRE, userId issu du jeton et jamais du corps, et
+    // vérification de propriété sur chaque écriture. Voir la note du webhook
+    // habits pour le détail de la faille corrigée.
     const authHeader = req.headers.get('authorization');
-    
-    // Verify authentication if a token is provided
-    if (authHeader) {
-      const token = authHeader.split(' ')[1];
-      try {
-        const payload = await verifyToken(token);
-        if (!payload) {
-          return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-        }
-      } catch (error) {
-        return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
-      }
+    const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
+    if (!token) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const payload = await verifyToken(token);
+    if (!payload?.userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    const authUserId = payload.userId;
 
     // Parse the webhook payload
     const webhookData = await req.json();
-    console.log('Objective webhook received:', webhookData);
 
     // Process the webhook based on the action type
     const { action, data } = webhookData;
 
     if (action === 'create_mission') {
       // Create a new mission (OKR period)
-      const { title, quarter, year, userId, target } = data;
-      
-      if (!title || !quarter || !year || !userId) {
+      const { title, quarter, year, target } = data;
+
+      if (!title || !quarter || !year) {
         return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
       }
-      
+
       const newMission = await prisma.mission.create({
         data: {
           title,
           quarter: parseInt(quarter),
           year: parseInt(year),
-          userId,
+          userId: authUserId,
           target: target ? parseFloat(target) : 100
         }
       });
-      
+
       return NextResponse.json({ success: true, mission: newMission });
-    } 
+    }
     else if (action === 'create_objective') {
       // Create a new objective for a mission
       const { title, missionId, target } = data;
-      
+
       if (!title || !missionId) {
         return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
       }
-      
+
+      // La mission cible doit appartenir à l'appelant.
+      const mission = await prisma.mission.findUnique({
+        where: { id: missionId },
+        select: { userId: true }
+      });
+      if (!mission || mission.userId !== authUserId) {
+        return NextResponse.json({ error: 'Not found' }, { status: 404 });
+      }
+
       const newObjective = await prisma.objective.create({
         data: {
           title,
@@ -64,25 +70,27 @@ export async function POST(req: NextRequest) {
           target: target ? parseFloat(target) : 100
         }
       });
-      
+
       return NextResponse.json({ success: true, objective: newObjective });
     }
     else if (action === 'update_objective_progress') {
       // Update the progress of an objective
       const { id, current } = data;
-      
+
       if (!id || current === undefined) {
         return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
       }
-      
+
+      // On charge la mission parente pour vérifier la propriété avant d'écrire.
       const objective = await prisma.objective.findUnique({
-        where: { id }
+        where: { id },
+        include: { mission: { select: { userId: true } } }
       });
-      
-      if (!objective) {
+
+      if (!objective || objective.mission?.userId !== authUserId) {
         return NextResponse.json({ error: 'Objective not found' }, { status: 404 });
       }
-      
+
       const currentValue = parseFloat(current);
       const progress = (currentValue / objective.target) * 100;
       

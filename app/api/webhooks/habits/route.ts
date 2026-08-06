@@ -6,58 +6,67 @@ const prisma = new PrismaClient();
 
 export async function POST(req: NextRequest) {
   try {
-    // Extract the authorization token from headers
+    // Authentification OBLIGATOIRE. L'ancienne version ne vérifiait le jeton que
+    // s'il était présent, et lisait le userId dans le corps de la requête :
+    // n'importe qui pouvait donc écrire sur le compte d'autrui en connaissant un
+    // userId (que d'autres routes fuitaient). Le userId vient désormais du jeton,
+    // jamais du corps, et chaque écriture vérifie la propriété.
     const authHeader = req.headers.get('authorization');
-    
-    // Verify authentication if a token is provided
-    if (authHeader) {
-      const token = authHeader.split(' ')[1];
-      try {
-        const payload = await verifyToken(token);
-        if (!payload) {
-          return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-        }
-      } catch (error) {
-        return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
-      }
+    const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
+    if (!token) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const payload = await verifyToken(token);
+    if (!payload?.userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    const authUserId = payload.userId;
 
     // Parse the webhook payload
     const webhookData = await req.json();
-    console.log('Habit webhook received:', webhookData);
 
     // Process the webhook based on the action type
     const { action, data } = webhookData;
 
     if (action === 'create_habit') {
       // Create a new habit
-      const { name, description, frequency, daysOfWeek, userId, color } = data;
-      
-      if (!name || !frequency || !userId) {
+      const { name, description, frequency, daysOfWeek, color } = data;
+
+      if (!name || !frequency) {
         return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
       }
-      
+
       const newHabit = await prisma.habit.create({
         data: {
           name,
           description,
           frequency,
           daysOfWeek: daysOfWeek || [],
-          userId,
+          userId: authUserId,
           color
         }
       });
-      
+
       return NextResponse.json({ success: true, habit: newHabit });
-    } 
+    }
     else if (action === 'log_habit_entry') {
       // Log a habit entry for a specific day
       const { habitId, date, completed, note, rating } = data;
-      
+
       if (!habitId || !date) {
         return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
       }
-      
+
+      // L'habitude doit appartenir à l'appelant, sinon on pourrait écrire dans
+      // le journal d'un autre utilisateur en devinant un habitId.
+      const habit = await prisma.habit.findUnique({
+        where: { id: habitId },
+        select: { userId: true }
+      });
+      if (!habit || habit.userId !== authUserId) {
+        return NextResponse.json({ error: 'Not found' }, { status: 404 });
+      }
+
       // Check if an entry already exists for this date
       const existingEntry = await prisma.habitEntry.findFirst({
         where: {
@@ -65,9 +74,9 @@ export async function POST(req: NextRequest) {
           date: new Date(date)
         }
       });
-      
+
       let habitEntry;
-      
+
       if (existingEntry) {
         // Update existing entry
         habitEntry = await prisma.habitEntry.update({
@@ -90,17 +99,14 @@ export async function POST(req: NextRequest) {
           }
         });
       }
-      
+
       return NextResponse.json({ success: true, habitEntry });
     }
     else if (action === 'get_habit_stats') {
-      // Get habit statistics for a user
-      const { userId, startDate, endDate } = data;
-      
-      if (!userId) {
-        return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
-      }
-      
+      // Get habit statistics for the authenticated user only
+      const { startDate, endDate } = data;
+      const userId = authUserId;
+
       const dateFilter: any = {};
       if (startDate) {
         dateFilter.gte = new Date(startDate);
