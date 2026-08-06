@@ -58,11 +58,10 @@ Ouvre le fichier JSON téléchargé et note ces 3 valeurs :
    **FIREBASE_PRIVATE_KEY** :
    ```
    -----BEGIN PRIVATE KEY-----
-   MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQDBN3Xhk0ncAPR7
-   /Li8B2+23lsxlay9pUl+kLApIP2bBeE+JwsIm9TiYb8SmEwcdE2B/9zO38mNkV8b
-   ...
+   <COLLER ICI LA CLÉ PRIVÉE COMPLÈTE DU JSON>
    -----END PRIVATE KEY-----
    ```
+   (Ne jamais committer de vraie clé dans ce fichier : le dépôt est public.)
    ⚠️ **IMPORTANT** : Copie TOUTE la clé privée, y compris :
    - `-----BEGIN PRIVATE KEY-----`
    - Toutes les lignes de la clé

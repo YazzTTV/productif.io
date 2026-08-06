@@ -250,7 +250,9 @@ export async function deleteSession(token: string) {
 export function setAuthCookie(response: Response, token: string) {
   response.cookies.set("auth_token", token, {
     httpOnly: true,
-    secure: false, // Désactivé en développement
+    // Secure en production uniquement : sinon le cookie de session peut transiter
+    // en clair sur HTTP. La valeur était codée en dur à false, y compris en prod.
+    secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/", // Important pour que le cookie soit disponible sur tout le site
     maxAge: 60 * 60 * 24 * 7 // 7 jours
