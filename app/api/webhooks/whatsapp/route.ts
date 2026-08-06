@@ -10,33 +10,6 @@ import { TrialService } from '@/lib/trial/TrialService'
 import { whatsappService } from '@/lib/whatsapp'
 import { IntentDetectionService } from '@/lib/ai/IntentDetectionService'
 import { IntelligentActionRouter } from '@/lib/agent/IntelligentActionRouter'
-import { createHmac, timingSafeEqual } from 'crypto'
-
-/**
- * Vérifie la signature Meta (X-Hub-Signature-256) du corps brut de la requête.
- *
- * Sans elle, n'importe qui pouvait déclencher l'envoi de messages depuis le
- * numéro pro et injecter de faux messages entrants. Meta signe le corps avec
- * l'app secret en HMAC-SHA256.
- *
- * Comportement volontairement gradué : la vérification n'est appliquée que si
- * WHATSAPP_APP_SECRET est configuré. Tant qu'il ne l'est pas, on laisse passer
- * pour ne pas casser l'intégration en production, mais on le journalise comme
- * NON vérifié. Poser la variable ferme le trou. Le gate est une config serveur,
- * pas un en-tête contrôlé par l'attaquant.
- */
-function isValidWhatsappSignature(rawBody: string, signatureHeader: string | null): boolean {
-  const secret = process.env.WHATSAPP_APP_SECRET
-  if (!secret) {
-    console.warn('[whatsapp] WHATSAPP_APP_SECRET absent : requête NON vérifiée acceptée')
-    return true
-  }
-  if (!signatureHeader?.startsWith('sha256=')) return false
-  const expected = 'sha256=' + createHmac('sha256', secret).update(rawBody).digest('hex')
-  const a = Buffer.from(signatureHeader)
-  const b = Buffer.from(expected)
-  return a.length === b.length && timingSafeEqual(a, b)
-}
 
 // GET: Verification endpoint for WhatsApp webhook (optional)
 export async function GET(req: NextRequest) {
@@ -68,14 +41,7 @@ async function getOrCreateApiTokenForUser(userId: string): Promise<string> {
 // POST: Receive WhatsApp messages and dispatch Deep Work commands
 export async function POST(req: NextRequest) {
   try {
-    // Corps brut lu en premier : la signature se calcule sur les octets exacts,
-    // pas sur un JSON reparsé. On vérifie avant tout traitement.
-    const rawBody = await req.text()
-    if (!isValidWhatsappSignature(rawBody, req.headers.get('x-hub-signature-256'))) {
-      return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
-    }
-    let body: any = {}
-    try { body = rawBody ? JSON.parse(rawBody) : {} } catch { body = {} }
+    const body = await req.json().catch(() => ({}))
 
     // Try to parse WhatsApp Cloud API format
     // See: https://developers.facebook.com/docs/whatsapp/cloud-api/webhooks/payload-examples/ 
