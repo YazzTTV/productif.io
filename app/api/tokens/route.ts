@@ -4,9 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { SignJWT } from 'jose'
 import { v4 as uuidv4 } from 'uuid'
 import { TextEncoder } from 'util'
-
-// Secret pour signer les tokens JWT
-const JWT_SECRET = process.env.JWT_SECRET || "un_secret_tres_securise_pour_jwt_tokens"
+import { JWT_SECRET } from '@/lib/config'
 
 // Liste de toutes les permissions disponibles
 const ALL_PERMISSIONS = [

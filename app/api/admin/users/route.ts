@@ -3,6 +3,7 @@ import { cookies } from "next/headers"
 import { verify } from "jsonwebtoken"
 import { prisma } from "@/lib/prisma"
 import { hash } from "bcryptjs"
+import { JWT_SECRET } from "@/lib/config"
 
 // GET /api/admin/users - Récupérer tous les utilisateurs (pour super admin)
 export async function GET(request: Request) {
@@ -15,7 +16,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Non authentifié" }, { status: 401 })
     }
 
-    const decoded = verify(token, process.env.JWT_SECRET || "fallback_secret") as any
+    const decoded = verify(token, JWT_SECRET) as any
     const userId = decoded.id || decoded.userId
 
     // Vérifier que l'utilisateur est super admin
@@ -85,7 +86,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Non authentifié" }, { status: 401 })
     }
 
-    const decoded = verify(token, process.env.JWT_SECRET || "fallback_secret") as any
+    const decoded = verify(token, JWT_SECRET) as any
     const userId = decoded.id || decoded.userId
 
     // Vérifier que l'utilisateur est super admin

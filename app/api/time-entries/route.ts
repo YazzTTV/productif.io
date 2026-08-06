@@ -3,6 +3,7 @@ import { cookies } from "next/headers"
 import { verify } from "jsonwebtoken"
 import { prisma } from "@/lib/prisma"
 import { verifyToken } from "@/lib/auth"
+import { JWT_SECRET } from "@/lib/config"
 
 // Augmenter le timeout pour les requêtes complexes (30 secondes)
 export const maxDuration = 30
@@ -17,7 +18,7 @@ async function getAuthUser() {
   }
 
   try {
-    const decoded = verify(token, process.env.JWT_SECRET || "fallback_secret")
+    const decoded = verify(token, JWT_SECRET)
     return { id: (decoded as any).id }
   } catch {
     return null

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { verify } from 'jsonwebtoken'
 import { prisma } from '@/lib/prisma'
+import { JWT_SECRET } from '@/lib/config'
 
 // Fonction pour obtenir l'utilisateur depuis les cookies
 async function getAuthUser() {
@@ -13,7 +14,7 @@ async function getAuthUser() {
       return null
     }
 
-    const decoded = verify(token, process.env.JWT_SECRET || 'fallback_secret') as { userId: string }
+    const decoded = verify(token, JWT_SECRET) as { userId: string }
     return decoded
   } catch (error) {
     return null

@@ -1,8 +1,7 @@
 import { NextRequest } from "next/server"
 import { cookies } from "next/headers"
 import { verify } from "jsonwebtoken"
-
-const JWT_SECRET = process.env.JWT_SECRET || "un_secret_tres_securise_pour_jwt_tokens"
+import { JWT_SECRET } from "@/lib/config"
 
 export async function getUserFromRequest(req: NextRequest) {
   try {

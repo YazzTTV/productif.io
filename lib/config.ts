@@ -1,4 +1,18 @@
-export const JWT_SECRET = process.env.JWT_SECRET || "un_secret_tres_securise_pour_jwt_tokens"
+/**
+ * Secret de signature des JWT. Source unique.
+ *
+ * Aucune valeur de repli : le dépôt est public, donc tout secret par défaut
+ * écrit ici serait un secret publié. Une valeur de repli faisait basculer
+ * silencieusement tout environnement sans JWT_SECRET sur une chaîne connue de
+ * tous, permettant de forger un jeton pour n'importe quel compte. On échoue
+ * bruyamment au démarrage plutôt que de démarrer avec un secret compromis.
+ */
+if (!process.env.JWT_SECRET) {
+  throw new Error(
+    "JWT_SECRET manquant. Refus de démarrer avec un secret par défaut : définissez la variable d'environnement."
+  )
+}
+export const JWT_SECRET = process.env.JWT_SECRET
 export const JWT_EXPIRES_IN = "7d"
 
 export const AUTH_COOKIE_NAME = "auth_token"

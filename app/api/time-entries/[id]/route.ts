@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { cookies } from "next/headers"
 import { verify } from "jsonwebtoken"
 import { prisma } from "@/lib/prisma"
+import { JWT_SECRET } from "@/lib/config"
 
 // Fonction utilitaire pour vérifier l'authentification
 async function getAuthUser() {
@@ -13,7 +14,7 @@ async function getAuthUser() {
   }
 
   try {
-    const decoded = verify(token, process.env.JWT_SECRET || "fallback_secret")
+    const decoded = verify(token, JWT_SECRET)
     return { id: (decoded as any).id }
   } catch (error) {
     return null

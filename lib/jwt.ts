@@ -1,6 +1,5 @@
 import * as jose from 'jose'
-
-const JWT_SECRET = process.env.JWT_SECRET || "un_secret_tres_securise_pour_jwt_tokens"
+import { JWT_SECRET } from '@/lib/config'
 
 interface SignOptions {
   expirationTime?: Date | string
