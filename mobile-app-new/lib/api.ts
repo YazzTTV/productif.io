@@ -1140,6 +1140,10 @@ export interface CatchUpDayLoad {
   minutesBefore: number;
   minutesAfter: number;
   capacityMinutes: number;
+  /** Jour posterieur a la date limite de toutes les matieres concernees : rien
+   *  ne pouvait y etre replace, l'ecran ne l'affiche donc pas. Optionnel pour
+   *  rester compatible avec une reponse d'API anterieure a ce champ. */
+  outOfReach?: boolean;
 }
 
 export interface CatchUpPlan {

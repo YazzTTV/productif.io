@@ -60,6 +60,14 @@ export interface CatchUpDayLoad {
   minutesBefore: number
   minutesAfter: number
   capacityMinutes: number
+  /**
+   * Aucun des blocs a replacer ne peut atterrir ce jour-la, parce qu'il tombe
+   * apres la date limite de toutes les matieres concernees. Sans ce drapeau,
+   * l'ecran affichait ces jours a 0 min a cote d'un jour double, ce qui donne
+   * l'impression que la repartition a oublie deux journees alors qu'elle a
+   * simplement refuse de programmer des revisions apres l'examen.
+   */
+  outOfReach: boolean
 }
 
 export interface CatchUpPlan {
@@ -162,6 +170,11 @@ export function planCatchUp(tasks: CatchUpTask[], options: CatchUpOptions): Catc
   const moves: CatchUpMove[] = []
   const ordered = [...tasks].sort(compareUrgency)
 
+  // Dernier jour de l'horizon qu'au moins un bloc peut encore atteindre.
+  // Sert uniquement a l'affichage : au-dela, montrer une journee vide induit
+  // en erreur puisque rien ne pouvait y aller.
+  let lastReachableSlot = tasks.length === 0 ? horizonDays - 1 : -1
+
   for (const task of ordered) {
     const minutes = taskMinutes(task)
 
@@ -179,6 +192,8 @@ export function planCatchUp(tasks: CatchUpTask[], options: CatchUpOptions): Catc
         maxSlot = Math.min(maxSlot, deadlineSlot)
       }
     }
+
+    if (maxSlot > lastReachableSlot) lastReachableSlot = maxSlot
 
     // Le jour le moins charge qui accepte encore le bloc, le plus tot en cas d'egalite.
     let chosen = -1
@@ -227,6 +242,7 @@ export function planCatchUp(tasks: CatchUpTask[], options: CatchUpOptions): Catc
       minutesBefore: loadBefore[slot],
       minutesAfter: loadByDay[slot],
       capacityMinutes,
+      outOfReach: slot > lastReachableSlot,
     })
   }
 

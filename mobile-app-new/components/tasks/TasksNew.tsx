@@ -2334,7 +2334,13 @@ export function TasksNew() {
               {/* La charge par jour : c'est ce qui montre que c'est reparti */}
               <View style={styles.catchUpSection}>
                 <Text style={styles.catchUpSectionTitle}>{t('catchUpLoadTitle')}</Text>
-                {catchUpPlan?.days.map((day) => {
+                {/*
+                  Les jours situes apres la date d'examen de toutes les matieres
+                  concernees ne sont pas affiches : rien ne pouvait y etre place.
+                  Les montrer a 0 min a cote d'un jour double faisait croire que
+                  la repartition avait oublie des journees.
+                */}
+                {catchUpPlan?.days.filter((day) => !day.outOfReach).map((day) => {
                   const capacity = day.capacityMinutes || 1;
                   const beforeRatio = Math.min(1, day.minutesBefore / capacity);
                   const addedRatio = Math.min(
@@ -2357,6 +2363,9 @@ export function TasksNew() {
                     </View>
                   );
                 })}
+                {catchUpPlan?.days.some((day) => day.outOfReach) && (
+                  <Text style={styles.catchUpDayNote}>{t('catchUpStopsAtDeadline')}</Text>
+                )}
               </View>
             </ScrollView>
 
@@ -3438,6 +3447,12 @@ const styles = StyleSheet.create({
     width: 56,
     textAlign: 'right',
     fontSize: 12,
+    color: 'rgba(0, 0, 0, 0.4)',
+  },
+  catchUpDayNote: {
+    marginTop: 8,
+    fontSize: 12,
+    lineHeight: 16,
     color: 'rgba(0, 0, 0, 0.4)',
   },
   catchUpApplyButton: {
