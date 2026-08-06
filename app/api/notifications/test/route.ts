@@ -1,10 +1,9 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '@/lib/prisma';
 import { whatsappService } from '@/lib/whatsapp';
 
-const prisma = new PrismaClient();
 
 export async function POST(req: Request) {
     try {
