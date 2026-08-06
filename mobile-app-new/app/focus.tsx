@@ -829,9 +829,26 @@ export default function FocusScreen() {
       }
 
       // Le blocage ne conditionne jamais le démarrage : une session sans
-      // bouclier reste une session de focus.
+      // bouclier reste une session de focus. En revanche on ne le tait plus :
+      // laisser croire que les apps sont bloquées alors que le bouclier n'a pas
+      // pu se poser, c'est exactement la promesse centrale qui échoue en silence.
       if (blockAppsEnabled) {
-        await startBlocking(result?.session?.id || `focus_${Date.now()}`, effectiveDuration);
+        const blocking = await startBlocking(
+          result?.session?.id || `focus_${Date.now()}`,
+          effectiveDuration
+        );
+        if (!blocking?.started) {
+          setBlockAppsEnabled(false);
+          refreshBlockingState();
+          Alert.alert(
+            t('blockApps'),
+            blocking?.reason === 'not_authorized'
+              ? t('blockAppsAuthorizationLost')
+              : blocking?.reason === 'no_selection'
+                ? t('blockAppsNoSelection')
+                : t('blockAppsCouldNotStart')
+          );
+        }
       }
 
       const startedAt = Date.now();
@@ -1178,17 +1195,35 @@ export default function FocusScreen() {
                 <Animated.View entering={FadeInDown.delay(450).duration(400)} style={introStyles.blockAppsCard}>
                   <View style={introStyles.blockAppsInfo}>
                     <Text style={introStyles.blockAppsTitle}>{t('blockApps')}</Text>
-                    <Text style={introStyles.blockAppsSubtitle}>
-                      {blockedCount > 0
-                        ? `${blockedCount} ${t('blockAppsSelected')}`
-                        : t('blockAppsNoSelection')}
+                    {/*
+                      L'autorisation Temps d'écran peut être retirée depuis les
+                      Réglages iOS à tout moment, sans que l'app en soit avertie.
+                      Sans cette ligne, la carte continuait d'afficher l'ancien
+                      décompte et l'utilisateur croyait ses apps bloquées alors
+                      que plus aucun bouclier ne pouvait se poser.
+                    */}
+                    <Text
+                      style={[
+                        introStyles.blockAppsSubtitle,
+                        blockingAuthStatus !== 'approved' && introStyles.blockAppsSubtitleWarning,
+                      ]}
+                    >
+                      {blockingAuthStatus !== 'approved'
+                        ? t('blockAppsAuthorizationLost')
+                        : blockedCount > 0
+                          ? `${blockedCount} ${t('blockAppsSelected')}`
+                          : t('blockAppsNoSelection')}
                     </Text>
                     <TouchableOpacity
                       onPress={openBlockedAppsPicker}
                       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                     >
                       <Text style={introStyles.blockAppsLink}>
-                        {blockedCount > 0 ? t('blockAppsEdit') : t('blockAppsChoose')}
+                        {blockingAuthStatus !== 'approved'
+                          ? t('blockAppsReauthorize')
+                          : blockedCount > 0
+                            ? t('blockAppsEdit')
+                            : t('blockAppsChoose')}
                       </Text>
                     </TouchableOpacity>
                   </View>
@@ -1197,6 +1232,12 @@ export default function FocusScreen() {
                     onValueChange={next => {
                       blockAppsTouchedRef.current = true;
                       // Jamais grisé : un interrupteur inerte n'explique rien.
+                      // Sans autorisation, l'activer relance la demande plutôt
+                      // que de promettre un blocage qui ne se posera jamais.
+                      if (next && blockingAuthStatus !== 'approved') {
+                        openBlockedAppsPicker();
+                        return;
+                      }
                       // Sans sélection, l'activer ouvre le sélecteur.
                       if (next && blockedCount === 0) {
                         openBlockedAppsPicker();
@@ -1635,6 +1676,12 @@ const introStyles = StyleSheet.create({
   blockAppsSubtitle: {
     fontSize: 12,
     color: 'rgba(0, 0, 0, 0.4)',
+  },
+  // Autorisation perdue : le gris à 40 % se lit comme une info secondaire alors
+  // que c'est la seule chose qui empêche le blocage de fonctionner.
+  blockAppsSubtitleWarning: {
+    color: '#B45309',
+    fontWeight: '600',
   },
   blockAppsLink: {
     fontSize: 13,

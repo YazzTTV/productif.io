@@ -581,6 +581,11 @@ export const translations = {
     blockAppsDenied:
       'Autorisation refusée. Tu peux la réactiver dans Réglages, Temps d\'écran, puis productif.io.',
     blockAppsUnsupported: 'Le blocage d\'applications est disponible sur iPhone uniquement.',
+    blockAppsAuthorizationLost:
+      'Autorisation Temps d\'écran retirée : le blocage ne peut pas se poser.',
+    blockAppsReauthorize: 'Réactiver l\'autorisation',
+    blockAppsCouldNotStart:
+      'Le blocage n\'a pas pu démarrer. La session continue, mais tes applications restent accessibles.',
     hardMode: 'Mode difficile',
     hardModeDescription: 'Désactive la pause et bloque le retour',
     breaks: 'Pauses',
@@ -635,6 +640,8 @@ export const translations = {
     catchUpSummary: '{count} blocs, {duration}, répartis sur {days} jour(s)',
     catchUpMovesTitle: 'Où part chaque bloc',
     catchUpLoadTitle: 'Charge par jour',
+    catchUpStopsAtDeadline:
+      'La répartition s\'arrête à la date de ton examen : rien n\'est programmé après.',
     catchUpDeadlinePassed: 'La date limite de cette matière est déjà passée',
     catchUpOverCapacity: 'Journée chargée : à déplacer à la main si besoin',
     catchUpApply: 'Replanifier',
@@ -1640,6 +1647,11 @@ export const translations = {
     blockAppsDenied:
       'Permission denied. You can turn it back on in Settings, Screen Time, then productif.io.',
     blockAppsUnsupported: 'App blocking is available on iPhone only.',
+    blockAppsAuthorizationLost:
+      'Screen Time permission removed: blocking cannot be applied.',
+    blockAppsReauthorize: 'Turn permission back on',
+    blockAppsCouldNotStart:
+      'Blocking could not start. The session continues, but your apps stay accessible.',
     hardMode: 'Hard mode',
     hardModeDescription: 'Disables pause and blocks back',
     examSettings: 'Exam settings',
@@ -1694,6 +1706,8 @@ export const translations = {
     catchUpSummary: '{count} blocks, {duration}, spread over {days} day(s)',
     catchUpMovesTitle: 'Where each block goes',
     catchUpLoadTitle: 'Load per day',
+    catchUpStopsAtDeadline:
+      'The plan stops at your exam date: nothing is scheduled after it.',
     catchUpDeadlinePassed: 'This subject deadline has already passed',
     catchUpOverCapacity: 'Busy day: move it by hand if needed',
     catchUpApply: 'Reschedule',
@@ -2682,6 +2696,8 @@ export const translations = {
     catchUpSummary: '{count} bloques, {duration}, repartidos en {days} día(s)',
     catchUpMovesTitle: 'Adónde va cada bloque',
     catchUpLoadTitle: 'Carga por día',
+    catchUpStopsAtDeadline:
+      'La distribución se detiene en la fecha de tu examen: no se programa nada después.',
     catchUpDeadlinePassed: 'La fecha límite de esta asignatura ya pasó',
     catchUpOverCapacity: 'Día cargado: muévelo a mano si hace falta',
     catchUpApply: 'Replanificar',
@@ -2741,6 +2757,11 @@ export const translations = {
     blockAppsDenied:
       'Permiso denegado. Puedes reactivarlo en Ajustes, Tiempo de uso, y luego productif.io.',
     blockAppsUnsupported: 'El bloqueo de aplicaciones está disponible solo en iPhone.',
+    blockAppsAuthorizationLost:
+      'Permiso de Tiempo de uso retirado: el bloqueo no puede aplicarse.',
+    blockAppsReauthorize: 'Reactivar el permiso',
+    blockAppsCouldNotStart:
+      'El bloqueo no pudo iniciarse. La sesión continúa, pero tus aplicaciones siguen accesibles.',
     hardMode: 'Modo difícil',
     hardModeDescription: 'Desactiva la pausa y bloquea el retroceso',
     breaks: 'Pausas',
