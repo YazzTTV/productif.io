@@ -1,5 +1,6 @@
 import { usePlacement } from 'expo-superwall';
 import { logSubscriptionEvent } from '@/lib/appsflyerEvents';
+import { invalidateAuthCache } from '@/lib/api';
 import { checkPremiumStatus } from '@/utils/premium';
 import { SUPERWALL_EVENTS, SuperwallEventName } from '@/lib/superwallEvents';
 import { getActiveExamSession, isDemoSession } from '@/utils/examSession';
@@ -42,6 +43,11 @@ export function useSuperwall() {
       // L'ancien test `result === 'purchased'` était toujours faux, donc aucun
       // achat n'était jamais remonté à AppsFlyer.
       if (result?.type === 'purchased' || result?.type === 'restored') {
+        // Le plan affiché vient de /auth/me, mis en cache 45 s. Sans cette
+        // invalidation, l'app continue de se croire gratuite juste après un
+        // achat : plan "Gratuit" dans les réglages et fonctionnalités encore
+        // verrouillées jusqu'à expiration du cache.
+        invalidateAuthCache();
         logSubscriptionEvent({
           productId: result.type === 'purchased' ? result.productId : undefined,
         });

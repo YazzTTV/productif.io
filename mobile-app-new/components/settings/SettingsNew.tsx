@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Switch, TextInput, Alert, Linking, Platform, InteractionManager } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { resetTutorial, setTutorialCompleted, setTutorialStage } from '@/tutorial/tutorialStorage';
 import { authService, onboardingService, apiCall } from '@/lib/api';
 import { connectGoogleCalendar, isGoogleCalendarConnected } from '@/lib/calendarAuth';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -67,12 +67,47 @@ export function SettingsNew() {
   const [calendarConnected, setCalendarConnected] = useState(false);
   const [calendarLoading, setCalendarLoading] = useState(false);
 
+  // Plan d'abonnement. null = statut encore inconnu : on n'affiche aucun plan
+  // plutôt qu'un "Gratuit" qui serait faux pour un abonné.
+  const [plan, setPlan] = useState<'free' | 'premium' | null>(null);
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
       isMountedRef.current = false;
     };
   }, []);
+
+  /**
+   * Le plan vient du serveur (/auth/me), seule source de vérité : il est
+   * dérivé de subscriptionStatus / subscriptionTier, donc il suit l'achat
+   * Superwall dès que le webhook a écrit en base.
+   * `force` court-circuite le cache de 45 s de checkAuth, nécessaire juste
+   * après un achat sinon on relit un statut périmé.
+   */
+  const refreshPlan = useCallback(async (options?: { force?: boolean }) => {
+    try {
+      const user = await authService.checkAuth(options?.force ? { force: true } : undefined);
+      if (!isMountedRef.current) return;
+      if (!user) {
+        setPlan(null);
+        return;
+      }
+      setPlan(user.isPremium || user.plan === 'premium' ? 'premium' : 'free');
+    } catch (error) {
+      // Réseau HS : on laisse le plan inconnu au lieu d'afficher "Gratuit".
+      if (!isMountedRef.current) return;
+      setPlan(null);
+    }
+  }, []);
+
+  // Relu à chaque fois que l'écran reprend le focus : un achat ou une
+  // résiliation faits ailleurs ne doivent pas laisser un plan périmé affiché.
+  useFocusEffect(
+    useCallback(() => {
+      refreshPlan();
+    }, [refreshPlan])
+  );
 
   useEffect(() => {
     const loadUserData = async () => {
@@ -377,52 +412,38 @@ export function SettingsNew() {
     );
   };
 
-  const resetOnboarding = async () => {
-    Alert.alert(
-      'Réinitialiser l\'onboarding',
-      'Voulez-vous vraiment réinitialiser l\'onboarding ? Vous serez redirigé vers l\'écran d\'accueil.',
-      [
-        { text: 'Annuler', style: 'cancel' },
-        {
-          text: 'Réinitialiser',
-          style: 'default',
-          onPress: async () => {
-            try {
-              await AsyncStorage.removeItem('onboarding_completed');
-              router.replace('/(onboarding-new)/intro');
-            } catch (error) {
-              console.error('Erreur lors de la réinitialisation de l\'onboarding:', error);
-              Alert.alert(t('error'), t('resetOnboardingError') || 'Impossible de réinitialiser l\'onboarding');
-            }
-          },
-        },
-      ]
-    );
+  /**
+   * Un abonné ne doit pas retomber sur le paywall : on l'envoie vers la page
+   * de gestion d'abonnement du store, seul endroit où il peut résilier ou
+   * changer de formule (Apple interdit de le faire dans l'app).
+   */
+  const openSubscriptionManagement = async () => {
+    const url =
+      Platform.OS === 'android'
+        ? 'https://play.google.com/store/account/subscriptions'
+        : 'https://apps.apple.com/account/subscriptions';
+    try {
+      await Linking.openURL(url);
+    } catch (error) {
+      Alert.alert(
+        t('error') || 'Erreur',
+        t('cannotOpenBrowser', undefined, 'Impossible d\'ouvrir le navigateur.')
+      );
+    }
   };
 
-  const restartTutorial = async () => {
-    Alert.alert(
-      'Relancer le didacticiel',
-      'Voulez-vous relancer le didacticiel depuis le début ?',
-      [
-        { text: 'Annuler', style: 'cancel' },
-        {
-          text: 'Relancer',
-          style: 'default',
-          onPress: async () => {
-            try {
-              await resetTutorial();
-              await setTutorialCompleted(false);
-              await setTutorialStage('calendar');
-              router.replace('/(tabs)');
-            } catch (error) {
-              console.error('Erreur relance didacticiel:', error);
-              Alert.alert(t('error'), 'Impossible de relancer le didacticiel.');
-            }
-          },
-        },
-      ]
-    );
+  const handleSubscriptionPress = async () => {
+    if (plan === 'premium') {
+      await openSubscriptionManagement();
+      return;
+    }
+
+    await triggerEvent(SUPERWALL_EVENTS.FEATURE_LOCKED, {
+      params: { source: 'settings_subscription' },
+    });
+    // Le paywall vient de se fermer et il a pu aboutir à un achat : on relit
+    // le statut hors cache pour que la carte affiche Premium immédiatement.
+    await refreshPlan({ force: true });
   };
 
   if (view === 'editProfile') {
@@ -1095,20 +1116,26 @@ export function SettingsNew() {
           <Text style={styles.sectionLabel}>{t('subscription') || 'Subscription'}</Text>
           <TouchableOpacity
             style={styles.subscriptionCard}
-            onPress={() =>
-              triggerEvent(SUPERWALL_EVENTS.FEATURE_LOCKED, {
-                params: { source: 'settings_subscription' },
-              })
-            }
+            disabled={plan === null}
+            onPress={handleSubscriptionPress}
             activeOpacity={0.7}
           >
             <View style={styles.subscriptionContent}>
-              <Text style={styles.subscriptionTitle}>{t('currentPlan')}: {t('free')}</Text>
+              <Text style={styles.subscriptionTitle}>
+                {t('currentPlan')}:{' '}
+                {plan === null
+                  ? t('loading')
+                  : plan === 'premium'
+                  ? t('premium')
+                  : t('free')}
+              </Text>
               <Text style={styles.subscriptionSubtitle}>
-                {t('unlockFeaturesDescription') || 'Unlock Exam Mode, calendar sync, and advanced AI'}
+                {plan === 'premium'
+                  ? t('manageSubscription', undefined, 'Gérer mon abonnement')
+                  : t('unlockFeaturesDescription') || 'Unlock Exam Mode, calendar sync, and advanced AI'}
               </Text>
             </View>
-            <Ionicons name="chevron-forward" size={24} color="#16A34A" />
+            {plan !== null && <Ionicons name="chevron-forward" size={24} color="#16A34A" />}
           </TouchableOpacity>
         </Animated.View>
 
@@ -1176,38 +1203,7 @@ export function SettingsNew() {
           </View>
         </Animated.View>
 
-        {/* SECTION 7 — DEVELOPMENT */}
-        <Animated.View entering={FadeInDown.delay(750).duration(400)} style={styles.section}>
-          <Text style={styles.sectionLabel}>Développement</Text>
-          <TouchableOpacity 
-            style={styles.settingCard} 
-            activeOpacity={0.7}
-            onPress={resetOnboarding}
-          >
-            <View style={styles.settingCardRow}>
-              <View style={styles.settingCardContent}>
-                <Text style={styles.settingCardTitle}>Réinitialiser l'onboarding</Text>
-                <Text style={styles.settingCardSubtitle}>Tester à nouveau le flux d'onboarding</Text>
-              </View>
-              <Ionicons name="refresh-outline" size={20} color="#16A34A" />
-            </View>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={styles.settingCard} 
-            activeOpacity={0.7}
-            onPress={restartTutorial}
-          >
-            <View style={styles.settingCardRow}>
-              <View style={styles.settingCardContent}>
-                <Text style={styles.settingCardTitle}>Relancer le didacticiel</Text>
-                <Text style={styles.settingCardSubtitle}>Rejouer le tutoriel guidé</Text>
-              </View>
-              <Ionicons name="play-circle-outline" size={20} color="#16A34A" />
-            </View>
-          </TouchableOpacity>
-        </Animated.View>
-
-        {/* SECTION 8 — LOGOUT */}
+        {/* SECTION 7 — LOGOUT */}
         <Animated.View entering={FadeInDown.delay(800).duration(400)} style={styles.section}>
           <TouchableOpacity
             style={styles.logoutCard}
