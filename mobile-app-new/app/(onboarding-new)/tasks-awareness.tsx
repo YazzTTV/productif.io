@@ -14,7 +14,6 @@ import Animated, {
   FadeIn,
 } from 'react-native-reanimated';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { tasksService } from '@/lib/api';
@@ -52,7 +51,6 @@ export default function TasksAwarenessScreen() {
   const params = useLocalSearchParams<{ initialText?: string }>();
   const { saveResponse } = useOnboardingData();
   const [tasks, setTasks] = useState('');
-  const [isRecording, setIsRecording] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const lastAppliedInitialTextRef = useRef<string | null>(null);
 
@@ -71,10 +69,6 @@ export default function TasksAwarenessScreen() {
     setTasks(newText);
   };
 
-  const toggleRecording = () => {
-    setIsRecording(!isRecording);
-    // In a real app, would start/stop speech recognition here
-  };
 
   const handleContinue = async () => {
     if (!tasks.trim() || isLoading) return;
@@ -193,38 +187,25 @@ export default function TasksAwarenessScreen() {
             ))}
           </Animated.View>
 
-          {/* Text input with mic */}
+          {/*
+            Le bouton micro a été retiré le 10 août : il ne faisait que basculer
+            un booléen et afficher un faux indicateur "Recording...". Aucune
+            capture audio, aucune demande de permission, aucune transcription.
+            Un contrôle visible qui ne fait rien, dans le tout premier écran que
+            traverse le reviewer Apple, est un motif de rejet. L'invite promettait
+            aussi le micro, elle a été réécrite.
+          */}
           <Animated.View entering={FadeInDown.delay(300).duration(400)} style={styles.inputContainer}>
             <View style={styles.inputWrapper}>
               <TextInput
                 style={styles.textInput}
-                placeholder={t('typeOrSpeak') || 'Type here or tap mic to speak...'}
+                placeholder={t('typeOrSpeak') || 'Write your tasks here, one per line...'}
                 placeholderTextColor="rgba(0, 0, 0, 0.4)"
                 value={tasks}
                 onChangeText={setTasks}
                 multiline
                 textAlignVertical="top"
               />
-              <TouchableOpacity
-                onPress={toggleRecording}
-                style={[
-                  styles.micButton,
-                  isRecording && styles.micButtonRecording,
-                ]}
-                activeOpacity={0.7}
-              >
-                <Ionicons
-                  name={isRecording ? 'stop' : 'mic'}
-                  size={20}
-                  color={isRecording ? '#FFFFFF' : 'rgba(0, 0, 0, 0.6)'}
-                />
-              </TouchableOpacity>
-              {isRecording && (
-                <View style={styles.recordingIndicator}>
-                  <View style={styles.recordingDot} />
-                  <Text style={styles.recordingText}>Recording...</Text>
-                </View>
-              )}
             </View>
             <Text style={styles.helpText}>
               {t('messyIsFine') || 'Messy is fine.'}
@@ -322,38 +303,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#000000',
     letterSpacing: -0.01 * 16,
-  },
-  micButton: {
-    position: 'absolute',
-    bottom: 16,
-    right: 16,
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: 'rgba(0, 0, 0, 0.05)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  micButtonRecording: {
-    backgroundColor: '#EF4444',
-  },
-  recordingIndicator: {
-    position: 'absolute',
-    top: 16,
-    right: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  recordingDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#EF4444',
-  },
-  recordingText: {
-    fontSize: 12,
-    color: '#EF4444',
   },
   helpText: {
     fontSize: 12,
