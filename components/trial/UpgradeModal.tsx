@@ -5,6 +5,15 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { X, Lock, Crown, Zap, Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useLocale } from '@/lib/i18n'
+import {
+  PRICE_YEARLY,
+  PRICE_YEARLY_PER_MONTH,
+  YEARLY_SAVING_PERCENT,
+  formatEur,
+  formatEurEn,
+  formatPercent,
+  formatPercentEn,
+} from '@/lib/pricing'
 
 interface UpgradeModalProps {
   isOpen: boolean
@@ -129,14 +138,20 @@ export function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
                       {isFr ? 'Plan Annuel' : 'Annual Plan'}
                     </span>
                     <div className="flex items-center gap-2">
-                      <span className="text-2xl font-bold text-gray-900">4,92€</span>
+                      <span className="text-2xl font-bold text-gray-900">
+                        {isFr
+                          ? formatEur(PRICE_YEARLY_PER_MONTH)
+                          : formatEurEn(PRICE_YEARLY_PER_MONTH)}
+                      </span>
                       <span className="text-gray-600">/ {isFr ? 'mois' : 'month'}</span>
                     </div>
                   </div>
                   <div className="flex items-center gap-2 text-sm">
                     <Zap className="w-4 h-4 text-[#00C27A]" />
                     <span className="text-[#00C27A] font-medium">
-                      {isFr ? "59€ par an, soit 40% d'économie" : '€59 per year, save 40%'}
+                      {isFr
+                        ? `${formatEur(PRICE_YEARLY)} par an, soit ${formatPercent(YEARLY_SAVING_PERCENT)} d'économie`
+                        : `${formatEurEn(PRICE_YEARLY)} per year, save ${formatPercentEn(YEARLY_SAVING_PERCENT)}`}
                     </span>
                   </div>
                 </div>

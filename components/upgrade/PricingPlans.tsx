@@ -4,12 +4,21 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Check } from 'lucide-react';
+import {
+  PRICE_MONTHLY,
+  PRICE_YEARLY,
+  PRICE_YEARLY_PER_MONTH,
+  YEARLY_SAVING_PERCENT,
+  TRIAL_DAYS,
+  formatEur,
+  formatPercent,
+} from '@/lib/pricing';
 
 const plans = [
   {
     id: 'monthly',
     name: 'Mensuel',
-    price: 7.99,
+    price: PRICE_MONTHLY,
     popular: false,
     features: [
       '✅ Sessions Deep Work illimitées',
@@ -17,22 +26,22 @@ const plans = [
       '✅ Suivi d\'habitudes avancé',
       '✅ Objectifs OKR et analytics',
       '✅ Support par email',
-      '✅ 7 jours d\'essai gratuit'
+      `✅ ${TRIAL_DAYS} jours d'essai gratuit`
     ]
   },
   {
     id: 'yearly',
     name: 'Annuel',
-    price: 4.92,
+    price: PRICE_YEARLY_PER_MONTH,
     popular: true,
-    savings: '40%',
+    savings: formatPercent(YEARLY_SAVING_PERCENT),
     features: [
       '✅ Tout du plan mensuel',
-      '✅ 59€ par an, soit 40% d\'économie',
+      `✅ ${formatEur(PRICE_YEARLY)} par an, soit ${formatPercent(YEARLY_SAVING_PERCENT)} d'économie`,
       '✅ Support prioritaire',
       '✅ Accès anticipé aux nouvelles fonctionnalités',
       '✅ Badge exclusif communauté',
-      '✅ 7 jours d\'essai gratuit'
+      `✅ ${TRIAL_DAYS} jours d'essai gratuit`
     ]
   }
 ];
@@ -88,7 +97,7 @@ export function PricingPlans({ userId }: { userId: string }) {
           <h3 className="text-2xl font-bold text-gray-900 mb-2">{plan.name}</h3>
           
           <div className="mb-6">
-            <span className="text-4xl font-bold text-gray-900">{plan.price}€</span>
+            <span className="text-4xl font-bold text-gray-900">{formatEur(plan.price)}</span>
             <span className="text-gray-600">/mois</span>
             {plan.savings && (
               <div className="mt-2">

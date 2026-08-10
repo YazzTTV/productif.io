@@ -5,6 +5,7 @@ import { motion } from 'framer-motion'
 import { Lock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { PRICE_MONTHLY, PRICE_YEARLY_PER_MONTH, formatEurEn } from '@/lib/pricing'
 
 interface PreviewWrapperProps {
   children: React.ReactNode
@@ -81,7 +82,8 @@ export function PreviewWrapper({
                 Upgrade to Premium
               </Button>
               <p className="text-xs text-black/40">
-                Annual: €3.33/month • Monthly: €7.99/month
+                Annual: {formatEurEn(PRICE_YEARLY_PER_MONTH)}/month • Monthly:{" "}
+                {formatEurEn(PRICE_MONTHLY)}/month
               </p>
             </div>
           </div>

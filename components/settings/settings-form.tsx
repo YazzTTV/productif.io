@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation"
 import { useToast } from "@/components/ui/use-toast"
 import { useTheme } from "next-themes"
 import { useLocale, Locale } from "@/lib/i18n"
+import { PRICE_MONTHLY, PRICE_YEARLY_PER_MONTH, formatEurEn } from "@/lib/pricing"
 import { 
   Moon, 
   Sun, 
@@ -380,7 +381,7 @@ export function SettingsForm({ user }: SettingsFormProps) {
                 {billingPeriod === 'monthly' ? (
                   <>
                     <div className="flex items-baseline gap-2">
-                      <span className="text-white text-4xl font-bold">€7.99</span>
+                      <span className="text-white text-4xl font-bold">{formatEurEn(PRICE_MONTHLY)}</span>
                       <span className="text-white/80 text-base">/month</span>
                     </div>
                     <p className="text-white/70 text-sm mt-1">{t('flexibleBilling')}</p>
@@ -388,7 +389,7 @@ export function SettingsForm({ user }: SettingsFormProps) {
                 ) : (
                   <>
                     <div className="flex items-baseline gap-2">
-                      <span className="text-white text-4xl font-bold">€4.92</span>
+                      <span className="text-white text-4xl font-bold">{formatEurEn(PRICE_YEARLY_PER_MONTH)}</span>
                       <span className="text-white/80 text-base">/month</span>
                     </div>
                     <div className="flex items-center gap-2 mt-1">

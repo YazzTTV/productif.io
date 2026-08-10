@@ -68,3 +68,21 @@ export function formatPercent(value: number): string {
   const hasDecimals = !Number.isInteger(value)
   return `${value.toFixed(hasDecimals ? 1 : 0).replace('.', ',')} %`
 }
+
+/**
+ * Variantes anglaises : €4.92 / €59 et 38.5% / 40%.
+ *
+ * Plusieurs surfaces sont bilingues et affichent le prix à l'anglaise, symbole
+ * devant, point décimal, pas d'espace avant le pourcentage. Elles avaient donc
+ * leurs propres chaînes en dur, ce qui les faisait diverger. Ces deux fonctions
+ * existent pour qu'elles puissent importer les constantes comme les autres.
+ */
+export function formatEurEn(amount: number): string {
+  const hasCents = !Number.isInteger(amount)
+  return `€${amount.toFixed(hasCents ? 2 : 0)}`
+}
+
+export function formatPercentEn(value: number): string {
+  const hasDecimals = !Number.isInteger(value)
+  return `${value.toFixed(hasDecimals ? 1 : 0)}%`
+}

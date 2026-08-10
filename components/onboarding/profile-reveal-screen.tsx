@@ -5,6 +5,16 @@ import { useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import { Sparkles, Check, Zap } from 'lucide-react'
 import { useLocale } from '@/lib/i18n'
+import {
+  PRICE_MONTHLY,
+  PRICE_YEARLY,
+  PRICE_YEARLY_PER_MONTH,
+  YEARLY_SAVING_PERCENT,
+  formatEur,
+  formatEurEn,
+  formatPercent,
+  formatPercentEn,
+} from '@/lib/pricing'
 
 // Fonction pour générer une valeur pseudo-aléatoire déterministe basée sur un seed
 function seededRandom(seed: number) {
@@ -208,18 +218,26 @@ export function ProfileRevealScreen({
                 </p>
                 <div className="flex items-center gap-2">
                   <span className="text-base text-green-600 bg-green-50 px-3 py-1 rounded-full font-medium">
-                    {isFr ? "💰 40% d'économie" : "💰 Save 40%"}
+                    {isFr
+                      ? `💰 ${formatPercent(YEARLY_SAVING_PERCENT)} d'économie`
+                      : `💰 Save ${formatPercentEn(YEARLY_SAVING_PERCENT)}`}
                   </span>
                 </div>
               </div>
               <div className="flex items-center gap-4">
                 <div className="text-right">
-                  <p className="text-gray-900 text-3xl font-bold">4,92€</p>
+                  <p className="text-gray-900 text-3xl font-bold">
+                    {isFr
+                      ? formatEur(PRICE_YEARLY_PER_MONTH)
+                      : formatEurEn(PRICE_YEARLY_PER_MONTH)}
+                  </p>
                   <p className="text-base text-gray-500">
                     {isFr ? "par mois" : "per month"}
                   </p>
                   <p className="text-sm text-gray-400">
-                    {isFr ? "59€ facturés annuellement" : "€59 billed annually"}
+                    {isFr
+                      ? `${formatEur(PRICE_YEARLY)} facturés annuellement`
+                      : `${formatEurEn(PRICE_YEARLY)} billed annually`}
                   </p>
                 </div>
                 <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center ${
@@ -257,7 +275,9 @@ export function ProfileRevealScreen({
               </div>
               <div className="flex items-center gap-4">
                 <div className="text-right">
-                  <p className="text-gray-900 text-3xl font-bold">7,99€</p>
+                  <p className="text-gray-900 text-3xl font-bold">
+                    {isFr ? formatEur(PRICE_MONTHLY) : formatEurEn(PRICE_MONTHLY)}
+                  </p>
                   <p className="text-base text-gray-500">
                     {isFr ? "par mois" : "per month"}
                   </p>
