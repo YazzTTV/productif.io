@@ -11,6 +11,7 @@ import {
   TRIAL_DAYS,
   BACK_TO_SCHOOL_END_LABEL,
   formatEur,
+  formatPercent,
 } from "@/lib/pricing"
 
 /**
@@ -302,8 +303,8 @@ export default function ModeExamenPage() {
                 <span className="text-base text-gray-500 font-normal">/an</span>
               </div>
               <p className="mt-1 text-sm text-gray-500">
-                Soit {formatEur(PRICE_YEARLY_PER_MONTH)} par mois, {YEARLY_SAVING_PERCENT} %
-                d&apos;économie
+                Soit {formatEur(PRICE_YEARLY_PER_MONTH)} par mois,{" "}
+                {formatPercent(YEARLY_SAVING_PERCENT)} d&apos;économie
               </p>
               <ul className="mt-8 space-y-3 flex-1">
                 {premiumPlan.map((item) => (
@@ -358,8 +359,7 @@ export default function ModeExamenPage() {
                 {BACK_TO_SCHOOL_END_LABEL}
               </p>
               <p className="mt-1 text-sm text-gray-600">
-                Du 15 août au {BACK_TO_SCHOOL_END_LABEL}. Ensuite le prix repasse à{" "}
-                {formatEur(PRICE_YEARLY)}.
+                Ensuite le prix repasse à {formatEur(PRICE_YEARLY)}.
               </p>
             </div>
             <PrimaryCta label="Profiter de l'offre" className="!px-6 !py-3.5 !text-sm !rounded-2xl" />
