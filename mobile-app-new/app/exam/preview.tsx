@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { saveExamSession } from '@/utils/examSession';
+import { hasExamModeAccess } from '@/utils/premium';
 import { selectExamTasks } from '@/utils/taskSelection';
 import { useSuperwall } from '@/hooks/useSuperwall';
 import { SUPERWALL_EVENTS } from '@/lib/superwallEvents';
@@ -27,6 +28,37 @@ export default function ExamPreviewScreen() {
     },
     [triggerEvent],
   );
+
+  /**
+   * Un abonné n'a rien à faire sur l'écran de démonstration payante.
+   *
+   * Sert aussi de rattrapage : `preview` est la première route déclarée du
+   * groupe `exam`, et une navigation vers `/exam/setup` qui n'aboutirait pas
+   * atterrirait ici. Sans ce test, un abonné se retrouverait devant le paywall
+   * sans aucun moyen de lancer sa session. Ne se déclenche pas au retour d'une
+   * démo, où l'écran doit rester pour présenter l'offre.
+   */
+  const accessRedirectRef = useRef(false);
+  useEffect(() => {
+    if (params.afterDemo) return;
+    // Une seule tentative par montage. `setup` renvoie ici quand l'accès est
+    // refusé, et cet effet renvoie là-bas quand il est accordé : les deux
+    // conditions sont complémentaires, mais si une réponse d'API incohérente
+    // les faisait diverger, on resterait bloqué dans un aller-retour. Au pire
+    // l'utilisateur reste sur cet écran, il ne boucle pas.
+    if (accessRedirectRef.current) return;
+    accessRedirectRef.current = true;
+    let cancelled = false;
+    (async () => {
+      const allowed = await hasExamModeAccess();
+      if (!cancelled && allowed) {
+        router.replace('/exam/setup');
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [params.afterDemo, router]);
 
   useEffect(() => {
     const token = params.afterDemo;

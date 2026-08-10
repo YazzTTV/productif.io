@@ -8,6 +8,7 @@ import { selectExamTasks, TaskForExam } from '@/utils/taskSelection';
 import { subjectsService, authService } from '@/lib/api';
 import { checkPremiumStatus } from '@/utils/premium';
 import { getRestorableFocusSession } from '@/utils/focusSession';
+import { getActiveExamSession } from '@/utils/examSession';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useExamSettings } from '@/hooks/useExamSettings';
 
@@ -52,6 +53,20 @@ export function ExamMode() {
       const runningFocus = await getRestorableFocusSession();
       if (runningFocus) {
         router.replace('/focus');
+        return;
+      }
+
+      // Même chose pour une session EXAMEN, qui n'était vérifiée nulle part.
+      // Sortir de l'écran de session laissait une session active, bouclier levé
+      // et compte à rebours affiché, sans aucun chemin de retour depuis l'app :
+      // constaté sur device le 10 août. Vérifié avant l'appel réseau, pour la
+      // même raison que la reprise du focus.
+      const runningExam = await getActiveExamSession();
+      if (runningExam) {
+        router.replace({
+          pathname: '/exam/session',
+          params: { sessionId: runningExam.sessionId },
+        });
         return;
       }
 
@@ -185,8 +200,20 @@ export function ExamMode() {
     );
   };
 
-  const handleStartFocus = () => {
-    router.push('/focus');
+  /**
+   * Démarre une vraie session de révision, et non plus l'écran Focus.
+   *
+   * Le Mode Examen est ce qui bloque les applications ; Focus ne bloque plus
+   * rien. Envoyer ici vers /focus revenait à faire du Mode Examen un simple
+   * écran d'information : tout le moteur de session (durée libre, hard mode,
+   * enchaînement des tâches, blocage, résumé) vivait dans `app/exam/setup.tsx`
+   * sans qu'aucun chemin de l'app n'y mène.
+   *
+   * `setup` revérifie l'accès premium à l'ouverture ET au démarrage, et gère
+   * lui-même le cas sans tâche : rien à dupliquer ici.
+   */
+  const handleStartExamSession = () => {
+    router.push('/exam/setup');
   };
 
   const handleSettingsPress = () => {
@@ -312,13 +339,20 @@ export function ExamMode() {
 
         {/* Fixed Bottom CTA */}
         <View style={styles.bottomCTA}>
-          {!allTasksCompleted && (
+          {/*
+            `tasks.every(...)` renvoie true sur une liste VIDE en JavaScript.
+            Testé seul, il masquait le bouton pour tout compte premium sans
+            tâche : l'écran n'offrait plus aucun moyen d'avancer, ce qui est
+            exactement l'état d'un compte neuf et de celui du reviewer Apple.
+            On ne masque donc que si des tâches existent ET sont toutes faites.
+          */}
+          {!(tasks.length > 0 && allTasksCompleted) && (
             <TouchableOpacity
               style={styles.startFocusButton}
-              onPress={handleStartFocus}
+              onPress={handleStartExamSession}
               activeOpacity={0.8}
             >
-              <Text style={styles.startFocusText}>{t('startFocus')}</Text>
+              <Text style={styles.startFocusText}>{t('startExamMode')}</Text>
             </TouchableOpacity>
           )}
           <TouchableOpacity

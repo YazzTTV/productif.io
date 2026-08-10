@@ -1,11 +1,12 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Switch, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Switch, ActivityIndicator, Alert } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { selectExamTasks, TaskForExam } from '@/utils/taskSelection';
 import { saveExamSession, getActiveExamSession } from '@/utils/examSession';
+import { startSessionLiveActivity } from '@/utils/liveActivity';
 import { hasExamModeAccess } from '@/utils/premium';
 import {
   getAuthorizationStatus,
@@ -44,6 +45,24 @@ export default function ExamSetupScreen() {
       setBlockedCount(count);
       setBlockAppsEnabled(count > 0 && getAuthorizationStatus() === 'approved');
     }, [blockingSupported])
+  );
+
+  /**
+   * Les tâches sont rechargées au RETOUR sur l'écran, jamais au premier
+   * affichage : le montage s'en charge déjà, en séquence après le contrôle
+   * d'accès. Sans ce rechargement, modifier ses tâches puis revenir laissait
+   * l'écran afficher la tâche principale d'avant modification, et c'est celle-là
+   * qui partait en session.
+   */
+  const initialFocusHandledRef = useRef(false);
+  useFocusEffect(
+    React.useCallback(() => {
+      if (!initialFocusHandledRef.current) {
+        initialFocusHandledRef.current = true;
+        return;
+      }
+      loadTasks();
+    }, [])
   );
 
   useEffect(() => {
@@ -108,9 +127,19 @@ export default function ExamSetupScreen() {
       const sessionId = `exam_${Date.now()}`;
       const allTaskIds = [primaryTask.id, ...nextTasks.map(t => t.id)].filter(Boolean);
 
+      // Compte à rebours visible hors de l'app. Il vaut surtout pour ce mode :
+      // le principe même du blocage est que l'utilisateur sort de l'app, donc
+      // c'est le seul endroit où il peut encore voir le temps restant.
+      const startedAt = Date.now();
+      const liveActivityId = startSessionLiveActivity(
+        'exam',
+        startedAt + duration * 60 * 1000,
+        primaryTask.title
+      );
+
       await saveExamSession({
         sessionId,
-        startedAt: Date.now(),
+        startedAt,
         plannedDuration: duration,
         hardMode,
         breaks,
@@ -118,12 +147,28 @@ export default function ExamSetupScreen() {
         plannedTaskIds: allTaskIds,
         completedTaskIds: [],
         isDemo: false,
+        liveActivityId,
+        blockApps: blockAppsEnabled,
       });
 
       // Le blocage est un bonus, pas une condition : une session sans bouclier
       // reste une session de révision. On ne la fait donc jamais échouer ici.
+      //
+      // Mais le retour est LU, et c'est le correctif du 6 août qui avait disparu
+      // avec le blocage quand il est sorti de focus.tsx : sans ça, l'utilisateur
+      // lançait une session en croyant ses applications bloquées sans qu'elles le
+      // soient, et rien ne le lui disait. C'est la promesse centrale du produit
+      // qui échouait en silence.
       if (blockAppsEnabled) {
-        await startBlocking(sessionId, duration);
+        const blocking = await startBlocking(sessionId, duration);
+        if (!blocking.started) {
+          Alert.alert(
+            t('blockApps'),
+            blocking.reason === 'not_authorized'
+              ? t('blockAppsAuthorizationLost')
+              : t('blockAppsCouldNotStart')
+          );
+        }
       }
 
       router.push({
@@ -137,8 +182,18 @@ export default function ExamSetupScreen() {
     }
   };
 
+  /**
+   * `/(tabs)/tasks` poussait le groupe d'ONGLETS par-dessus la pile du Mode
+   * Examen. Un écran d'onglet n'a pas de bouton retour par construction, donc
+   * cet écran de réglage se retrouvait enterré sous la barre d'onglets sans
+   * aucun chemin de retour : cul-de-sac constaté sur device le 10 août.
+   *
+   * `/tasks-new` rend le même contenu avec une flèche de retour, et c'est déjà
+   * la destination utilisée par l'onglet Assistant. Elle trie par matière et
+   * par impact, ce qui est le cadre du Mode Examen.
+   */
   const handleEditTasks = () => {
-    router.push('/(tabs)/tasks');
+    router.push('/tasks-new');
   };
 
   if (loading) {

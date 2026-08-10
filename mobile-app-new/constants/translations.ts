@@ -125,7 +125,7 @@ export const translations = {
     revisions: 'Révisions',
     avoiding: "Choses que j'évite",
     personalObligations: 'Obligations personnelles',
-    typeOrSpeak: 'Tapez ici ou appuyez sur le micro pour parler...',
+    typeOrSpeak: 'Écris tes tâches ici, une par ligne...',
     
     // ─── Task Clarification ────────────────────────────────────────────────────
     whatWeUnderstood: 'Voici ce que nous avons compris.',
@@ -586,6 +586,8 @@ export const translations = {
     blockAppsReauthorize: 'Réactiver l\'autorisation',
     blockAppsCouldNotStart:
       'Le blocage n\'a pas pu démarrer. La session continue, mais tes applications restent accessibles.',
+    examBlockingLost:
+      'Autorisation Temps d\'écran retirée. Tes applications ne sont plus bloquées.',
     hardMode: 'Mode difficile',
     hardModeDescription: 'Désactive la pause et bloque le retour',
     breaks: 'Pauses',
@@ -1191,7 +1193,7 @@ export const translations = {
     revisions: 'Revisions',
     avoiding: "Things I'm avoiding",
     personalObligations: 'Personal obligations',
-    typeOrSpeak: 'Type here or tap mic to speak...',
+    typeOrSpeak: 'Write your tasks here, one per line...',
     
     // ─── Task Clarification ────────────────────────────────────────────────────
     whatWeUnderstood: "Here's what we understood.",
@@ -1654,6 +1656,8 @@ export const translations = {
     blockAppsReauthorize: 'Turn permission back on',
     blockAppsCouldNotStart:
       'Blocking could not start. The session continues, but your apps stay accessible.',
+    examBlockingLost:
+      'Screen Time permission removed. Your apps are no longer blocked.',
     hardMode: 'Hard mode',
     hardModeDescription: 'Disables pause and blocks back',
     examSettings: 'Exam settings',
@@ -2260,7 +2264,7 @@ export const translations = {
     revisions: 'Revisiones',
     avoiding: 'Cosas que estoy evitando',
     personalObligations: 'Obligaciones personales',
-    typeOrSpeak: 'Escribe aquí o toca el micrófono para hablar...',
+    typeOrSpeak: 'Escribe tus tareas aquí, una por línea...',
     
     // ─── Task Clarification ────────────────────────────────────────────────────
     whatWeUnderstood: 'Esto es lo que entendimos.',
@@ -2766,6 +2770,8 @@ export const translations = {
     blockAppsReauthorize: 'Reactivar el permiso',
     blockAppsCouldNotStart:
       'El bloqueo no pudo iniciarse. La sesión continúa, pero tus aplicaciones siguen accesibles.',
+    examBlockingLost:
+      'Permiso de Tiempo de uso retirado. Tus aplicaciones ya no están bloqueadas.',
     hardMode: 'Modo difícil',
     hardModeDescription: 'Desactiva la pausa y bloquea el retroceso',
     breaks: 'Pausas',

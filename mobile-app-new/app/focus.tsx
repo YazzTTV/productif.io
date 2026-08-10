@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
-import { View, Text, TouchableOpacity, StyleSheet, Dimensions, ScrollView, PanResponder, Modal, Alert, BackHandler, Platform, Switch } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Dimensions, ScrollView, PanResponder, Modal, Alert, BackHandler, Platform } from 'react-native';
 import Animated, { 
   useSharedValue, 
   useAnimatedStyle, 
@@ -27,26 +27,26 @@ import {
   setTutorialCompleted,
   setTutorialStage,
 } from '@/tutorial/tutorialStorage';
-import { hasActiveRealExamSession } from '@/utils/examSession';
+import { hasActiveRealExamSession, getActiveExamSession, isDemoSession } from '@/utils/examSession';
+/**
+ * Focus ne bloque plus aucune application : le blocage appartient au Mode
+ * Examen, qui est la fonctionnalité premium. Ce qui reste ici sert uniquement
+ * de sortie de secours pour un bouclier resté en place alors qu'aucune session
+ * examen ne tourne (app tuée en cours de session, par exemple).
+ */
 import {
-  BLOCKED_APPS_SELECTION_ID,
   getActiveBlock,
-  getAuthorizationStatus as getBlockingAuthorizationStatus,
-  getBlockedSelectionCount,
   isAppBlockingSupported,
-  requestAuthorization as requestBlockingAuthorization,
-  startBlocking,
   stopBlocking,
 } from '@/utils/appBlocking';
-import { DeviceActivitySelectionViewPersisted } from 'react-native-device-activity';
 import {
   clearFocusSession,
   getRestorableFocusSession,
   saveFocusSession,
 } from '@/utils/focusSession';
 import {
-  startFocusLiveActivity,
-  stopFocusLiveActivity,
+  startSessionLiveActivity,
+  stopSessionLiveActivity,
 } from '@/utils/liveActivity';
 const { width } = Dimensions.get('window');
 const RING_SIZE = Math.min(width * 0.65, 260);
@@ -454,35 +454,11 @@ export default function FocusScreen() {
   const [tutorialCompleted, setTutorialCompletedState] = useState(false);
   const [maxFocusDuration, setMaxFocusDuration] = useState<number | null>(null);
 
-  // Blocage des applications distrayantes pendant la session.
   const blockingSupported = isAppBlockingSupported();
-  const [blockAppsEnabled, setBlockAppsEnabled] = useState(false);
-  const [blockedCount, setBlockedCount] = useState(0);
-
-  const [showBlockedAppsPicker, setShowBlockedAppsPicker] = useState(false);
-  const [requestingBlockingAuth, setRequestingBlockingAuth] = useState(false);
-  const [blockingAuthStatus, setBlockingAuthStatus] = useState(() =>
-    isAppBlockingSupported() ? getBlockingAuthorizationStatus() : 'unsupported'
-  );
-
-  // L'utilisateur a-t-il touché l'interrupteur lui-même ? Sans cette trace, le
-  // rafraîchissement au retour d'écran écrasait son choix à chaque fois.
-  const blockAppsTouchedRef = useRef(false);
 
   // Dans une ref et non dans le state : la Live Activity doit pouvoir être
   // arrêtée depuis des callbacks mémoïsés sans les faire se recréer.
   const liveActivityIdRef = useRef<string | null>(null);
-
-  const refreshBlockingState = useCallback(() => {
-    if (!blockingSupported) return;
-    const count = getBlockedSelectionCount();
-    const status = getBlockingAuthorizationStatus();
-    setBlockedCount(count);
-    setBlockingAuthStatus(status);
-    if (!blockAppsTouchedRef.current) {
-      setBlockAppsEnabled(count > 0 && status === 'approved');
-    }
-  }, [blockingSupported]);
 
   // Blocage survivant à une app tuée : le bouclier vit dans l'extension, l'état
   // de session non. On le retrouve pour pouvoir l'afficher et y mettre fin.
@@ -491,25 +467,78 @@ export default function FocusScreen() {
   const refreshOrphanBlock = useCallback(async () => {
     if (!blockingSupported) return;
     const record = await getActiveBlock();
-    // Une session en cours dans cet écran gère déjà son propre bouclier.
-    setOrphanBlockExpiresAt(record && phase !== 'active' ? record.expiresAt : null);
-  }, [blockingSupported, phase]);
+    if (!record) {
+      setOrphanBlockExpiresAt(null);
+      return;
+    }
+    // Un bouclier posé par une session examen en cours n'est PAS orphelin.
+    // Sans ce test, cet écran proposait un bouton "Arrêter le blocage" qui
+    // débloquait les apps en plein examen, en présentant le bouclier légitime
+    // de l'examen comme un résidu.
+    if (await hasActiveRealExamSession()) {
+      setOrphanBlockExpiresAt(null);
+      return;
+    }
+    setOrphanBlockExpiresAt(record.expiresAt);
+  }, [blockingSupported]);
 
   useFocusEffect(
     useCallback(() => {
-      refreshBlockingState();
       refreshOrphanBlock();
-    }, [refreshBlockingState, refreshOrphanBlock])
+    }, [refreshOrphanBlock])
+  );
+
+  /**
+   * Une session examen en cours interdit d'entrer sur cet écran.
+   *
+   * Décision du 10 août : le Mode Examen est ce qui pose le bouclier, il doit
+   * donc être le seul minuteur actif tant qu'il tourne. La cohabitation était
+   * autorisée et techniquement sûre, mais elle affichait DEUX comptes à rebours
+   * dans la Dynamic Island, et terminer le focus n'arrêtait que le sien.
+   *
+   * Garde symétrique de celle d'ExamMode, qui renvoie déjà ici quand une session
+   * focus tourne : l'état « les deux en cours » devient inatteignable, au lieu
+   * d'être seulement rendu inoffensif.
+   *
+   * Les démos sont exclues volontairement : elles durent 5 minutes, ne posent pas
+   * de bouclier, et servent à présenter l'offre à un compte gratuit.
+   */
+  const [examGuardResolved, setExamGuardResolved] = useState(false);
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      // Remis à false à CHAQUE arrivée sur l'écran, pas seulement au premier
+      // montage : la session examen peut avoir démarré depuis la dernière fois,
+      // et un drapeau posé une fois pour toutes laisserait alors l'écran
+      // s'afficher pendant la vérification.
+      setExamGuardResolved(false);
+      (async () => {
+        const exam = await getActiveExamSession();
+        if (cancelled) return;
+        if (exam && !isDemoSession(exam)) {
+          // Volontairement sans lever le drapeau : l'écran reste vide jusqu'à ce
+          // que la redirection ait pris effet.
+          router.replace({
+            pathname: '/exam/session',
+            params: { sessionId: exam.sessionId },
+          });
+          return;
+        }
+        setExamGuardResolved(true);
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }, [router]),
   );
 
   const handleStopOrphanBlock = useCallback(async () => {
     await stopBlocking('manual_stop_orphan');
-    stopFocusLiveActivity(liveActivityIdRef.current);
+    stopSessionLiveActivity('focus', liveActivityIdRef.current);
     liveActivityIdRef.current = null;
     await clearFocusSession();
     setOrphanBlockExpiresAt(null);
-    refreshBlockingState();
-  }, [refreshBlockingState]);
+  }, []);
 
   /**
    * Reprise d'une session interrompue par la mort de l'app.
@@ -545,37 +574,6 @@ export default function FocusScreen() {
     })();
   }, []);
 
-  /**
-   * La sélection vit dans une modale et non dans un écran dédié : une route
-   * séparée passait par le Stack du groupe `exam`, dont `preview` est la
-   * première route déclarée, et la navigation n'aboutissait pas. Une modale
-   * supprime le routeur de l'équation et évite en plus de faire quitter à
-   * l'utilisateur son écran de démarrage de session.
-   */
-  const openBlockedAppsPicker = useCallback(async () => {
-    if (!blockingSupported) return;
-
-    if (getBlockingAuthorizationStatus() !== 'approved') {
-      setRequestingBlockingAuth(true);
-      try {
-        await requestBlockingAuthorization();
-      } finally {
-        setRequestingBlockingAuth(false);
-      }
-      const status = getBlockingAuthorizationStatus();
-      setBlockingAuthStatus(status);
-      if (status !== 'approved') {
-        Alert.alert(
-          t('blockApps'),
-          status === 'denied' ? t('blockAppsDenied') : t('blockAppsPermissionExplainer')
-        );
-        return;
-      }
-    }
-
-    setShowBlockedAppsPicker(true);
-  }, [blockingSupported, t]);
-  
   const currentTask = tasks[currentTaskIndex] || { id: '', title: '', subject: '', completed: false };
   const completedCount = tasks.filter(t => t.completed).length;
 
@@ -828,32 +826,9 @@ export default function FocusScreen() {
         console.log('✅ [Focus] Nouvelle session démarrée:', result.session.id);
       }
 
-      // Le blocage ne conditionne jamais le démarrage : une session sans
-      // bouclier reste une session de focus. En revanche on ne le tait plus :
-      // laisser croire que les apps sont bloquées alors que le bouclier n'a pas
-      // pu se poser, c'est exactement la promesse centrale qui échoue en silence.
-      if (blockAppsEnabled) {
-        const blocking = await startBlocking(
-          result?.session?.id || `focus_${Date.now()}`,
-          effectiveDuration
-        );
-        if (!blocking?.started) {
-          setBlockAppsEnabled(false);
-          refreshBlockingState();
-          Alert.alert(
-            t('blockApps'),
-            blocking?.reason === 'not_authorized'
-              ? t('blockAppsAuthorizationLost')
-              : blocking?.reason === 'no_selection'
-                ? t('blockAppsNoSelection')
-                : t('blockAppsCouldNotStart')
-          );
-        }
-      }
-
       const startedAt = Date.now();
       const endsAt = startedAt + effectiveDuration * 60 * 1000;
-      const liveActivityId = startFocusLiveActivity(endsAt, currentTask?.title);
+      const liveActivityId = startSessionLiveActivity('focus', endsAt, currentTask?.title);
       liveActivityIdRef.current = liveActivityId;
 
       // Persistée avant l'affichage : si l'app meurt juste après, la session
@@ -1012,10 +987,11 @@ export default function FocusScreen() {
   }, [progress, phase]);
 
   const handleComplete = useCallback(async () => {
-    // Levée du bouclier avant tout le reste : si un appel réseau échoue
-    // ensuite, l'utilisateur ne doit pas rester avec ses apps bloquées.
-    await stopBlocking('focus_completed');
-    stopFocusLiveActivity(liveActivityIdRef.current);
+    // Aucun appel à stopBlocking ici : Focus ne pose plus de bouclier, et en
+    // lever un reviendrait à débloquer les apps d'une session examen qui
+    // tourne par-dessus. C'est exactement le défaut que le Mode Examen vend
+    // contre : la promesse qui tombe en silence.
+    stopSessionLiveActivity('focus', liveActivityIdRef.current);
     liveActivityIdRef.current = null;
     await clearFocusSession();
 
@@ -1040,8 +1016,8 @@ export default function FocusScreen() {
   }, [sessionId, router, tutorialCompleted, tutorialStage, triggerEvent]);
 
   const handleExit = useCallback(async () => {
-    await stopBlocking('focus_exited');
-    stopFocusLiveActivity(liveActivityIdRef.current);
+    // Même raison que dans handleComplete : ne jamais toucher au bouclier.
+    stopSessionLiveActivity('focus', liveActivityIdRef.current);
     liveActivityIdRef.current = null;
     await clearFocusSession();
 
@@ -1071,6 +1047,15 @@ export default function FocusScreen() {
   }, [sessionId, phase, router, tutorialCompleted, tutorialStage]);
 
   const strokeDashoffset = CIRCUMFERENCE * (1 - progress);
+
+  // Rien n'est rendu avant que la garde examen ait répondu. La redirection seule
+  // suffisait à empêcher de LANCER un focus, mais l'écran s'affichait le temps de
+  // la lecture du stockage, et douze appelants poussent vers ici, dont le bouton
+  // minuteur d'une tâche. Un écran vide de quelques millisecondes est invisible,
+  // un écran Focus qui clignote ne l'est pas.
+  if (!examGuardResolved) {
+    return <View style={{ flex: 1, backgroundColor: '#FFFFFF' }} />;
+  }
 
   // ━━━━━━━━━━━━━━━━━━━━━━
   // INTRO SCREEN - Design System
@@ -1190,67 +1175,6 @@ export default function FocusScreen() {
                 </Animated.View>
               )}
 
-              {/* Blocage des applications */}
-              {blockingSupported && (
-                <Animated.View entering={FadeInDown.delay(450).duration(400)} style={introStyles.blockAppsCard}>
-                  <View style={introStyles.blockAppsInfo}>
-                    <Text style={introStyles.blockAppsTitle}>{t('blockApps')}</Text>
-                    {/*
-                      L'autorisation Temps d'écran peut être retirée depuis les
-                      Réglages iOS à tout moment, sans que l'app en soit avertie.
-                      Sans cette ligne, la carte continuait d'afficher l'ancien
-                      décompte et l'utilisateur croyait ses apps bloquées alors
-                      que plus aucun bouclier ne pouvait se poser.
-                    */}
-                    <Text
-                      style={[
-                        introStyles.blockAppsSubtitle,
-                        blockingAuthStatus !== 'approved' && introStyles.blockAppsSubtitleWarning,
-                      ]}
-                    >
-                      {blockingAuthStatus !== 'approved'
-                        ? t('blockAppsAuthorizationLost')
-                        : blockedCount > 0
-                          ? `${blockedCount} ${t('blockAppsSelected')}`
-                          : t('blockAppsNoSelection')}
-                    </Text>
-                    <TouchableOpacity
-                      onPress={openBlockedAppsPicker}
-                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    >
-                      <Text style={introStyles.blockAppsLink}>
-                        {blockingAuthStatus !== 'approved'
-                          ? t('blockAppsReauthorize')
-                          : blockedCount > 0
-                            ? t('blockAppsEdit')
-                            : t('blockAppsChoose')}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                  <Switch
-                    value={blockAppsEnabled}
-                    onValueChange={next => {
-                      blockAppsTouchedRef.current = true;
-                      // Jamais grisé : un interrupteur inerte n'explique rien.
-                      // Sans autorisation, l'activer relance la demande plutôt
-                      // que de promettre un blocage qui ne se posera jamais.
-                      if (next && blockingAuthStatus !== 'approved') {
-                        openBlockedAppsPicker();
-                        return;
-                      }
-                      // Sans sélection, l'activer ouvre le sélecteur.
-                      if (next && blockedCount === 0) {
-                        openBlockedAppsPicker();
-                        return;
-                      }
-                      setBlockAppsEnabled(next);
-                    }}
-                    trackColor={{ false: 'rgba(0, 0, 0, 0.1)', true: '#16A34A' }}
-                    thumbColor="#FFFFFF"
-                  />
-                </Animated.View>
-              )}
-
               {/* Start button */}
               <Animated.View entering={FadeInDown.delay(500).duration(400)} style={introStyles.startButtonContainer}>
                 <TouchableOpacity
@@ -1279,50 +1203,6 @@ export default function FocusScreen() {
             router.replace('/review-habits');
           }}
         />
-
-        {/* Sélection des applications à bloquer */}
-        <Modal
-          visible={showBlockedAppsPicker}
-          animationType="slide"
-          presentationStyle="pageSheet"
-          onRequestClose={() => {
-            setShowBlockedAppsPicker(false);
-            refreshBlockingState();
-          }}
-        >
-          <View style={blockPickerStyles.container}>
-            <View style={blockPickerStyles.header}>
-              <Text style={blockPickerStyles.title}>{t('blockApps')}</Text>
-              <TouchableOpacity
-                onPress={() => {
-                  setShowBlockedAppsPicker(false);
-                  refreshBlockingState();
-                }}
-                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-              >
-                <Ionicons name="close" size={26} color="#000" />
-              </TouchableOpacity>
-            </View>
-
-            <Text style={blockPickerStyles.count}>
-              {blockedCount > 0
-                ? `${blockedCount} ${t('blockAppsSelected')}`
-                : t('blockAppsNoSelection')}
-            </Text>
-
-            <DeviceActivitySelectionViewPersisted
-              style={blockPickerStyles.picker}
-              familyActivitySelectionId={BLOCKED_APPS_SELECTION_ID}
-              headerText={t('blockAppsPickerHeader')}
-              footerText={t('blockAppsPickerFooter')}
-              onSelectionChange={event => {
-                const { applicationCount, categoryCount, webDomainCount } =
-                  event.nativeEvent;
-                setBlockedCount(applicationCount + categoryCount + webDomainCount);
-              }}
-            />
-          </View>
-        </Modal>
 
         {/* Session Settings Modal */}
         <SessionSettingsModal
@@ -1448,37 +1328,6 @@ export default function FocusScreen() {
     </View>
   );
 }
-
-const blockPickerStyles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-    paddingTop: 20,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 24,
-    paddingBottom: 12,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#000',
-  },
-  count: {
-    fontSize: 13,
-    color: 'rgba(0, 0, 0, 0.4)',
-    paddingHorizontal: 24,
-    paddingBottom: 12,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  picker: {
-    flex: 1,
-  },
-});
 
 const introStyles = StyleSheet.create({
   container: {
@@ -1651,43 +1500,6 @@ const introStyles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '600',
-  },
-  blockAppsCard: {
-    width: '100%',
-    maxWidth: 400,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 16,
-    marginBottom: 16,
-    borderRadius: 16,
-    backgroundColor: 'rgba(0, 0, 0, 0.02)',
-  },
-  blockAppsInfo: {
-    flex: 1,
-    marginRight: 16,
-  },
-  blockAppsTitle: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#000',
-    marginBottom: 4,
-  },
-  blockAppsSubtitle: {
-    fontSize: 12,
-    color: 'rgba(0, 0, 0, 0.4)',
-  },
-  // Autorisation perdue : le gris à 40 % se lit comme une info secondaire alors
-  // que c'est la seule chose qui empêche le blocage de fonctionner.
-  blockAppsSubtitleWarning: {
-    color: '#B45309',
-    fontWeight: '600',
-  },
-  blockAppsLink: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#16A34A',
-    marginTop: 6,
   },
   startButtonContainer: {
     width: '100%',

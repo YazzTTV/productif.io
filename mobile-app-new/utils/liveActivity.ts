@@ -19,16 +19,44 @@ import * as LiveActivity from 'expo-live-activity';
 
 const BRAND_GREEN = '#16A34A';
 
+/**
+ * Les deux modes n'affichent pas la même chose, parce qu'ils ne promettent pas
+ * la même chose : seul le Mode Examen bloque des applications. Un texte unique
+ * annonçait « Tes applications sont débloquées » à la fin d'une session Focus,
+ * qui n'a jamais rien bloqué.
+ */
+export type SessionKind = 'focus' | 'exam';
+
+const COPY: Record<SessionKind, {
+  title: string;
+  fallbackSubtitle: string;
+  endTitle: string;
+  endSubtitle: string;
+}> = {
+  focus: {
+    title: 'Session focus',
+    fallbackSubtitle: 'Concentration en cours',
+    endTitle: 'Session terminée',
+    endSubtitle: 'Tâche bouclée',
+  },
+  exam: {
+    title: 'Bloc de révision',
+    fallbackSubtitle: 'Révision en cours',
+    endTitle: 'Bloc terminé',
+    endSubtitle: 'Tes applications sont débloquées',
+  },
+};
+
 export function isLiveActivitySupported(): boolean {
   return Platform.OS === 'ios';
 }
 
-function buildState(taskTitle: string | undefined, endsAt: number) {
+function buildState(kind: SessionKind, taskTitle: string | undefined, endsAt: number) {
   return {
-    title: 'Bloc de révision',
+    title: COPY[kind].title,
     // Le titre de la tâche donne le contexte au coup d'oeil, mais il peut être
     // absent : la session peut démarrer sans tâche sélectionnée.
-    subtitle: taskTitle?.trim() || 'Concentration en cours',
+    subtitle: taskTitle?.trim() || COPY[kind].fallbackSubtitle,
     progressBar: { date: endsAt },
   };
 }
@@ -37,14 +65,15 @@ function buildState(taskTitle: string | undefined, endsAt: number) {
  * Démarre le compte à rebours. Retourne l'identifiant à conserver pour pouvoir
  * l'arrêter, y compris après un redémarrage de l'app.
  */
-export function startFocusLiveActivity(
+export function startSessionLiveActivity(
+  kind: SessionKind,
   endsAt: number,
   taskTitle?: string
 ): string | null {
   if (!isLiveActivitySupported()) return null;
 
   try {
-    const id = LiveActivity.startActivity(buildState(taskTitle, endsAt), {
+    const id = LiveActivity.startActivity(buildState(kind, taskTitle, endsAt), {
       backgroundColor: '#0A0A0A',
       titleColor: '#FFFFFF',
       subtitleColor: '#FFFFFFB3',
@@ -61,26 +90,16 @@ export function startFocusLiveActivity(
   }
 }
 
-export function updateFocusLiveActivity(
-  id: string,
-  endsAt: number,
-  taskTitle?: string
-): void {
-  if (!isLiveActivitySupported()) return;
-  try {
-    LiveActivity.updateActivity(id, buildState(taskTitle, endsAt));
-  } catch (error) {
-    console.error('[liveActivity] Mise à jour impossible:', error);
-  }
-}
-
 /** Arrête le compte à rebours. Idempotent et sans effet si l'id est absent. */
-export function stopFocusLiveActivity(id: string | null | undefined): void {
+export function stopSessionLiveActivity(
+  kind: SessionKind,
+  id: string | null | undefined
+): void {
   if (!isLiveActivitySupported() || !id) return;
   try {
     LiveActivity.stopActivity(id, {
-      title: 'Bloc terminé',
-      subtitle: 'Tes applications sont débloquées',
+      title: COPY[kind].endTitle,
+      subtitle: COPY[kind].endSubtitle,
       progressBar: { date: Date.now() },
     });
   } catch (error) {

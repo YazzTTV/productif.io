@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, BackHandler, Alert } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { View, Text, TouchableOpacity, StyleSheet, BackHandler, Alert, AppState } from 'react-native';
+import { getAuthorizationStatus, isAppBlockingSupported } from '@/utils/appBlocking';
+import { useRouter, useLocalSearchParams, useNavigation } from 'expo-router';
 import Animated, { FadeIn, FadeOut, SlideInRight, SlideOutLeft } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -38,6 +39,54 @@ export default function ExamSessionScreen() {
 
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const pausedAtRef = useRef<number | null>(null);
+
+  /**
+   * Coupe le glissement de bord sur la pile PARENTE, pas seulement sur celle du
+   * groupe exam.
+   *
+   * `gestureEnabled: false` sur la route `session` empêche la pile interne de
+   * consommer le geste, et la pile racine le récupère alors et dépile le groupe
+   * `exam` en entier. Constaté sur device le 10 août : le glissement sortait sur
+   * l'accueil en laissant la session, le bouclier et le compte à rebours actifs,
+   * donc la contrainte vendue restait contournable d'un pouce.
+   *
+   * Rétabli au démontage, pour ne pas priver `preview` et `setup` du retour au
+   * glissement, qui est légitime sur ces deux écrans.
+   */
+  /**
+   * Le bouclier est tombé alors que la session l'avait demandé.
+   *
+   * Retirer l'autorisation Temps d'écran depuis les Réglages iOS lève le blocage
+   * immédiatement, et aucune app ne peut l'empêcher. Ce qu'on peut empêcher, c'est
+   * le mensonge : sans ce test, la session continuait d'afficher son compte à
+   * rebours comme si les applications étaient bloquées. C'est le défaut du 6 août,
+   * réintroduit le 7 quand le blocage est sorti de `focus.tsx` avec le correctif.
+   *
+   * Réévalué au retour au premier plan, parce que le passage par les Réglages iOS
+   * met justement l'app en arrière-plan.
+   */
+  const [blockingLost, setBlockingLost] = useState(false);
+  useEffect(() => {
+    if (!session?.blockApps || !isAppBlockingSupported()) {
+      setBlockingLost(false);
+      return;
+    }
+    const evaluate = () => setBlockingLost(getAuthorizationStatus() !== 'approved');
+    evaluate();
+    const subscription = AppState.addEventListener('change', state => {
+      if (state === 'active') evaluate();
+    });
+    return () => subscription.remove();
+  }, [session?.blockApps]);
+
+  const navigation = useNavigation();
+  useEffect(() => {
+    const parent = navigation.getParent();
+    parent?.setOptions({ gestureEnabled: false });
+    return () => {
+      parent?.setOptions({ gestureEnabled: true });
+    };
+  }, [navigation]);
 
   useEffect(() => {
     loadSession();
@@ -278,8 +327,12 @@ export default function ExamSessionScreen() {
         {
           text: t('addTask'),
           onPress: () => {
-            // Could open task picker modal
-            router.push('/(tabs)/tasks');
+            // Même cul-de-sac que dans setup.tsx, et pire ici : pousser le
+            // groupe d'onglets depuis une session ACTIVE enterrait l'écran de
+            // session sous une barre d'onglets sans bouton retour. En hard
+            // mode, cette alerte devenait donc une sortie de session, alors que
+            // c'est exactement la contrainte qu'on vend.
+            router.push('/tasks-new');
           },
         },
         {
@@ -438,6 +491,18 @@ export default function ExamSessionScreen() {
         )}
       </View>
 
+      {/*
+        Affiché en permanence, pas en alerte : une alerte se ferme et l'écran
+        recommence à mentir. Tant que l'autorisation n'est pas rendue, la session
+        doit dire que les applications ne sont plus bloquées.
+      */}
+      {blockingLost && (
+        <View style={styles.blockingLostBanner}>
+          <Ionicons name="warning-outline" size={16} color="#F59E0B" />
+          <Text style={styles.blockingLostText}>{t('examBlockingLost')}</Text>
+        </View>
+      )}
+
       {/* Timer Ring + centered time */}
       <View style={styles.timerContainer}>
         <Svg width={RING_SIZE} height={RING_SIZE}>
@@ -555,6 +620,24 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '500',
+  },
+  blockingLostBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginHorizontal: 24,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    backgroundColor: 'rgba(245, 158, 11, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.35)',
+  },
+  blockingLostText: {
+    flex: 1,
+    color: '#F59E0B',
+    fontSize: 13,
+    lineHeight: 18,
   },
   timerContainer: {
     alignItems: 'center',

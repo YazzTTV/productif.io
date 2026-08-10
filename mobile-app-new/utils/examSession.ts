@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { stopBlocking } from '@/utils/appBlocking';
+import { stopSessionLiveActivity } from '@/utils/liveActivity';
 
 export interface ExamSession {
   sessionId: string;
@@ -24,6 +25,24 @@ export interface ExamSession {
    * survivait indéfiniment et servait de jeton d'accès permanent.
    */
   createdAt?: number;
+  /**
+   * Identifiant de la Live Activity du compte à rebours. Persisté avec la
+   * session pour la même raison que côté focus : sans lui, une app tuée en
+   * cours de session laisserait un compte à rebours fantôme dans la Dynamic
+   * Island, sans plus aucun moyen de l'arrêter.
+   */
+  liveActivityId?: string | null;
+  /**
+   * La session a été démarrée AVEC blocage demandé.
+   *
+   * Nécessaire pour distinguer deux situations que l'écran de session
+   * confondait : « tu n'as jamais demandé le blocage » et « tu l'as demandé et
+   * il est tombé ». Le second cas arrive dès que l'autorisation Temps d'écran est
+   * retirée depuis les Réglages iOS, ce qu'iOS applique immédiatement et qu'aucune
+   * app ne peut empêcher. Sans ce champ, la session continuait d'afficher son
+   * compte à rebours comme si les applications étaient bloquées.
+   */
+  blockApps?: boolean;
 }
 
 const SESSION_KEY = 'exam_session_active';
@@ -112,6 +131,25 @@ export async function hasActiveRealExamSession(): Promise<boolean> {
  * même, la réconciliation au premier plan rattrapera.
  */
 export async function clearExamSession(): Promise<void> {
+  // Lu directement depuis le stockage, et surtout PAS via getActiveExamSession :
+  // celui-ci appelle clearExamSession sur une session périmée, ce qui partirait
+  // en récursion infinie.
+  let liveActivityId: string | null = null;
+  try {
+    const data = await AsyncStorage.getItem(SESSION_KEY);
+    if (data) {
+      const session: ExamSession = JSON.parse(data);
+      liveActivityId = session?.liveActivityId ?? null;
+    }
+  } catch (error) {
+    console.error('Error reading exam session before clearing:', error);
+  }
+
+  try {
+    stopSessionLiveActivity('exam', liveActivityId);
+  } catch (error) {
+    console.error('Error stopping live activity:', error);
+  }
   try {
     await stopBlocking('exam_session_cleared');
   } catch (error) {
