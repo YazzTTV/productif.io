@@ -57,24 +57,30 @@ const softwareSchema = {
     "Application de révision pour étudiants : le planning se construit par priorité et les applications distrayantes sont bloquées pendant les blocs de travail.",
 }
 
-/** CTA principal. Pointe sur l'App Store quand l'URL est configurée, sinon sur
- *  l'onboarding web plutôt que vers un lien mort. */
-function PrimaryCta({ label, className = "" }: { label: string; className?: string }) {
-  const base =
-    "inline-flex items-center justify-center px-8 py-4 bg-[#16a34a] text-white rounded-3xl font-medium text-base hover:bg-[#15803d] transition-colors duration-200"
-
+/** Destination unique de TOUS les CTA de la page : l'App Store quand l'URL est
+ *  configurée, sinon l'onboarding web plutôt qu'un lien mort. Tout bouton de
+ *  cette page doit passer par ici, sinon il diverge en silence. */
+function CtaLink({ label, className }: { label: string; className: string }) {
   if (APP_STORE_URL) {
     return (
-      <a href={APP_STORE_URL} target="_blank" rel="noopener" className={`${base} ${className}`}>
+      <a href={APP_STORE_URL} target="_blank" rel="noopener" className={className}>
         {label}
       </a>
     )
   }
   return (
-    <Link href="/onboarding" className={`${base} ${className}`}>
+    <Link href="/onboarding" className={className}>
       {label}
     </Link>
   )
+}
+
+/** CTA principal, style plein vert. */
+function PrimaryCta({ label, className = "" }: { label: string; className?: string }) {
+  const base =
+    "inline-flex items-center justify-center px-8 py-4 bg-[#16a34a] text-white rounded-3xl font-medium text-base hover:bg-[#15803d] transition-colors duration-200"
+
+  return <CtaLink label={label} className={`${base} ${className}`} />
 }
 
 const frictions = [
@@ -282,12 +288,10 @@ export default function ModeExamenPage() {
                   Mode Examen non inclus
                 </li>
               </ul>
-              <Link
-                href="/onboarding"
+              <CtaLink
+                label="Commencer"
                 className="mt-8 inline-flex items-center justify-center px-6 py-3.5 bg-white text-gray-900 rounded-2xl font-medium text-sm border border-black/[0.08] hover:bg-gray-50 transition-colors"
-              >
-                Commencer
-              </Link>
+              />
             </div>
 
             {/* Annuel, mis en avant */}
