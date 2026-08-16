@@ -1,0 +1,38 @@
+# Ce que la CLI Railway ne doit PAS televerser.
+#
+# Sans ce fichier, `railway up` envoyait pres de 6 Go de contexte, dont
+# mobile-app-new qui pese 4,4 Go a lui seul avec ses artefacts de build iOS.
+# Le service deploye ici est le scheduler de notifications : il a besoin de
+# prisma/, src/, lib/, package.json et du Dockerfile.scheduler, rien de plus.
+#
+# A ne pas confondre avec .dockerignore, qui filtre le contexte PENDANT le
+# build. Celui-ci filtre ce qui part sur le reseau, en amont.
+
+# Applications mobiles, aucune n'entre dans le build du scheduler
+mobile-app-new
+mobile-app
+mobile
+ios
+android
+
+# Dependances et sorties de build, reconstruites dans l'image
+node_modules
+.next
+out
+dist
+build
+tsconfig.tsbuildinfo
+
+# Historique et sauvegardes
+.git
+.github
+backups
+
+# Environnements locaux et artefacts d'outillage
+.env
+.env.*
+!.env.example
+.vercel
+.expo
+.DS_Store
+*.log
