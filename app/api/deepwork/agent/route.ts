@@ -68,14 +68,34 @@ export async function POST(req: NextRequest) {
     if (limits.focusPerDay !== null) {
       const todayStart = startOfDay(new Date())
       const todayEnd = endOfDay(new Date())
-      const sessionsToday = await prisma.deepWorkSession.count({
+      // Une session annulée consomme le quota, sinon la limite ne borne rien :
+      // annuler supprimait la ligne et rendait le plan gratuit illimité.
+      // Exception, une annulation dans les deux premières minutes ne consomme
+      // rien : à 2 sessions par jour, un faux départ coûterait la moitié de
+      // l'allocation quotidienne. L'abus, lui, suppose une session menée à
+      // terme puis annulée, donc au-delà de la grâce, donc comptée.
+      const CANCEL_GRACE_MS = 2 * 60 * 1000
+      const todaySessions = await prisma.deepWorkSession.findMany({
         where: {
           userId,
           timeEntry: {
             startTime: { gte: todayStart, lte: todayEnd },
           },
         },
+        select: {
+          status: true,
+          timeEntry: { select: { startTime: true, endTime: true } },
+        },
       })
+
+      const sessionsToday = todaySessions.filter((s) => {
+        if (s.status !== 'cancelled') return true
+        // Annulation sans heure de fin : on ne peut pas mesurer, on compte.
+        if (!s.timeEntry?.startTime || !s.timeEntry?.endTime) return true
+        const durationMs =
+          s.timeEntry.endTime.getTime() - s.timeEntry.startTime.getTime()
+        return durationMs >= CANCEL_GRACE_MS
+      }).length
 
       if (sessionsToday >= limits.focusPerDay) {
         return NextResponse.json(

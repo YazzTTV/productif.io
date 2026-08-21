@@ -76,10 +76,17 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
         break
       }
       case 'cancel': {
+        // Ne PAS supprimer la ligne. Le quota quotidien du plan gratuit compte
+        // les sessions de la journée, donc l'ancien `timeEntry.delete` (qui
+        // effaçait la DeepWorkSession en cascade) rendait la limite inopérante :
+        // un compte gratuit enchaînait autant de sessions qu'il voulait en
+        // annulant chacune, alors que le paywall vend justement les sessions
+        // illimitées. On conserve la session en 'cancelled' et on ferme le
+        // TimeEntry, car c'est sa durée qui décide ensuite si l'annulation
+        // consomme le quota (voir la période de grâce dans ../route.ts).
         updateData.status = 'cancelled'
-        await prisma.timeEntry.delete({ where: { id: session.timeEntry.id } })
-        // Cascade supprimera DeepWorkSession
-        return NextResponse.json({ message: 'Session annulée et supprimée' })
+        timeEntryUpdate = { endTime: now }
+        break
       }
       case 'add_interruption': {
         updateData.interruptions = session.interruptions + 1
