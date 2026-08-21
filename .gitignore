@@ -74,3 +74,7 @@ productif-upload.keystore
 # Fichiers contenant des valeurs Firebase pour Railway (contiennent des clés privées)
 RAILWAY_FIREBASE_VALUES.txt
 *RAILWAY*FIREBASE*.txt
+
+# Sauvegardes de base de donnees : contiennent des emails et des empreintes de mots de passe.
+# Ne JAMAIS suivre, le depot est public.
+backups/
