@@ -2,7 +2,9 @@
 
 import { useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { appConfig } from "@/lib/config"
+// Ne PAS importer depuis "@/lib/config" : ce module leve si JWT_SECRET manque,
+// et ce composant est client, donc le throw partirait dans le navigateur.
+import { appConfig } from "@/lib/app-config"
 
 export function AutoLogout() {
   const router = useRouter()

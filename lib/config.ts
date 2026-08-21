@@ -34,9 +34,9 @@ export const AUTH_COOKIE_OPTIONS = {
  * Configuration de l'application
  */
 
-export const appConfig = {
-  // Déconnexion automatique lors de la fermeture de la page
-  autoLogoutEnabled: true,
-  
-  // Autres configurations globales de l'application peuvent être ajoutées ici
-} 
+/**
+ * `appConfig` a demenage dans `lib/app-config.ts` pour qu'un composant client
+ * puisse le lire sans embarquer le throw sur JWT_SECRET ci-dessus. Reexporte
+ * ici pour le code serveur qui l'importait deja.
+ */
+export { appConfig } from "./app-config" 
