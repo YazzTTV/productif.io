@@ -19,6 +19,7 @@ import { initAppCheck } from '@/lib/appCheck';
 import { useAppsFlyer, flushQueuedAttribution } from '@/hooks/useAppsFlyer';
 import { useBlockingReconciliation } from '@/hooks/useBlockingReconciliation';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useProductAnalytics } from '@/hooks/useProductAnalytics';
 
 function AppContent() {
   const { actualTheme } = useTheme();
@@ -30,6 +31,7 @@ function AppContent() {
   useSuperwallUserSync();
   useAppsFlyer();
   useBlockingReconciliation();
+  useProductAnalytics();
 
   useEffect(() => {
     const onUrl = async (event: { url: string }) => {

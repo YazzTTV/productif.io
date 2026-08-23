@@ -17,6 +17,7 @@ import { authService, onboardingService, getAuthToken } from '@/lib/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { flushQueuedAttribution } from '@/hooks/useAppsFlyer';
+import { identifyAnalyticsUser, trackEvent } from '@/lib/analytics';
 
 export default function SignupScreen() {
   const { t } = useLanguage();
@@ -54,6 +55,7 @@ export default function SignupScreen() {
     }
 
     setIsLoading(true);
+    await trackEvent('signup_started', { method: 'email' });
     
     try {
       const response = await authService.signup({
@@ -64,6 +66,8 @@ export default function SignupScreen() {
       
       if (response.success && response.token) {
         await authService.setToken(response.token);
+        await identifyAnalyticsUser(response.user?.id ?? null);
+        await trackEvent('signup_completed', { method: 'email' });
         flushQueuedAttribution();
         
         console.log('[SIGNUP] Compte créé avec succès');

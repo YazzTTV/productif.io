@@ -4,6 +4,7 @@ import { invalidateAuthCache } from '@/lib/api';
 import { checkPremiumStatus } from '@/utils/premium';
 import { SUPERWALL_EVENTS, SuperwallEventName } from '@/lib/superwallEvents';
 import { getActiveExamSession, isDemoSession } from '@/utils/examSession';
+import { trackEvent } from '@/lib/analytics';
 
 const DEFAULT_COOLDOWN_MS = 60_000;
 /**
@@ -36,9 +37,16 @@ interface TriggerEventOptions {
 export function useSuperwall() {
   const { registerPlacement, state } = usePlacement({
     onError: (err) => console.error('[Superwall] Placement error:', err),
-    onPresent: (info) => console.log('[Superwall] Paywall presented:', info),
+    onPresent: (info) => {
+      console.log('[Superwall] Paywall presented:', info);
+      void trackEvent('paywall_viewed', { placement: lastPlacement });
+    },
     onDismiss: (info, result) => {
       console.log('[Superwall] Paywall dismissed:', info, 'Result:', result);
+      void trackEvent('paywall_dismissed', {
+        placement: lastPlacement,
+        result: result?.type ?? 'unknown',
+      });
       // PaywallResult est une union discriminée : il faut tester result.type.
       // L'ancien test `result === 'purchased'` était toujours faux, donc aucun
       // achat n'était jamais remonté à AppsFlyer.
@@ -51,6 +59,13 @@ export function useSuperwall() {
         logSubscriptionEvent({
           productId: result.type === 'purchased' ? result.productId : undefined,
         });
+        void trackEvent(
+          result.type === 'purchased' ? 'purchase_completed' : 'purchase_restored',
+          {
+            placement: lastPlacement,
+            product_id: result.type === 'purchased' ? result.productId : undefined,
+          },
+        );
       }
     },
   });

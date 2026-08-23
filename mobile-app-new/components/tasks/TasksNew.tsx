@@ -37,6 +37,7 @@ import {
   markUserFirstActionTriggered,
   shouldTriggerUserFirstAction,
 } from '@/lib/superwallFirstAction';
+import { trackEvent } from '@/lib/analytics';
 
 interface Task {
   id: string;
@@ -627,6 +628,7 @@ export function TasksNew() {
       if (result.success && result.plan) {
         setWeeklyPlan(result.plan);
         setShowPlanPreview(true);
+        await trackEvent('weekly_plan_generated');
       } else {
         Alert.alert(t('error'), t('generatePlanError'));
       }
@@ -653,6 +655,9 @@ export function TasksNew() {
       const result = await weeklyPlanningService.applyPlan();
       
       if (result.success) {
+        await trackEvent('weekly_plan_applied', {
+          events_created: result.eventsCreated ?? 0,
+        });
         Alert.alert(
           t('success'),
           result.message || t('sessionsCreatedInCalendar', { count: result.eventsCreated }),
