@@ -15,6 +15,7 @@ import {
   startBlocking,
 } from '@/utils/appBlocking';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { trackEvent } from '@/lib/analytics';
 
 const MIN_DURATION = 25;
 const MAX_DURATION = 180;
@@ -149,6 +150,14 @@ export default function ExamSetupScreen() {
         isDemo: false,
         liveActivityId,
         blockApps: blockAppsEnabled,
+      });
+
+      await trackEvent('exam_mode_started', {
+        duration_minutes: duration,
+        hard_mode: hardMode,
+        breaks_enabled: breaks,
+        app_blocking_enabled: blockAppsEnabled,
+        task_count: allTaskIds.length,
       });
 
       // Le blocage est un bonus, pas une condition : une session sans bouclier
@@ -672,4 +681,3 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
 });
-

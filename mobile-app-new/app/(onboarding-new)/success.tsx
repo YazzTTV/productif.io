@@ -24,6 +24,7 @@ import { useOnboardingData } from '@/hooks/useOnboardingData';
 import { useSuperwall } from '@/hooks/useSuperwall';
 import { SUPERWALL_EVENTS } from '@/lib/superwallEvents';
 import { setTutorialCompleted, setTutorialStage } from '@/tutorial/tutorialStorage';
+import { trackEvent } from '@/lib/analytics';
 
 const AnimatedView = Animated.createAnimatedComponent(View);
 
@@ -103,6 +104,7 @@ export default function SuccessScreen() {
     await saveResponse('completed', true);
     await forceSync(); // Forcer la synchronisation finale avec le backend
     await AsyncStorage.setItem('onboarding_completed', 'true');
+    await trackEvent('onboarding_completed', { next_action: 'start_focus' });
     await triggerEvent(SUPERWALL_EVENTS.ONBOARDING_COMPLETED, {
       params: { source: 'onboarding_success_start_focus' },
       requireNonPremium: false,
@@ -346,3 +348,4 @@ const styles = StyleSheet.create({
     color: 'rgba(0, 0, 0, 0.6)',
   },
 });
+    await trackEvent('onboarding_completed', { next_action: 'view_calendar' });
