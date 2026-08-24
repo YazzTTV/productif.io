@@ -1,10 +1,12 @@
 "use client"
 
+import { useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { Calendar, ShieldOff, Flame, BellRing, ListChecks, LineChart, Check } from "lucide-react"
 import { useLocale } from "@/lib/i18n"
 import { EmailCapture } from "@/components/mode-examen/email-capture"
+import { getAttributedAppUrl, trackFunnelEvent } from "@/lib/funnel-analytics"
 import { pageCopy, faqItems, type FeatureId } from "./copy"
 import {
   PRICE_MONTHLY,
@@ -34,6 +36,8 @@ import {
  */
 
 const APP_STORE_URL = process.env.NEXT_PUBLIC_APP_STORE_URL
+const APP_DESTINATION_URL =
+  process.env.NEXT_PUBLIC_APPSFLYER_ONELINK_URL || "https://productif.onelink.me/HCEk"
 
 /** Ordre d'affichage des fonctionnalites et icone associee. La copie est
  *  indexee sur ces memes identifiants, donc ajouter une entree ici sans la
@@ -47,36 +51,75 @@ const FEATURES: { id: FeatureId; icon: typeof Calendar; signature?: boolean }[] 
   { id: "progress", icon: LineChart },
 ]
 
-/** Destination unique de TOUS les CTA de la page : l'App Store quand l'URL est
- *  configurée, sinon l'onboarding web plutôt qu'un lien mort. Tout bouton de
- *  cette page doit passer par ici, sinon il diverge en silence. */
-function CtaLink({ label, className }: { label: string; className: string }) {
-  if (APP_STORE_URL) {
-    return (
-      <a href={APP_STORE_URL} target="_blank" rel="noopener" className={className}>
-        {label}
-      </a>
+/** Destination unique de TOUS les CTA de la page : OneLink AppsFlyer avec les
+ *  UTM de la page, pour relier le clic web a l'install et au compte cree. */
+function CtaLink({
+  label,
+  className,
+  placement = "unknown",
+}: {
+  label: string
+  className: string
+  placement?: string
+}) {
+  const [destinationUrl, setDestinationUrl] = useState(APP_DESTINATION_URL)
+
+  useEffect(() => {
+    setDestinationUrl(
+      getAttributedAppUrl({
+        placement,
+        fallbackAppStoreUrl: APP_STORE_URL,
+      }),
     )
-  }
+  }, [placement])
+
   return (
-    <Link href="/onboarding" className={className}>
+    <a
+      href={destinationUrl}
+      target="_blank"
+      rel="noopener"
+      className={className}
+      onClick={() =>
+        trackFunnelEvent("mode_examen_app_store_click", {
+          placement,
+          cta_label: label,
+          destination: destinationUrl,
+          attribution_provider: "appsflyer",
+        })
+      }
+    >
       {label}
-    </Link>
+    </a>
   )
 }
 
 /** CTA principal, style plein vert. */
-function PrimaryCta({ label, className = "" }: { label: string; className?: string }) {
+function PrimaryCta({
+  label,
+  className = "",
+  placement = "primary",
+}: {
+  label: string
+  className?: string
+  placement?: string
+}) {
   const base =
     "inline-flex items-center justify-center px-8 py-4 bg-[#16a34a] text-white rounded-3xl font-medium text-base hover:bg-[#15803d] transition-colors duration-200"
 
-  return <CtaLink label={label} className={`${base} ${className}`} />
+  return <CtaLink label={label} className={`${base} ${className}`} placement={placement} />
 }
 
 export function ModeExamenContent() {
   const { locale, setLocale } = useLocale()
   const c = pageCopy[locale]
   const isEn = locale === "en"
+  const viewTracked = useRef(false)
+
+  useEffect(() => {
+    if (viewTracked.current) return
+    viewTracked.current = true
+    trackFunnelEvent("mode_examen_view", { locale })
+  }, [locale])
 
   // Formatage des montants a l'anglaise ou a la francaise, jamais en dur.
   const eur = isEn ? formatEurEn : formatEur
@@ -139,7 +182,7 @@ export function ModeExamenContent() {
           </p>
 
           <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
-            <PrimaryCta label={c.hero.ctaPrimary} />
+            <PrimaryCta label={c.hero.ctaPrimary} placement="hero" />
             <Link
               href="#le-systeme"
               className="inline-flex items-center justify-center px-8 py-4 bg-white text-gray-900 rounded-3xl font-medium text-base border border-black/[0.08] hover:bg-gray-50 transition-colors duration-200"
@@ -256,6 +299,7 @@ export function ModeExamenContent() {
               <CtaLink
                 label={c.pricing.freeCta}
                 className="mt-8 inline-flex items-center justify-center px-6 py-3.5 bg-white text-gray-900 rounded-2xl font-medium text-sm border border-black/[0.08] hover:bg-gray-50 transition-colors"
+                placement="pricing_free"
               />
             </div>
 
@@ -285,6 +329,7 @@ export function ModeExamenContent() {
               <PrimaryCta
                 label={c.pricing.yearlyCta(TRIAL_DAYS)}
                 className="mt-8 !px-6 !py-3.5 !text-sm !rounded-2xl"
+                placement="pricing_yearly"
               />
             </div>
 
@@ -309,6 +354,7 @@ export function ModeExamenContent() {
               <PrimaryCta
                 label={c.pricing.monthlyCta(TRIAL_DAYS)}
                 className="mt-8 !px-6 !py-3.5 !text-sm !rounded-2xl !bg-white !text-gray-900 border border-black/[0.08] hover:!bg-gray-50"
+                placement="pricing_monthly"
               />
             </div>
           </div>
@@ -326,6 +372,7 @@ export function ModeExamenContent() {
             <PrimaryCta
               label={c.pricing.backToSchoolCta}
               className="!px-6 !py-3.5 !text-sm !rounded-2xl"
+              placement="back_to_school"
             />
           </div>
         </div>
@@ -365,7 +412,7 @@ export function ModeExamenContent() {
           </h2>
           <p className="mt-6 text-lg text-gray-600">{c.finalCta.body}</p>
           <div className="mt-10 flex justify-center">
-            <PrimaryCta label={c.finalCta.cta} />
+            <PrimaryCta label={c.finalCta.cta} placement="final_cta" />
           </div>
         </div>
       </section>
