@@ -56,7 +56,8 @@
     "fix-habit-dates": "node scripts/fix-habit-dates.js",
     "analyze-date-flow": "node scripts/analyze-date-flow.js",
     "add-waitlist": "ts-node -r tsconfig-paths/register scripts/add-waitlist-entries.ts",
-    "test:scan-save-email": "node scripts/test-scan-save-email.js"
+    "test:scan-save-email": "node scripts/test-scan-save-email.js",
+    "links:tiktok": "tsx scripts/generate-tiktok-links.ts"
   },
   "dependencies": {
     "@capacitor/android": "^7.2.0",
