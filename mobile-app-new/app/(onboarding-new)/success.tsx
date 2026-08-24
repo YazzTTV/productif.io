@@ -118,6 +118,7 @@ export default function SuccessScreen() {
 
   const handleViewCalendar = async () => {
     // TODO: Ouvrir le calendrier natif ou l'app
+    await trackEvent('onboarding_completed', { next_action: 'view_calendar' });
     await triggerEvent(SUPERWALL_EVENTS.ONBOARDING_COMPLETED, {
       params: { source: 'onboarding_success_view_calendar' },
       requireNonPremium: false,
@@ -348,4 +349,3 @@ const styles = StyleSheet.create({
     color: 'rgba(0, 0, 0, 0.6)',
   },
 });
-    await trackEvent('onboarding_completed', { next_action: 'view_calendar' });

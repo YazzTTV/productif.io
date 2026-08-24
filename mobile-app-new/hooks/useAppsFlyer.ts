@@ -10,6 +10,38 @@ const APPSFLYER_APP_ID = '6755625569';
 const ATTRIBUTION_SENT_PREFIX = 'af_attribution_sent_';
 const ATTRIBUTION_QUEUE_KEY = 'af_attribution_queue';
 const INSTALL_ID_KEY = 'app_install_id';
+const ATTRIBUTION_SIGNAL_KEYS = [
+  'af_sub1',
+  'af_sub2',
+  'af_sub3',
+  'af_sub4',
+  'af_sub5',
+  'af_referrer',
+  'media_source',
+  'pid',
+  'campaign',
+  'c',
+  'utm_source',
+  'utm_medium',
+  'utm_campaign',
+  'utm_content',
+  'af_channel',
+  'af_ad',
+  'af_keywords',
+  'deep_link_value',
+  'deep_link_sub1',
+  'deep_link_sub2',
+  'deep_link_sub3',
+];
+
+type AppsFlyerConversionResponse = {
+  data?: Record<string, any>;
+};
+
+type AppsFlyerDeepLinkResponse = AppsFlyerConversionResponse & {
+  deepLinkStatus?: string;
+  deepLinkValue?: string;
+};
 
 // ── In-flight lock (mémoire) pour éviter double POST au même launch ──
 let sendingAttribution = false;
@@ -36,22 +68,65 @@ async function getOrCreateInstallId(): Promise<string> {
   }
 }
 
+function getString(data: Record<string, any>, keys: string[]): string | null {
+  for (const key of keys) {
+    const value = data[key];
+    if (typeof value === 'string' && value.trim()) return value.trim();
+    if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  }
+  return null;
+}
+
+function hasAttributionSignal(data: Record<string, any>): boolean {
+  return ATTRIBUTION_SIGNAL_KEYS.some((key) => {
+    const value = data[key];
+    return typeof value === 'string' ? value.trim().length > 0 : value != null;
+  });
+}
+
+function normalizeAttributionData(data: Record<string, any>): Record<string, any> {
+  const mediaSource = getString(data, ['media_source', 'pid', 'utm_source']);
+  const campaign = getString(data, ['campaign', 'c', 'utm_campaign']);
+  const channel = getString(data, ['af_channel', 'utm_medium']);
+  const content = getString(data, ['af_ad', 'af_sub2', 'utm_content', 'deep_link_sub3']);
+
+  return {
+    ...data,
+    media_source: mediaSource,
+    campaign,
+    af_channel: channel,
+    af_ad: content,
+    af_keywords: getString(data, ['af_keywords', 'utm_term']),
+    af_sub1: getString(data, ['af_sub1', 'af_referrer']),
+    af_sub2: content,
+    af_sub3: getString(data, ['af_sub3', 'placement']),
+    af_sub4: getString(data, ['af_sub4', 'path']),
+    af_sub5: getString(data, ['af_sub5', 'locale']),
+    deep_link_value: getString(data, ['deep_link_value']),
+    deep_link_sub1: getString(data, ['deep_link_sub1']),
+    deep_link_sub2: getString(data, ['deep_link_sub2']),
+    deep_link_sub3: getString(data, ['deep_link_sub3']),
+  };
+}
+
 async function sendAttributionToBackend(conversionData: Record<string, any>): Promise<boolean> {
   if (sendingAttribution) return false;
   sendingAttribution = true;
 
   try {
+    const normalizedData = normalizeAttributionData(conversionData);
+
     const flagKey = await getAttributionFlagKey();
     if (!flagKey) {
-      await queueAttribution(conversionData);
+      await queueAttribution(normalizedData);
       return false;
     }
 
     const alreadySent = await AsyncStorage.getItem(flagKey);
     if (alreadySent) return false;
 
-    const referredBy = conversionData.af_sub1 || conversionData.af_referrer || null;
-    const attributionSource = conversionData.media_source || null;
+    const referredBy = normalizedData.af_sub1 || null;
+    const attributionSource = normalizedData.media_source || null;
 
     if (!referredBy && !attributionSource) return false;
 
@@ -63,26 +138,31 @@ async function sendAttributionToBackend(conversionData: Record<string, any>): Pr
       attributionProvider: 'appsflyer',
       installId,
       attributionData: {
-        media_source: conversionData.media_source || null,
-        campaign: conversionData.campaign || null,
-        adgroup: conversionData.adgroup || null,
-        adset: conversionData.adset || null,
-        af_sub1: conversionData.af_sub1 || null,
-        af_sub2: conversionData.af_sub2 || null,
-        af_sub3: conversionData.af_sub3 || null,
-        af_sub4: conversionData.af_sub4 || null,
-        af_sub5: conversionData.af_sub5 || null,
-        af_channel: conversionData.af_channel || null,
-        af_ad: conversionData.af_ad || null,
-        af_adset: conversionData.af_adset || null,
-        af_status: conversionData.af_status || null,
-        install_time: conversionData.install_time || null,
-        click_time: conversionData.click_time || null,
+        media_source: normalizedData.media_source || null,
+        campaign: normalizedData.campaign || null,
+        adgroup: normalizedData.adgroup || null,
+        adset: normalizedData.adset || null,
+        af_sub1: normalizedData.af_sub1 || null,
+        af_sub2: normalizedData.af_sub2 || null,
+        af_sub3: normalizedData.af_sub3 || null,
+        af_sub4: normalizedData.af_sub4 || null,
+        af_sub5: normalizedData.af_sub5 || null,
+        af_channel: normalizedData.af_channel || null,
+        af_ad: normalizedData.af_ad || null,
+        af_adset: normalizedData.af_adset || null,
+        af_keywords: normalizedData.af_keywords || null,
+        deep_link_value: normalizedData.deep_link_value || null,
+        deep_link_sub1: normalizedData.deep_link_sub1 || null,
+        deep_link_sub2: normalizedData.deep_link_sub2 || null,
+        deep_link_sub3: normalizedData.deep_link_sub3 || null,
+        af_status: normalizedData.af_status || null,
+        install_time: normalizedData.install_time || null,
+        click_time: normalizedData.click_time || null,
       },
     };
 
     console.log(
-      `[AppsFlyer→Backend] provider=appsflyer media_source=${attributionSource} campaign=${conversionData.campaign || '-'} af_sub1=${referredBy || '-'} deep_link_sub1=${conversionData.deep_link_sub1 || '-'} is_first_launch=${conversionData.is_first_launch ?? '-'}`
+      `[AppsFlyer→Backend] provider=appsflyer media_source=${attributionSource} campaign=${normalizedData.campaign || '-'} af_sub1=${referredBy || '-'} af_sub2=${normalizedData.af_sub2 || '-'} deep_link_sub1=${normalizedData.deep_link_sub1 || '-'} is_first_launch=${normalizedData.is_first_launch ?? '-'}`
     );
 
     await apiCall('/user/attribution', {
@@ -104,9 +184,12 @@ async function sendAttributionToBackend(conversionData: Record<string, any>): Pr
 
 // ── Queue locale : stocke les données si user pas connecté ──
 
-async function queueAttribution(data: Record<string, any>) {
+export async function queueAttribution(data: Record<string, any>) {
   try {
-    await AsyncStorage.setItem(ATTRIBUTION_QUEUE_KEY, JSON.stringify(data));
+    const normalizedData = normalizeAttributionData(data);
+    if (!hasAttributionSignal(normalizedData)) return;
+
+    await AsyncStorage.setItem(ATTRIBUTION_QUEUE_KEY, JSON.stringify(normalizedData));
     console.log('[AppsFlyer] Attribution mise en queue (user pas connecté)');
   } catch {
     // Pas critique
@@ -153,16 +236,16 @@ export function useAppsFlyer() {
         onDeepLinkListener: true,
         timeToWaitForATTUserAuthorization: 10,
       },
-      (result) => {
+      (result: unknown) => {
         console.log('[AppsFlyer] SDK initialisé:', result);
         setCustomerUserIdAndFlush();
       },
-      (error) => {
+      (error: unknown) => {
         console.error('[AppsFlyer] Erreur init SDK:', error);
       }
     );
 
-    const onInstallConversionData = appsFlyer.onInstallConversionData((res) => {
+    const onInstallConversionData = appsFlyer.onInstallConversionData((res: AppsFlyerConversionResponse | null) => {
       console.log('[AppsFlyer] onInstallConversionData:', JSON.stringify(res?.data, null, 2));
 
       const data = res?.data;
@@ -171,19 +254,15 @@ export function useAppsFlyer() {
       sendAttributionToBackend(data);
     });
 
-    const onDeepLink = appsFlyer.onDeepLink((res) => {
+    const onDeepLink = appsFlyer.onDeepLink((res: AppsFlyerDeepLinkResponse | null) => {
       console.log('[AppsFlyer] Deep link:', res?.deepLinkStatus, res?.deepLinkValue);
 
       if (res?.deepLinkStatus === 'FOUND' && res?.data) {
-        const afSub1 = res.data.af_sub1 || res.data.deep_link_sub1;
-        if (afSub1) {
-          sendAttributionToBackend({
-            af_sub1: afSub1,
-            media_source: res.data.media_source || 'deep_link',
-            campaign: res.data.campaign,
-            ...res.data,
-          });
-        }
+        sendAttributionToBackend({
+          media_source: res.data.media_source || res.data.pid || 'deep_link',
+          campaign: res.data.campaign || res.data.c,
+          ...res.data,
+        });
       }
     });
 

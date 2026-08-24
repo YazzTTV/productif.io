@@ -16,9 +16,8 @@ import '@/utils/suppressWarnings'; // Supprimer les warnings NativeEventEmitter
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { useSuperwallUserSync } from '@/hooks/useSuperwallUserSync';
 import { initAppCheck } from '@/lib/appCheck';
-import { useAppsFlyer, flushQueuedAttribution } from '@/hooks/useAppsFlyer';
+import { useAppsFlyer, flushQueuedAttribution, queueAttribution } from '@/hooks/useAppsFlyer';
 import { useBlockingReconciliation } from '@/hooks/useBlockingReconciliation';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useProductAnalytics } from '@/hooks/useProductAnalytics';
 
 function AppContent() {
@@ -36,24 +35,50 @@ function AppContent() {
   useEffect(() => {
     const onUrl = async (event: { url: string }) => {
       try {
-        await SuperwallExpoModule?.handleDeepLink?.(event.url);
+        await (SuperwallExpoModule as any)?.handleDeepLink?.(event.url);
       } catch (e) {
         console.log('[DeepLink] Superwall error (non-fatal):', e);
       }
 
-      // Capturer af_sub1 depuis les URL scheme (productifio://ref?af_sub1=...)
-      // pour permettre l'attribution même sans passer par AppsFlyer OneLink
+      // Capturer les paramètres depuis les URL scheme (productifio://...?af_sub1=...)
+      // pour permettre l'attribution même sans passer par AppsFlyer OneLink.
       try {
         const parsed = Linking.parse(event.url);
-        const afSub1 = parsed.queryParams?.af_sub1 as string | undefined;
-        if (afSub1) {
-          console.log('[DeepLink] af_sub1 détecté:', afSub1);
-          const queueData = {
-            af_sub1: afSub1,
-            media_source: (parsed.queryParams?.media_source as string) || 'direct_link',
-            campaign: (parsed.queryParams?.campaign as string) || null,
-          };
-          await AsyncStorage.setItem('af_attribution_queue', JSON.stringify(queueData));
+        const queryParams = parsed.queryParams || {};
+        const attributionKeys = [
+          'af_sub1',
+          'af_sub2',
+          'af_sub3',
+          'af_sub4',
+          'af_sub5',
+          'media_source',
+          'pid',
+          'campaign',
+          'c',
+          'utm_source',
+          'utm_medium',
+          'utm_campaign',
+          'utm_content',
+          'af_channel',
+          'af_ad',
+          'deep_link_value',
+          'deep_link_sub1',
+          'deep_link_sub2',
+          'deep_link_sub3',
+        ];
+        const queueData = attributionKeys.reduce<Record<string, string>>((acc, key) => {
+          const value = queryParams[key];
+          if (typeof value === 'string' && value.trim()) acc[key] = value.trim();
+          return acc;
+        }, {});
+
+        if (Object.keys(queueData).length > 0) {
+          console.log('[DeepLink] attribution détectée:', queueData);
+          await queueAttribution({
+            media_source: queueData.media_source || queueData.pid || queueData.utm_source || 'direct_link',
+            campaign: queueData.campaign || queueData.c || queueData.utm_campaign || null,
+            ...queueData,
+          });
           // Laisser le temps au TokenStorage de charger le token depuis AsyncStorage
           setTimeout(() => flushQueuedAttribution(), 2000);
         }

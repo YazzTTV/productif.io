@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { useLocale } from "@/lib/i18n"
 import { pageCopy } from "@/app/mode-examen/copy"
+import { trackFunnelEvent } from "@/lib/funnel-analytics"
 
 /**
  * Capture d'email de la page /mode-examen.
@@ -58,6 +59,10 @@ export function EmailCapture({
         return
       }
 
+      trackFunnelEvent("mode_examen_lead_submit", {
+        source,
+        variant,
+      })
       setStatus("done")
       setEmail("")
     } catch {
