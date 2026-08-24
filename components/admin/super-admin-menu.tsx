@@ -8,6 +8,7 @@ import {
   Users, 
   ClipboardList, 
   BarChart3,
+  Megaphone,
   ChevronDown
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -55,6 +56,12 @@ export function SuperAdminMenu() {
       icon: BarChart3,
       path: "/dashboard/admin/super-dashboard",
       description: "Vue globale des utilisateurs"
+    },
+    {
+      label: "Acquisition",
+      icon: Megaphone,
+      path: "/dashboard/admin/acquisition",
+      description: "Tracking TikTok et liens créas"
     },
     {
       label: "Entreprises",
@@ -140,4 +147,3 @@ export function SuperAdminMenu() {
     </DropdownMenu>
   )
 }
-

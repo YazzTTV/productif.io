@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useState, useEffect } from "react"
-import { LayoutDashboard, CheckSquare, Clock, BarChart, Settings, FolderKanban, Heart, Target, Book, Users, Building2, LineChart, Trophy, Mail, Bot, Lock, ClipboardList, Gift } from "lucide-react"
+import { LayoutDashboard, CheckSquare, Clock, Settings, FolderKanban, Heart, Target, Book, Users, Building2, LineChart, Trophy, Mail, Bot, Lock, ClipboardList, Gift, Megaphone } from "lucide-react"
 import { buttonVariants } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { cn } from "@/lib/utils"
@@ -417,6 +417,21 @@ export function DashboardNav({ viewAsMode = false, viewAsUserId, onNavItemClick 
               >
                 <LineChart className="mr-2 h-4 w-4" />
                 <span className="truncate">{t('adminDashboard')}</span>
+              </Link>
+
+              <Link
+                href="/dashboard/admin/acquisition"
+                className={cn(
+                  buttonVariants({
+                    variant: isActive("/dashboard/admin/acquisition") ? "secondary" : "ghost",
+                    size: "default",
+                  }),
+                  "justify-start w-full"
+                )}
+                onClick={handleNavClick}
+              >
+                <Megaphone className="mr-2 h-4 w-4" />
+                <span className="truncate">Acquisition</span>
               </Link>
 
               <Link

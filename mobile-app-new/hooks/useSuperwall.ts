@@ -5,6 +5,7 @@ import { checkPremiumStatus } from '@/utils/premium';
 import { SUPERWALL_EVENTS, SuperwallEventName } from '@/lib/superwallEvents';
 import { getActiveExamSession, isDemoSession } from '@/utils/examSession';
 import { trackEvent } from '@/lib/analytics';
+import { trackBackendProductEvent } from '@/lib/productEvents';
 
 const DEFAULT_COOLDOWN_MS = 60_000;
 /**
@@ -24,8 +25,10 @@ let lastPlacement: string | null = null;
 let isPresenting = false;
 let lastFinishedAt = 0;
 
+type SuperwallParams = Record<string, string | number | boolean | null | undefined>;
+
 interface TriggerEventOptions {
-  params?: Record<string, any>;
+  params?: SuperwallParams;
   feature?: () => void;
   cooldownMs?: number;
   bypassCooldown?: boolean;
@@ -40,13 +43,16 @@ export function useSuperwall() {
     onPresent: (info) => {
       console.log('[Superwall] Paywall presented:', info);
       void trackEvent('paywall_viewed', { placement: lastPlacement });
+      void trackBackendProductEvent('paywall_viewed', { placement: lastPlacement });
     },
     onDismiss: (info, result) => {
       console.log('[Superwall] Paywall dismissed:', info, 'Result:', result);
-      void trackEvent('paywall_dismissed', {
+      const dismissParams = {
         placement: lastPlacement,
         result: result?.type ?? 'unknown',
-      });
+      };
+      void trackEvent('paywall_dismissed', dismissParams);
+      void trackBackendProductEvent('paywall_dismissed', dismissParams);
       // PaywallResult est une union discriminée : il faut tester result.type.
       // L'ancien test `result === 'purchased'` était toujours faux, donc aucun
       // achat n'était jamais remonté à AppsFlyer.
@@ -59,13 +65,13 @@ export function useSuperwall() {
         logSubscriptionEvent({
           productId: result.type === 'purchased' ? result.productId : undefined,
         });
-        void trackEvent(
-          result.type === 'purchased' ? 'purchase_completed' : 'purchase_restored',
-          {
-            placement: lastPlacement,
-            product_id: result.type === 'purchased' ? result.productId : undefined,
-          },
-        );
+        const purchaseEvent = result.type === 'purchased' ? 'purchase_completed' : 'purchase_restored';
+        const purchaseParams = {
+          placement: lastPlacement,
+          product_id: result.type === 'purchased' ? result.productId : undefined,
+        };
+        void trackEvent(purchaseEvent, purchaseParams);
+        void trackBackendProductEvent(purchaseEvent, purchaseParams);
       }
     },
   });
@@ -144,7 +150,7 @@ export function useSuperwall() {
 
   const showPaywall = async (
     placement: SuperwallEventName,
-    params?: Record<string, any>,
+    params?: SuperwallParams,
     feature?: () => void,
   ) => {
     await triggerEvent(placement, { params, feature });

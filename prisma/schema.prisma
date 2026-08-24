@@ -91,6 +91,7 @@ model User {
   installId           String?   // UUID device pour détection anti-fraude
 
   subscriptionEvents  SubscriptionEvent[]
+  productAnalyticsEvents ProductAnalyticsEvent[]
   commissionsReceived CommissionLedger[] @relation("CommissionReferredUser")
   creatorApplication  CreatorApplication?
 
@@ -981,6 +982,20 @@ model SubscriptionEvent {
   @@index([eventName])
   @@index([transactionId])
   @@map("subscription_events")
+}
+
+model ProductAnalyticsEvent {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  eventName String
+  params    Json?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([eventName])
+  @@index([createdAt])
+  @@map("product_analytics_events")
 }
 
 model CommissionLedger {

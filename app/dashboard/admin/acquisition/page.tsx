@@ -27,6 +27,10 @@ interface AcquisitionData {
     attributedUsers: number
     tiktokAttributedUsers: number
     premiumAttributedUsers: number
+    paywallViews: number
+    paywallDismisses: number
+    purchases: number
+    restores: number
     attributionRate: number
     premiumRate: number
   }
@@ -38,6 +42,10 @@ interface AcquisitionData {
     placement: string
     users: number
     premiumUsers: number
+    paywallViews: number
+    paywallDismisses: number
+    purchases: number
+    restores: number
     conversionRate: number
     firstSignupAt: string | null
     lastSignupAt: string | null
@@ -63,9 +71,7 @@ interface AcquisitionData {
     subscriptionStatus: string
     isPremium: boolean
   }[]
-  notes: {
-    paywallViews: string
-  }
+  notes: Record<string, string>
 }
 
 function formatDate(value: string | null) {
@@ -224,6 +230,11 @@ export default function AdminAcquisitionPage() {
             value={loading ? "..." : data?.totals.premiumAttributedUsers ?? 0}
             detail={`${data?.totals.premiumRate ?? 0}% des attribués`}
           />
+          <StatCard
+            title="Paywall vues"
+            value={loading ? "..." : data?.totals.paywallViews ?? 0}
+            detail={`${data?.totals.purchases ?? 0} achats, ${data?.totals.restores ?? 0} restores`}
+          />
         </div>
 
         <Card>
@@ -233,7 +244,7 @@ export default function AdminAcquisitionPage() {
               <div>
                 <CardTitle>Performance par source, vague et créa</CardTitle>
                 <CardDescription>
-                  Les vues paywall restent dans Firebase Analytics tant qu&apos;elles ne sont pas répliquées en base.
+                  Comptes créés, étapes paywall et conversions premium groupés par attribution.
                 </CardDescription>
               </div>
             </div>
@@ -247,6 +258,9 @@ export default function AdminAcquisitionPage() {
                   <TableHead>Créa</TableHead>
                   <TableHead>Placement</TableHead>
                   <TableHead className="text-right">Comptes</TableHead>
+                  <TableHead className="text-right">Paywall</TableHead>
+                  <TableHead className="text-right">Dismiss</TableHead>
+                  <TableHead className="text-right">Achats</TableHead>
                   <TableHead className="text-right">Premium</TableHead>
                   <TableHead className="text-right">Conv.</TableHead>
                   <TableHead>Dernier signup</TableHead>
@@ -262,6 +276,9 @@ export default function AdminAcquisitionPage() {
                     </TableCell>
                     <TableCell>{group.placement}</TableCell>
                     <TableCell className="text-right">{group.users}</TableCell>
+                    <TableCell className="text-right">{group.paywallViews}</TableCell>
+                    <TableCell className="text-right">{group.paywallDismisses}</TableCell>
+                    <TableCell className="text-right">{group.purchases + group.restores}</TableCell>
                     <TableCell className="text-right">{group.premiumUsers}</TableCell>
                     <TableCell className="text-right">{group.conversionRate}%</TableCell>
                     <TableCell>{formatDate(group.lastSignupAt)}</TableCell>
@@ -269,7 +286,7 @@ export default function AdminAcquisitionPage() {
                 ))}
                 {!loading && data?.groups.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={8} className="py-8 text-center text-muted-foreground">
+                    <TableCell colSpan={11} className="py-8 text-center text-muted-foreground">
                       Aucune attribution sur cette période.
                     </TableCell>
                   </TableRow>
