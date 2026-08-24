@@ -770,6 +770,17 @@ export const subjectsService = {
     }
   },
 
+  // Modifier une matière (nom, coefficient, date d'examen)
+  async update(
+    subjectId: string,
+    subjectData: { name?: string; coefficient?: number; deadline?: string | null }
+  ): Promise<any> {
+    return await apiCall(`/subjects/${subjectId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(subjectData),
+    });
+  },
+
   // Supprimer une matière
   async delete(subjectId: string): Promise<{ success: boolean }> {
     return await apiCall(`/subjects/${subjectId}`, {

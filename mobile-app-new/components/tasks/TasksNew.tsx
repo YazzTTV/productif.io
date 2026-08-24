@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Modal, TextInput, Platform, Alert, ActivityIndicator, Image, Keyboard } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Modal, TextInput, Platform, Alert, ActivityIndicator, Image, Keyboard, type GestureResponderEvent } from 'react-native';
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
@@ -59,7 +59,7 @@ interface Subject {
   insight?: string;
   tasks: Task[];
   nextDeadline?: string;
-  deadline?: Date;
+  deadline?: Date | string | null;
 }
 
 const MOCK_SUBJECTS: Subject[] = [
@@ -136,6 +136,8 @@ export function TasksNew() {
   const [newSubjectName, setNewSubjectName] = useState('');
   const [newSubjectCoeff, setNewSubjectCoeff] = useState(1);
   const [newSubjectDeadline, setNewSubjectDeadline] = useState<Date | null>(null);
+  // Non nul quand la feuille sert a MODIFIER une matiere existante au lieu d'en creer une.
+  const [editingSubjectId, setEditingSubjectId] = useState<string | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -806,9 +808,63 @@ export function TasksNew() {
     }
   };
 
+  // Ferme la feuille et remet le formulaire a zero, creation comme modification.
+  const closeSubjectModal = () => {
+    setShowAddSubjectModal(false);
+    setEditingSubjectId(null);
+    setNewSubjectName('');
+    setNewSubjectCoeff(1);
+    setNewSubjectDeadline(null);
+  };
+
+  const openAddSubjectModal = () => {
+    setEditingSubjectId(null);
+    setNewSubjectName('');
+    setNewSubjectCoeff(1);
+    setNewSubjectDeadline(null);
+    setShowAddSubjectModal(true);
+  };
+
+  const handleEditSubject = (subject: Subject) => {
+    setEditingSubjectId(subject.id);
+    setNewSubjectName(subject.name || '');
+    setNewSubjectCoeff(subject.coefficient || 1);
+    setNewSubjectDeadline(subject.deadline ? new Date(subject.deadline) : null);
+    setShowAddSubjectModal(true);
+  };
+
   const handleAddSubject = async () => {
     if (!newSubjectName.trim()) {
       Alert.alert(t('error'), t('enterSubjectName'));
+      return;
+    }
+
+    // Modification d'une matiere existante : meme formulaire, autre verbe.
+    if (editingSubjectId) {
+      try {
+        setSaving(true);
+        const updated = await subjectsService.update(editingSubjectId, {
+          name: newSubjectName.trim(),
+          coefficient: newSubjectCoeff,
+          deadline: newSubjectDeadline ? newSubjectDeadline.toISOString() : null,
+        });
+        setSubjects(prev =>
+          prev.map(subject =>
+            subject.id === editingSubjectId ? { ...subject, ...updated } : subject
+          )
+        );
+        closeSubjectModal();
+        // On relit le serveur : le coefficient et la date changent les scores,
+        // donc les paliers de couleur de TOUTES les matieres.
+        await loadSubjects();
+      } catch (error: any) {
+        Alert.alert(
+          t('error'),
+          error?.message || t('editSubjectError') || 'Impossible de modifier la matière'
+        );
+      } finally {
+        setSaving(false);
+      }
       return;
     }
 
@@ -847,10 +903,7 @@ export function TasksNew() {
       scrollViewRef.current?.scrollTo({ y: 0, animated: true });
       
       // Réinitialiser le formulaire
-      setNewSubjectName('');
-      setNewSubjectCoeff(1);
-      setNewSubjectDeadline(null);
-      setShowAddSubjectModal(false);
+      closeSubjectModal();
       
       // Recharger les matières depuis l'API pour s'assurer d'avoir les dernières données
       await loadSubjects();
@@ -1197,7 +1250,7 @@ export function TasksNew() {
               <TouchableOpacity
                 ref={addSubjectButtonRef}
                 style={styles.addSubjectButton}
-                onPress={() => setShowAddSubjectModal(true)}
+                onPress={openAddSubjectModal}
                 activeOpacity={0.8}
               >
                 <Ionicons name="add-circle-outline" size={20} color="#16A34A" />
@@ -1206,7 +1259,7 @@ export function TasksNew() {
             ) : (
               <TouchableOpacity
                 style={styles.addSubjectButton}
-                onPress={() => setShowAddSubjectModal(true)}
+                onPress={openAddSubjectModal}
                 activeOpacity={0.8}
               >
                 <Ionicons name="add-circle-outline" size={20} color="#16A34A" />
@@ -1347,8 +1400,23 @@ export function TasksNew() {
                   <View style={styles.subjectHeaderActions}>
                     {subject.id !== 'no-subject' && (
                       <TouchableOpacity
+                        style={styles.editSubjectButton}
+                        onPress={(event: GestureResponderEvent) => {
+                          event.stopPropagation();
+                          handleEditSubject(subject);
+                        }}
+                        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                      >
+                        <Ionicons name="pencil-outline" size={20} color="rgba(0, 0, 0, 0.45)" />
+                      </TouchableOpacity>
+                    )}
+                    {subject.id !== 'no-subject' && (
+                      <TouchableOpacity
                         style={styles.deleteSubjectButton}
-                        onPress={() => handleDeleteSubject(subject.id, subject.name)}
+                        onPress={(event: GestureResponderEvent) => {
+                          event.stopPropagation();
+                          handleDeleteSubject(subject.id, subject.name);
+                        }}
                         hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
                       >
                         <Ionicons name="trash-outline" size={20} color="#EF4444" />
@@ -1604,7 +1672,7 @@ export function TasksNew() {
         targetRef={addSubjectButtonRef}
         text="Ajoute une matiere avec son coef."
         nextLabel="Ajouter"
-        onNext={() => setShowAddSubjectModal(true)}
+        onNext={openAddSubjectModal}
         onSkip={async () => {
           const hasRealSubject = subjects.some(subject => subject.id !== 'no-subject');
           if (hasRealSubject) {
@@ -1711,14 +1779,18 @@ export function TasksNew() {
         visible={showAddSubjectModal}
         animationType="slide"
         transparent={true}
-        onRequestClose={() => setShowAddSubjectModal(false)}
+        onRequestClose={closeSubjectModal}
       >
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { paddingBottom: insets.bottom + 24 }]}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Ajouter une matière</Text>
+              <Text style={styles.modalTitle}>
+                {editingSubjectId
+                  ? t('editSubject') || 'Modifier la matière'
+                  : t('addSubject')}
+              </Text>
               <TouchableOpacity
-                onPress={() => setShowAddSubjectModal(false)}
+                onPress={closeSubjectModal}
                 style={styles.closeButton}
               >
                 <Ionicons name="close" size={24} color="#000" />
@@ -1815,7 +1887,9 @@ export function TasksNew() {
                 {saving ? (
                   <ActivityIndicator size="small" color="#FFFFFF" />
                 ) : (
-                  <Text style={styles.submitButtonText}>{t('addSubject')}</Text>
+                  <Text style={styles.submitButtonText}>
+                    {editingSubjectId ? t('saveChanges') : t('addSubject')}
+                  </Text>
                 )}
               </TouchableOpacity>
             </ScrollView>
@@ -2570,6 +2644,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+  },
+  editSubjectButton: {
+    padding: 8,
   },
   deleteSubjectButton: {
     padding: 8,
