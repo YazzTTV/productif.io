@@ -855,8 +855,10 @@ export function TasksNew() {
         );
         closeSubjectModal();
         // On relit le serveur : le coefficient et la date changent les scores,
-        // donc les paliers de couleur de TOUTES les matieres.
-        await loadSubjects();
+        // donc les paliers de couleur de TOUTES les matieres. Et la deadline est
+        // une entree directe du rattrapage, donc loadCatchUp aussi, comme partout
+        // ailleurs ou une matiere bouge.
+        await Promise.all([loadSubjects(), loadCatchUp()]);
       } catch (error: any) {
         Alert.alert(
           t('error'),
@@ -1215,6 +1217,13 @@ export function TasksNew() {
   }
 
   const firstRealSubjectId = subjects.find(subject => subject.id !== 'no-subject')?.id ?? null;
+
+  // En creation on interdit le passe. En edition la matiere peut deja porter une
+  // date passee : la borner a aujourd'hui fait afficher aujourd'hui a la molette
+  // alors que le brouillon garde l'ancienne date, donc l'ecran mentait sur ce
+  // qu'un Confirmer allait enregistrer.
+  const subjectDateMinimum =
+    subjectDateDraft && subjectDateDraft < new Date() ? subjectDateDraft : new Date();
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -1907,7 +1916,7 @@ export function TasksNew() {
                   locale={language}
                   themeVariant="light"
                   style={styles.datePickerSpinner}
-                  minimumDate={new Date()}
+                  minimumDate={subjectDateMinimum}
                   onChange={(event, selectedDate) => {
                     if (selectedDate) setSubjectDateDraft(selectedDate);
                   }}
@@ -1940,7 +1949,7 @@ export function TasksNew() {
               value={subjectDateDraft || new Date()}
               mode="date"
               display="default"
-              minimumDate={new Date()}
+              minimumDate={subjectDateMinimum}
               onChange={(event, selectedDate) => {
                 setShowDatePicker(false);
                 if (event.type === 'set' && selectedDate) {
