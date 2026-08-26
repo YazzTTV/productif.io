@@ -114,12 +114,47 @@ export function ModeExamenContent() {
   const c = pageCopy[locale]
   const isEn = locale === "en"
   const viewTracked = useRef(false)
+  const localeGuessed = useRef(false)
 
   useEffect(() => {
     if (viewTracked.current) return
     viewTracked.current = true
     trackFunnelEvent("mode_examen_view", { locale })
   }, [locale])
+
+  // Le provider demarre en francais et ne lit que localStorage, donc un visiteur
+  // anglophone qui arrive ici pour la premiere fois recoit la page en francais et
+  // doit trouver le selecteur pour la comprendre. C'est acceptable pour le trafic
+  // TikTok, qui est francophone, mais pas pour une source anglophone comme
+  // Product Hunt, ou la seule action possible depuis un ordinateur est de laisser
+  // son email.
+  //
+  // On ne devine qu'UNE fois et seulement en l'absence de choix enregistre : un
+  // visiteur qui a deja clique sur FR / EN garde son choix, ici comme partout.
+  useEffect(() => {
+    if (localeGuessed.current) return
+    localeGuessed.current = true
+    if (typeof window === "undefined") return
+    if (window.localStorage.getItem("locale")) return
+    const browser = window.navigator.language || ""
+    if (!browser.toLowerCase().startsWith("fr")) setLocale("en")
+  }, [setLocale])
+
+  // Attribution de la source du lead. /api/leads connait deja "product-hunt"
+  // dans KNOWN_SOURCES, mais rien ne le lui envoyait : la landing passait
+  // toujours "mode-examen", donc un email venu de Product Hunt etait
+  // indistinguable d'un email venu de TikTok, et la metrique du lancement
+  // n'etait pas mesurable. Le lien a publier est /mode-examen?src=product-hunt.
+  //
+  // On lit window.location plutot que useSearchParams, qui imposerait une
+  // frontiere Suspense au rendu de cette page.
+  const [leadSource, setLeadSource] = useState("mode-examen")
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const src = new URLSearchParams(window.location.search).get("src")
+    if (src === "product-hunt") setLeadSource(src)
+  }, [])
 
   // Formatage des montants a l'anglaise ou a la francaise, jamais en dur.
   const eur = isEn ? formatEurEn : formatEur
@@ -197,7 +232,7 @@ export function ModeExamenContent() {
               donc un visiteur Android ou sur ordinateur repart sans laisser de trace.
               Ce bloc doit rester visible sans scroller, c'est tout l'intérêt. */}
           <div className="mt-10 flex justify-center">
-            <EmailCapture variant="inline" />
+            <EmailCapture variant="inline" source={leadSource} />
           </div>
         </div>
       </section>
@@ -419,7 +454,7 @@ export function ModeExamenContent() {
 
       {/* ================= CAPTURE EMAIL ================= */}
       <section className="py-24 md:py-32 px-6 border-t border-black/[0.04]">
-        <EmailCapture variant="section" />
+        <EmailCapture variant="section" source={leadSource} />
       </section>
 
       {/* ================= FOOTER ================= */}
