@@ -6,9 +6,10 @@ import AudioVisualizer from "@/components/scan/AudioVisualizer";
 import DiagnosticChart, { DiagnosticMessage } from "@/components/scan/DiagnosticChart";
 import EnergyTimeline, { TimelineTask } from "@/components/scan/EnergyTimeline";
 import EmailCapture from "@/components/scan/EmailCapture";
+import { DEFAULT_PRODUCTIF_APP_STORE_URL } from "@/lib/tiktok-attribution-links";
 
 const APP_STORE_URL =
-  process.env.NEXT_PUBLIC_APP_STORE_URL || "https://apps.apple.com/app/id0000000000";
+  process.env.NEXT_PUBLIC_APP_STORE_URL || DEFAULT_PRODUCTIF_APP_STORE_URL;
 
 // Chips de suggestions pour l'entrée des tâches
 const PROMPT_CHIPS = [

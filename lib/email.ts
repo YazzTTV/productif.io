@@ -1,4 +1,5 @@
 import { Resend } from 'resend'
+import { DEFAULT_PRODUCTIF_APP_STORE_URL } from './tiktok-attribution-links'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
@@ -43,7 +44,7 @@ export async function sendSessionEmail({
       : ''
 
   const appStoreUrl =
-    process.env.NEXT_PUBLIC_APP_STORE_URL || 'https://apps.apple.com/app/productifio/id673896827'
+    process.env.NEXT_PUBLIC_APP_STORE_URL || DEFAULT_PRODUCTIF_APP_STORE_URL
 
   const html = planningHtml
     ? `
