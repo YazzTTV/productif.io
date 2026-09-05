@@ -91,7 +91,7 @@ const fr: PageCopy = {
     ctaPrimary: "Commencer gratuitement",
     ctaSecondary: "Voir comment ça marche",
     trialNote: (days) =>
-      `${days} jours d'essai Premium, sans carte bancaire. Pensé pour PACES, prépa, droit et concours.`,
+      `${days} jours d'essai Premium, rien n'est débité pendant l'essai. Pensé pour PACES, prépa, droit et concours.`,
   },
   emailInline: {
     prompt: "Sur Android, ou sur ordinateur ? Laisse ton email, je t'envoie le lien.",
@@ -193,7 +193,7 @@ const fr: PageCopy = {
     monthlyItems: (days) => [
       "Toutes les fonctions Premium",
       "Sans engagement, annulable à tout moment",
-      `${days} jours d'essai, sans carte`,
+      `${days} jours d'essai, rien de débité`,
     ],
     monthlyCta: (days) => `Essayer ${days} jours`,
     backToSchoolTitle: (price, endLabel) => `Offre de rentrée : ${price} par an jusqu'au ${endLabel}`,
@@ -223,7 +223,7 @@ const en: PageCopy = {
     ctaPrimary: "Start for free",
     ctaSecondary: "See how it works",
     trialNote: (days) =>
-      `${days}-day Premium trial, no card required. Built for heavy revision loads and competitive exams.`,
+      `${days}-day Premium trial, nothing charged during the trial. Built for heavy revision loads and competitive exams.`,
   },
   emailInline: {
     prompt: "On Android, or on a computer? Leave your email and I'll send you the link.",
@@ -325,7 +325,7 @@ const en: PageCopy = {
     monthlyItems: (days) => [
       "Every Premium feature",
       "No commitment, cancel any time",
-      `${days}-day trial, no card`,
+      `${days}-day trial, nothing charged`,
     ],
     monthlyCta: (days) => `Try ${days} days`,
     backToSchoolTitle: (price, endLabel) => `Back-to-school offer: ${price} a year until ${endLabel}`,
@@ -369,7 +369,7 @@ export function faqItems(
       },
       {
         q: "How much does it cost?",
-        a: `There's a free version to try it out. Premium is ${prices.monthly} a month or ${prices.yearly} a year, which is ${prices.yearlyPerMonth} a month. You get a ${prices.trialDays}-day free Premium trial, no card required.`,
+        a: `There's a free version to try it out. Premium is ${prices.monthly} a month or ${prices.yearly} a year, which is ${prices.yearlyPerMonth} a month. You get a ${prices.trialDays}-day free Premium trial: it runs through the App Store, nothing is charged during the trial, and you cancel in one tap from your Apple subscriptions.`,
       },
       {
         q: "Which phones does it work on?",
@@ -393,7 +393,7 @@ export function faqItems(
     },
     {
       q: "Combien ça coûte ?",
-      a: `Il y a une version gratuite pour tester. Le Premium est à ${prices.monthly} par mois ou ${prices.yearly} par an, soit ${prices.yearlyPerMonth} par mois. Tu as ${prices.trialDays} jours d'essai Premium gratuits, sans carte bancaire.`,
+      a: `Il y a une version gratuite pour tester. Le Premium est à ${prices.monthly} par mois ou ${prices.yearly} par an, soit ${prices.yearlyPerMonth} par mois. Tu as ${prices.trialDays} jours d'essai Premium gratuits : l'essai passe par l'App Store, rien n'est débité pendant l'essai, et tu annules en un geste depuis tes abonnements Apple.`,
     },
     {
       q: "Ça marche sur quel téléphone ?",
