@@ -706,6 +706,11 @@ export const tasksService = {
   },
 
   // Créer des tâches intelligentes (plan tomorrow)
+  // Timeout court et volontaire : au-delà, l'appelant retombe sur un découpage
+  // local instantané qui donne un résultat équivalent. Le défaut par défaut est
+  // de 30 s, et le serveur s'autorise 60 s (maxDuration de la route), donc
+  // l'utilisateur pouvait regarder un spinner une demi-minute avant d'obtenir
+  // ce que le repli produit immédiatement.
   async planTomorrow(userInput: string, date?: string): Promise<any> {
     return await apiCall('/tasks/agent/batch-create', {
       method: 'POST',
@@ -713,7 +718,7 @@ export const tasksService = {
         userInput,
         date,
       }),
-    });
+    }, 12000);
   },
 };
 
@@ -1587,6 +1592,11 @@ export const assistantService = {
   },
 
   // Créer des tâches intelligentes (plan tomorrow)
+  // Timeout court et volontaire : au-delà, l'appelant retombe sur un découpage
+  // local instantané qui donne un résultat équivalent. Le défaut par défaut est
+  // de 30 s, et le serveur s'autorise 60 s (maxDuration de la route), donc
+  // l'utilisateur pouvait regarder un spinner une demi-minute avant d'obtenir
+  // ce que le repli produit immédiatement.
   async planTomorrow(userInput: string, date?: string): Promise<any> {
     return await apiCall('/tasks/agent/batch-create', {
       method: 'POST',
@@ -1594,7 +1604,7 @@ export const assistantService = {
         userInput,
         date,
       }),
-    });
+    }, 12000);
   },
 
   // Envoyer un message au chat et recevoir une réponse de l'agent IA
