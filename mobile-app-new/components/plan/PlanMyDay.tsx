@@ -149,14 +149,37 @@ export function PlanMyDay() {
         return;
       }
 
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
-      });
+      const modeAudio = { allowsRecordingIOS: true, playsInSilentModeIOS: true };
+      await Audio.setAudioModeAsync(modeAudio);
 
-      const { recording: newRecording } = await Audio.Recording.createAsync(
-        Audio.RecordingOptionsPresets.HIGH_QUALITY
-      );
+      // expo-av n'autorise qu'un seul objet Recording preparé à la fois. Un
+      // enregistrement précédent mal déchargé (sortie d'écran, erreur) fait
+      // donc échouer createAsync.
+      if (recording) {
+        try {
+          await recording.stopAndUnloadAsync();
+        } catch {
+          // déjà déchargé : c'est le cas normal
+        }
+        setRecording(null);
+      }
+
+      const creerEnregistrement = async () =>
+        (await Audio.Recording.createAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY)).recording;
+
+      let newRecording: Audio.Recording;
+      try {
+        newRecording = await creerEnregistrement();
+      } catch (premierEchec) {
+        // iOS met un instant à activer la session audio, en particulier juste
+        // après l'octroi de la permission micro. Le premier appui echouait donc
+        // et le second passait. On refait ici, une seule fois, l'essai que
+        // l'utilisateur faisait à la main.
+        console.warn('Premier essai d\'enregistrement échoué, nouvelle tentative:', premierEchec);
+        await new Promise((resolve) => setTimeout(resolve, 350));
+        await Audio.setAudioModeAsync(modeAudio);
+        newRecording = await creerEnregistrement();
+      }
 
       setRecording(newRecording);
       setIsRecording(true);
@@ -1195,7 +1218,7 @@ export function PlanMyDay() {
         <Coachmark
           visible={!tutorialCompleted && tutorialStage === 'plan' && phase === 'association'}
           targetRef={confirmButtonRef}
-          text="Planifie automatiquement ta journee."
+          text="Planifie automatiquement ta journée."
           nextLabel="Planifier"
           onNext={confirmAssociations}
           onSkip={async () => {
