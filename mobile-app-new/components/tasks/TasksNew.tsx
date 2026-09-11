@@ -140,6 +140,15 @@ export function TasksNew() {
   const [editingSubjectId, setEditingSubjectId] = useState<string | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [loading, setLoading] = useState(true);
+  // Ne vider l'écran qu'au tout premier chargement.
+  //
+  // useFocusEffect rappelle le chargement à chaque retour sur cet écran, et
+  // setLoading(true) y déclenchait un écran de chargement plein cadre. Résultat :
+  // chaque navigation repassait par un écran vide, même quand les données
+  // étaient déjà là et inchangées. On garde désormais le contenu affiché et on
+  // rafraîchit en arrière-plan.
+  const hasLoadedOnceRef = useRef(false);
+
   const [saving, setSaving] = useState(false);
   const [showAddTaskModal, setShowAddTaskModal] = useState(false);
   const [selectedSubjectForTask, setSelectedSubjectForTask] = useState<string | null>(null);
@@ -233,7 +242,7 @@ export function TasksNew() {
 
   const loadSubjects = React.useCallback(async () => {
     try {
-      setLoading(true);
+      if (!hasLoadedOnceRef.current) setLoading(true);
       const data = await subjectsService.getAll();
       console.log('📥 [TasksNew] Données reçues de l\'API:', JSON.stringify(data, null, 2));
       if (Array.isArray(data)) {
@@ -291,6 +300,7 @@ export function TasksNew() {
         setExpandedSubjects([MOCK_SUBJECTS[0].id]);
       }
     } finally {
+      hasLoadedOnceRef.current = true;
       setLoading(false);
     }
   }, []);

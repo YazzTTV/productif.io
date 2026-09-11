@@ -31,6 +31,15 @@ export default function ExamSetupScreen() {
   const [primaryTask, setPrimaryTask] = useState<TaskForExam | null>(null);
   const [nextTasks, setNextTasks] = useState<TaskForExam[]>([]);
   const [loading, setLoading] = useState(true);
+  // Ne vider l'écran qu'au tout premier chargement.
+  //
+  // useFocusEffect rappelle le chargement à chaque retour sur cet écran, et
+  // setLoading(true) y déclenchait un écran de chargement plein cadre. Résultat :
+  // chaque navigation repassait par un écran vide, même quand les données
+  // étaient déjà là et inchangées. On garde désormais le contenu affiché et on
+  // rafraîchit en arrière-plan.
+  const hasLoadedOnceRef = useRef(false);
+
   const [starting, setStarting] = useState(false);
   const [blockAppsEnabled, setBlockAppsEnabled] = useState(false);
   const [blockedCount, setBlockedCount] = useState(0);
@@ -100,13 +109,14 @@ export default function ExamSetupScreen() {
 
   const loadTasks = async () => {
     try {
-      setLoading(true);
+      if (!hasLoadedOnceRef.current) setLoading(true);
       const { primary, next } = await selectExamTasks();
       setPrimaryTask(primary);
       setNextTasks(next);
     } catch (error) {
       console.error('Error loading tasks:', error);
     } finally {
+      hasLoadedOnceRef.current = true;
       setLoading(false);
     }
   };

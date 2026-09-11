@@ -52,6 +52,15 @@ export function ReviewHabits() {
   const addHabitButtonRef = useRef<TouchableOpacity>(null);
   const [habits, setHabits] = useState<Habit[]>([]);
   const [loading, setLoading] = useState(true);
+  // Ne vider l'écran qu'au tout premier chargement.
+  //
+  // useFocusEffect rappelle le chargement à chaque retour sur cet écran, et
+  // setLoading(true) y déclenchait un écran de chargement plein cadre. Résultat :
+  // chaque navigation repassait par un écran vide, même quand les données
+  // étaient déjà là et inchangées. On garde désormais le contenu affiché et on
+  // rafraîchit en arrière-plan.
+  const hasLoadedOnceRef = useRef(false);
+
   const [selectedDate] = useState(() => startOfDay(new Date()));
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newHabitName, setNewHabitName] = useState('');
@@ -65,7 +74,7 @@ export function ReviewHabits() {
 
   const fetchHabits = async () => {
     try {
-      setLoading(true);
+      if (!hasLoadedOnceRef.current) setLoading(true);
       console.log('🔄 Récupération des habitudes...');
       const response = await habitsService.getAll();
       console.log('📋 Habitudes récupérées:', response);
@@ -86,6 +95,7 @@ export function ReviewHabits() {
       console.error('❌ Erreur lors du chargement des habitudes:', error);
       Alert.alert('Erreur', 'Impossible de charger les habitudes');
     } finally {
+      hasLoadedOnceRef.current = true;
       setLoading(false);
     }
   };
