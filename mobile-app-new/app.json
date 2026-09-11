@@ -2,7 +2,7 @@
   "expo": {
     "name": "Productif.io",
     "slug": "productif-io",
-    "version": "1.2",
+    "version": "1.2.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "productifio",
