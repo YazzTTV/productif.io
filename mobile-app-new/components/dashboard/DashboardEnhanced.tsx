@@ -5,7 +5,7 @@ import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { authService, gamificationService, googleCalendarService } from '@/lib/api';
-import { isAppleCalendarConnected } from '@/lib/calendarAuth';
+import { isAppleCalendarConnected, getAppleTodayEvents } from '@/lib/calendarAuth';
 import { format, parseISO, isBefore, isAfter } from 'date-fns';
 import { checkPremiumStatus } from '@/utils/premium';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -249,9 +249,14 @@ export function DashboardEnhanced() {
       }
 
       if (!calendarConnected) {
-        // Apple n'expose pas ses événements côté serveur, seulement l'état de
-        // connexion : la liste reste vide mais l'app cesse de le nier.
+        // Apple n'expose pas ses événements côté serveur. On les lit donc
+        // directement sur l'appareil, sans quoi l'accueil affichait « connecté »
+        // au-dessus d'une journée vide alors que les blocs créés par l'app
+        // étaient bien visibles dans l'app Calendrier d'iOS.
         calendarConnected = await isAppleCalendarConnected();
+        if (calendarConnected) {
+          setCalendarEvents(await getAppleTodayEvents());
+        }
       }
       setIsCalendarConnected(calendarConnected);
 

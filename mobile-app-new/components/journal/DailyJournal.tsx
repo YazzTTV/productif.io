@@ -967,7 +967,12 @@ export function DailyJournal() {
           >
           <TouchableOpacity
             style={styles.doneButton}
-            onPress={() => router.back()}
+            // Le journal est une etape terminale : on rentre a l'accueil de
+            // facon deterministe. router.back() renvoyait a l'ecran precedent
+            // dans la pile, qui n'est pas l'accueil quand on arrive ici depuis
+            // le didacticiel ou depuis Focus, et ne faisait rien quand la pile
+            // etait vide.
+            onPress={() => router.replace('/(tabs)')}
             activeOpacity={0.8}
           >
             <Text style={styles.doneButtonText}>{t('closeJournal')}</Text>

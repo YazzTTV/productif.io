@@ -53,7 +53,19 @@ export function Coachmark({
           width > 0 &&
           height > 0;
         if (valid) {
-          setRect({ x, y, width, height });
+          // Ne remplacer l'etat que si la cible a reellement bouge. Cette
+          // mesure tourne toutes les 800 ms tant que la bulle est visible, et
+          // ecrire un nouvel objet a chaque passage forcait un rendu complet
+          // en continu pendant tout le didacticiel, pour rien.
+          setRect((precedent) =>
+            precedent &&
+            precedent.x === x &&
+            precedent.y === y &&
+            precedent.width === width &&
+            precedent.height === height
+              ? precedent
+              : { x, y, width, height }
+          );
         } else if (tries < 10) {
           tries += 1;
           setTimeout(measure, 120);
@@ -103,12 +115,14 @@ export function Coachmark({
         <View
           style={[styles.tooltip, tooltipStyle]}
           onLayout={(e) => {
-            const h = e.nativeEvent.layout.height;
-            // On ne réécrit que sur un vrai changement, sinon onLayout et le
-            // repositionnement se relancent mutuellement sans fin.
-            setMesureHauteur((precedente) =>
-              precedente !== null && Math.abs(precedente - h) < 1 ? precedente : h
-            );
+            // UNE SEULE mesure, jamais davantage. onLayout modifie la hauteur
+            // qui modifie la position qui redeclenche onLayout : tout garde
+            // base sur une comparaison de valeurs peut osciller entre deux
+            // hauteurs et boucler a l'infini, ce qui fait terminer l'app par
+            // iOS pour consommation processeur. Une seule ecriture d'etat rend
+            // la boucle structurellement impossible.
+            if (mesureHauteur !== null) return;
+            setMesureHauteur(e.nativeEvent.layout.height);
           }}
         >
           <Text style={styles.text}>{text}</Text>

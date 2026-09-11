@@ -250,6 +250,63 @@ export async function getAppleCalendars(): Promise<any[]> {
 }
 
 /**
+ * Événements du jour du calendrier Apple, dans la forme attendue par l'accueil.
+ *
+ * Sans cette lecture, l'accueil savait que le calendrier Apple etait connecte
+ * mais n'avait aucun evenement a montrer : les blocs crees par l'app
+ * apparaissaient dans l'app Calendrier d'iOS et nulle part dans Productif.io.
+ */
+export async function getAppleTodayEvents(): Promise<
+  {
+    id: string;
+    summary: string;
+    description?: string;
+    start: string;
+    end: string;
+    timeZone: string;
+    isAllDay?: boolean;
+    isProductif: boolean;
+  }[]
+> {
+  if (Platform.OS !== 'ios') {
+    return [];
+  }
+
+  try {
+    const CalendarModule = await getCalendarModule();
+    if (!CalendarModule) return [];
+
+    const calendars = await getAppleCalendars();
+    const ids = calendars.map((cal: any) => cal.id).filter(Boolean);
+    if (ids.length === 0) return [];
+
+    const debut = new Date();
+    debut.setHours(0, 0, 0, 0);
+    const fin = new Date(debut);
+    fin.setDate(fin.getDate() + 1);
+
+    const evenements = await CalendarModule.getEventsAsync(ids, debut, fin);
+    const fuseau = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+    return (evenements || []).map((ev: any) => ({
+      id: String(ev.id),
+      summary: ev.title || 'Sans titre',
+      description: ev.notes || undefined,
+      start: new Date(ev.startDate).toISOString(),
+      end: new Date(ev.endDate).toISOString(),
+      timeZone: ev.timeZone || fuseau,
+      isAllDay: Boolean(ev.allDay),
+      // On ne sait pas distinguer de façon fiable un événement écrit par
+      // l'app d'un événement personnel : on ne le prétend donc pas.
+      isProductif: false,
+    }));
+  } catch (error) {
+    console.error('❌ [CalendarAuth] Lecture des événements Apple:', error);
+    return [];
+  }
+}
+
+/**
  * Crée un événement dans le calendrier Apple
  */
 export async function createAppleCalendarEvent(
