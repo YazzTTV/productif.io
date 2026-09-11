@@ -70,8 +70,22 @@ export default function TasksAwarenessScreen() {
   };
 
 
+  // Les chips insèrent leur propre libellé dans le champ (« Échéances: »).
+  // Le garde du bouton se contentait de tasks.trim() : cliquer un chip
+  // suffisait donc à activer « Continuer » sans qu'aucune tâche ait été saisie,
+  // et l'utilisateur atterrissait sur un écran vide. On exige du texte réel,
+  // c'est-à-dire ce qui reste une fois les libellés de chips retirés.
+  const hasRealContent = React.useMemo(() => {
+    let stripped = tasks;
+    for (const chipKey of promptChips) {
+      const label = t(chipKey) || chipKey;
+      stripped = stripped.split(`${label}:`).join(' ');
+    }
+    return stripped.replace(/[\s:;,.\-•*]/g, '').length > 0;
+  }, [tasks, t]);
+
   const handleContinue = async () => {
-    if (!tasks.trim() || isLoading) return;
+    if (!hasRealContent || isLoading) return;
 
     const rawInput = tasks.trim();
     setIsLoading(true);
@@ -216,10 +230,10 @@ export default function TasksAwarenessScreen() {
           <Animated.View entering={FadeInDown.delay(400).duration(400)} style={styles.buttonContainer}>
             <TouchableOpacity
               onPress={handleContinue}
-              disabled={!tasks.trim() || isLoading}
+              disabled={!hasRealContent || isLoading}
               style={[
                 styles.continueButton,
-                (!tasks.trim() || isLoading) && styles.continueButtonDisabled,
+                (!hasRealContent || isLoading) && styles.continueButtonDisabled,
               ]}
               activeOpacity={0.8}
             >

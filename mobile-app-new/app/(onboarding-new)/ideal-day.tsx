@@ -57,27 +57,57 @@ export default function IdealDayScreen() {
           .map((task: any) => task.title);
         setPriorities(priorityTasks);
 
-        // Créer la timeline à partir des tâches
+        // Créer la timeline à partir des tâches.
+        //
+        // Ce filtre ne lisait que dueDate. Or une tâche issue du repli local
+        // (analyse IA indisponible) n'a pas de dueDate, et une tâche planifiée
+        // porte sa date sur scheduledFor. Résultat : la « journée idéale »
+        // s'affichait entièrement vide, sous un texte affirmant qu'elle
+        // suffisait à faire une bonne journée. Constaté sur le compte du
+        // premier testeur externe, le 8 septembre 2026.
+        const readTaskDate = (task: any): Date | null => {
+          const raw = task.dueDate || task.scheduledFor;
+          if (!raw) return null;
+          const parsed = new Date(raw);
+          return Number.isNaN(parsed.getTime()) ? null : parsed;
+        };
+
+        const estimateDuration = (task: any): number => {
+          if (task.energyLevel === 0) return 30;
+          if (task.energyLevel === 1) return 45;
+          if (task.energyLevel === 3) return 90;
+          return 60;
+        };
+
+        // Sans aucune date exploitable, on étale les tâches à partir de 9h
+        // plutôt que de rendre un écran vide : l'utilisateur a bien saisi des
+        // tâches, il doit les voir.
+        let fallbackCursor = 9 * 60;
+
         const blocks: TimelineBlock[] = tasks
-          .filter((task: any) => task.dueDate)
+          .filter((task: any) => (task.title || task.name))
           .map((task: any) => {
-            const dueDate = new Date(task.dueDate);
-            const hours = dueDate.getHours();
-            const minutes = dueDate.getMinutes();
-            const timeStr = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
-            
-            // Estimer la durée en fonction de la priorité et de l'énergie
-            let duration = 60; // Par défaut 60 minutes
-            if (task.energyLevel === 0) duration = 30;
-            else if (task.energyLevel === 1) duration = 45;
-            else if (task.energyLevel === 2) duration = 60;
-            else if (task.energyLevel === 3) duration = 90;
+            const duration = estimateDuration(task);
+            const date = readTaskDate(task);
+
+            let minutesFromMidnight: number;
+            if (date) {
+              minutesFromMidnight = date.getHours() * 60 + date.getMinutes();
+            } else {
+              minutesFromMidnight = fallbackCursor;
+              fallbackCursor += duration + 15;
+            }
+
+            const hours = Math.floor(minutesFromMidnight / 60) % 24;
+            const minutes = minutesFromMidnight % 60;
 
             return {
-              time: timeStr,
+              time: `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`,
               duration,
-              activity: task.title,
-              priority: task.priority === 4 || task.priority === 'high',
+              activity: task.title || task.name,
+              // La clarification renvoie un booléen, que les deux tests
+              // d'origine laissaient passer à travers.
+              priority: task.priority === true || task.priority === 4 || task.priority === 'high',
             };
           })
           .sort((a: TimelineBlock, b: TimelineBlock) => {
@@ -288,11 +318,13 @@ export default function IdealDayScreen() {
             })}
           </Animated.View>
 
-          <Animated.View entering={FadeIn.delay(800).duration(400)}>
-            <Text style={styles.footerText}>
-              {t('enoughForGoodDay') || 'This is enough to make tomorrow a good day.'}
-            </Text>
-          </Animated.View>
+          {timeline.length > 0 && (
+            <Animated.View entering={FadeIn.delay(800).duration(400)}>
+              <Text style={styles.footerText}>
+                {t('enoughForGoodDay') || 'This is enough to make tomorrow a good day.'}
+              </Text>
+            </Animated.View>
+          )}
         </View>
       </ScrollView>
 

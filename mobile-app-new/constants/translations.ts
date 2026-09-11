@@ -130,6 +130,8 @@ export const translations = {
     // ─── Task Clarification ────────────────────────────────────────────────────
     whatWeUnderstood: 'Voici ce que nous avons compris.',
     mustDoTomorrow: 'À faire demain',
+    noTasksExtracted: "Aucune tâche détectée pour l'instant.",
+    taskTitlePlaceholder: 'Titre de la tâche',
     buildIdealDay: 'Construire ma journée idéale',
     
     // ─── AI Processing ─────────────────────────────────────────────────────────
@@ -1200,6 +1202,8 @@ export const translations = {
     // ─── Task Clarification ────────────────────────────────────────────────────
     whatWeUnderstood: "Here's what we understood.",
     mustDoTomorrow: 'Must do tomorrow',
+    noTasksExtracted: 'No tasks detected yet.',
+    taskTitlePlaceholder: 'Task title',
     buildIdealDay: 'Build my ideal day',
     
     // ─── AI Processing ─────────────────────────────────────────────────────────
@@ -2273,6 +2277,8 @@ export const translations = {
     // ─── Task Clarification ────────────────────────────────────────────────────
     whatWeUnderstood: 'Esto es lo que entendimos.',
     mustDoTomorrow: 'Debo hacer mañana',
+    noTasksExtracted: 'Ninguna tarea detectada por ahora.',
+    taskTitlePlaceholder: 'Título de la tarea',
     buildIdealDay: 'Construir mi día ideal',
     
     // ─── AI Processing ─────────────────────────────────────────────────────────

@@ -151,7 +151,7 @@ export default function TaskClarificationScreen() {
                             style={styles.taskTitle}
                             value={task.title}
                             onChangeText={(text) => updateTaskTitle(task.id, text)}
-                            placeholder="Task title"
+                            placeholder={t('taskTitlePlaceholder') || 'Task title'}
                             placeholderTextColor="rgba(0, 0, 0, 0.4)"
                           />
 
@@ -178,7 +178,7 @@ export default function TaskClarificationScreen() {
             </Animated.View>
           ) : (
             <View style={styles.emptyState}>
-              <Text style={styles.emptyText}>No tasks extracted yet...</Text>
+              <Text style={styles.emptyText}>{t('noTasksExtracted') || 'No tasks detected yet.'}</Text>
               <TouchableOpacity
                 onPress={handleBackToInput}
                 style={styles.backButton}
