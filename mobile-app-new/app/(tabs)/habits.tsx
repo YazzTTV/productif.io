@@ -27,6 +27,7 @@ import Reanimated, { FadeInDown } from 'react-native-reanimated';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useSuperwall } from '@/hooks/useSuperwall';
 import { SUPERWALL_EVENTS } from '@/lib/superwallEvents';
+import { readCache, writeCache, CACHE_KEYS } from '@/lib/dataCache';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = width - 32; // 16px padding on each side
@@ -421,6 +422,7 @@ export default function HabitsScreen() {
   const { t } = useLanguage();
   const { triggerEvent } = useSuperwall();
   const [habits, setHabits] = useState<Habit[]>([]);
+  const hasLoadedOnceRef = useRef(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedDate, setSelectedDate] = useState(() => startOfDay(new Date()));
@@ -449,14 +451,30 @@ export default function HabitsScreen() {
       // Trier les habitudes par ordre
       const sortedHabits = habitsData.sort((a, b) => (a.order || 0) - (b.order || 0));
       setHabits(sortedHabits);
+      void writeCache(CACHE_KEYS.habits, sortedHabits);
     } catch (error) {
       console.error('❌ Erreur lors du chargement des habitudes:', error);
       Alert.alert(t('error'), t('loadHabitsError'));
     } finally {
+      hasLoadedOnceRef.current = true;
       setLoading(false);
       setRefreshing(false);
     }
   };
+
+  // Afficher d'entrée ce qu'on avait la dernière fois, puis laisser la réponse
+  // du serveur remplacer. Sans cela le premier rendu est toujours vide, et les
+  // routes de l'API coûtent 0,3 à 0,9 s même quand elles ne font rien.
+  useEffect(() => {
+    let annule = false;
+    (async () => {
+      const cached = await readCache<Habit[]>(CACHE_KEYS.habits);
+      if (annule || !cached || hasLoadedOnceRef.current) return;
+      setHabits(cached);
+      setLoading(false);
+    })();
+    return () => { annule = true; };
+  }, []);
 
   useFocusEffect(
     useCallback(() => {

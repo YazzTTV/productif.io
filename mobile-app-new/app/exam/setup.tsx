@@ -16,6 +16,7 @@ import {
 } from '@/utils/appBlocking';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { trackEvent } from '@/lib/analytics';
+import { readCache, writeCache, CACHE_KEYS } from '@/lib/dataCache';
 
 const MIN_DURATION = 25;
 const MAX_DURATION = 180;
@@ -113,6 +114,7 @@ export default function ExamSetupScreen() {
       const { primary, next } = await selectExamTasks();
       setPrimaryTask(primary);
       setNextTasks(next);
+      void writeCache(CACHE_KEYS.examTasks, { primary, next });
     } catch (error) {
       console.error('Error loading tasks:', error);
     } finally {
@@ -120,6 +122,22 @@ export default function ExamSetupScreen() {
       setLoading(false);
     }
   };
+
+  // Afficher d'entrée la sélection de la dernière fois. Elle est recalculée
+  // juste après : c'est un point de départ visuel, pas une source de vérité.
+  useEffect(() => {
+    let annule = false;
+    (async () => {
+      const cached = await readCache<{ primary: TaskForExam | null; next: TaskForExam[] }>(
+        CACHE_KEYS.examTasks
+      );
+      if (annule || !cached || hasLoadedOnceRef.current) return;
+      setPrimaryTask(cached.primary);
+      setNextTasks(cached.next || []);
+      setLoading(false);
+    })();
+    return () => { annule = true; };
+  }, []);
 
   const handleStart = async () => {
     if (!primaryTask) {

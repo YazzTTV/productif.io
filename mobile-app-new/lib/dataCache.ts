@@ -102,4 +102,8 @@ export async function clearDataCache(): Promise<void> {
 
 export const CACHE_KEYS = {
   subjects: 'subjects',
+  habits: 'habits',
+  habitsReview: 'habits_review',
+  projects: 'projects',
+  examTasks: 'exam_tasks',
 } as const;

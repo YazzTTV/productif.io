@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { projectsService } from '@/lib/api';
 import { dashboardEvents, DASHBOARD_DATA_CHANGED } from '@/lib/events';
+import { readCache, writeCache, CACHE_KEYS } from '@/lib/dataCache';
 
 const { width } = Dimensions.get('window');
 
@@ -86,6 +87,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onPress, onDelete })
 
 export default function ProjectsScreen() {
   const [projects, setProjects] = useState<Project[]>([]);
+  const hasLoadedOnceRef = useRef(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -98,15 +100,32 @@ export default function ProjectsScreen() {
       const response = await projectsService.getProjects();
       console.log('📋 Projets récupérés (page projets):', response);
       // La réponse de l'API est directement un tableau de projets
-      setProjects(Array.isArray(response) ? response : response.projects || []);
+      const list = Array.isArray(response) ? response : response.projects || [];
+      setProjects(list);
+      void writeCache(CACHE_KEYS.projects, list);
     } catch (error) {
       console.error('❌ Erreur lors du chargement des projets:', error);
       Alert.alert('Erreur', 'Impossible de charger les projets');
     } finally {
+      hasLoadedOnceRef.current = true;
       setLoading(false);
       setRefreshing(false);
     }
   };
+
+  // Afficher d'entrée ce qu'on avait la dernière fois, puis laisser la réponse
+  // du serveur remplacer. Sans cela le premier rendu est toujours vide, et les
+  // routes de l'API coûtent 0,3 à 0,9 s même quand elles ne font rien.
+  useEffect(() => {
+    let annule = false;
+    (async () => {
+      const cached = await readCache<Project[]>(CACHE_KEYS.projects);
+      if (annule || !cached || hasLoadedOnceRef.current) return;
+      setProjects(cached);
+      setLoading(false);
+    })();
+    return () => { annule = true; };
+  }, []);
 
   useFocusEffect(
     useCallback(() => {

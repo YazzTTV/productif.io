@@ -26,6 +26,7 @@ import {
 } from '@/tutorial/tutorialStorage';
 import { useSuperwall } from '@/hooks/useSuperwall';
 import { SUPERWALL_EVENTS } from '@/lib/superwallEvents';
+import { readCache, writeCache, CACHE_KEYS } from '@/lib/dataCache';
 
 interface Habit {
   id: string;
@@ -91,6 +92,7 @@ export function ReviewHabits() {
       
       console.log('📊 Habitudes traitées:', habitsData);
       setHabits(habitsData);
+      void writeCache(CACHE_KEYS.habitsReview, habitsData);
     } catch (error) {
       console.error('❌ Erreur lors du chargement des habitudes:', error);
       Alert.alert('Erreur', 'Impossible de charger les habitudes');
@@ -99,6 +101,19 @@ export function ReviewHabits() {
       setLoading(false);
     }
   };
+
+  // Afficher d'entrée ce qu'on avait la dernière fois, puis laisser la réponse
+  // du serveur remplacer.
+  useEffect(() => {
+    let annule = false;
+    (async () => {
+      const cached = await readCache<Habit[]>(CACHE_KEYS.habitsReview);
+      if (annule || !cached || hasLoadedOnceRef.current) return;
+      setHabits(cached);
+      setLoading(false);
+    })();
+    return () => { annule = true; };
+  }, []);
 
   const refreshTutorialState = useCallback(async () => {
     const [completed, stage] = await Promise.all([
