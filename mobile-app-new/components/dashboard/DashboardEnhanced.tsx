@@ -5,6 +5,7 @@ import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { authService, gamificationService, googleCalendarService } from '@/lib/api';
+import { isAppleCalendarConnected } from '@/lib/calendarAuth';
 import { format, parseISO, isBefore, isAfter } from 'date-fns';
 import { checkPremiumStatus } from '@/utils/premium';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -228,10 +229,15 @@ export function DashboardEnhanced() {
       const premiumStatus = await checkPremiumStatus();
       setIsPremium(premiumStatus.isPremium);
 
-      // Récupérer les événements Google Calendar
+      // Récupérer les événements du calendrier.
+      //
+      // Un calendrier Apple connecté doit compter ici au même titre que Google :
+      // cet état commande l'affichage ET l'avance du didacticiel, qui restait
+      // donc bloqué à l'étape « calendrier » pour tout utilisateur sur Apple.
+      let calendarConnected = false;
       try {
         const calendarData = await googleCalendarService.getTodayEvents();
-        setIsCalendarConnected(calendarData.connected);
+        calendarConnected = Boolean(calendarData.connected);
         if (calendarData.connected && calendarData.events) {
           setCalendarEvents(calendarData.events);
         } else {
@@ -240,8 +246,14 @@ export function DashboardEnhanced() {
       } catch (error) {
         console.error('Erreur récupération événements Google Calendar:', error);
         setCalendarEvents([]);
-        setIsCalendarConnected(false);
       }
+
+      if (!calendarConnected) {
+        // Apple n'expose pas ses événements côté serveur, seulement l'état de
+        // connexion : la liste reste vide mais l'app cesse de le nier.
+        calendarConnected = await isAppleCalendarConnected();
+      }
+      setIsCalendarConnected(calendarConnected);
 
       if (user) {
         const storedFavoriteGroupId = await AsyncStorage.getItem(FAVORITE_GROUP_KEY);

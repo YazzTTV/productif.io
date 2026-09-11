@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Audio } from 'expo-av';
 import * as FileSystem from 'expo-file-system';
 import { taskAssociationService, googleCalendarService, dailyPlanningService, authService, PlanLimits, getAuthToken } from '@/lib/api';
+import { isAppleCalendarConnected, getAppleCalendars, createAppleCalendarEvent } from '@/lib/calendarAuth';
 import { format, addMinutes, setHours, setMinutes, startOfDay, isBefore, getHours, getMinutes } from 'date-fns';
 import { useLanguage } from '@/contexts/LanguageContext';
 import {
@@ -63,6 +64,8 @@ export function PlanMyDay() {
   
   // Google Calendar & Overview
   const [isCalendarConnected, setIsCalendarConnected] = useState(false);
+  // Google seul, pour les actions qui passent reellement par l'API Google.
+  const [isGoogleCalendarConnected, setIsGoogleCalendarConnected] = useState(false);
   const [eventStartTimes, setEventStartTimes] = useState<Date[]>([]); // Heure de début de chaque événement
   const [isCreatingEvents, setIsCreatingEvents] = useState(false);
   const [targetDate, setTargetDate] = useState(new Date()); // Date cible pour le plan
@@ -520,14 +523,26 @@ export function PlanMyDay() {
     }
   };
 
-  // Vérifier la connexion Google Calendar
+  // Vérifier qu'un calendrier est connecté, quel qu'en soit le fournisseur.
+  //
+  // Cette fonction ne lisait que Google. Une connexion Apple réussie et
+  // enregistrée côté serveur restait donc invisible ici, et le didacticiel
+  // devenait infranchissable : son seul passage de l'étape « plan » à l'étape
+  // « focus » est dans le succès de handleCreateCalendarEvents, gardé par cet
+  // état. Constaté sur un compte réel le 8 septembre 2026.
   const checkCalendarConnection = async () => {
+    let google = false;
     try {
       const status = await googleCalendarService.getStatus();
-      setIsCalendarConnected(status.connected && !status.isExpired);
+      google = Boolean(status.connected && !status.isExpired);
     } catch {
-      setIsCalendarConnected(false);
+      google = false;
     }
+
+    const apple = google ? false : await isAppleCalendarConnected();
+
+    setIsGoogleCalendarConnected(google);
+    setIsCalendarConnected(google || apple);
   };
 
   // Modifier la durée d'une tâche (phase association)
@@ -627,14 +642,77 @@ export function PlanMyDay() {
     setEventStartTimes(reorderedTimes);
   };
 
-  // Créer les événements dans Google Calendar
+  // Fin de l'étape de planification, commune aux deux fournisseurs.
+  // Le didacticiel ne doit jamais dépendre du calendrier choisi.
+  const finishPlanningStep = async () => {
+    if (tutorialStage === 'plan' && !tutorialCompleted) {
+      await setTutorialStage('focus');
+      setTutorialStageState('focus');
+      router.push('/focus');
+    } else {
+      router.back();
+    }
+  };
+
+  // Chemin Apple : expo-calendar écrit directement dans le calendrier local,
+  // il n'existe pas d'API serveur équivalente à celle de Google.
+  const createAppleDayEvents = async () => {
+    try {
+      setIsCreatingEvents(true);
+
+      const calendars = await getAppleCalendars();
+      const target = calendars.find((cal: any) => cal.allowsModifications) || calendars[0];
+      if (!target) {
+        Alert.alert('Erreur', "Aucun calendrier Apple modifiable n'a été trouvé sur cet appareil.");
+        return;
+      }
+
+      let created = 0;
+      for (let i = 0; i < tasks.length; i++) {
+        const task = tasks[i];
+        const start = eventStartTimes[i] || new Date();
+        const end = new Date(start.getTime() + (task.estimatedDuration || 60) * 60000);
+        const eventId = await createAppleCalendarEvent(
+          target.id,
+          task.title,
+          start,
+          end,
+          task.description || undefined
+        );
+        if (eventId) created++;
+      }
+
+      if (created === 0) {
+        Alert.alert('Erreur', 'Impossible de créer les événements dans le calendrier Apple.');
+        return;
+      }
+
+      Alert.alert(
+        'Succès',
+        `${created} événement(s) ajouté(s) à votre calendrier Apple.`,
+        [{ text: 'OK', onPress: () => { void finishPlanningStep(); } }]
+      );
+    } catch (error) {
+      console.error('Erreur création événements Apple:', error);
+      Alert.alert('Erreur', 'Impossible de créer les événements dans le calendrier Apple.');
+    } finally {
+      setIsCreatingEvents(false);
+    }
+  };
+
+  // Créer les événements dans le calendrier connecté
   const handleCreateCalendarEvents = async () => {
     if (!isCalendarConnected) {
       Alert.alert(
-        'Google Calendar non connecté',
-        'Connectez votre Google Calendar dans les paramètres pour ajouter ces événements.',
+        'Aucun calendrier connecté',
+        'Connectez Google Agenda ou le calendrier Apple dans les paramètres pour ajouter ces événements.',
         [{ text: 'OK' }]
       );
+      return;
+    }
+
+    if (!isGoogleCalendarConnected) {
+      await createAppleDayEvents();
       return;
     }
 
@@ -684,15 +762,7 @@ export function PlanMyDay() {
             {
               text: 'OK',
               onPress: () => {
-                void (async () => {
-                  if (tutorialStage === 'plan' && !tutorialCompleted) {
-                    await setTutorialStage('focus');
-                    setTutorialStageState('focus');
-                    router.push('/focus');
-                  } else {
-                    router.back();
-                  }
-                })();
+                void finishPlanningStep();
               },
             },
           ]
