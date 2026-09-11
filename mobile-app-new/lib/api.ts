@@ -134,6 +134,17 @@ export class TokenStorage {
 
   async clearToken() {
     this.token = null;
+
+    // Le cache de données est cloisonné par utilisateur, mais on le purge quand
+    // même : le téléphone ne doit rien garder d'un compte déconnecté. Import
+    // dynamique, parce que dataCache importe TokenStorage depuis ce fichier.
+    try {
+      const { clearDataCache } = await import('@/lib/dataCache');
+      await clearDataCache();
+    } catch {
+      // une purge qui échoue ne doit pas empêcher la déconnexion
+    }
+
     if (isAsyncStorageAvailable()) {
       try {
         await AsyncStorage.removeItem('auth_token');
@@ -1592,21 +1603,6 @@ export const assistantService = {
   },
 
   // Créer des tâches intelligentes (plan tomorrow)
-  // Timeout court et volontaire : au-delà, l'appelant retombe sur un découpage
-  // local instantané qui donne un résultat équivalent. Le défaut par défaut est
-  // de 30 s, et le serveur s'autorise 60 s (maxDuration de la route), donc
-  // l'utilisateur pouvait regarder un spinner une demi-minute avant d'obtenir
-  // ce que le repli produit immédiatement.
-  async planTomorrow(userInput: string, date?: string): Promise<any> {
-    return await apiCall('/tasks/agent/batch-create', {
-      method: 'POST',
-      body: JSON.stringify({
-        userInput,
-        date,
-      }),
-    }, 12000);
-  },
-
   // Envoyer un message au chat et recevoir une réponse de l'agent IA
   async sendChatMessage(message: string): Promise<any> {
     return await apiCall('/assistant/chat', {

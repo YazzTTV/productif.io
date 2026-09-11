@@ -24,6 +24,7 @@ import {
   TutorialStage,
 } from '@/tutorial/tutorialStorage';
 import { InlineHint } from '@/tutorial/InlineHint';
+import { readCache, writeCache, CACHE_KEYS } from '@/lib/dataCache';
 import { Coachmark } from '@/tutorial/Coachmark';
 import { useSuperwall } from '@/hooks/useSuperwall';
 import {
@@ -282,6 +283,9 @@ export function TasksNew() {
           completedCount: s.tasks.filter((t: Task) => t.completed).length,
         })));
         setSubjects(normalizedData);
+        // Ce qui est à l'écran devient ce qu'on affichera d'entrée la
+        // prochaine fois, avant même que le réseau ait répondu.
+        void writeCache(CACHE_KEYS.subjects, normalizedData);
         // Ouvrir la matière du didacticiel ou la première par défaut
         if (normalizedData.length > 0) {
           const firstSubjectId = normalizedData[0].id;
@@ -303,6 +307,23 @@ export function TasksNew() {
       hasLoadedOnceRef.current = true;
       setLoading(false);
     }
+  }, []);
+
+  // Afficher immédiatement les matières de la dernière session, puis laisser
+  // le chargement réseau les remplacer. C'est ce qui rend l'ouverture de
+  // l'onglet instantanée au lieu de commencer par un écran vide.
+  useEffect(() => {
+    let annule = false;
+    (async () => {
+      const cached = await readCache<Subject[]>(CACHE_KEYS.subjects);
+      // Si l'API a déjà répondu entre-temps, on ne réécrase pas du frais par du vieux.
+      if (annule || !cached || hasLoadedOnceRef.current) return;
+      setSubjects(cached);
+      setLoading(false);
+    })();
+    return () => {
+      annule = true;
+    };
   }, []);
 
   // Charger les matières depuis l'API au montage
