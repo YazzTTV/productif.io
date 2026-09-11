@@ -143,9 +143,24 @@ export function PlanMyDay() {
 
   const startRecording = async () => {
     try {
-      const permission = await Audio.requestPermissionsAsync();
+      let permission = await Audio.requestPermissionsAsync();
+
+      // Sur iOS, le statut renvoyé juste après la validation du dialogue
+      // système peut encore valoir false : l'utilisateur venait d'autoriser le
+      // micro et voyait malgré tout « l'accès au microphone est nécessaire ».
+      // C'est ce qui produisait l'échec au premier appui suivi d'un succès au
+      // second, le statut étant à jour la fois suivante. On relit donc le
+      // statut avant de conclure à un refus.
       if (!permission.granted) {
-        Alert.alert('Permission refusée', 'L\'accès au microphone est nécessaire pour enregistrer.');
+        await new Promise((resolve) => setTimeout(resolve, 400));
+        permission = await Audio.getPermissionsAsync();
+      }
+
+      if (!permission.granted) {
+        Alert.alert(
+          'Accès au micro refusé',
+          'Autorise le micro pour Productif.io dans les Réglages de ton iPhone pour dicter ta journée.'
+        );
         return;
       }
 
@@ -176,7 +191,7 @@ export function PlanMyDay() {
         // et le second passait. On refait ici, une seule fois, l'essai que
         // l'utilisateur faisait à la main.
         console.warn('Premier essai d\'enregistrement échoué, nouvelle tentative:', premierEchec);
-        await new Promise((resolve) => setTimeout(resolve, 350));
+        await new Promise((resolve) => setTimeout(resolve, 500));
         await Audio.setAudioModeAsync(modeAudio);
         newRecording = await creerEnregistrement();
       }
@@ -186,7 +201,7 @@ export function PlanMyDay() {
       setPhase('recording');
     } catch (error: any) {
       console.error('Erreur démarrage enregistrement:', error);
-      Alert.alert('Erreur', 'Impossible de démarrer l\'enregistrement.');
+      Alert.alert('Le micro n\'a pas démarré', 'Réessaie dans un instant.');
     }
   };
 
