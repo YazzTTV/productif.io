@@ -1,6 +1,20 @@
 # Assistant IA > Analyses : livraison
 
-15 septembre 2026. Implémentation locale sur `codex/assistant-analyses`. Aucun déploiement de production ni publication mobile effectué.
+15 septembre 2026. Backend et interface web déployés en production. Le code applicatif est intégré à `main` (`00e0aaf`). Noah réalise lui-même l’archive et l’envoi TestFlight.
+
+## Déploiement réalisé
+
+- Domaine : https://www.productif.io/dashboard/analytics
+- Déploiement final : `dpl_AhD5iVXKV2ZedvruJZvLpFkzkaTk`, https://productif-io-1-8qbzwfbn7-noahs-projects-6c1762cf.vercel.app
+- Migration `20260915150000_study_analysis` appliquée avec succès par le build de production.
+- Contrôles réels sur compte temporaire : accès protégé, séance de 25 minutes, synchronisation rejouée sans doublon, check-in enregistré, tâche terminée et limite d’historique du compte gratuit.
+- Explication IA réellement générée et validée. La sortie utilise un schéma JSON strict, avec identifiants de faits autorisés et absence de chiffres dans le texte. Le contrôle applicatif et le repli calculé restent actifs.
+- Comptes de test supprimés après vérification. Aucun compte utilisateur existant modifié.
+- Version précédente utilisable pour retour arrière : `dpl_F7MwtMGGo1PhAR9ENc7B5Ns7dofv` (avant cette fonctionnalité). Conserver la migration additive en cas de retour arrière.
+
+### Avant ton envoi TestFlight
+
+Le backend est prêt. Utiliser le code à jour de `main`, choisir un numéro de build supérieur au dernier envoyé à Apple, puis archiver et envoyer avec le circuit habituel. Aucune dépendance native ajoutée pour cette fonctionnalité. La recette sur appareil reste à faire avant diffusion plus large.
 
 ## Ce qui est créé
 
@@ -57,7 +71,7 @@ Ne pas lancer `npm run build` comme simple test avec une base de production conf
 ## Limites de validation et exploitation
 
 - Aucun parcours natif sur iPhone physique n’a été exécuté ici. L’export iOS valide le bundle, pas le comportement des extensions natives.
-- L’appel réel au fournisseur IA n’a pas été exécuté dans les tests. Le chemin de repli a été testé. Les chiffres affichés viennent du moteur de calcul ; la validation de sortie du modèle ne constitue pas une preuve de justesse de chaque phrase.
+- Les tests automatisés utilisent le chemin de repli ; une vérification réelle du fournisseur IA avec des données fictives a aussi été réalisée pendant le déploiement. Les chiffres affichés viennent du moteur de calcul ; la validation de sortie du modèle ne constitue pas une preuve de justesse de chaque phrase.
 - Le cache des explications est borné et local au processus. Il ne constitue pas un quota distribué entre plusieurs instances. Les limites de trafic et de coût de l’infrastructure doivent couvrir cette route avant une ouverture à grande échelle.
 - Une séance arrêtée par le système sans notification de fin ne devient pas artificiellement une séance réussie. Le temps est plafonné à la durée prévue et l’état peut rester indéterminé.
 - La page web permet de consulter et d’expliquer le bilan. Les raccourcis de préparation d’une séance ciblée sont intégrés au parcours mobile ; le web renvoie à l’espace de travail existant.

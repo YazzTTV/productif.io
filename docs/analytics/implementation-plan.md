@@ -26,4 +26,4 @@
 
 ## Statut
 
-Implémentation locale terminée. Le moteur, la collecte, les écrans, les routes et la migration sont créés. Les résultats de vérification, limites et étapes d’activation sont consignés dans [delivery.md](delivery.md). La recette sur appareil natif et le déploiement restent à effectuer avant publication.
+Implémentation locale terminée. Le moteur, la collecte, les écrans, les routes et la migration sont créés. Les résultats de vérification, limites et étapes d’activation sont consignés dans [delivery.md](delivery.md). Le backend et le web sont déployés en production. Noah prend en charge le build et l’envoi TestFlight ; la recette sur appareil natif reste à effectuer.
