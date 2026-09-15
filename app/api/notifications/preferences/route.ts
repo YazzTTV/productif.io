@@ -293,6 +293,13 @@ export async function POST(request: NextRequest) {
                     const schedulerUrl = `${base.replace(/\/$/, '')}/api/update-user`;
                     const isLocal = base.includes('localhost') || base.includes('127.0.0.1');
                     try {
+                        // Rendre l'absence de cle BRUYANTE. C'est ce silence qui a
+                        // laisse passer 36 jours de 401 : sans cet avertissement, une
+                        // variable manquante cote Vercel donne exactement le meme
+                        // symptome qu'un en-tete jamais ecrit.
+                        if (!process.env.SCHEDULER_API_KEY && !isLocal) {
+                            console.error('❌ SCHEDULER_API_KEY absente cote Vercel : l\'appel partira sans en-tete et le scheduler repondra 401.');
+                        }
                         console.log(`🔗 Tentative de connexion au scheduler ${isLocal ? '(LOCAL)' : '(RAILWAY)'}: ${schedulerUrl}`);
                         const resp = await fetch(schedulerUrl, {
                             method: 'POST',
