@@ -92,7 +92,26 @@ export async function POST(req: NextRequest) {
             model: process.env.STUDY_ANALYSIS_MODEL || "gpt-4o-mini",
             temperature: 0.2,
             max_tokens: 450,
-            response_format: { type: "json_object" },
+            response_format: {
+              type: "json_schema",
+              json_schema: {
+                name: "study_explanation",
+                strict: true,
+                schema: {
+                  type: "object",
+                  properties: {
+                    response: { type: "string", pattern: "^[^0-9]*$" },
+                    factIds: {
+                      type: "array",
+                      items: { type: "string", enum: facts.map((f) => f.id) },
+                      minItems: 1,
+                    },
+                  },
+                  required: ["response", "factIds"],
+                  additionalProperties: false,
+                },
+              },
+            },
             messages: [
               {
                 role: "system",
