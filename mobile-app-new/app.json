@@ -2,7 +2,7 @@
   "expo": {
     "name": "Productif.io",
     "slug": "productif-io",
-    "version": "1.2.1",
+    "version": "1.3.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "productifio",
@@ -12,7 +12,7 @@
       "bundleIdentifier": "io.productif.app",
       "appleTeamId": "NGAU42SNSX",
       "googleServicesFile": "./firebase/GoogleService-Info.plist",
-      "buildNumber": "15",
+      "buildNumber": "16",
       "infoPlist": {
         "CFBundleLocalizations": ["fr", "en", "es"],
         "NSCameraUsageDescription": "We need access to your camera to allow you to take photos for your tasks and journal entries.",

@@ -92,13 +92,12 @@ export function usePushNotifications(options: UsePushNotificationsOptions = {}) 
           let token: string | null = null;
           
           if (Platform.OS === 'ios') {
-            const projectId = Constants.expoConfig?.extra?.eas?.projectId || Constants.easConfig?.projectId;
-            if (projectId) {
-              token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
-            } else {
-              const deviceToken = await Notifications.getDevicePushTokenAsync();
-              token = deviceToken.data;
-            }
+            // Token APNs NATIF, jamais le token Expo. Le backend envoie en APNs
+            // direct via @parse/node-apn (lib/apns.ts), qui attend un device token
+            // brut. Un `ExponentPushToken[...]` est rejete par Apple en
+            // `BadDeviceToken` 400, constate en production le 15 septembre.
+            const deviceToken = await Notifications.getDevicePushTokenAsync();
+            token = deviceToken.data;
           } else {
             // Sur Android, configurer à nouveau le canal pour être sûr
             await Notifications.setNotificationChannelAsync('default', {
@@ -541,18 +540,11 @@ async function registerForPushNotificationsAsync(): Promise<string | null> {
       // Pour iOS natif, on utilise getDevicePushTokenAsync au lieu de getExpoPushTokenAsync
       // car on envoie directement via APNs
       if (Platform.OS === 'ios') {
-        // Pour une app native iOS, on doit utiliser le device token natif
-        // Mais avec Expo, on peut utiliser getExpoPushTokenAsync qui retourne un token Expo
-        // Si tu veux utiliser APNs directement, il faut utiliser getDevicePushTokenAsync
-        // Pour l'instant, on utilise getExpoPushTokenAsync qui fonctionne avec Expo
-        const projectId = Constants.expoConfig?.extra?.eas?.projectId || Constants.easConfig?.projectId;
-        if (projectId) {
-          token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
-        } else {
-          // Fallback: utiliser getDevicePushTokenAsync pour iOS natif
-          const deviceToken = await Notifications.getDevicePushTokenAsync();
-          token = deviceToken.data;
-        }
+        // Meme regle que dans requestPermissions : device token APNs natif.
+        // Le commentaire precedent disait deja qu'il fallait getDevicePushTokenAsync
+        // pour APNs direct, et le code faisait l'inverse.
+        const deviceToken = await Notifications.getDevicePushTokenAsync();
+        token = deviceToken.data;
       } else {
         // Pour Android, utiliser getDevicePushTokenAsync() pour obtenir le token FCM natif
         // Cela permet d'envoyer directement via FCM depuis le backend sans passer par Expo Push Notification Service
