@@ -82,6 +82,10 @@ model User {
   appleCalendarConnection AppleCalendarConnection?
   subjects                Subject[]
 
+  studySessions StudySession[]
+  studyCheckIns StudyCheckIn[]
+  taskHistory TaskHistory[]
+
   // Attribution / Affiliation
   referredBy          String?   // af_sub1 = ID de l'affilié
   attributionSource   String?   // media_source (e.g. "partner_inv", "influencer")
@@ -185,6 +189,8 @@ model Task {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
   title        String
+  completedAt DateTime?
+  history TaskHistory[]
   description  String?
   dueDate      DateTime?
   userId       String
@@ -1042,4 +1048,50 @@ model CreatorApplication {
   @@index([status])
   @@index([email])
   @@map("creator_applications")
+}
+
+// Active segments are timestamp intervals; paused and unknown time is excluded.
+model StudySession {
+  userId String
+  clientId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  source String
+  serverSessionId String?
+  startedAt DateTime
+  endedAt DateTime?
+  plannedSeconds Int
+  status String
+  segments Json
+  revision Int
+  recommendationId String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@id([userId, clientId])
+  @@index([userId, startedAt])
+}
+
+model StudyCheckIn {
+  userId String
+  clientId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sessionId String?
+  type String
+  value Int
+  timestamp DateTime
+  createdAt DateTime @default(now())
+  @@id([userId, clientId])
+  @@index([userId, timestamp])
+}
+
+model TaskHistory {
+  id String @id @default(cuid())
+  userId String
+  taskId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  kind String
+  previousDate DateTime?
+  nextDate DateTime?
+  createdAt DateTime @default(now())
+  @@index([userId, createdAt])
 }

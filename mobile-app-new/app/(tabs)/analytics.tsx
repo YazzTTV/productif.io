@@ -1,806 +1,1012 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
-  StyleSheet,
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
+  RefreshControl,
+  StyleSheet,
+  Modal,
   TextInput,
-  Alert,
- Dimensions } from 'react-native';
-import { router, useLocalSearchParams } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import { LineChart } from 'react-native-chart-kit';
-import { behaviorService, authService, PlanLimits } from '@/lib/api';
-import { format, parseISO, subDays } from 'date-fns';
-import { fr, enUS, es as esLocale } from 'date-fns/locale';
-import { useLanguage } from '@/contexts/LanguageContext';
-import { useSuperwall } from '@/hooks/useSuperwall';
-import { SUPERWALL_EVENTS } from '@/lib/superwallEvents';
+  Switch,
+} from "react-native";
+import { useRouter } from "expo-router";
+import { useLanguage } from "@/contexts/LanguageContext";
+import { useTheme } from "@/contexts/ThemeContext";
+import { apiCall } from "@/lib/api";
+import { flushStudyQueue, type StudyAnalysis } from "@/lib/studyAnalysis";
+import { factText, type AnalysisLanguage } from "@/lib/studyCopy";
+import { trackEvent } from "@/lib/analytics";
+import { StudyCheckIn } from "@/components/analytics/StudyCheckIn";
+import { useSuperwall } from "@/hooks/useSuperwall";
+import { SUPERWALL_EVENTS } from "@/lib/superwallEvents";
 
-const { width } = Dimensions.get('window');
-
-type CheckInType = 'mood' | 'stress' | 'focus';
-
-interface AnalyticsData {
-  date: string;
-  mood: number | null;
-  stress: number | null;
-  focus: number | null;
-  moodCount: number;
-  stressCount: number;
-  focusCount: number;
-}
-
-interface AnalyticsScreenProps {
-  checkInType?: CheckInType;
-  isActive?: boolean; // Nouvelle prop pour indiquer si l'onglet est actif
-}
-
-export default function AnalyticsScreen({ checkInType: propCheckInType, isActive = true }: AnalyticsScreenProps = {}) {
-  const params = useLocalSearchParams();
-  const checkInType = (propCheckInType || params.checkInType) as CheckInType | undefined;
-  const hasLoadedRef = useRef(false);
-  const { t, language } = useLanguage();
-  const { triggerEvent } = useSuperwall();
-  const locale = language === 'en' ? enUS : language === 'es' ? esLocale : fr;
-
-  const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
-  const [analyticsData, setAnalyticsData] = useState<AnalyticsData[]>([]);
-  const [averages, setAverages] = useState<{
-    mood: number | null;
-    stress: number | null;
-    focus: number | null;
-  }>({ mood: null, stress: null, focus: null });
-  const [planLimits, setPlanLimits] = useState<PlanLimits | null>(null);
-  const [plan, setPlan] = useState<string | null>(null);
-  const [showCheckInForm, setShowCheckInForm] = useState(!!checkInType);
-  const [checkInValue, setCheckInValue] = useState('');
-  const [checkInNote, setCheckInNote] = useState('');
-
-  // Charger les données au montage
-  useEffect(() => {
-    console.log('🔄 [Analytics] useEffect - Montage du composant, isActive:', isActive);
-    console.log('🔄 [Analytics] hasLoadedRef.current:', hasLoadedRef.current);
-    if (!hasLoadedRef.current) {
-      hasLoadedRef.current = true;
-      console.log('🔄 [Analytics] Premier chargement...');
-      loadPlan();
-      loadAnalytics();
-    } else if (isActive) {
-      console.log('🔄 [Analytics] Composant déjà monté, rechargement...');
-      loadAnalytics();
+type Fact = StudyAnalysis["facts"][number];
+const duration = (seconds: number) =>
+  `${Math.floor(seconds / 3600)} h ${Math.floor((seconds % 3600) / 60)
+    .toString()
+    .padStart(2, "0")} min`;
+export default function AnalyticsScreen({
+  checkInType,
+  isActive = true,
+}: { checkInType?: "mood" | "stress" | "focus"; isActive?: boolean } = {}) {
+  const router = useRouter(),
+    { language } = useLanguage(),
+    { colors } = useTheme(),
+    { triggerEvent } = useSuperwall();
+  const lang: AnalysisLanguage =
+    language === "en" ? "en" : language === "es" ? "es" : "fr";
+  const tr = (fr: string, en: string, es: string) =>
+    lang === "en" ? en : lang === "es" ? es : fr;
+  const [days, setDays] = useState(7),
+    [data, setData] = useState<StudyAnalysis | null>(null),
+    [busy, setBusy] = useState(false),
+    [error, setError] = useState(""),
+    [pending, setPending] = useState(false),
+    [locked, setLocked] = useState(false);
+  const [section, setSection] = useState("work"),
+    [selected, setSelected] = useState<Fact | null>(null),
+    [question, setQuestion] = useState(""),
+    [journal, setJournal] = useState(false),
+    [answer, setAnswer] = useState(""),
+    [asking, setAsking] = useState(false);
+  const request = useRef(0),
+    explainRequest = useRef(0);
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  const load = useCallback(async () => {
+    const id = ++request.current;
+    setBusy(true);
+    setError("");
+    setLocked(false);
+    try {
+      const queued = await flushStudyQueue();
+      const result = await apiCall<StudyAnalysis>(
+        `/study-analysis?days=${days}&timezone=${encodeURIComponent(timezone)}`,
+      );
+      if (id === request.current) {
+        setData(result);
+        setPending(queued > 0);
+      }
+    } catch (e: any) {
+      if (id === request.current) {
+        setData(null);
+        setLocked(e?.status === 403 || e?.locked === true);
+        setError("unavailable");
+      }
+    } finally {
+      if (id === request.current) setBusy(false);
     }
-  }, []);
-
-  // Recharger les données quand l'onglet devient actif
+  }, [days, timezone]);
   useEffect(() => {
-    console.log('🔄 [Analytics] useEffect - isActive changé:', isActive);
     if (isActive) {
-      console.log('🔄 [Analytics] Onglet actif, rechargement des données...');
-      loadAnalytics();
+      void load();
+      void trackEvent("analysis_opened", { period_days: days });
     }
-  }, [isActive]);
-
-  const loadAnalytics = async () => {
+    return () => {
+      request.current++;
+    };
+  }, [load, isActive]);
+  const text = (content: React.ReactNode, style: object = {}) => (
+    <Text style={[{ color: colors.text }, style]}>{content}</Text>
+  );
+  const card = (children: React.ReactNode, key?: string) => (
+    <View
+      key={key}
+      style={[
+        styles.card,
+        { backgroundColor: colors.surface, borderColor: colors.border },
+      ]}
+    >
+      {children}
+    </View>
+  );
+  function open(f: Fact) {
+    explainRequest.current++;
+    setSelected(f);
+    setQuestion("");
+    setAnswer("");
+    setJournal(false);
+    setAsking(false);
+    void trackEvent("analysis_evidence_opened", { fact_kind: f.kind });
+  }
+  async function explain() {
+    if (!selected) return;
+    const id = ++explainRequest.current;
+    setAsking(true);
     try {
-      setLoading(true);
-      console.log('📊 [Analytics] ===== DÉBUT DU CHARGEMENT =====');
-
-      // Vérifier d'abord si l'utilisateur est authentifié
-      const user = await authService.checkAuth();
-      setIsAuthenticated(!!user);
-
-      if (!user) {
-        console.log('ℹ️ [Analytics] Utilisateur non authentifié, affichage d\'un état approprié');
-        setAnalyticsData([]);
-        setAverages({ mood: null, stress: null, focus: null });
-        setLoading(false);
-        return;
-      }
-
-      console.log('📊 [Analytics] Appel à behaviorService.getAnalytics()...');
-      const response = await behaviorService.getAnalytics();
-      console.log('✅ [Analytics] Données reçues:', JSON.stringify(response, null, 2));
-      console.log('✅ [Analytics] response.data:', response.data);
-      console.log('✅ [Analytics] response.averages:', response.averages);
-      setAnalyticsData(response.data || []);
-      setAverages(response.averages || { mood: null, stress: null, focus: null });
-      if (response.planLimits) {
-        setPlanLimits(response.planLimits);
-      }
-      if (response.plan) {
-        setPlan(response.plan);
-      }
-      console.log('✅ [Analytics] State mis à jour');
-      console.log('📊 [Analytics] ===== FIN DU CHARGEMENT =====');
-    } catch (error: any) {
-      console.error('❌ [Analytics] Erreur lors du chargement des analytics:', error);
-      console.error('❌ [Analytics] Type d\'erreur:', error?.constructor?.name);
-      console.error('❌ [Analytics] Message:', error?.message);
-      console.error('❌ [Analytics] Stack:', error?.stack);
-      
-      // Si l'endpoint n'existe pas encore (404), afficher un message plus informatif
-      if (error.message && (error.message.includes('Endpoint non trouvé') || error.message.includes('404'))) {
-        Alert.alert(
-          t('analyticsDeployingTitle', undefined, 'Fonctionnalité en cours de déploiement'),
-          t('analyticsDeployingMessage', undefined, 'L\'endpoint analytics est en cours de déploiement. Veuillez réessayer dans quelques instants.'),
-          [{ text: t('ok', undefined, 'OK') }]
-        );
-      } else if (error.message && error.message.toLowerCase().includes('premium')) {
-        Alert.alert(
-          t('analyticsPremiumTitle', undefined, 'Analytics Premium'),
-          t('analyticsPremiumMessage', undefined, 'Analytics détaillés réservés au plan Premium. Débloquez plus de jours d\'historique.'),
-          [
-            { text: t('later', undefined, 'Plus tard') },
-            {
-              text: t('upgrade', undefined, 'Passer en Premium'),
-              onPress: () =>
-                triggerEvent(SUPERWALL_EVENTS.FEATURE_LOCKED, {
-                  params: { source: 'analytics_alert_upgrade' },
-                  // CTA explicite : doit toujours afficher le paywall.
-                  bypassCooldown: true,
-                }),
-            }
-          ]
-        );
-      } else if ((error.message && error.message.includes('réseau')) || error.message.includes('timeout')) {
-        Alert.alert(
-          t('analyticsConnectionErrorTitle', undefined, 'Erreur de connexion'),
-          t('analyticsConnectionErrorMessage', undefined, 'Vérifiez votre connexion internet et réessayez.'),
-          [{ text: t('ok', undefined, 'OK') }]
-        );
-      } else {
-        Alert.alert(
-          t('error', undefined, 'Erreur'),
-          t('analyticsGenericError', { message: error?.message || '' }, `Impossible de charger les données analytics. ${error?.message ? `\n\n${error.message}` : ''}`),
-          [{ text: t('ok', undefined, 'OK') }]
-        );
-      }
-      
-      // Initialiser avec des données vides pour éviter les erreurs d'affichage
-      setAnalyticsData([]);
-      setAverages({ mood: null, stress: null, focus: null });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadPlan = async () => {
-    try {
-      const user = await authService.checkAuth();
-      setPlanLimits(user?.planLimits || null);
-      setPlan(user?.plan || null);
-    } catch (error) {
-      setPlanLimits(null);
-      setPlan(null);
-    }
-  };
-
-  const handleSubmitCheckIn = async () => {
-    if (!checkInType || !checkInValue) {
-      Alert.alert(
-        t('error', undefined, 'Erreur'),
-        t('analyticsNoteRequired', undefined, 'Veuillez entrer une note entre 1 et 10')
-      );
-      return;
-    }
-
-    const value = parseInt(checkInValue, 10);
-    if (isNaN(value) || value < 1 || value > 10) {
-      Alert.alert(
-        t('error', undefined, 'Erreur'),
-        t('analyticsNoteInvalid', undefined, 'La note doit être entre 1 et 10')
-      );
-      return;
-    }
-
-    try {
-      setSubmitting(true);
-      console.log('💾 [Analytics] Enregistrement du check-in:', { type: checkInType, value, note: checkInNote });
-      
-      const result = await behaviorService.createCheckIn({
-        type: checkInType,
-        value,
-        note: checkInNote || undefined,
-        context: {
-          triggeredBy: 'notification',
-          timestamp: new Date().toISOString(),
-        },
-      });
-
-      console.log('✅ [Analytics] Check-in enregistré avec succès:', result);
-
-      Alert.alert(t('success', undefined, 'Succès'), t('analyticsNoteSaved', undefined, 'Votre note a été enregistrée !'), [
+      const r = await apiCall<{ response: string; generated?: boolean }>(
+        "/study-analysis/explain",
         {
-          text: t('ok', undefined, 'OK'),
-          onPress: () => {
-            setShowCheckInForm(false);
-            setCheckInValue('');
-            setCheckInNote('');
-            loadAnalytics();
-          },
+          method: "POST",
+          body: JSON.stringify({
+            days,
+            timezone,
+            language: lang,
+            factId: selected.id,
+            question,
+            includeJournal: journal,
+          }),
         },
-      ]);
-    } catch (error: any) {
-      console.error('❌ [Analytics] Erreur lors de l\'enregistrement:', error);
-      console.error('❌ [Analytics] Type d\'erreur:', error?.constructor?.name);
-      console.error('❌ [Analytics] Message:', error?.message);
-      console.error('❌ [Analytics] Stack:', error?.stack);
-      
-      let errorMessage = t('analyticsSaveError', undefined, 'Impossible d\'enregistrer votre note');
-      if (error?.message) {
-        if (error.message.includes('réseau') || error.message.includes('timeout')) {
-          errorMessage = t('analyticsSaveConnectionError', undefined, 'Erreur de connexion. Vérifiez votre internet et réessayez.');
-        } else {
-          errorMessage = t('analyticsSaveErrorWithMessage', { message: error.message }, `Erreur: ${error.message}`);
-        }
-      }
-      
-      Alert.alert(t('error', undefined, 'Erreur'), errorMessage);
+      );
+      if (id === explainRequest.current)
+        setAnswer(
+          r.generated === false
+            ? tr(
+                "Synthèse calculée (explication IA indisponible) : ",
+                "Calculated summary (AI explanation unavailable): ",
+                "Resumen calculado (explicación IA no disponible): ",
+              ) + r.response
+            : r.response,
+        );
+    } catch {
+      if (id === explainRequest.current)
+        setAnswer(
+          tr(
+            "L’explication est indisponible. Les faits ci-dessus restent accessibles.",
+            "Explanation unavailable. The facts above remain available.",
+            "Explicación no disponible. Los datos siguen disponibles.",
+          ),
+        );
     } finally {
-      setSubmitting(false);
+      if (id === explainRequest.current) setAsking(false);
     }
-  };
-
-  const getTypeLabel = (type: CheckInType) => {
-    const labels = {
-      mood: t('analyticsTypeMood', undefined, 'Humeur'),
-      stress: t('analyticsTypeStress', undefined, 'Stress'),
-      focus: t('analyticsTypeFocus', undefined, 'Focus'),
-    };
-    return labels[type];
-  };
-
-  const getTypeEmoji = (type: CheckInType) => {
-    const emojis = {
-      mood: '🙂',
-      stress: '😌',
-      focus: '🎯',
-    };
-    return emojis[type];
-  };
-
-  const getTypeColor = (type: CheckInType) => {
-    const colors = {
-      mood: '#10B981',
-      stress: '#F59E0B',
-      focus: '#3B82F6',
-    };
-    return colors[type];
-  };
-
-  const prepareChartData = (type: CheckInType) => {
-    const labels = analyticsData.map((d) => {
-      const date = parseISO(d.date);
-      return format(date, 'EEE', { locale }).substring(0, 3);
+  }
+  function act(f: Fact) {
+    setSelected(null);
+    void trackEvent("analysis_action_opened", {
+      fact_kind: f.kind,
+      recommendation_id: f.id,
     });
-
-    const data = analyticsData.map((d) => {
-      const value = d[type];
-      return value !== null ? value : 0;
+    if (f.action === "plan") {
+      router.push("/plan-my-day");
+      return;
+    }
+    const task = data?.organization.delayed.find((t) => t.id === f.taskId),
+      subject = data?.subjects.find((s) => s.nextTaskId === f.taskId);
+    router.push({
+      pathname: "/focus",
+      params: {
+        duration: "25",
+        recommendationId: f.id,
+        ...(f.taskId
+          ? {
+              taskId: f.taskId,
+              title: task?.title || subject?.nextTaskTitle || "",
+              subject: subject?.name || tr("Tâche", "Task", "Tarea"),
+            }
+          : {}),
+      },
     });
-
-    return { labels, data };
-  };
-
-  if (loading) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#10B981" />
-          <Text style={styles.loadingText}>
-            {t('analyticsLoading', undefined, 'Chargement des données...')}
-          </Text>
-        </View>
-      </View>
-    );
   }
-
-  // Si on est encore en train de vérifier l'authentification, afficher un loader
-  if (isAuthenticated === null) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#16a34a" />
-          <Text style={styles.loadingText}>
-            {t('loading', undefined, 'Chargement...')}
-          </Text>
-        </View>
-      </View>
-    );
-  }
-
-  // Si l'utilisateur n'est pas authentifié, afficher un message approprié
-  if (isAuthenticated === false) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.authRequiredContainer}>
-          <Ionicons name="lock-closed-outline" size={64} color="#9ca3af" />
-          <Text style={styles.authRequiredTitle}>
-            {t('analyticsAuthRequiredTitle', undefined, 'Connexion requise')}
-          </Text>
-          <Text style={styles.authRequiredText}>
-            {t('analyticsAuthRequiredText', undefined, 'Connectez-vous pour accéder à vos analytics et suivre vos progrès personnels.')}
-          </Text>
-          <TouchableOpacity
-            style={styles.authButton}
-            onPress={() => router.push('/login')}
-          >
-            <Text style={styles.authButtonText}>
-              {t('login', undefined, 'Se connecter')}
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  }
-
+  const actionLabel = tr(
+    "Préparer une session",
+    "Prepare a session",
+    "Preparar una sesión",
+  );
   return (
-    <View style={styles.container}>
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
       <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.page}
+        refreshControl={
+          <RefreshControl
+            refreshing={busy}
+            onRefresh={load}
+            tintColor={colors.primary}
+          />
+        }
       >
-        {planLimits?.analyticsRetentionDays !== null && (
-          <View style={styles.planNotice}>
-            <View style={styles.planNoticeLeft}>
-              <Text style={styles.planNoticeTitle}>
-                {t('analyticsPlanNoticeTitle', undefined, 'Analytics en aperçu')}
-              </Text>
-              <Text style={styles.planNoticeText}>
-                {t(
-                  'analyticsPlanNoticeText',
-                  { days: planLimits.analyticsRetentionDays ?? 0 },
-                  `Vous voyez les ${planLimits.analyticsRetentionDays} derniers jours. Passez en Premium pour un historique complet.`
-                )}
-              </Text>
-            </View>
-            <TouchableOpacity
-              style={styles.planNoticeButton}
-              onPress={() =>
-                triggerEvent(SUPERWALL_EVENTS.FEATURE_LOCKED, {
-                  params: { source: 'analytics_inline_upgrade' },
-                  // CTA explicite : doit toujours afficher le paywall.
-                  bypassCooldown: true,
-                })
-              }
-            >
-              <Text style={styles.planNoticeButtonText}>
-                {t('upgrade', undefined, 'Upgrade')}
-              </Text>
-            </TouchableOpacity>
-          </View>
+        {text(
+          tr(
+            "Comprendre tes progrès",
+            "Understand your progress",
+            "Entiende tu progreso",
+          ),
+          styles.title,
         )}
-        {/* Formulaire de check-in si arrivé depuis une notification */}
-        {showCheckInForm && checkInType && (
-          <View style={styles.checkInCard}>
-            <View style={styles.checkInHeader}>
-              <Text style={styles.checkInEmoji}>{getTypeEmoji(checkInType)}</Text>
-              <Text style={styles.checkInTitle}>
-                {t(
-                  'analyticsCheckinTitle',
-                  { type: getTypeLabel(checkInType).toLowerCase() },
-                  `Notez votre ${getTypeLabel(checkInType).toLowerCase()}`
-                )}
-              </Text>
-            </View>
-            <Text style={styles.checkInSubtitle}>
-              {t('analyticsCheckinSubtitle', undefined, 'Sur une échelle de 1 à 10, comment vous sentez-vous ?')}
-            </Text>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>
-                {t('analyticsNoteLabel', undefined, 'Note (1-10)')}
-              </Text>
-              <TextInput
-                style={styles.numberInput}
-                value={checkInValue}
-                onChangeText={setCheckInValue}
-                keyboardType="number-pad"
-                placeholder="8"
-                maxLength={2}
-                autoFocus
-              />
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>
-                {t('analyticsOptionalNoteLabel', undefined, 'Note (optionnel)')}
-              </Text>
-              <TextInput
-                style={styles.noteInput}
-                value={checkInNote}
-                onChangeText={setCheckInNote}
-                placeholder={t('analyticsNotePlaceholder', undefined, 'Ajoutez une note si vous le souhaitez...')}
-                multiline
-                numberOfLines={3}
-              />
-            </View>
-
+        {text(
+          tr(
+            "Ton travail, tes révisions, ton ressenti.",
+            "Your work, your studies, your experience.",
+            "Tu trabajo, tus estudios, tus sensaciones.",
+          ),
+          { color: colors.textSecondary },
+        )}
+        <View style={styles.row}>
+          {[7, 14, 30, 90].map((n) => (
             <TouchableOpacity
+              key={n}
+              accessibilityRole="button"
+              accessibilityState={{ selected: days === n }}
+              onPress={() => setDays(n)}
               style={[
-                styles.submitButton,
-                submitting && styles.submitButtonDisabled,
+                styles.chip,
+                { backgroundColor: days === n ? "#166534" : colors.surface },
               ]}
-              onPress={handleSubmitCheckIn}
-              disabled={submitting || !checkInValue}
             >
-              {submitting ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
+              {text(`${n} ${tr("jours", "days", "días")}`, {
+                color: days === n ? "white" : colors.text,
+              })}
+            </TouchableOpacity>
+          ))}
+        </View>
+        {!!error &&
+          card(
+            <>
+              {text(
+                locked
+                  ? tr(
+                      "Cet historique est réservé au Premium.",
+                      "This history requires Premium.",
+                      "Este historial requiere Premium.",
+                    )
+                  : tr(
+                      "Impossible de charger ton bilan. Aucune donnée n’a été remplacée par zéro.",
+                      "Could not load your report. Missing data was not replaced with zero.",
+                      "No se pudo cargar el informe. Los datos ausentes no se sustituyen por cero.",
+                    ),
+              )}
+              <TouchableOpacity
+                accessibilityRole="button"
+                style={styles.button}
+                onPress={() =>
+                  locked
+                    ? triggerEvent(SUPERWALL_EVENTS.FEATURE_LOCKED, {
+                        params: { source: "study_analysis_history" },
+                        bypassCooldown: true,
+                      })
+                    : load()
+                }
+              >
+                {text(
+                  locked
+                    ? tr("Voir le Premium", "View Premium", "Ver Premium")
+                    : tr("Réessayer", "Retry", "Reintentar"),
+                  styles.buttonText,
+                )}
+              </TouchableOpacity>
+            </>,
+          )}
+        {busy && !data && !error && (
+          <ActivityIndicator size="large" color={colors.primary} />
+        )}
+        {data && (
+          <>
+            {text(
+              `${data.period.start} → ${data.period.end} · ${data.timezone}`,
+              styles.small,
+            )}
+            {pending &&
+              text(
+                tr(
+                  "Des activités attendent encore leur synchronisation.",
+                  "Some activities are waiting to sync.",
+                  "Algunas actividades están pendientes de sincronizar.",
+                ),
+                { color: "#b45309" },
+              )}
+            {card(
+              <>
+                <View style={styles.kpis}>
+                  <View style={styles.kpi}>
+                    {text(duration(data.summary.seconds), styles.number)}
+                    {text(
+                      tr(
+                        "Temps enregistré",
+                        "Recorded time",
+                        "Tiempo registrado",
+                      ),
+                      styles.small,
+                    )}
+                  </View>
+                  <View style={styles.kpi}>
+                    {text(data.summary.completedTasks, styles.number)}
+                    {text(
+                      tr(
+                        "Tâches terminées",
+                        "Tasks completed",
+                        "Tareas completadas",
+                      ),
+                      styles.small,
+                    )}
+                  </View>
+                  <View style={styles.kpi}>
+                    {text(`${data.summary.activeDays}/${days}`, styles.number)}
+                    {text(
+                      tr("Jours actifs", "Active days", "Días activos"),
+                      styles.small,
+                    )}
+                  </View>
+                </View>
+                {data.summary.previousSeconds !== null &&
+                  text(
+                    `${tr("Période précédente comparable", "Comparable previous period", "Período anterior comparable")} : ${duration(data.summary.previousSeconds)}`,
+                    styles.small,
+                  )}
+                {data.coverage.partial &&
+                  text(
+                    tr(
+                      "Historique partiel : les mesures ont commencé pendant cette période.",
+                      "Partial history: recording began during this period.",
+                      "Historial parcial: las mediciones comenzaron durante este período.",
+                    ),
+                    styles.small,
+                  )}
+                {!!(
+                  data.coverage.legacySessions ||
+                  data.coverage.unknownCompletions
+                ) &&
+                  text(
+                    tr(
+                      `Historique incomplet : ${data.coverage.legacySessions} anciennes sessions sans durée fiable hors pauses ; ${data.coverage.unknownCompletions} tâches sans date de complétion.`,
+                      `Incomplete history: ${data.coverage.legacySessions} older sessions without reliable active time; ${data.coverage.unknownCompletions} tasks without a completion date.`,
+                      `Historial incompleto: ${data.coverage.legacySessions} sesiones sin duración activa fiable; ${data.coverage.unknownCompletions} tareas sin fecha de finalización.`,
+                    ),
+                    styles.small,
+                  )}
+                {text(
+                  tr(
+                    "Le temps enregistré ne mesure pas ton attention ni le travail fait hors de Productif.",
+                    "Recorded time does not measure attention or work outside Productif.",
+                    "El tiempo registrado no mide tu atención ni el trabajo fuera de Productif.",
+                  ),
+                  styles.small,
+                )}
+              </>,
+            )}
+            {text(
+              tr("Ta prochaine étape", "Your next step", "Tu siguiente paso"),
+              styles.heading,
+            )}
+            {data.facts.map((f) =>
+              card(
                 <>
-                  <Ionicons name="checkmark-circle" size={20} color="#fff" />
-                  <Text style={styles.submitButtonText}>
-                    {t('save', undefined, 'Enregistrer')}
-                  </Text>
-                </>
+                  {text(factText(f, lang), { fontSize: 17, lineHeight: 25 })}
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    style={styles.button}
+                    onPress={() => act(f)}
+                  >
+                    {text(
+                      f.action === "plan"
+                        ? tr(
+                            "Revoir mon planning",
+                            "Review my plan",
+                            "Revisar mi plan",
+                          )
+                        : actionLabel,
+                      styles.buttonText,
+                    )}
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    style={styles.link}
+                    onPress={() => open(f)}
+                  >
+                    {text(
+                      tr(
+                        "Pourquoi ? En discuter avec l’assistant",
+                        "Why? Discuss with the assistant",
+                        "¿Por qué? Hablar con el asistente",
+                      ),
+                      { color: colors.primary },
+                    )}
+                  </TouchableOpacity>
+                </>,
+                f.id,
+              ),
+            )}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.row}
+            >
+              {[
+                ["work", tr("Sessions", "Sessions", "Sesiones")],
+                ["subjects", tr("Matières", "Subjects", "Asignaturas")],
+                [
+                  "organization",
+                  tr("Organisation", "Planning", "Organización"),
+                ],
+                ["mood", tr("Ressenti", "Experience", "Sensaciones")],
+                ["habits", tr("Habitudes", "Habits", "Hábitos")],
+              ].map(([id, label]) => (
+                <TouchableOpacity
+                  key={id}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: section === id }}
+                  onPress={() => setSection(id)}
+                  style={[
+                    styles.chip,
+                    {
+                      backgroundColor:
+                        section === id ? "#166534" : colors.surface,
+                    },
+                  ]}
+                >
+                  {text(label, {
+                    color: section === id ? "white" : colors.text,
+                  })}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            {section === "work" &&
+              card(
+                <>
+                  {text(
+                    tr(
+                      "Ton rythme de travail",
+                      "Your work rhythm",
+                      "Tu ritmo de trabajo",
+                    ),
+                    styles.heading,
+                  )}
+                  <ScrollView horizontal>
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "flex-end",
+                        gap: 10,
+                        paddingVertical: 10,
+                      }}
+                    >
+                      {data.daily.map((d) => (
+                        <View
+                          key={d.date}
+                          style={{ width: 42, alignItems: "center", gap: 6 }}
+                        >
+                          {text(Math.floor(d.seconds / 60), styles.small)}
+                          <View
+                            accessibilityLabel={`${d.date}: ${Math.floor(d.seconds / 60)} min`}
+                            style={{
+                              height: Math.max(
+                                3,
+                                (d.seconds /
+                                  Math.max(
+                                    ...data.daily.map((x) => x.seconds),
+                                    1,
+                                  )) *
+                                  95,
+                              ),
+                              width: 26,
+                              borderRadius: 6,
+                              backgroundColor: d.seconds
+                                ? "#16a34a"
+                                : colors.border,
+                            }}
+                          />
+                          {text(d.date.slice(8), styles.small)}
+                        </View>
+                      ))}
+                    </View>
+                  </ScrollView>
+                  {text(
+                    tr(
+                      "Minutes enregistrées par jour",
+                      "Recorded minutes per day",
+                      "Minutos registrados por día",
+                    ),
+                    styles.small,
+                  )}
+                  {text(
+                    `${tr("Terminées", "Completed", "Finalizadas")} : ${data.summary.completedSessions} · ${tr("Écourtées", "Stopped early", "Interrumpidas")} : ${data.summary.stoppedSessions} · ${tr("En cours / inconnues", "Ongoing / unknown", "En curso / desconocidas")} : ${data.summary.unknownSessions}`,
+                  )}
+                  {text(
+                    `${tr("Temps non attribué à une matière", "Time not assigned to a subject", "Tiempo sin asignatura")} : ${duration(data.summary.unassignedSeconds)}`,
+                    styles.small,
+                  )}
+                  {text(
+                    tr(
+                      "Formats de session",
+                      "Session lengths",
+                      "Duración de sesiones",
+                    ),
+                    styles.heading,
+                  )}
+                  {data.durationPatterns.map((g) => (
+                    <View key={g.key}>
+                      {text(
+                        `${g.key === "short" ? "≤ 25 min" : g.key === "medium" ? "26–45 min" : "> 45 min"} : ${g.completed}/${g.count} ${tr("terminées", "completed", "finalizadas")}`,
+                      )}
+                      {!g.available &&
+                        text(
+                          tr(
+                            "Échantillon encore limité.",
+                            "Sample still limited.",
+                            "Muestra aún limitada.",
+                          ),
+                          styles.small,
+                        )}
+                    </View>
+                  ))}
+                  {text(
+                    tr(
+                      "Créneaux observés",
+                      "Observed time slots",
+                      "Franjas observadas",
+                    ),
+                    styles.heading,
+                  )}
+                  {data.timePatterns.map((g) => (
+                    <View key={g.key}>
+                      {text(
+                        `${g.key === "morning" ? tr("Matin", "Morning", "Mañana") : g.key === "afternoon" ? tr("Après-midi", "Afternoon", "Tarde") : tr("Soir", "Evening", "Noche")} : ${g.count} ${tr("sessions", "sessions", "sesiones")}`,
+                      )}
+                      {text(
+                        g.available
+                          ? `${g.completed}/${g.count} ${tr("terminées ; observation, pas une cause.", "completed; observation, not a cause.", "finalizadas; observación, no causa.")}`
+                          : tr(
+                              "Pas encore assez de sessions sur plusieurs jours pour comparer.",
+                              "Not enough sessions across several days to compare.",
+                              "Aún faltan sesiones en varios días para comparar.",
+                            ),
+                        styles.small,
+                      )}
+                    </View>
+                  ))}
+                </>,
+              )}
+            {section === "subjects" && (
+              <>
+                {!data.subjects.length &&
+                  card(
+                    <>
+                      {text(
+                        tr(
+                          "Ajoute tes matières et chapitres pour suivre ton programme.",
+                          "Add subjects and chapters to track your syllabus.",
+                          "Añade asignaturas y capítulos para seguir tu programa.",
+                        ),
+                      )}
+                      <TouchableOpacity
+                        style={styles.button}
+                        onPress={() => router.push("/tasks-new")}
+                      >
+                        {text(
+                          tr("Mes matières", "My subjects", "Mis asignaturas"),
+                          styles.buttonText,
+                        )}
+                      </TouchableOpacity>
+                    </>,
+                  )}
+                {data.subjects.map((s) =>
+                  card(
+                    <>
+                      {text(s.name, styles.heading)}
+                      {text(
+                        `${s.completed}/${s.total} ${tr("chapitres cochés", "chapters checked", "capítulos marcados")} · ${tr("Coefficient", "Weight", "Coeficiente")} ${s.coefficient}`,
+                      )}
+                      <View
+                        style={{
+                          height: 8,
+                          borderRadius: 5,
+                          backgroundColor: colors.border,
+                        }}
+                      >
+                        <View
+                          style={{
+                            height: 8,
+                            borderRadius: 5,
+                            width: `${s.total ? (s.completed / s.total) * 100 : 0}%`,
+                            backgroundColor: "#16a34a",
+                          }}
+                        />
+                      </View>
+                      {text(
+                        `${duration(s.seconds)} · ${s.deadline ? new Date(s.deadline).toLocaleDateString(lang) : tr("Échéance non renseignée", "No deadline set", "Sin fecha límite")}`,
+                      )}
+                      {s.estimatedRemainingMinutes !== null &&
+                        text(
+                          `${tr("Charge restante estimée", "Estimated remaining workload", "Carga restante estimada")} : ${s.estimatedRemainingMinutes} min`,
+                          styles.small,
+                        )}
+                      {text(
+                        tr(
+                          "Avancement du programme saisi, pas une mesure de maîtrise.",
+                          "Progress through your entered syllabus, not a measure of mastery.",
+                          "Avance en el programa introducido, no una medida de dominio.",
+                        ),
+                        styles.small,
+                      )}
+                      <TouchableOpacity
+                        onPress={() => router.push("/tasks-new")}
+                        style={styles.link}
+                      >
+                        {text(
+                          tr(
+                            "Voir les chapitres",
+                            "View chapters",
+                            "Ver capítulos",
+                          ),
+                          { color: colors.primary },
+                        )}
+                      </TouchableOpacity>
+                    </>,
+                    s.id,
+                  ),
+                )}
+              </>
+            )}
+            {section === "organization" &&
+              card(
+                <>
+                  {text(
+                    `${tr("Tâches planifiées avec une session liée", "Scheduled tasks with a linked session", "Tareas planificadas con sesión vinculada")} : ${data.organization.plannedTasksWithSession}/${data.organization.plannedTasks}`,
+                  )}
+                  {text(
+                    tr(
+                      "Une absence de session ne prouve pas une absence de travail.",
+                      "No recorded session does not mean no work was done.",
+                      "Sin sesión registrada no significa que no se haya trabajado.",
+                    ),
+                    styles.small,
+                  )}
+                  {text(
+                    tr(
+                      "Ce qui reste reporté",
+                      "Repeatedly postponed",
+                      "Lo que se sigue aplazando",
+                    ),
+                    styles.heading,
+                  )}
+                  {!data.organization.delayed.length &&
+                    text(
+                      tr(
+                        "Aucun report répété enregistré sur cette période.",
+                        "No repeated postponements recorded in this period.",
+                        "No hay aplazamientos repetidos registrados.",
+                      ),
+                      styles.small,
+                    )}
+                  {data.organization.delayed.map((t) => (
+                    <View key={t.id}>
+                      {text(
+                        `${t.title} · ${t.reports} ${tr("reports", "postponements", "aplazamientos")}`,
+                      )}
+                    </View>
+                  ))}
+                  {text(
+                    tr(
+                      "Durée estimée / enregistrée",
+                      "Estimate / available recorded time",
+                      "Duración estimada / registrada",
+                    ),
+                    styles.heading,
+                  )}
+                  {!data.organization.estimates.length &&
+                    text(
+                      tr(
+                        "Associe tes sessions à des tâches avec une durée estimée pour comparer.",
+                        "Link sessions to tasks with estimates to compare.",
+                        "Vincula sesiones a tareas con estimaciones para comparar.",
+                      ),
+                      styles.small,
+                    )}
+                  {data.organization.estimates.map((t) => (
+                    <View key={t.id}>
+                      {text(
+                        `${t.title} : ${t.estimatedMinutes} / ${t.actualMinutes} min`,
+                      )}
+                    </View>
+                  ))}
+                  <TouchableOpacity
+                    style={styles.button}
+                    onPress={() => router.push("/plan-my-day")}
+                  >
+                    {text(
+                      tr(
+                        "Préparer mon planning",
+                        "Prepare my plan",
+                        "Preparar mi plan",
+                      ),
+                      styles.buttonText,
+                    )}
+                  </TouchableOpacity>
+                </>,
+              )}
+            {section === "mood" && (
+              <>
+                {card(
+                  <>
+                    {text(
+                      tr(
+                        "Ton ressenti déclaré",
+                        "Your self-reported experience",
+                        "Tus sensaciones declaradas",
+                      ),
+                      styles.heading,
+                    )}
+                    {text(
+                      `${data.coverage.checkins} ${tr("réponses sur la période", "responses in this period", "respuestas en este período")}`,
+                      styles.small,
+                    )}
+                    {data.moods.map((m) => (
+                      <View key={m.type} style={{ gap: 8 }}>
+                        {text(
+                          `${({ focus: tr("Concentration", "Focus", "Concentración"), energy: tr("Énergie", "Energy", "Energía"), mood: tr("Humeur", "Mood", "Ánimo"), stress: tr("Stress", "Stress", "Estrés"), motivation: tr("Motivation", "Motivation", "Motivación") } as Record<string, string>)[m.type]} : ${m.average === null ? "—" : `${m.average}/10`} (${m.count})`,
+                          { fontWeight: "600" },
+                        )}
+                        <ScrollView horizontal>
+                          <View style={styles.row}>
+                            {m.daily.map((d) => (
+                              <View
+                                key={d.date}
+                                style={{ width: 35, alignItems: "center" }}
+                              >
+                                {text(
+                                  d.value === null ? "—" : String(d.value),
+                                  {
+                                    color:
+                                      d.value === null
+                                        ? colors.textSecondary
+                                        : colors.primary,
+                                  },
+                                )}
+                                {text(d.date.slice(8), styles.small)}
+                              </View>
+                            ))}
+                          </View>
+                        </ScrollView>
+                      </View>
+                    ))}
+                    {text(
+                      tr(
+                        "— signifie aucune réponse. Une association ne prouve pas une cause.",
+                        "— means no response. An association does not establish a cause.",
+                        "— significa sin respuesta. Una asociación no demuestra una causa.",
+                      ),
+                      styles.small,
+                    )}
+                  </>,
+                )}
+                {card(
+                  <>
+                    {text(
+                      tr(
+                        "Énergie et concentration",
+                        "Energy and focus",
+                        "Energía y concentración",
+                      ),
+                      styles.heading,
+                    )}
+                    {text(
+                      data.moodAssociation.available
+                        ? tr(
+                            `Concentration moyenne déclarée : ${data.moodAssociation.highFocus}/10 avec énergie élevée (${data.moodAssociation.highCount} sessions), ${data.moodAssociation.lowFocus}/10 avec énergie faible (${data.moodAssociation.lowCount} sessions).`,
+                            `Average reported focus: ${data.moodAssociation.highFocus}/10 with high energy (${data.moodAssociation.highCount} sessions), ${data.moodAssociation.lowFocus}/10 with low energy (${data.moodAssociation.lowCount} sessions).`,
+                            `Concentración declarada: ${data.moodAssociation.highFocus}/10 con energía alta (${data.moodAssociation.highCount} sesiones), ${data.moodAssociation.lowFocus}/10 con energía baja (${data.moodAssociation.lowCount} sesiones).`,
+                          )
+                        : tr(
+                            "Il faut davantage de réponses énergie et concentration liées aux mêmes sessions, sur plusieurs semaines.",
+                            "More energy and focus ratings linked to the same sessions over several weeks are needed.",
+                            "Hacen falta más respuestas de energía y concentración vinculadas a las mismas sesiones durante varias semanas.",
+                          ),
+                    )}
+                    {text(
+                      tr(
+                        "Observation personnelle ; aucun lien de cause à effet démontré.",
+                        "Personal observation; no cause-and-effect relationship established.",
+                        "Observación personal; no demuestra causa y efecto.",
+                      ),
+                      styles.small,
+                    )}
+                  </>,
+                )}
+                <StudyCheckIn
+                  initialType={checkInType || "focus"}
+                  onSaved={() => void load()}
+                />
+              </>
+            )}
+            {section === "habits" &&
+              card(
+                <>
+                  {text(
+                    tr("Tes habitudes", "Your habits", "Tus hábitos"),
+                    styles.heading,
+                  )}
+                  {!data.habits.length &&
+                    text(
+                      tr(
+                        "Aucune habitude renseignée.",
+                        "No habits entered.",
+                        "No hay hábitos registrados.",
+                      ),
+                    )}
+                  {data.habits.map((h) => (
+                    <View key={h.id}>
+                      {text(h.name, { fontWeight: "600" })}
+                      {text(
+                        `${h.completed}/${h.expected} · ${h.percent === null ? "—" : `${h.percent}%`}`,
+                        styles.small,
+                      )}
+                    </View>
+                  ))}
+                  {text(
+                    tr(
+                      "Calcul sur les jours prévus depuis la création de chaque habitude.",
+                      "Based on scheduled days since each habit was created.",
+                      "Calculado sobre días previstos desde la creación de cada hábito.",
+                    ),
+                    styles.small,
+                  )}
+                  <TouchableOpacity
+                    style={styles.link}
+                    onPress={() => router.push("/review-habits")}
+                  >
+                    {text(
+                      tr(
+                        "Revoir mes habitudes",
+                        "Review my habits",
+                        "Revisar mis hábitos",
+                      ),
+                      { color: colors.primary },
+                    )}
+                  </TouchableOpacity>
+                </>,
+              )}
+            {!!checkInType && section !== "mood" && (
+              <StudyCheckIn
+                initialType={checkInType}
+                onSaved={() => void load()}
+              />
+            )}
+            {text(
+              `${tr("Mis à jour", "Updated", "Actualizado")} ${new Date(data.generatedAt).toLocaleTimeString(lang, { hour: "2-digit", minute: "2-digit" })}`,
+              styles.small,
+            )}
+          </>
+        )}
+      </ScrollView>
+      <Modal
+        visible={!!selected}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => {
+          explainRequest.current++;
+          setSelected(null);
+        }}
+      >
+        <ScrollView
+          keyboardShouldPersistTaps="handled"
+          style={{ backgroundColor: colors.background }}
+          contentContainerStyle={[styles.page, { paddingTop: 36 }]}
+        >
+          <TouchableOpacity
+            accessibilityRole="button"
+            onPress={() => {
+              explainRequest.current++;
+              setSelected(null);
+            }}
+            style={styles.link}
+          >
+            {text(tr("Fermer", "Close", "Cerrar"), { color: colors.primary })}
+          </TouchableOpacity>
+          {text(
+            tr("Comprendre et agir", "Understand and act", "Entender y actuar"),
+            styles.title,
+          )}
+          {selected &&
+            card(
+              <>
+                {text(factText(selected, lang), {
+                  fontSize: 18,
+                  lineHeight: 26,
+                })}
+                {text(
+                  `${data?.period.start} → ${data?.period.end}`,
+                  styles.small,
+                )}
+                {text(
+                  tr(
+                    "Ce constat est calculé à partir de tes activités enregistrées. Il peut manquer du travail réalisé ailleurs.",
+                    "This fact is calculated from recorded activities. Work done elsewhere may be missing.",
+                    "Este dato se calcula con actividades registradas. Puede faltar trabajo realizado fuera.",
+                  ),
+                  styles.small,
+                )}
+              </>,
+            )}
+          <TextInput
+            accessibilityLabel={tr(
+              "Ta question",
+              "Your question",
+              "Tu pregunta",
+            )}
+            multiline
+            maxLength={700}
+            placeholder={tr(
+              "Ajoute du contexte ou pose une question…",
+              "Add context or ask a question…",
+              "Añade contexto o haz una pregunta…",
+            )}
+            placeholderTextColor={colors.textSecondary}
+            value={question}
+            onChangeText={setQuestion}
+            style={{
+              minHeight: 100,
+              padding: 16,
+              borderWidth: 1,
+              borderColor: colors.border,
+              borderRadius: 16,
+              color: colors.text,
+            }}
+          />
+          <View style={styles.row}>
+            <Switch
+              value={journal}
+              onValueChange={setJournal}
+              accessibilityLabel={tr(
+                "Inclure mon journal",
+                "Include my journal",
+                "Incluir mi diario",
+              )}
+            />
+            <View style={{ flex: 1 }}>
+              {text(
+                tr(
+                  "Inclure mes dernières entrées de journal dans cette demande",
+                  "Include recent journal entries in this request",
+                  "Incluir mis últimas entradas del diario en esta solicitud",
+                ),
+                styles.small,
+              )}
+            </View>
+          </View>
+          <TouchableOpacity
+            disabled={asking}
+            accessibilityRole="button"
+            onPress={explain}
+            style={styles.button}
+          >
+            {asking ? (
+              <ActivityIndicator color="white" />
+            ) : (
+              text(
+                tr(
+                  "Demander à l’assistant",
+                  "Ask the assistant",
+                  "Preguntar al asistente",
+                ),
+                styles.buttonText,
+              )
+            )}
+          </TouchableOpacity>
+          {!!answer && card(text(answer, { lineHeight: 25, fontSize: 16 }))}
+          {selected && (
+            <TouchableOpacity
+              style={styles.button}
+              onPress={() => act(selected)}
+            >
+              {text(
+                selected.action === "plan"
+                  ? tr(
+                      "Revoir mon planning",
+                      "Review my plan",
+                      "Revisar mi plan",
+                    )
+                  : actionLabel,
+                styles.buttonText,
               )}
             </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.skipButton}
-              onPress={() => setShowCheckInForm(false)}
-            >
-              <Text style={styles.skipButtonText}>
-                {t('skip', undefined, 'Passer')}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* Résumé des moyennes */}
-        <View style={styles.summaryCard}>
-          <Text style={styles.sectionTitle}>
-            {t('analyticsSummaryTitle', undefined, 'Moyennes sur 7 jours')}
-          </Text>
-          <View style={styles.summaryGrid}>
-            <View style={styles.summaryItem}>
-              <Text style={styles.summaryEmoji}>🙂</Text>
-              <Text style={styles.summaryLabel}>{getTypeLabel('mood')}</Text>
-              <Text style={styles.summaryValue}>
-                {averages.mood !== null ? averages.mood.toFixed(1) : '—'}
-              </Text>
-            </View>
-            <View style={styles.summaryItem}>
-              <Text style={styles.summaryEmoji}>😌</Text>
-              <Text style={styles.summaryLabel}>{getTypeLabel('stress')}</Text>
-              <Text style={styles.summaryValue}>
-                {averages.stress !== null ? averages.stress.toFixed(1) : '—'}
-              </Text>
-            </View>
-            <View style={styles.summaryItem}>
-              <Text style={styles.summaryEmoji}>🎯</Text>
-              <Text style={styles.summaryLabel}>{getTypeLabel('focus')}</Text>
-              <Text style={styles.summaryValue}>
-                {averages.focus !== null ? averages.focus.toFixed(1) : '—'}
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Graphiques */}
-        {['mood', 'stress', 'focus'].map((type) => {
-          const checkInType = type as CheckInType;
-          const chartData = prepareChartData(checkInType);
-          const hasData = analyticsData.some((d) => d[checkInType] !== null);
-
-          if (!hasData) return null;
-
-          return (
-            <View key={type} style={styles.chartCard}>
-              <View style={styles.chartHeader}>
-                <Text style={styles.chartEmoji}>{getTypeEmoji(checkInType)}</Text>
-                <Text style={styles.chartTitle}>{getTypeLabel(checkInType)}</Text>
-              </View>
-              <LineChart
-                data={{
-                  labels: chartData.labels,
-                  datasets: [
-                    {
-                      data: chartData.data,
-                      color: (opacity = 1) => getTypeColor(checkInType),
-                      strokeWidth: 2,
-                    },
-                  ],
-                }}
-                width={width - 48}
-                height={200}
-                chartConfig={{
-                  backgroundColor: '#FFFFFF',
-                  backgroundGradientFrom: '#FFFFFF',
-                  backgroundGradientTo: '#FFFFFF',
-                  decimalPlaces: 1,
-                  color: (opacity = 1) => getTypeColor(checkInType),
-                  labelColor: (opacity = 1) => `rgba(107, 114, 128, ${opacity})`,
-                  style: {
-                    borderRadius: 16,
-                  },
-                  propsForDots: {
-                    r: '5',
-                    strokeWidth: '2',
-                    stroke: getTypeColor(checkInType),
-                  },
-                }}
-                bezier
-                style={{
-                  marginVertical: 8,
-                  borderRadius: 16,
-                }}
-                withInnerLines={true}
-                withOuterLines={true}
-                withVerticalLabels={true}
-                withHorizontalLabels={true}
-                yAxisLabel=""
-                yAxisSuffix="/10"
-                yAxisInterval={1}
-                fromZero={true}
-              />
-            </View>
-          );
-        })}
-
-        {/* Espacement pour le bas */}
-        <View style={{ height: 100 }} />
-      </ScrollView>
+          )}
+        </ScrollView>
+      </Modal>
     </View>
   );
 }
-
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F9FAFB',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 12,
-    color: '#6B7280',
-    fontSize: 14,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: 24,
-  },
-  planNotice: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    backgroundColor: '#ECFDF3',
-    borderColor: '#16A34A',
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 16,
-  },
-  planNoticeLeft: {
-    flex: 1,
-    gap: 4,
-  },
-  planNoticeTitle: {
-    color: '#14532D',
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  planNoticeText: {
-    color: '#166534',
-    fontSize: 13,
-  },
-  planNoticeButton: {
-    backgroundColor: '#16A34A',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 10,
-  },
-  planNoticeButtonText: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-    fontSize: 13,
-  },
-  checkInCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 24,
-    borderWidth: 2,
-    borderColor: '#10B981',
-    shadowColor: '#10B981',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  checkInHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  checkInEmoji: {
-    fontSize: 32,
-    marginRight: 12,
-  },
-  checkInTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#111827',
-  },
-  checkInSubtitle: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginBottom: 20,
-  },
-  inputContainer: {
-    marginBottom: 16,
-  },
-  inputLabel: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#374151',
-    marginBottom: 8,
-  },
-  numberInput: {
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 18,
-    fontWeight: '600',
-    textAlign: 'center',
-    backgroundColor: '#FFFFFF',
-  },
-  noteInput: {
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 16,
-    minHeight: 80,
-    textAlignVertical: 'top',
-    backgroundColor: '#FFFFFF',
-  },
-  submitButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#10B981',
-    borderRadius: 12,
-    paddingVertical: 14,
-    marginTop: 8,
-    gap: 8,
-  },
-  submitButtonDisabled: {
-    opacity: 0.6,
-  },
-  submitButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  skipButton: {
-    marginTop: 12,
-    alignItems: 'center',
-  },
-  skipButtonText: {
-    color: '#6B7280',
-    fontSize: 14,
-  },
-  summaryCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 16,
-  },
-  summaryGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-  },
-  summaryItem: {
-    alignItems: 'center',
-  },
-  summaryEmoji: {
-    fontSize: 32,
-    marginBottom: 8,
-  },
-  summaryLabel: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginBottom: 4,
-  },
-  summaryValue: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#111827',
-  },
-  chartCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  chartHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  chartEmoji: {
-    fontSize: 24,
-    marginRight: 8,
-  },
-  chartTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#111827',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#6B7280',
-  },
-  authRequiredContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 32,
-  },
-  authRequiredTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#111827',
-    marginTop: 24,
-    marginBottom: 12,
-    textAlign: 'center',
-  },
-  authRequiredText: {
-    fontSize: 16,
-    color: '#6B7280',
-    textAlign: 'center',
-    lineHeight: 24,
-    marginBottom: 32,
-  },
-  authButton: {
-    backgroundColor: '#16a34a',
-    paddingHorizontal: 32,
-    paddingVertical: 16,
-    borderRadius: 12,
-    minWidth: 160,
-  },
-  authButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
+  page: { padding: 20, paddingBottom: 130, gap: 16 },
+  title: { fontSize: 28, fontWeight: "700", letterSpacing: -0.6 },
+  heading: { fontSize: 19, fontWeight: "600" },
+  card: { padding: 18, borderWidth: 1, borderRadius: 22, gap: 14 },
+  row: { flexDirection: "row", gap: 8, alignItems: "center" },
+  chip: { paddingHorizontal: 15, paddingVertical: 13, borderRadius: 15 },
+  small: { fontSize: 12, lineHeight: 18, opacity: 0.7 },
+  number: { fontSize: 23, fontWeight: "700", color: "#16a34a" },
+  kpis: { flexDirection: "row", flexWrap: "wrap", gap: 18 },
+  kpi: { minWidth: 90, flex: 1, gap: 6 },
+  button: { padding: 15, borderRadius: 14, backgroundColor: "#166534" },
+  buttonText: { color: "white", fontWeight: "600", textAlign: "center" },
+  link: { paddingVertical: 12, minHeight: 44 },
 });

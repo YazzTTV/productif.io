@@ -1,3 +1,4 @@
+import { changeStudySession } from '@/lib/studyAnalysis';
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, BackHandler, Alert, AppState } from 'react-native';
 import { getAuthorizationStatus, isAppBlockingSupported } from '@/utils/appBlocking';
@@ -39,6 +40,7 @@ export default function ExamSessionScreen() {
 
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const pausedAtRef = useRef<number | null>(null);
+  const finishingRef = useRef(false);
 
   /**
    * Coupe le glissement de bord sur la pile PARENTE, pas seulement sur celle du
@@ -158,6 +160,7 @@ export default function ExamSessionScreen() {
       }
       
       setIsRunning(!activeSession.pausedAt);
+      pausedAtRef.current = activeSession.pausedAt ?? null;
 
       // Load tasks (gère aussi le mode démo)
       await loadTasks(activeSession);
@@ -287,11 +290,17 @@ export default function ExamSessionScreen() {
         await tasksService.updateTask(currentTask.id, { completed: true });
       } catch (error) {
         console.error('Error completing task:', error);
+        return;
       }
     }
 
-    const newCompletedIds = [...session.completedTaskIds, currentTask.id];
+    const newCompletedIds = [...new Set([...session.completedTaskIds, currentTask.id])];
     const newTaskIndex = session.currentTaskIndex + 1;
+
+    // Persist the last completed task before offering to finish.
+    const completedSession = { ...session, completedTaskIds: newCompletedIds };
+    await saveExamSession(completedSession);
+    setSession(completedSession);
 
     // Check if there are more tasks
     if (newTaskIndex >= allTasks.length) {
@@ -299,6 +308,8 @@ export default function ExamSessionScreen() {
       handleNoMoreTasks();
       return;
     }
+
+    if (!isDemo) await changeStudySession('exam', 'task', allTasks[newTaskIndex]?.id);
 
     // Update session
     const updatedSession: ExamSession = {
@@ -347,6 +358,7 @@ export default function ExamSessionScreen() {
   const handlePause = async () => {
     if (!session) return;
     
+    if (!isDemoSession(session)) await changeStudySession('exam', 'pause');
     setIsRunning(false);
     pausedAtRef.current = Date.now();
     
@@ -364,6 +376,7 @@ export default function ExamSessionScreen() {
     const pauseDuration = (Date.now() - pausedAtRef.current) / 1000;
     const totalPaused = (session.totalPausedTime || 0) + pauseDuration;
     
+    if (!isDemoSession(session)) await changeStudySession('exam', 'resume');
     setIsRunning(true);
     pausedAtRef.current = null;
     
@@ -410,12 +423,17 @@ export default function ExamSessionScreen() {
           text: t('end') || 'Terminer',
           style: 'destructive',
           onPress: async () => {
+            if (finishingRef.current) return;
+            finishingRef.current = true;
+            const latest = await getActiveExamSession();
+            const recorded = await changeStudySession('exam', 'stopped');
             await clearExamSession();
-            const completedCount = session?.completedTaskIds.length || 0;
+            const completedCount = latest?.completedTaskIds.length ?? session?.completedTaskIds.length ?? 0;
             router.replace({
               pathname: '/exam/summary',
               params: {
-                duration: session?.plannedDuration.toString() || '0',
+                duration: String(Math.round((recorded?.seconds ?? 0) / 60)),
+                studySessionId: recorded?.clientId ?? '',
                 completed: completedCount.toString(),
               },
             });
@@ -426,9 +444,13 @@ export default function ExamSessionScreen() {
   };
 
   const handleSessionEnd = async () => {
+    if (finishingRef.current) return;
+    finishingRef.current = true;
     stopTimer();
+    const latest = await getActiveExamSession();
     const isDemo = session?.sessionId.startsWith('exam_demo_') || params.demo === 'true';
     
+    const recorded = !isDemo ? await changeStudySession('exam', 'completed') : null;
     await clearExamSession();
     
     if (isDemo) {
@@ -451,11 +473,12 @@ export default function ExamSessionScreen() {
       return;
     }
     
-    const completedCount = session?.completedTaskIds.length || 0;
+    const completedCount = latest?.completedTaskIds.length ?? session?.completedTaskIds.length ?? 0;
     router.replace({
       pathname: '/exam/summary',
       params: {
-        duration: session?.plannedDuration.toString() || '0',
+        duration: String(Math.round((recorded?.seconds ?? 0) / 60)),
+        studySessionId: recorded?.clientId ?? '',
         completed: completedCount.toString(),
       },
     });

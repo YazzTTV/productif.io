@@ -1,3 +1,4 @@
+import { beginStudySession } from '@/lib/studyAnalysis';
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Switch, ActivityIndicator, Alert } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -179,6 +180,8 @@ export default function ExamSetupScreen() {
         liveActivityId,
         blockApps: blockAppsEnabled,
       });
+
+      await beginStudySession('exam', sessionId, duration, primaryTask.id);
 
       await trackEvent('exam_mode_started', {
         duration_minutes: duration,

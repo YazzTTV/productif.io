@@ -2,6 +2,11 @@ import analytics from '@react-native-firebase/analytics';
 import { Platform } from 'react-native';
 
 export type ProductEvent =
+  | 'analysis_opened'
+  | 'analysis_evidence_opened'
+  | 'analysis_action_opened'
+  | 'analysis_session_started'
+  | 'analysis_session_completed'
   | 'app_opened'
   | 'screen_view'
   | 'signup_started'

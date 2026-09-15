@@ -1,3 +1,4 @@
+import { beginStudySession, changeStudySession } from '@/lib/studyAnalysis';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
@@ -437,12 +438,14 @@ export default function FocusScreen() {
   const { triggerEvent } = useSuperwall();
   const params = useLocalSearchParams();
   const { settings: dailyStructure } = useDailyStructureSettings();
-  const startButtonRef = useRef<TouchableOpacity>(null);
+  const startButtonRef = useRef<React.ElementRef<typeof TouchableOpacity>>(null);
   
+  const studyClockRef = useRef({ startedAt: 0, pausedSeconds: 0, pausedAt: 0 });
+  const finishingRef = useRef(false);
   const [phase, setPhase] = useState<FocusPhase>('intro');
   const [selectedDuration, setSelectedDuration] = useState(parseInt(params.duration as string) || dailyStructure.focusDuration);
   const [showSettings, setShowSettings] = useState(false);
-  const [focusDuration, setFocusDuration] = useState(dailyStructure.focusDuration);
+  const [focusDuration, setFocusDuration] = useState<number>(dailyStructure.focusDuration);
   const [breakDuration, setBreakDuration] = useState(10);
   const [maxSessions, setMaxSessions] = useState(dailyStructure.maxSessions);
   const taskId = params.taskId as string | undefined;
@@ -555,7 +558,7 @@ export default function FocusScreen() {
 
     (async () => {
       const restored = await getRestorableFocusSession();
-      if (!restored) return;
+      if (!restored) { await changeStudySession('focus', 'unknown'); return; }
 
       console.log(
         `[appBlocking] session focus restauree, ${restored.remainingSeconds}s restantes`
@@ -566,12 +569,13 @@ export default function FocusScreen() {
       // se retrouverait avec deux comptes à rebours concurrents.
       liveActivityIdRef.current = restored.liveActivityId ?? null;
 
+      studyClockRef.current = { startedAt: restored.startedAt, pausedSeconds: restored.totalPausedSeconds ?? 0, pausedAt: restored.pausedAt ?? 0 };
       setSelectedDuration(restored.durationMinutes);
       setSessionId(restored.sessionId);
       setCurrentTaskIndex(restored.taskIndex);
       setTimeLeft(restored.remainingSeconds);
       setPhase('active');
-      setIsRunning(true);
+      setIsRunning(!restored.pausedAt);
     })();
   }, []);
 
@@ -661,19 +665,6 @@ export default function FocusScreen() {
   useEffect(() => {
     loadPrioritizedTasks();
   }, []);
-
-  // Gérer le bouton retour Android pour éviter l'erreur GO_BACK
-  useEffect(() => {
-    if (Platform.OS !== 'android') return;
-
-    const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
-      // Utiliser handleExit qui gère déjà la logique de sortie
-      handleExit();
-      return true; // Empêcher le comportement par défaut
-    });
-
-    return () => backHandler.remove();
-  }, [handleExit]);
 
   const loadPrioritizedTasks = async () => {
     try {
@@ -828,6 +819,9 @@ export default function FocusScreen() {
       }
 
       const startedAt = Date.now();
+      studyClockRef.current = { startedAt, pausedSeconds: 0, pausedAt: 0 };
+      finishingRef.current = false;
+      await beginStudySession('focus', result?.session?.id ?? `focus_${startedAt}`, effectiveDuration, currentTask.id, result?.session?.id, typeof params.recommendationId === 'string' ? params.recommendationId : undefined);
       const endsAt = startedAt + effectiveDuration * 60 * 1000;
       const liveActivityId = startSessionLiveActivity('focus', endsAt, currentTask?.title);
       liveActivityIdRef.current = liveActivityId;
@@ -867,15 +861,18 @@ export default function FocusScreen() {
       
       console.log('🔍 [Focus] isPlanLocked:', isPlanLocked);
 
-      const startLocally = () => {
+      const startLocally = async () => {
+        const startedAt = Date.now();
+        studyClockRef.current = { startedAt, pausedSeconds: 0, pausedAt: 0 };
+        finishingRef.current = false;
+        await beginStudySession('focus', `focus_${startedAt}`, selectedDuration, currentTask.id, null, typeof params.recommendationId === 'string' ? params.recommendationId : undefined);
+        await saveFocusSession({sessionId:null,startedAt,durationMinutes:selectedDuration,taskIndex:0});
         setTimeLeft(Math.round(selectedDuration * 60));
-        setPhase('active');
-        setIsRunning(true);
-        setCurrentTaskIndex(0);
+        setPhase('active'); setIsRunning(true); setCurrentTaskIndex(0);
       };
 
       if (isPlanLocked && (await hasActiveRealExamSession())) {
-        startLocally();
+        await startLocally();
         return;
       }
 
@@ -905,11 +902,11 @@ export default function FocusScreen() {
       // Si c'est une session déjà en cours (sans erreur de limite), continuer localement
       if (errorMessage.includes('déjà en cours') || (errorMessage.includes('session') && errorMessage.includes('déjà'))) {
         console.log('⚠️ [Focus] Session déjà en cours côté serveur, continuation locale');
-        startLocally();
+        await startLocally();
       } else {
         console.error('❌ [Focus] Erreur lors du démarrage de la session:', error);
         // Continuer quand même en mode local pour les autres erreurs
-        startLocally();
+        await startLocally();
       }
     }
   };
@@ -951,6 +948,27 @@ export default function FocusScreen() {
     }
   };
 
+  const handleTogglePause = async () => {
+    const clock = studyClockRef.current;
+    if (!clock.startedAt) return;
+    if (isRunning) {
+      clock.pausedAt = Date.now();
+      await changeStudySession('focus', 'pause');
+      stopSessionLiveActivity('focus', liveActivityIdRef.current);
+    } else {
+      clock.pausedSeconds += (Date.now() - clock.pausedAt) / 1000;
+      clock.pausedAt = 0;
+      await changeStudySession('focus', 'resume');
+      liveActivityIdRef.current = startSessionLiveActivity('focus', Date.now() + timeLeft * 1000, currentTask.title);
+    }
+    await saveFocusSession({sessionId,startedAt:clock.startedAt,durationMinutes:selectedDuration,taskIndex:currentTaskIndex,pausedAt:clock.pausedAt||undefined,totalPausedSeconds:clock.pausedSeconds,liveActivityId:liveActivityIdRef.current});
+    setIsRunning(!isRunning);
+  };
+
+  useEffect(() => {
+    if (phase === 'active') void changeStudySession('focus', 'task', currentTask.id);
+  }, [currentTask.id, phase]);
+
   // Timer logic
   useEffect(() => {
     if (intervalRef.current) {
@@ -960,14 +978,11 @@ export default function FocusScreen() {
     if (!isRunning || phase !== 'active') return;
 
     intervalRef.current = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 0) {
-          setIsRunning(false);
-          handleComplete();
-          return 0;
-        }
-        return prev - 1;
-      });
+      const clock = studyClockRef.current;
+      if (!clock.startedAt) return;
+      const remaining = Math.max(0, Math.ceil(selectedDuration * 60 - (Date.now() - clock.startedAt) / 1000 + clock.pausedSeconds));
+      setTimeLeft(remaining);
+      if (remaining === 0 && !finishingRef.current) { setIsRunning(false); void handleComplete(); }
     }, 1000);
 
     return () => {
@@ -975,7 +990,7 @@ export default function FocusScreen() {
         clearInterval(intervalRef.current);
       }
     };
-  }, [isRunning, phase]);
+  }, [isRunning, phase, sessionId, selectedDuration]);
 
   // Update progress animation
   useEffect(() => {
@@ -988,6 +1003,9 @@ export default function FocusScreen() {
   }, [progress, phase]);
 
   const handleComplete = useCallback(async () => {
+    if (finishingRef.current) return;
+    finishingRef.current = true;
+    const recorded = await changeStudySession('focus', 'completed');
     // Aucun appel à stopBlocking ici : Focus ne pose plus de bouclier, et en
     // lever un reviendrait à débloquer les apps d'une session examen qui
     // tourne par-dessus. C'est exactement le défaut que le Mode Examen vend
@@ -1019,10 +1037,14 @@ export default function FocusScreen() {
       return;
     }
     // Toujours revenir au dashboard après une session
-    router.replace('/(tabs)');
+    if (recorded) router.replace({pathname:'/study-summary',params:{sessionId:recorded.clientId,seconds:String(recorded.seconds)}});
+    else router.replace('/(tabs)');
   }, [sessionId, router, tutorialCompleted, tutorialStage, triggerEvent]);
 
   const handleExit = useCallback(async () => {
+    if (finishingRef.current) return;
+    finishingRef.current = true;
+    const recorded = phase === 'active' ? await changeStudySession('focus', 'stopped') : null;
     // Même raison que dans handleComplete : ne jamais toucher au bouclier.
     stopSessionLiveActivity('focus', liveActivityIdRef.current);
     liveActivityIdRef.current = null;
@@ -1050,8 +1072,22 @@ export default function FocusScreen() {
       return;
     }
     // Toujours revenir au dashboard après une session
-    router.replace('/(tabs)');
+    if (recorded) router.replace({pathname:'/study-summary',params:{sessionId:recorded.clientId,seconds:String(recorded.seconds)}});
+    else router.replace('/(tabs)');
   }, [sessionId, phase, router, tutorialCompleted, tutorialStage]);
+
+  // Gérer le bouton retour Android pour éviter l'erreur GO_BACK
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+      // Utiliser handleExit qui gère déjà la logique de sortie
+      handleExit();
+      return true; // Empêcher le comportement par défaut
+    });
+
+    return () => backHandler.remove();
+  }, [handleExit]);
 
   const strokeDashoffset = CIRCUMFERENCE * (1 - progress);
 
@@ -1312,7 +1348,7 @@ export default function FocusScreen() {
         <Animated.View entering={FadeInDown.delay(500).duration(400)} style={styles.controlsContainer}>
           <TouchableOpacity
             style={styles.pauseButton}
-            onPress={() => setIsRunning(!isRunning)}
+            onPress={handleTogglePause}
             activeOpacity={0.7}
           >
             <Ionicons 

@@ -15,7 +15,7 @@ export default function AssistantScreen() {
   const [initialCheckInType] = useState<'mood' | 'stress' | 'focus' | undefined>(checkInTypeParam);
   
   // Si on arrive depuis une notification avec checkInType, afficher directement Analytics
-  const [activeTab, setActiveTab] = useState<TabType>(initialCheckInType ? 'analytics' : 'assistant');
+  const [activeTab, setActiveTab] = useState<TabType>(initialCheckInType || params.tab === 'analytics' ? 'analytics' : 'assistant');
 
   // Nettoyer le param après consommation pour éviter les redirections persistantes
   useEffect(() => {

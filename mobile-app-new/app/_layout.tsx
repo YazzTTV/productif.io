@@ -20,6 +20,8 @@ import { useAppsFlyer, flushQueuedAttribution, queueAttribution } from '@/hooks/
 import { useBlockingReconciliation } from '@/hooks/useBlockingReconciliation';
 import { useProductAnalytics } from '@/hooks/useProductAnalytics';
 
+import { useStudySync } from '@/lib/studyAnalysis';
+
 function AppContent() {
   const { actualTheme } = useTheme();
   const [loaded] = useFonts({
@@ -31,6 +33,7 @@ function AppContent() {
   useAppsFlyer();
   useBlockingReconciliation();
   useProductAnalytics();
+  useStudySync();
 
   useEffect(() => {
     const onUrl = async (event: { url: string }) => {

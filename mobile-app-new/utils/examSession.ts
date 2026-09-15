@@ -1,3 +1,4 @@
+import { changeStudySession } from '@/lib/studyAnalysis';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { stopBlocking } from '@/utils/appBlocking';
 import { stopSessionLiveActivity } from '@/utils/liveActivity';
@@ -155,6 +156,7 @@ export async function clearExamSession(): Promise<void> {
   } catch (error) {
     console.error('Error stopping app blocking:', error);
   }
+  try { await changeStudySession('exam', 'unknown'); } catch (error) { console.warn('[Exam] Could not archive session', error); }
   try {
     await AsyncStorage.removeItem(SESSION_KEY);
   } catch (error) {
@@ -163,7 +165,7 @@ export async function clearExamSession(): Promise<void> {
 }
 
 export function calculateTimeRemaining(session: ExamSession): number {
-  const now = Date.now();
+  const now = session.pausedAt ?? Date.now();
   const elapsed = (now - session.startedAt) / 1000; // in seconds
   const pausedTime = session.totalPausedTime || 0;
   const actualElapsed = elapsed - pausedTime;

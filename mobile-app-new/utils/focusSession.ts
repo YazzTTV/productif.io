@@ -22,6 +22,8 @@ export interface PersistedFocusSession {
   startedAt: number;
   durationMinutes: number;
   taskIndex: number;
+  pausedAt?: number;
+  totalPausedSeconds?: number;
   /**
    * Identifiant de la Live Activity associée. Persisté parce que iOS la
    * maintient affichée même après la mort de l'app : sans cet identifiant, on
@@ -68,7 +70,7 @@ export async function getRestorableFocusSession(): Promise<
       return null;
     }
 
-    const elapsedMs = Date.now() - session.startedAt;
+    const elapsedMs = (session.pausedAt ?? Date.now()) - session.startedAt - (session.totalPausedSeconds ?? 0) * 1000;
     // Horloge incohérente : on ne fait pas confiance à la trace.
     if (elapsedMs < 0 || elapsedMs > MAX_OVERRUN_MS) {
       await clearFocusSession();

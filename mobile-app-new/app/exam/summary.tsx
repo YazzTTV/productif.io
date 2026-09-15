@@ -1,3 +1,4 @@
+import { StudyCheckIn } from '@/components/analytics/StudyCheckIn';
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -15,11 +16,9 @@ export default function ExamSummaryScreen() {
   const duration = parseInt(params.duration as string) || 0;
   const completed = parseInt(params.completed as string) || 0;
   
-  const [stressLevel, setStressLevel] = useState<number | null>(null);
-  const [moodLevel, setMoodLevel] = useState<number | null>(null);
 
   const handleBackToDashboard = () => {
-    router.replace('/(tabs)');
+    router.replace({pathname:'/(tabs)/assistant',params:{tab:'analytics'}});
   };
 
   const handleStartAnother = () => {
@@ -56,68 +55,7 @@ export default function ExamSummaryScreen() {
           </View>
         </Animated.View>
 
-        {/* XP (if system exists) */}
-        <Animated.View entering={FadeInDown.delay(300).duration(400)} style={styles.xpSection}>
-          <View style={styles.xpCard}>
-            <Text style={styles.xpLabel}>{t('xpGained')}</Text>
-            <Text style={styles.xpValue}>+{completed * 10}</Text>
-          </View>
-        </Animated.View>
-
-        {/* Quick Check-ins */}
-        <Animated.View entering={FadeInDown.delay(400).duration(400)} style={styles.checkInSection}>
-          <Text style={styles.checkInTitle}>{t('quickCheckIn') || 'Quick check-in'}</Text>
-          
-          <View style={styles.checkInItem}>
-            <Text style={styles.checkInLabel}>{t('stressNow')}</Text>
-            <View style={styles.ratingButtons}>
-              {[1, 2, 3, 4, 5].map((level) => (
-                <TouchableOpacity
-                  key={level}
-                  style={[
-                    styles.ratingButton,
-                    stressLevel === level && styles.ratingButtonActive,
-                  ]}
-                  onPress={() => setStressLevel(level)}
-                >
-                  <Text
-                    style={[
-                      styles.ratingText,
-                      stressLevel === level && styles.ratingTextActive,
-                    ]}
-                  >
-                    {level}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-
-          <View style={styles.checkInItem}>
-            <Text style={styles.checkInLabel}>{t('moodNow')}</Text>
-            <View style={styles.ratingButtons}>
-              {[1, 2, 3, 4, 5].map((level) => (
-                <TouchableOpacity
-                  key={level}
-                  style={[
-                    styles.ratingButton,
-                    moodLevel === level && styles.ratingButtonActive,
-                  ]}
-                  onPress={() => setMoodLevel(level)}
-                >
-                  <Text
-                    style={[
-                      styles.ratingText,
-                      moodLevel === level && styles.ratingTextActive,
-                    ]}
-                  >
-                    {level}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-        </Animated.View>
+        {!!params.studySessionId && <StudyCheckIn sessionId={String(params.studySessionId)} />}
 
         {/* CTAs */}
         <Animated.View entering={FadeInDown.delay(500).duration(400)} style={styles.ctaSection}>
@@ -126,7 +64,7 @@ export default function ExamSummaryScreen() {
             onPress={handleBackToDashboard}
             activeOpacity={0.8}
           >
-            <Text style={styles.primaryButtonText}>{t('backToDashboard')}</Text>
+            <Text style={styles.primaryButtonText}>{t('analyticsTab')}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
