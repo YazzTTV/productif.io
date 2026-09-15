@@ -273,9 +273,18 @@ export async function POST(request: NextRequest) {
 
         console.log(`📡 Événement de mise à jour émis pour l'utilisateur ${userId}`);
 
-        // NOUVEAU : Notifier le scheduler par HTTP (communication inter-processus)
-        // Fire-and-forget : ne pas bloquer la réponse même si le scheduler ne répond pas
-        (async () => {
+        // Notifier le scheduler par HTTP (communication inter-processus).
+        //
+        // ATTENDU, et jamais en fire-and-forget : une fonction serverless Vercel
+        // est gelee des que la reponse est renvoyee, donc un `fetch` non attendu
+        // est tue avant de partir. C'etait une COURSE : le 15 septembre l'appel
+        // de 11h19 est sorti (200 dans les Network Logs Railway) et ceux de
+        // 11h50 et 11h56 non, laissant les taches cron du scheduler sur des
+        // horaires perimes pendant que la base portait les nouveaux.
+        //
+        // Le cout est mesure : 64 ms et 36 ms sur les appels reels, et un
+        // AbortSignal.timeout(2000) borne le pire cas.
+        await (async () => {
             try {
                 console.log(`🔄 Notification du scheduler pour l'utilisateur ${userId}...`);
 
@@ -343,7 +352,7 @@ export async function POST(request: NextRequest) {
                 console.log(`❌ Erreur lors de la notification du scheduler:`, error);
                 // On continue même si le scheduler n'est pas accessible
             }
-        })(); // IIFE pour exécuter de manière asynchrone sans bloquer
+        })();
 
         return NextResponse.json(updatedPreferences);
     } catch (error) {
