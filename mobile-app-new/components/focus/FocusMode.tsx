@@ -15,6 +15,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { assistantService } from '@/lib/api';
 import { useSuperwall } from '@/hooks/useSuperwall';
 import { SUPERWALL_EVENTS } from '@/lib/superwallEvents';
+import { resolveFocusPlacement, markUserFirstActionTriggered } from '@/lib/superwallFirstAction';
 import { hasActiveRealExamSession } from '@/utils/examSession';
 
 const { width } = Dimensions.get('window');
@@ -143,11 +144,16 @@ export function FocusMode({
         console.log('Session terminée localement');
       }
     }
-    await triggerEvent(SUPERWALL_EVENTS.FOCUS_COMPLETED, {
-      params: { source: 'focus_mode_component' },
+    // Meme regle que dans app/focus.tsx : un seul placement, jamais les deux.
+    const { placement, isFirstAction } = await resolveFocusPlacement();
+    await triggerEvent(placement, {
+      params: { source: 'focus_mode_component', first_session: isFirstAction },
       requireNonPremium: false,
       bypassCooldown: true,
     });
+    if (isFirstAction) {
+      await markUserFirstActionTriggered();
+    }
 
     onComplete?.(timeSpent);
   }, [sessionId, timeLeft, totalSeconds, onComplete, triggerEvent]);

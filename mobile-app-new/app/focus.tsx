@@ -20,6 +20,7 @@ import { selectExamTasks, TaskForExam } from '@/utils/taskSelection';
 import { useDailyStructureSettings } from '@/hooks/useDailyStructureSettings';
 import { useSuperwall } from '@/hooks/useSuperwall';
 import { SUPERWALL_EVENTS } from '@/lib/superwallEvents';
+import { resolveFocusPlacement, markUserFirstActionTriggered } from '@/lib/superwallFirstAction';
 import { Coachmark } from '@/tutorial/Coachmark';
 import {
   getTutorialCompleted,
@@ -1002,11 +1003,17 @@ export default function FocusScreen() {
         console.log('Session terminée localement');
       }
     }
-    await triggerEvent(SUPERWALL_EVENTS.FOCUS_COMPLETED, {
-      params: { source: 'focus_screen' },
+    // La premiere session porte user_first_action, les suivantes
+    // focus_completed. Voir resolveFocusPlacement pour le pourquoi.
+    const { placement, isFirstAction } = await resolveFocusPlacement();
+    await triggerEvent(placement, {
+      params: { source: 'focus_screen', first_session: isFirstAction },
       requireNonPremium: false,
       bypassCooldown: true,
     });
+    if (isFirstAction) {
+      await markUserFirstActionTriggered();
+    }
     if (!tutorialCompleted && tutorialStage === 'habits') {
       router.replace('/review-habits');
       return;

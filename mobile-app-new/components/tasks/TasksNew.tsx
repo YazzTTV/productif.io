@@ -34,10 +34,6 @@ import {
   TIER_COLORS,
 } from '@/utils/priorityScore';
 import { SUPERWALL_EVENTS } from '@/lib/superwallEvents';
-import {
-  markUserFirstActionTriggered,
-  shouldTriggerUserFirstAction,
-} from '@/lib/superwallFirstAction';
 import { trackEvent } from '@/lib/analytics';
 
 interface Task {
@@ -998,7 +994,6 @@ export function TasksNew() {
 
     try {
       setCreatingTask(true);
-      const fireUserFirstAction = await shouldTriggerUserFirstAction();
       const selectedSubject = subjects.find(s => s.id === selectedSubjectForTask);
       
       // Vérifier que la matière existe vraiment (pas une matière virtuelle)
@@ -1047,20 +1042,6 @@ export function TasksNew() {
       setSelectedSubjectForTask(null);
       
       Alert.alert(t('success'), t('taskAddedSuccessfully'));
-
-      // Le paywall part APRES que la tache soit visible et confirmee. Place
-      // avant `loadSubjects()`, il bloquait le rafraichissement de la liste :
-      // l'utilisateur appuyait sur creer et recevait un ecran de paiement a la
-      // place de sa tache. Constate en base le 12 septembre sur les 4 comptes
-      // qui ont cree une tache puis quitte en 2 a 7 minutes.
-      if (fireUserFirstAction) {
-        await triggerEvent(SUPERWALL_EVENTS.USER_FIRST_ACTION, {
-          params: { source: 'tasks_new_first_creation' },
-          requireNonPremium: false,
-          bypassCooldown: true,
-        });
-        await markUserFirstActionTriggered();
-      }
 
       if (tutorialStage === 'task') {
         await setTutorialStage('plan');
@@ -1180,18 +1161,8 @@ export function TasksNew() {
 
     try {
       setImportingChapters(true);
-      const fireUserFirstAction = await shouldTriggerUserFirstAction();
 
       const result = await subjectsService.bulkAddTasks(selectedSubjectForBulk, titles);
-
-      if (fireUserFirstAction && result.createdCount > 0) {
-        await triggerEvent(SUPERWALL_EVENTS.USER_FIRST_ACTION, {
-          params: { source: 'tasks_new_bulk_import' },
-          requireNonPremium: false,
-          bypassCooldown: true,
-        });
-        await markUserFirstActionTriggered();
-      }
 
       await loadSubjects();
 

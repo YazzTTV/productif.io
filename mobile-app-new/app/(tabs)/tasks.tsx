@@ -31,12 +31,6 @@ import Animated, {
   FadeIn,
 } from 'react-native-reanimated';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { useSuperwall } from '@/hooks/useSuperwall';
-import { SUPERWALL_EVENTS } from '@/lib/superwallEvents';
-import {
-  markUserFirstActionTriggered,
-  shouldTriggerUserFirstAction,
-} from '@/lib/superwallFirstAction';
 
 interface Task {
   id: string;
@@ -227,7 +221,6 @@ const TaskCard: React.FC<TaskCardProps & { index?: number }> = ({ task, onToggle
 export default function TasksScreen() {
   const router = useRouter();
   const { t } = useLanguage();
-  const { triggerEvent } = useSuperwall();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -513,8 +506,6 @@ export default function TasksScreen() {
       );
       return;
     }
-
-    const fireUserFirstAction = await shouldTriggerUserFirstAction();
     setCreating(true);
     try {
       // Convertir les valeurs comme sur l'app web
@@ -550,18 +541,6 @@ export default function TasksScreen() {
         t('success', undefined, 'Succès'),
         t('tasksCreateSuccess', undefined, 'Tâche créée avec succès !')
       );
-
-      // Meme raison que dans TasksNew : le paywall ne doit jamais passer avant
-      // la confirmation de creation. Il etait declenche avant cette alerte,
-      // donc le message de succes arrivait derriere l'ecran de paiement.
-      if (fireUserFirstAction) {
-        await triggerEvent(SUPERWALL_EVENTS.USER_FIRST_ACTION, {
-          params: { source: 'tasks_first_creation' },
-          requireNonPremium: false,
-          bypassCooldown: true,
-        });
-        await markUserFirstActionTriggered();
-      }
     } catch (error) {
       console.error('Erreur lors de la création:', error);
       Alert.alert(
