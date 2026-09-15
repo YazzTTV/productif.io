@@ -546,6 +546,14 @@ export default function TasksScreen() {
       fetchTasks(); // Recharger les tâches
       // Notifier le dashboard
       dashboardEvents.emit(DASHBOARD_DATA_CHANGED);
+      Alert.alert(
+        t('success', undefined, 'Succès'),
+        t('tasksCreateSuccess', undefined, 'Tâche créée avec succès !')
+      );
+
+      // Meme raison que dans TasksNew : le paywall ne doit jamais passer avant
+      // la confirmation de creation. Il etait declenche avant cette alerte,
+      // donc le message de succes arrivait derriere l'ecran de paiement.
       if (fireUserFirstAction) {
         await triggerEvent(SUPERWALL_EVENTS.USER_FIRST_ACTION, {
           params: { source: 'tasks_first_creation' },
@@ -554,11 +562,6 @@ export default function TasksScreen() {
         });
         await markUserFirstActionTriggered();
       }
-      
-      Alert.alert(
-        t('success', undefined, 'Succès'),
-        t('tasksCreateSuccess', undefined, 'Tâche créée avec succès !')
-      );
     } catch (error) {
       console.error('Erreur lors de la création:', error);
       Alert.alert(

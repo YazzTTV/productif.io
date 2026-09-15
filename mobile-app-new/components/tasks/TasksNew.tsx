@@ -1031,15 +1031,6 @@ export function TasksNew() {
       
       console.log('✅ [TasksNew] Tâche créée avec succès:', newTask);
 
-      if (fireUserFirstAction) {
-        await triggerEvent(SUPERWALL_EVENTS.USER_FIRST_ACTION, {
-          params: { source: 'tasks_new_first_creation' },
-          requireNonPremium: false,
-          bypassCooldown: true,
-        });
-        await markUserFirstActionTriggered();
-      }
-
       // Recharger les matières pour afficher la nouvelle tâche
       await loadSubjects();
       // Une tache posee sur un jour passe change l'etat du rattrapage
@@ -1056,6 +1047,20 @@ export function TasksNew() {
       setSelectedSubjectForTask(null);
       
       Alert.alert(t('success'), t('taskAddedSuccessfully'));
+
+      // Le paywall part APRES que la tache soit visible et confirmee. Place
+      // avant `loadSubjects()`, il bloquait le rafraichissement de la liste :
+      // l'utilisateur appuyait sur creer et recevait un ecran de paiement a la
+      // place de sa tache. Constate en base le 12 septembre sur les 4 comptes
+      // qui ont cree une tache puis quitte en 2 a 7 minutes.
+      if (fireUserFirstAction) {
+        await triggerEvent(SUPERWALL_EVENTS.USER_FIRST_ACTION, {
+          params: { source: 'tasks_new_first_creation' },
+          requireNonPremium: false,
+          bypassCooldown: true,
+        });
+        await markUserFirstActionTriggered();
+      }
 
       if (tutorialStage === 'task') {
         await setTutorialStage('plan');
