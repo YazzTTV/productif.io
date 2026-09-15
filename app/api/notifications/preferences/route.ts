@@ -296,7 +296,16 @@ export async function POST(request: NextRequest) {
                         console.log(`🔗 Tentative de connexion au scheduler ${isLocal ? '(LOCAL)' : '(RAILWAY)'}: ${schedulerUrl}`);
                         const resp = await fetch(schedulerUrl, {
                             method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
+                            // Sans cet en-tete, requireSchedulerKey cote scheduler renvoie 401.
+                            // La cle a ete posee sur Railway le 10 aout et l'appelant ne l'a
+                            // jamais envoyee : toute mise a jour de preferences a echoue en
+                            // silence depuis, les deux cotes avalant l'erreur.
+                            headers: {
+                                'Content-Type': 'application/json',
+                                ...(process.env.SCHEDULER_API_KEY
+                                    ? { 'x-scheduler-key': process.env.SCHEDULER_API_KEY }
+                                    : {}),
+                            },
                             body: JSON.stringify({
                                 userId,
                                 oldPreferences: oldPreferences || null,

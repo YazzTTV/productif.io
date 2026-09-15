@@ -103,7 +103,13 @@ export async function PATCH(req: NextRequest) {
         }
         await fetch(`${schedulerUrl}/api/update-user`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          // Meme raison que dans notifications/preferences : sans la cle, 401.
+          headers: {
+            'Content-Type': 'application/json',
+            ...(process.env.SCHEDULER_API_KEY
+              ? { 'x-scheduler-key': process.env.SCHEDULER_API_KEY }
+              : {}),
+          },
           body: JSON.stringify({ 
             userId: user.userId,
             oldPreferences: null,
