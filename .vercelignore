@@ -53,6 +53,12 @@ logs
 
 # Large media files
 *.mp4
+# Exception : la preuve video de la landing Mode Examen. 103 Ko, servie
+# depuis public/, et sans elle la section preuve affiche une balise video
+# cassee. Constate en production le 16 septembre : le HTML la referencait,
+# le fichier repondait 404 parce que la regle *.mp4 ci-dessus l'excluait
+# du televersement alors qu'il est bien suivi par git.
+!public/demo-blocage.mp4
 *.mov
 *.avi
 *.wmv
