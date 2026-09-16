@@ -42,12 +42,14 @@ export type PageCopy = {
     errorNetwork: string
   }
   emailSection: { title: string; body: string; note: string }
+  demo: { title: string; caption: string }
   friction: {
     titleLead: string
     titleAccent: string
     titleTail: string
     intro: string
     items: string[]
+    stakes: string
     closing: string
   }
   features: { title: string; subtitle: string; signatureLabel: string; items: Record<FeatureId, Feature> }
@@ -87,11 +89,11 @@ const fr: PageCopy = {
     titleLead: "Le problème, c'est de ",
     titleAccent: "t'y mettre",
     subtitle:
-      "Ton planning de révisions se construit tout seul. Et ton téléphone se bloque jusqu'à ce que tu l'aies fait.",
+      "Tu lances ta session, tes applis se ferment, et il n'y a aucun bouton pour les rouvrir. Ça se déverrouille tout seul à la fin.",
     ctaPrimary: "Commencer gratuitement",
     ctaSecondary: "Voir comment ça marche",
     trialNote: (days) =>
-      `${days} jours d'essai Premium, rien n'est débité pendant l'essai. Pensé pour PACES, prépa, droit et concours.`,
+      `${days} jours d'essai Premium, rien n'est débité pendant l'essai. Pensé pour le PASS, la prépa, le droit et les concours.`,
   },
   emailInline: {
     prompt: "Sur Android, ou sur ordinateur ? Laisse ton email, je t'envoie le lien.",
@@ -110,18 +112,25 @@ const fr: PageCopy = {
     body: "L'app est sur iPhone aujourd'hui. Laisse ton email et tu reçois le lien quand c'est dispo pour toi, sans avoir à y repenser.",
     note: "Une adresse email, rien d'autre. Pas de spam, désinscription en un clic.",
   },
+  demo: {
+    title: "Ce qui se passe quand tu essaies d'ouvrir TikTok",
+    caption:
+      "Pas de bouton pour ignorer. Ton app se rouvre toute seule à la fin du bloc, et pas avant.",
+  },
   friction: {
     titleLead: "Tu as déjà essayé. Et tu as arrêté au bout de ",
     titleAccent: "deux semaines",
     titleTail: ".",
     intro:
-      "Les vingt applications de la rentrée dernière, l'agenda papier, le planificateur parfait. Normal que ça n'ait pas tenu : ces outils ne font rien quand tu ne les ouvres pas.",
+      "Les vingt applications de la rentrée dernière, l'agenda papier, le planificateur parfait. Normal que ça n'ait pas tenu : ces outils ne font rien quand tu ne les ouvres pas. Si tu t'es déjà dit une de ces phrases :",
     items: [
-      "Tu perds 40 minutes à t'organiser avant de commencer à travailler.",
-      "Tu prends ton téléphone 5 minutes, tu le reposes une heure plus tard.",
-      "Tu es à fond trois jours, puis tu décroches et tu culpabilises.",
-      "Devant la pile de polys, tu ne sais même pas par où attaquer.",
+      "J'ai refait mon planning trois fois cette semaine. J'ai ouvert zéro chapitre.",
+      "Je prends mon téléphone pour vérifier un truc. Je le repose une heure après.",
+      "Je suis à fond trois jours, et le jeudi je ne rouvre plus rien.",
+      "Il me reste onze chapitres, je ne sais pas lequel prendre, alors je n'en prends aucun.",
     ],
+    stakes:
+      "La veille, il te reste trois chapitres et tu sais déjà que tu ne les feras pas. Ce n'est pas la soirée qui a raté, c'est les trois semaines d'avant.",
     closing: "Ce n'est pas une question de motivation. C'est une question de système.",
   },
   features: {
@@ -163,7 +172,8 @@ const fr: PageCopy = {
   },
   pricing: {
     title: "Commence gratuitement",
-    subtitle: "Teste sans risque. Passe en Premium quand tu vois que ça marche.",
+    subtitle:
+      "Teste sans risque. Et si tu hésites sur le prix : une année redoublée, c'est douze mois de ta vie.",
     freeLabel: "Gratuit",
     freePrice: "0 €",
     freeTagline: "Pour tester sans t'engager",
@@ -189,7 +199,7 @@ const fr: PageCopy = {
     yearlyCta: (days) => `Essayer ${days} jours gratuitement`,
     monthlyLabel: "Premium mensuel",
     perMonth: "/mois",
-    monthlyTagline: "Moins qu'un café par semaine",
+    monthlyTagline: "Sans engagement. Tu arrêtes quand tu veux.",
     monthlyItems: (days) => [
       "Toutes les fonctions Premium",
       "Sans engagement, annulable à tout moment",
@@ -219,7 +229,7 @@ const en: PageCopy = {
     titleLead: "The hard part is ",
     titleAccent: "getting started",
     subtitle:
-      "Your revision schedule builds itself. And your phone stays locked until you've done the work.",
+      "You start your session, your apps close, and there is no button to reopen them. It unlocks itself at the end.",
     ctaPrimary: "Start for free",
     ctaSecondary: "See how it works",
     trialNote: (days) =>
@@ -242,18 +252,25 @@ const en: PageCopy = {
     body: "The app is on iPhone today. Leave your email and you'll get the link when it's available for you, without having to think about it again.",
     note: "One email address, nothing else. No spam, unsubscribe in one click.",
   },
+  demo: {
+    title: "What happens when you try to open TikTok",
+    caption:
+      "No ignore button. Your app reopens on its own at the end of the block, and not before.",
+  },
   friction: {
     titleLead: "You've tried before. And you quit after ",
     titleAccent: "two weeks",
     titleTail: ".",
     intro:
-      "The twenty apps you downloaded last September, the paper planner, the perfect system. Of course it didn't last: none of those tools do anything when you don't open them.",
+      "The twenty apps you downloaded last September, the paper planner, the perfect system. Of course it didn't last: none of those tools do anything when you don't open them. If you have ever said one of these:",
     items: [
-      "You lose 40 minutes organising before you start actually working.",
-      "You pick up your phone for 5 minutes and put it down an hour later.",
-      "You go all in for three days, then drop off and feel guilty about it.",
-      "Faced with the pile of course notes, you don't even know where to start.",
+      "I redid my schedule three times this week. I opened zero chapters.",
+      "I pick up my phone to check one thing. I put it down an hour later.",
+      "I go all in for three days, and by Thursday I don't open anything.",
+      "I have eleven chapters left, I don't know which one to pick, so I pick none.",
     ],
+    stakes:
+      "The night before, you have three chapters left and you already know you won't do them. It isn't the evening that failed. It's the three weeks before.",
     closing: "It isn't a motivation problem. It's a system problem.",
   },
   features: {
@@ -295,7 +312,8 @@ const en: PageCopy = {
   },
   pricing: {
     title: "Start for free",
-    subtitle: "Try it at no risk. Go Premium once you see it working.",
+    subtitle:
+      "Try it at no risk. And if the price gives you pause: repeating a year costs you twelve months of your life.",
     freeLabel: "Free",
     freePrice: "€0",
     freeTagline: "To try it without committing",
@@ -321,7 +339,7 @@ const en: PageCopy = {
     yearlyCta: (days) => `Try ${days} days free`,
     monthlyLabel: "Premium monthly",
     perMonth: "/month",
-    monthlyTagline: "Less than one coffee a week",
+    monthlyTagline: "No commitment. Cancel whenever you want.",
     monthlyItems: (days) => [
       "Every Premium feature",
       "No commitment, cancel any time",
@@ -388,7 +406,7 @@ export function faqItems(
       a: "Un planificateur attend que tu l'ouvres et te laisse décider de tout. Ici, l'ordre des chapitres est calculé par priorité, et les distractions sont coupées pendant que tu travailles. Le problème n'a jamais été de faire une liste, c'est de s'y mettre.",
     },
     {
-      q: "C'est vraiment fait pour la PACES ou la prépa ?",
+      q: "C'est vraiment fait pour le PASS ou la prépa ?",
       a: "Oui. Le Mode Examen est pensé pour les gros volumes et les dates de concours : tu rentres tes chapitres et tes dates, il répartit tout et t'indique quoi réviser chaque jour.",
     },
     {

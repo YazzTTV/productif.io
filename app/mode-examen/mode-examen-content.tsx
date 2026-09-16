@@ -237,6 +237,37 @@ export function ModeExamenContent() {
         </div>
       </section>
 
+      {/* ================= PREUVE =================
+          La chose la plus dure a croire dans cette page est "aucun bouton pour
+          rouvrir". Tout le monde a deja utilise le Temps d'ecran d'iOS et sait
+          qu'on peut appuyer sur "Ignorer la limite". Un paragraphe ne prouve
+          pas le contraire, une boucle de 5 secondes si.
+          Place APRES le hero et jamais dedans : le bloc de capture d'email doit
+          rester visible sans scroller, c'est ce que dit le commentaire du hero.
+          autoPlay + muted + loop + playsInline sont les quatre attributs sans
+          lesquels Safari iOS refuse de lire en ligne ou passe en plein ecran. */}
+      <section className="px-6 pb-24">
+        <div className="max-w-3xl mx-auto flex flex-col items-center text-center">
+          <h2 className="text-2xl md:text-3xl font-light text-gray-900 tracking-[-0.03em] max-w-xl">
+            {c.demo.title}
+          </h2>
+          <div className="mt-10 rounded-[2rem] overflow-hidden border border-black/[0.08] shadow-sm bg-black">
+            <video
+              src="/demo-blocage.mp4"
+              poster="/demo-blocage.jpg"
+              autoPlay
+              muted
+              loop
+              playsInline
+              preload="metadata"
+              aria-label={c.demo.title}
+              className="block w-[270px] h-auto"
+            />
+          </div>
+          <p className="mt-6 max-w-md text-sm text-gray-500">{c.demo.caption}</p>
+        </div>
+      </section>
+
       {/* ================= FREIN N1 ================= */}
       <section className="py-24 md:py-32 px-6 bg-[#fafafa] border-y border-black/[0.04]">
         <div className="max-w-3xl mx-auto text-center">
@@ -258,7 +289,11 @@ export function ModeExamenContent() {
             ))}
           </div>
 
-          <p className="mt-14 text-lg font-medium text-gray-900">{c.friction.closing}</p>
+          <p className="mt-14 mx-auto max-w-2xl text-left text-lg text-gray-900 leading-relaxed border-l-2 border-[#16a34a] pl-6">
+            {c.friction.stakes}
+          </p>
+
+          <p className="mt-10 text-lg font-medium text-gray-900">{c.friction.closing}</p>
         </div>
       </section>
 

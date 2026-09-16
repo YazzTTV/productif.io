@@ -55,7 +55,7 @@ const OG_DESCRIPTION =
 export const metadata: Metadata = {
   title: "Mode Examen - productif.io | Ton planning de révisions se construit tout seul",
   description:
-    "Tu sais quoi faire, le problème c'est de t'y mettre. Ton planning de révisions se construit tout seul et ton téléphone se bloque jusqu'à la fin du bloc. Conçu pour PACES, prépa, droit et concours.",
+    "Tu sais quoi faire, le problème c'est de t'y mettre. Ton planning de révisions se construit tout seul et ton téléphone se bloque jusqu'à la fin du bloc. Conçu pour le PASS, la prépa, le droit et les concours.",
   openGraph: {
     title: "Mode Examen - productif.io",
     description: OG_DESCRIPTION,
