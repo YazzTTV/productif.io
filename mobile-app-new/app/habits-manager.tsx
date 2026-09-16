@@ -26,6 +26,7 @@ import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 import { Select } from '@/components/ui/Select';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSuperwall } from '@/hooks/useSuperwall';
+import { habitDateKey } from '@/lib/habitDate';
 import { SUPERWALL_EVENTS } from '@/lib/superwallEvents';
 
 interface Habit {
@@ -146,6 +147,8 @@ export default function HabitsManagerScreen() {
   }, []);
 
   const handleToggleHabit = async (habitId: string) => {
+    let currentCompleted = false;
+    let currentStreak = 0;
     try {
       const dateString = format(selectedDate, 'yyyy-MM-dd');
       const habit = habits.find(h => h.id === habitId);
@@ -153,25 +156,33 @@ export default function HabitsManagerScreen() {
 
       const entries = habit.entries || [];
       const todayEntry = entries.find(e => {
-        const entryDate = format(new Date(e.date), 'yyyy-MM-dd');
+        const entryDate = habitDateKey(e.date);
         return entryDate === dateString;
       });
-      const currentCompleted = todayEntry?.completed || false;
-      const currentStreak = habit.currentStreak ?? 0;
+      currentCompleted = todayEntry?.completed || false;
+      currentStreak = habit.currentStreak ?? 0;
 
       await habitsService.complete(habitId, dateString, currentCompleted);
       await fetchHabits();
       dashboardEvents.emit(DASHBOARD_DATA_CHANGED);
-      if (!currentCompleted && currentStreak === 0) {
+    } catch (error) {
+      console.error('Erreur lors de la mise à jour:', error);
+      Alert.alert(t('error'), t('habitsUpdateError', undefined, 'Impossible de mettre à jour l\'habitude'));
+      return;
+    }
+
+    // L'entrée est déjà enregistrée : un échec Superwall ne doit pas être
+    // présenté comme un échec de mise à jour de l'habitude.
+    if (!currentCompleted && currentStreak === 0) {
+      try {
         await triggerEvent(SUPERWALL_EVENTS.STREAK_STARTED, {
           params: { source: 'habits_toggle', habitId },
           requireNonPremium: false,
           bypassCooldown: true,
         });
+      } catch (error) {
+        console.error('⚠️ Échec non bloquant de l\'affichage Superwall:', error);
       }
-    } catch (error) {
-      console.error('Erreur lors de la mise à jour:', error);
-      Alert.alert(t('error'), t('habitsUpdateError', undefined, 'Impossible de mettre à jour l\'habitude'));
     }
   };
 
@@ -260,7 +271,7 @@ export default function HabitsManagerScreen() {
     const dateString = format(selectedDate, 'yyyy-MM-dd');
     const entries = habit.entries || [];
     const entry = entries.find(e => {
-      const entryDate = format(new Date(e.date), 'yyyy-MM-dd');
+      const entryDate = habitDateKey(e.date);
       return entryDate === dateString;
     });
     return entry?.completed || false;

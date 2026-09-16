@@ -4,25 +4,29 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { AIConductorNew } from '@/components/ai/AIConductorNew';
 import AnalyticsScreen from './analytics';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 
 type TabType = 'assistant' | 'analytics';
 
 export default function AssistantScreen() {
   const { t } = useLanguage();
+  const insets = useSafeAreaInsets();
   const params = useLocalSearchParams();
   const router = useRouter();
   const checkInTypeParam = params.checkInType as 'mood' | 'stress' | 'focus' | undefined;
-  const [initialCheckInType] = useState<'mood' | 'stress' | 'focus' | undefined>(checkInTypeParam);
-  
-  // Si on arrive depuis une notification avec checkInType, afficher directement Analytics
-  const [activeTab, setActiveTab] = useState<TabType>(initialCheckInType || params.tab === 'analytics' ? 'analytics' : 'assistant');
+  const [activeTab, setActiveTab] = useState<TabType>(params.tab === 'analytics' ? 'analytics' : 'assistant');
 
-  // Nettoyer le param après consommation pour éviter les redirections persistantes
   useEffect(() => {
-    if (checkInTypeParam) {
-      router.setParams({ checkInType: undefined } as any);
+    if (params.tab === 'analytics') {
+      setActiveTab('analytics');
+      router.setParams({ tab: undefined });
     }
-  }, [checkInTypeParam, router]);
+    if (checkInTypeParam && ['mood', 'stress', 'focus'].includes(checkInTypeParam)) {
+      router.setParams({ checkInType: undefined });
+      router.push({ pathname: '/check-in', params: { kind: checkInTypeParam } });
+    }
+  }, [checkInTypeParam, params.tab, router]);
 
   // Gérer le bouton retour Android pour éviter l'erreur GO_BACK
   useEffect(() => {
@@ -51,7 +55,8 @@ export default function AssistantScreen() {
   return (
     <View style={styles.container}>
       {/* Tabs internes */}
-      <View style={styles.tabsContainer}>
+      <StatusBar style="dark" />
+      <View style={[styles.tabsContainer, { paddingTop: insets.top + 8 }]}>
         <TouchableOpacity
           style={[styles.tab, activeTab === 'assistant' && styles.tabActive]}
           onPress={() => setActiveTab('assistant')}
@@ -74,7 +79,7 @@ export default function AssistantScreen() {
       {activeTab === 'assistant' ? (
         <AIConductorNew />
       ) : (
-        <AnalyticsScreen checkInType={initialCheckInType} isActive={activeTab === 'analytics'} />
+        <AnalyticsScreen isActive={activeTab === 'analytics'} />
       )}
     </View>
   );

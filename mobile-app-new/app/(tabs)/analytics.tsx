@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -10,10 +10,13 @@ import {
   Modal,
   TextInput,
   Switch,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
+import { useFocusEffect } from "@react-navigation/native";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { useTheme } from "@/contexts/ThemeContext";
 import { apiCall } from "@/lib/api";
 import { flushStudyQueue, type StudyAnalysis } from "@/lib/studyAnalysis";
 import { factText, type AnalysisLanguage } from "@/lib/studyCopy";
@@ -21,20 +24,30 @@ import { trackEvent } from "@/lib/analytics";
 import { StudyCheckIn } from "@/components/analytics/StudyCheckIn";
 import { useSuperwall } from "@/hooks/useSuperwall";
 import { SUPERWALL_EVENTS } from "@/lib/superwallEvents";
+import { chartData } from "@/lib/analyticsChart";
 
 type Fact = StudyAnalysis["facts"][number];
 const duration = (seconds: number) =>
   `${Math.floor(seconds / 3600)} h ${Math.floor((seconds % 3600) / 60)
     .toString()
     .padStart(2, "0")} min`;
+const compactDuration = (seconds: number) => {
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  return rest ? `${hours} h ${rest} min` : `${hours} h`;
+};
+const friendlyDate = (value: string, lang: AnalysisLanguage) =>
+  new Date(`${value}T12:00:00Z`).toLocaleDateString(lang, { day: "numeric", month: "short", timeZone: "UTC" });
 export default function AnalyticsScreen({
   checkInType,
   isActive = true,
 }: { checkInType?: "mood" | "stress" | "focus"; isActive?: boolean } = {}) {
   const router = useRouter(),
     { language } = useLanguage(),
-    { colors } = useTheme(),
     { triggerEvent } = useSuperwall();
+  const insets = useSafeAreaInsets();
   const lang: AnalysisLanguage =
     language === "en" ? "en" : language === "es" ? "es" : "fr";
   const tr = (fr: string, en: string, es: string) =>
@@ -51,6 +64,8 @@ export default function AnalyticsScreen({
     [journal, setJournal] = useState(false),
     [answer, setAnswer] = useState(""),
     [asking, setAsking] = useState(false);
+  const [showMoreFacts, setShowMoreFacts] = useState(false),
+    [showDetails, setShowDetails] = useState(false);
   const request = useRef(0),
     explainRequest = useRef(0);
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
@@ -78,7 +93,8 @@ export default function AnalyticsScreen({
       if (id === request.current) setBusy(false);
     }
   }, [days, timezone]);
-  useEffect(() => {
+  useFocusEffect(
+    useCallback(() => {
     if (isActive) {
       void load();
       void trackEvent("analysis_opened", { period_days: days });
@@ -86,16 +102,16 @@ export default function AnalyticsScreen({
     return () => {
       request.current++;
     };
-  }, [load, isActive]);
-  const text = (content: React.ReactNode, style: object = {}) => (
-    <Text style={[{ color: colors.text }, style]}>{content}</Text>
+    }, [load, isActive, days]),
   );
+  const palette = { background: "#F4F8F5", surface: "#FFFFFF", text: "#173B35", muted: "#61736D", border: "#DDEAE2", green: "#087F5B", pale: "#E4F4EC" };
+  const text = (content: React.ReactNode, style: object = {}) => <Text style={[{ color: palette.text }, style]}>{content}</Text>;
   const card = (children: React.ReactNode, key?: string) => (
     <View
       key={key}
       style={[
         styles.card,
-        { backgroundColor: colors.surface, borderColor: colors.border },
+        { backgroundColor: palette.surface, borderColor: palette.border },
       ]}
     >
       {children}
@@ -185,14 +201,14 @@ export default function AnalyticsScreen({
     "Preparar una sesión",
   );
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
+    <View style={{ flex: 1, backgroundColor: palette.background }}>
       <ScrollView
-        contentContainerStyle={styles.page}
+        contentContainerStyle={[styles.page, { paddingBottom: Math.max(130, insets.bottom + 100) }]}
         refreshControl={
           <RefreshControl
             refreshing={busy}
             onRefresh={load}
-            tintColor={colors.primary}
+            tintColor={palette.green}
           />
         }
       >
@@ -210,7 +226,7 @@ export default function AnalyticsScreen({
             "Your work, your studies, your experience.",
             "Tu trabajo, tus estudios, tus sensaciones.",
           ),
-          { color: colors.textSecondary },
+          { color: palette.muted },
         )}
         <View style={styles.row}>
           {[7, 14, 30, 90].map((n) => (
@@ -219,13 +235,10 @@ export default function AnalyticsScreen({
               accessibilityRole="button"
               accessibilityState={{ selected: days === n }}
               onPress={() => setDays(n)}
-              style={[
-                styles.chip,
-                { backgroundColor: days === n ? "#166534" : colors.surface },
-              ]}
+                style={[styles.chip, { backgroundColor: days === n ? palette.green : palette.surface, borderColor: palette.border, borderWidth: 1 }]}
             >
               {text(`${n} ${tr("jours", "days", "días")}`, {
-                color: days === n ? "white" : colors.text,
+                color: days === n ? "white" : palette.text,
               })}
             </TouchableOpacity>
           ))}
@@ -267,13 +280,23 @@ export default function AnalyticsScreen({
               </TouchableOpacity>
             </>,
           )}
+        <TouchableOpacity accessibilityRole="button" style={[styles.button, { backgroundColor: palette.pale }]} onPress={() => router.push({ pathname: "/check-in", params: { kind: "mood" } })}>
+          {text(tr("Noter mon ressenti", "Add a check-in", "Añadir una valoración"), { textAlign: "center", color: palette.green, fontWeight: "600" })}
+        </TouchableOpacity>
         {busy && !data && !error && (
-          <ActivityIndicator size="large" color={colors.primary} />
+          <ActivityIndicator size="large" color={palette.green} />
         )}
         {data && (
           <>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
+              {[["work", tr("Sessions", "Sessions", "Sesiones")], ["subjects", tr("Matières", "Subjects", "Asignaturas")], ["organization", tr("Organisation", "Planning", "Organización")], ["mood", tr("Ressenti", "Experience", "Sensaciones")], ["habits", tr("Habitudes", "Habits", "Hábitos")]].map(([id, label]) => (
+                <TouchableOpacity key={id} accessibilityRole="button" accessibilityState={{ selected: section === id }} onPress={() => setSection(id)} style={[styles.chip, { backgroundColor: section === id ? palette.green : palette.surface, borderColor: palette.border, borderWidth: 1 }]}>
+                  {text(label, { color: section === id ? "white" : palette.text })}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
             {text(
-              `${data.period.start} → ${data.period.end} · ${data.timezone}`,
+              `${friendlyDate(data.period.start, lang)} → ${friendlyDate(data.period.end, lang)}`,
               styles.small,
             )}
             {pending &&
@@ -289,7 +312,7 @@ export default function AnalyticsScreen({
               <>
                 <View style={styles.kpis}>
                   <View style={styles.kpi}>
-                    {text(duration(data.summary.seconds), styles.number)}
+                    {text(compactDuration(data.summary.seconds), styles.number)}
                     {text(
                       tr(
                         "Temps enregistré",
@@ -323,8 +346,12 @@ export default function AnalyticsScreen({
                     `${tr("Période précédente comparable", "Comparable previous period", "Período anterior comparable")} : ${duration(data.summary.previousSeconds)}`,
                     styles.small,
                   )}
-                {data.coverage.partial &&
-                  text(
+                {(data.coverage.partial || data.coverage.legacySessions || data.coverage.unknownCompletions) && <>
+                  <TouchableOpacity accessibilityRole="button" accessibilityState={{ expanded: showDetails }} onPress={() => setShowDetails((v) => !v)} style={styles.detailToggle}>
+                    {text(showDetails ? tr("Masquer les détails", "Hide details", "Ocultar detalles") : tr("Voir les détails sur les données", "See data details", "Ver detalles de los datos"), { color: palette.green, fontWeight: "600" })}
+                  </TouchableOpacity>
+                  {showDetails && <>
+                  {data.coverage.partial && text(
                     tr(
                       "Historique partiel : les mesures ont commencé pendant cette période.",
                       "Partial history: recording began during this period.",
@@ -332,7 +359,7 @@ export default function AnalyticsScreen({
                     ),
                     styles.small,
                   )}
-                {!!(
+                  {!!(
                   data.coverage.legacySessions ||
                   data.coverage.unknownCompletions
                 ) &&
@@ -344,6 +371,8 @@ export default function AnalyticsScreen({
                     ),
                     styles.small,
                   )}
+                  </>}
+                </>}
                 {text(
                   tr(
                     "Le temps enregistré ne mesure pas ton attention ni le travail fait hors de Productif.",
@@ -358,7 +387,7 @@ export default function AnalyticsScreen({
               tr("Ta prochaine étape", "Your next step", "Tu siguiente paso"),
               styles.heading,
             )}
-            {data.facts.map((f) =>
+            {data.facts.slice(0, showMoreFacts ? data.facts.length : 1).map((f) =>
               card(
                 <>
                   {text(factText(f, lang), { fontSize: 17, lineHeight: 25 })}
@@ -389,47 +418,18 @@ export default function AnalyticsScreen({
                         "Why? Discuss with the assistant",
                         "¿Por qué? Hablar con el asistente",
                       ),
-                      { color: colors.primary },
+                      { color: palette.green },
                     )}
                   </TouchableOpacity>
                 </>,
                 f.id,
               ),
             )}
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.row}
-            >
-              {[
-                ["work", tr("Sessions", "Sessions", "Sesiones")],
-                ["subjects", tr("Matières", "Subjects", "Asignaturas")],
-                [
-                  "organization",
-                  tr("Organisation", "Planning", "Organización"),
-                ],
-                ["mood", tr("Ressenti", "Experience", "Sensaciones")],
-                ["habits", tr("Habitudes", "Habits", "Hábitos")],
-              ].map(([id, label]) => (
-                <TouchableOpacity
-                  key={id}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: section === id }}
-                  onPress={() => setSection(id)}
-                  style={[
-                    styles.chip,
-                    {
-                      backgroundColor:
-                        section === id ? "#166534" : colors.surface,
-                    },
-                  ]}
-                >
-                  {text(label, {
-                    color: section === id ? "white" : colors.text,
-                  })}
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
+            {data.facts.length > 1 && (
+              <TouchableOpacity accessibilityRole="button" accessibilityState={{ expanded: showMoreFacts }} onPress={() => setShowMoreFacts((v) => !v)} style={styles.moreFacts}>
+                {text(showMoreFacts ? tr("Réduire les recommandations", "Show fewer recommendations", "Ver menos recomendaciones") : tr("Voir les autres recommandations", "See other recommendations", "Ver otras recomendaciones"), { color: palette.green, fontWeight: "600" })}
+              </TouchableOpacity>
+            )}
             {section === "work" &&
               card(
                 <>
@@ -441,50 +441,37 @@ export default function AnalyticsScreen({
                     ),
                     styles.heading,
                   )}
-                  <ScrollView horizontal>
-                    <View
-                      style={{
-                        flexDirection: "row",
-                        alignItems: "flex-end",
-                        gap: 10,
-                        paddingVertical: 10,
-                      }}
-                    >
-                      {data.daily.map((d) => (
+                  <View style={styles.chart}>
+                      {chartData(data.daily, days).map((d, index, points) => (
                         <View
                           key={d.date}
-                          style={{ width: 42, alignItems: "center", gap: 6 }}
+                          style={styles.chartPoint}
                         >
-                          {text(Math.floor(d.seconds / 60), styles.small)}
+                          {text(compactDuration(d.seconds), styles.chartValue)}
                           <View
                             accessibilityLabel={`${d.date}: ${Math.floor(d.seconds / 60)} min`}
                             style={{
                               height: Math.max(
                                 3,
-                                (d.seconds /
-                                  Math.max(
-                                    ...data.daily.map((x) => x.seconds),
-                                    1,
-                                  )) *
-                                  95,
+                                (d.seconds / Math.max(...chartData(data.daily, days).map((x) => x.seconds), 1)) * 95,
                               ),
-                              width: 26,
+                              width: "70%",
                               borderRadius: 6,
-                              backgroundColor: d.seconds
-                                ? "#16a34a"
-                                : colors.border,
+                              backgroundColor: d.seconds ? palette.green : palette.border,
                             }}
                           />
-                          {text(d.date.slice(8), styles.small)}
+                          {text(
+                            (index === 0 || index === points.length - 1 || points.length <= 8) ? (index === points.length - 1 ? friendlyDate(d.endDate, lang) : friendlyDate(d.date, lang)) : " ",
+                            styles.chartLabel,
+                          )}
                         </View>
                       ))}
-                    </View>
-                  </ScrollView>
+                  </View>
                   {text(
                     tr(
-                      "Minutes enregistrées par jour",
-                      "Recorded minutes per day",
-                      "Minutos registrados por día",
+                      days >= 30 ? "Minutes enregistrées par semaine" : "Minutes enregistrées par jour",
+                      days >= 30 ? "Recorded minutes per week" : "Recorded minutes per day",
+                      days >= 30 ? "Minutos registrados por semana" : "Minutos registrados por día",
                     ),
                     styles.small,
                   )}
@@ -580,7 +567,7 @@ export default function AnalyticsScreen({
                         style={{
                           height: 8,
                           borderRadius: 5,
-                          backgroundColor: colors.border,
+                          backgroundColor: palette.border,
                         }}
                       >
                         <View
@@ -618,7 +605,7 @@ export default function AnalyticsScreen({
                             "View chapters",
                             "Ver capítulos",
                           ),
-                          { color: colors.primary },
+                          { color: palette.green },
                         )}
                       </TouchableOpacity>
                     </>,
@@ -738,8 +725,8 @@ export default function AnalyticsScreen({
                                   {
                                     color:
                                       d.value === null
-                                        ? colors.textSecondary
-                                        : colors.primary,
+                                        ? palette.muted
+                                        : palette.green,
                                   },
                                 )}
                                 {text(d.date.slice(8), styles.small)}
@@ -840,7 +827,7 @@ export default function AnalyticsScreen({
                         "Review my habits",
                         "Revisar mis hábitos",
                       ),
-                      { color: colors.primary },
+                      { color: palette.green },
                     )}
                   </TouchableOpacity>
                 </>,
@@ -867,10 +854,11 @@ export default function AnalyticsScreen({
           setSelected(null);
         }}
       >
+        <KeyboardAvoidingView style={{ flex: 1, backgroundColor: palette.background }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
         <ScrollView
           keyboardShouldPersistTaps="handled"
-          style={{ backgroundColor: colors.background }}
-          contentContainerStyle={[styles.page, { paddingTop: 36 }]}
+          style={{ backgroundColor: palette.background }}
+          contentContainerStyle={[styles.page, { paddingTop: 36, paddingBottom: insets.bottom + 32 }]}
         >
           <TouchableOpacity
             accessibilityRole="button"
@@ -880,7 +868,7 @@ export default function AnalyticsScreen({
             }}
             style={styles.link}
           >
-            {text(tr("Fermer", "Close", "Cerrar"), { color: colors.primary })}
+            {text(tr("Fermer", "Close", "Cerrar"), { color: palette.green })}
           </TouchableOpacity>
           {text(
             tr("Comprendre et agir", "Understand and act", "Entender y actuar"),
@@ -894,7 +882,7 @@ export default function AnalyticsScreen({
                   lineHeight: 26,
                 })}
                 {text(
-                  `${data?.period.start} → ${data?.period.end}`,
+                  data ? `${friendlyDate(data.period.start, lang)} → ${friendlyDate(data.period.end, lang)}` : "",
                   styles.small,
                 )}
                 {text(
@@ -920,19 +908,19 @@ export default function AnalyticsScreen({
               "Add context or ask a question…",
               "Añade contexto o haz una pregunta…",
             )}
-            placeholderTextColor={colors.textSecondary}
+            placeholderTextColor={palette.muted}
             value={question}
             onChangeText={setQuestion}
             style={{
               minHeight: 100,
               padding: 16,
               borderWidth: 1,
-              borderColor: colors.border,
+              borderColor: palette.border,
               borderRadius: 16,
-              color: colors.text,
+              color: palette.text,
             }}
           />
-          <View style={styles.row}>
+          <View style={styles.switchRow}>
             <Switch
               value={journal}
               onValueChange={setJournal}
@@ -991,22 +979,30 @@ export default function AnalyticsScreen({
             </TouchableOpacity>
           )}
         </ScrollView>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );
 }
 const styles = StyleSheet.create({
   page: { padding: 20, paddingBottom: 130, gap: 16 },
-  title: { fontSize: 28, fontWeight: "700", letterSpacing: -0.6 },
-  heading: { fontSize: 19, fontWeight: "600" },
-  card: { padding: 18, borderWidth: 1, borderRadius: 22, gap: 14 },
+  title: { fontSize: 30, fontWeight: "800", letterSpacing: -0.8 },
+  heading: { fontSize: 19, fontWeight: "700" },
+  card: { padding: 18, borderWidth: 1, borderRadius: 20, gap: 14, shadowColor: "#173B35", shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 1 },
   row: { flexDirection: "row", gap: 8, alignItems: "center" },
-  chip: { paddingHorizontal: 15, paddingVertical: 13, borderRadius: 15 },
-  small: { fontSize: 12, lineHeight: 18, opacity: 0.7 },
-  number: { fontSize: 23, fontWeight: "700", color: "#16a34a" },
+  chip: { paddingHorizontal: 15, paddingVertical: 12, borderRadius: 14 },
+  small: { fontSize: 12, lineHeight: 18, color: "#61736D" },
+  number: { fontSize: 25, fontWeight: "800", color: "#087F5B" },
   kpis: { flexDirection: "row", flexWrap: "wrap", gap: 18 },
   kpi: { minWidth: 90, flex: 1, gap: 6 },
-  button: { padding: 15, borderRadius: 14, backgroundColor: "#166534" },
+  button: { padding: 15, borderRadius: 14, backgroundColor: "#087F5B", minHeight: 50, justifyContent: "center" },
   buttonText: { color: "white", fontWeight: "600", textAlign: "center" },
   link: { paddingVertical: 12, minHeight: 44 },
+  moreFacts: { minHeight: 44, justifyContent: "center", alignItems: "center" },
+  detailToggle: { minHeight: 44, justifyContent: "center" },
+  switchRow: { flexDirection: "row", alignItems: "center", gap: 12, minHeight: 52 },
+  chart: { flexDirection: "row", alignItems: "flex-end", paddingVertical: 10, minHeight: 145 },
+  chartPoint: { flex: 1, alignItems: "center", justifyContent: "flex-end", gap: 6, minWidth: 0 },
+  chartValue: { fontSize: 10, color: "#61736D", minHeight: 14 },
+  chartLabel: { fontSize: 10, color: "#61736D", height: 32, textAlign: "center" },
 });

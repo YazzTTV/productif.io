@@ -14,7 +14,8 @@ export default function TabLayout() {
   
   // Calcul dynamique de la hauteur de la TabBar pour Android avec navigation gestuelle
   const androidBottomPadding = Math.max(insets.bottom, 10);
-  const tabBarHeight = Platform.OS === 'ios' ? 88 : 60 + androidBottomPadding;
+  const iosBottomPadding = Math.max(insets.bottom, 20);
+  const tabBarHeight = Platform.OS === 'ios' ? 60 + iosBottomPadding : 60 + androidBottomPadding;
 
   return (
     <Tabs
@@ -25,7 +26,7 @@ export default function TabLayout() {
         tabBarButton: HapticTab,
         tabBarStyle: {
           position: 'absolute',
-          backgroundColor: Platform.OS === 'ios' ? 'transparent' : 'rgba(255, 255, 255, 0.98)',
+          backgroundColor: '#FFFFFF',
           borderTopWidth: 0,
           elevation: Platform.OS === 'android' ? 8 : 0,
           shadowColor: '#000',
@@ -33,7 +34,7 @@ export default function TabLayout() {
           shadowOpacity: 0.1,
           shadowRadius: 4,
           height: tabBarHeight,
-          paddingBottom: Platform.OS === 'ios' ? 28 : androidBottomPadding,
+          paddingBottom: Platform.OS === 'ios' ? iosBottomPadding : androidBottomPadding,
           paddingTop: 10,
         },
         tabBarBackground: () => (

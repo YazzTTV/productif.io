@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { habitsService } from '@/lib/api';
+import { dashboardEvents, DASHBOARD_DATA_CHANGED } from '@/lib/events';
 import { format, startOfDay } from 'date-fns';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Coachmark } from '@/tutorial/Coachmark';
@@ -27,6 +28,7 @@ import {
 import { useSuperwall } from '@/hooks/useSuperwall';
 import { SUPERWALL_EVENTS } from '@/lib/superwallEvents';
 import { readCache, writeCache, CACHE_KEYS } from '@/lib/dataCache';
+import { habitDateKey } from '@/lib/habitDate';
 
 interface Habit {
   id: string;
@@ -70,6 +72,7 @@ export function ReviewHabits() {
   const [newHabitDaysOfWeek, setNewHabitDaysOfWeek] = useState<string[]>(['monday','tuesday','wednesday','thursday','friday','saturday','sunday']);
   const [creating, setCreating] = useState(false);
   const [showActionMenu, setShowActionMenu] = useState<string | null>(null);
+  const [updatingHabits, setUpdatingHabits] = useState<Set<string>>(new Set());
   const [tutorialStage, setTutorialStageState] = useState<TutorialStage | null>(null);
   const [tutorialCompleted, setTutorialCompletedState] = useState(false);
 
@@ -132,19 +135,28 @@ export function ReviewHabits() {
   );
 
   const toggleHabit = async (habitId: string) => {
+    if (updatingHabits.has(habitId)) return;
+    setUpdatingHabits(prev => new Set(prev).add(habitId));
+
     const dateString = format(selectedDate, 'yyyy-MM-dd');
     const habit = habits.find(h => h.id === habitId);
-    const entry = habit?.entries?.find(e => format(new Date(e.date), 'yyyy-MM-dd') === dateString);
+    const entry = habit?.entries?.find(e => habitDateKey(e.date) === dateString);
     const currentCompleted = entry?.completed ?? false;
     const streakBefore = habit?.currentStreak ?? 0;
     const newCompleted = !currentCompleted;
+    const previousHabit = habit
+      ? {
+          ...habit,
+          entries: habit.entries?.map(entry => ({ ...entry })),
+        }
+      : undefined;
     
     // Optimistic update - mise à jour immédiate de l'UI
     setHabits(prev => prev.map(h => {
       if (h.id !== habitId) return h;
       
-      const existingEntries = h.entries || [];
-      const entryIndex = existingEntries.findIndex(e => format(new Date(e.date), 'yyyy-MM-dd') === dateString);
+      const existingEntries = [...(h.entries || [])];
+      const entryIndex = existingEntries.findIndex(e => habitDateKey(e.date) === dateString);
       
       let updatedEntries;
       if (entryIndex >= 0) {
@@ -154,7 +166,7 @@ export function ReviewHabits() {
       } else {
         updatedEntries = [...existingEntries, {
           id: `temp-${Date.now()}`,
-          date: selectedDate.toISOString(),
+          date: dateString,
           completed: newCompleted,
           count: 1,
         }];
@@ -163,33 +175,39 @@ export function ReviewHabits() {
       return { ...h, entries: updatedEntries };
     }));
     
-    // Appel API en arrière-plan
+    // L'écriture et le déclenchement Superwall sont deux opérations
+    // indépendantes. Une erreur d'affichage du paywall ne doit pas annuler
+    // une entrée déjà enregistrée sur le serveur.
     try {
       await habitsService.complete(habitId, dateString, currentCompleted);
-      if (!currentCompleted && streakBefore === 0) {
+      dashboardEvents.emit(DASHBOARD_DATA_CHANGED);
+    } catch (error) {
+      console.error('❌ Erreur lors du toggle:', error);
+      // Rollback only this habit. A concurrent update of another habit must
+      // remain visible, and a temporary entry must not survive a failed write.
+      if (previousHabit) {
+        setHabits(prev => prev.map(h => h.id === habitId ? previousHabit : h));
+      }
+      Alert.alert('Erreur', 'Impossible de mettre à jour l\'habitude');
+      return;
+    } finally {
+      setUpdatingHabits(prev => {
+        const next = new Set(prev);
+        next.delete(habitId);
+        return next;
+      });
+    }
+
+    if (!currentCompleted && streakBefore === 0) {
+      try {
         await triggerEvent(SUPERWALL_EVENTS.STREAK_STARTED, {
           params: { source: 'review_habits_toggle', habitId },
           requireNonPremium: false,
           bypassCooldown: true,
         });
+      } catch (error) {
+        console.error('⚠️ Échec non bloquant de l\'affichage Superwall:', error);
       }
-    } catch (error) {
-      console.error('❌ Erreur lors du toggle:', error);
-      // Rollback en cas d'erreur
-      setHabits(prev => prev.map(h => {
-        if (h.id !== habitId) return h;
-        const existingEntries = h.entries || [];
-        const entryIndex = existingEntries.findIndex(e => format(new Date(e.date), 'yyyy-MM-dd') === dateString);
-        
-        if (entryIndex >= 0) {
-          const updatedEntries = existingEntries.map((e, idx) => 
-            idx === entryIndex ? { ...e, completed: currentCompleted } : e
-          );
-          return { ...h, entries: updatedEntries };
-        }
-        return h;
-      }));
-      Alert.alert('Erreur', 'Impossible de mettre à jour l\'habitude');
     }
   };
 
@@ -303,7 +321,7 @@ export function ReviewHabits() {
 
   const isHabitCompleted = (habit: Habit): boolean => {
     const dateString = format(selectedDate, 'yyyy-MM-dd');
-    const entry = habit.entries?.find(e => format(new Date(e.date), 'yyyy-MM-dd') === dateString);
+    const entry = habit.entries?.find(e => habitDateKey(e.date) === dateString);
     return entry?.completed ?? false;
   };
 
@@ -339,6 +357,7 @@ export function ReviewHabits() {
     onMoveDown,
     canMoveUp,
     canMoveDown,
+    isUpdating,
   }: { 
     habit: Habit; 
     isCompleted: boolean; 
@@ -350,6 +369,7 @@ export function ReviewHabits() {
     onMoveDown: () => void;
     canMoveUp: boolean;
     canMoveDown: boolean;
+    isUpdating: boolean;
   }) => {
     const checkboxScale = useSharedValue(isCompleted ? 1 : 0);
     const cardScale = useSharedValue(1);
@@ -395,6 +415,7 @@ export function ReviewHabits() {
           onLongPress={onLongPress}
           onPressIn={handlePressIn}
           onPressOut={handlePressOut}
+          disabled={isUpdating}
           activeOpacity={1}
         >
           <View style={styles.habitContent}>
@@ -539,6 +560,7 @@ export function ReviewHabits() {
                   onMoveDown={() => handleMoveHabit(habit.id, 'down')}
                   canMoveUp={index > 0}
                   canMoveDown={index < allHabits.length - 1}
+                  isUpdating={updatingHabits.has(habit.id)}
                 />
               );
             })}

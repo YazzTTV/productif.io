@@ -28,6 +28,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useSuperwall } from '@/hooks/useSuperwall';
 import { SUPERWALL_EVENTS } from '@/lib/superwallEvents';
 import { readCache, writeCache, CACHE_KEYS } from '@/lib/dataCache';
+import { habitDateKey } from '@/lib/habitDate';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = width - 32; // 16px padding on each side
@@ -100,7 +101,7 @@ const HabitCard: React.FC<HabitCardProps> = ({
   const dateString = format(selectedDate, 'yyyy-MM-dd');
   const allEntries = habit.completions || habit.entries || [];
   const entry = allEntries.find((e) => {
-    const entryDateString = format(new Date(e.date), 'yyyy-MM-dd');
+    const entryDateString = habitDateKey(e.date);
     return entryDateString === dateString;
   });
 
@@ -497,18 +498,29 @@ export default function HabitsScreen() {
 
     setUpdatingHabits(prev => new Set([...prev, habitId]));
 
-    // Snapshot pour rollback en cas d'échec
-    const previous = habits;
+    // Snapshot immutable pour rollback en cas d'échec de l'écriture.
+    // Les tableaux d'entrées sont sinon mutés par la mise à jour optimiste,
+    // ce qui rend le rollback incapable de restaurer l'état précédent.
+    const previousHabit = habits.find(h => h.id === habitId);
+    const previous = previousHabit
+      ? {
+          ...previousHabit,
+          entries: previousHabit.entries?.map(entry => ({ ...entry })),
+          completions: previousHabit.completions?.map(completion => ({ ...completion })),
+        }
+      : undefined;
 
     setHabits(prev => prev.map(h => {
       if (h.id !== habitId) return h;
-      const allEntries = (h.completions || h.entries || []) as any[];
-      const entryIndex = allEntries.findIndex(e => format(new Date(e.date), 'yyyy-MM-dd') === dateString);
+      // Clone the entry list before changing it: cached/server state must stay
+      // untouched so a later rollback can restore only this habit.
+      const allEntries = [...((h.completions || h.entries || []) as any[])];
+      const entryIndex = allEntries.findIndex(e => habitDateKey(e.date) === dateString);
       const toggled = !currentCompleted;
       if (entryIndex >= 0) {
         allEntries[entryIndex] = { ...allEntries[entryIndex], completed: toggled };
       } else {
-        allEntries.push({ id: `local-${Date.now()}`, date: date.toISOString(), completed: toggled, count: 1 });
+        allEntries.push({ id: `local-${Date.now()}`, date: dateString, completed: toggled, count: 1 });
       }
       return { ...h, entries: allEntries, completions: undefined } as any;
     }));
@@ -516,26 +528,36 @@ export default function HabitsScreen() {
     try {
       const response = await habitsService.complete(habitId, dateString, currentCompleted);
       console.log('✅ Réponse API:', response);
-      // Notifier le dashboard
+      // Notifier le dashboard only after the server has accepted the write.
       dashboardEvents.emit(DASHBOARD_DATA_CHANGED);
-      if (!currentCompleted && streakBefore === 0) {
-        await triggerEvent(SUPERWALL_EVENTS.STREAK_STARTED, {
-          params: { source: 'habits_tab_toggle', habitId },
-          requireNonPremium: false,
-          bypassCooldown: true,
-        });
-      }
     } catch (error) {
       console.error('❌ Erreur lors de la mise à jour (rollback):', error);
       Alert.alert(t('error'), t('updateHabitError'));
-      // Rollback
-      setHabits(previous);
+      if (previous) {
+        setHabits(prev => prev.map(h => h.id === habitId ? previous : h));
+      }
+      return;
     } finally {
       setUpdatingHabits(prev => {
         const newSet = new Set(prev);
         newSet.delete(habitId);
         return newSet;
       });
+    }
+
+    // The habit entry is already durable at this point. Superwall is a
+    // separate, optional follow-up; a presentation failure must never undo a
+    // successful checkbox write or show an update error.
+    if (!currentCompleted && streakBefore === 0) {
+      try {
+        await triggerEvent(SUPERWALL_EVENTS.STREAK_STARTED, {
+          params: { source: 'habits_tab_toggle', habitId },
+          requireNonPremium: false,
+          bypassCooldown: true,
+        });
+      } catch (error) {
+        console.error('⚠️ Échec non bloquant de l\'affichage Superwall:', error);
+      }
     }
   };
 
@@ -720,7 +742,7 @@ export default function HabitsScreen() {
   // Calculer les statistiques du jour
   const completedHabits = habitsForToday.filter(habit => {
     const entry = habit.entries?.find(e =>
-      new Date(e.date).toDateString() === selectedDate.toDateString()
+      habitDateKey(e.date) === habitDateKey(selectedDate)
     )
     return entry?.completed ?? false
   }).length
@@ -988,7 +1010,7 @@ export default function HabitsScreen() {
                   const allEntries = (habit.completions || habit.entries || []) as any[];
                   const dateString = format(selectedDate, 'yyyy-MM-dd');
                   const entry = allEntries.find(
-                    (e) => format(new Date(e.date), 'yyyy-MM-dd') === dateString
+                    (e) => habitDateKey(e.date) === dateString
                   );
                   const isBroken = entry?.completed ?? false;
 

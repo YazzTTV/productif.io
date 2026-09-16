@@ -1,16 +1,16 @@
 import React from "react";
+import { StatusBar } from "expo-status-bar";
 import { ScrollView, Text, TouchableOpacity } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StudyCheckIn } from "@/components/analytics/StudyCheckIn";
-import { useTheme } from "@/contexts/ThemeContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 export default function StudySummary() {
   const p = useLocalSearchParams(),
     router = useRouter(),
     insets = useSafeAreaInsets();
-  const { colors } = useTheme(),
-    { language } = useLanguage();
+  const colors = { background: "#F4F8F5", text: "#173B35", textSecondary: "#61736D" };
+  const { language } = useLanguage();
   const tr = (fr: string, en: string, es: string) =>
     language === "en" ? en : language === "es" ? es : fr;
   const minutes = Math.floor(Math.max(0, Number(p.seconds) || 0) / 60),
@@ -21,9 +21,11 @@ export default function StudySummary() {
       contentContainerStyle={{
         padding: 24,
         paddingTop: insets.top + 24,
+        paddingBottom: insets.bottom + 24,
         gap: 20,
       }}
     >
+      <StatusBar style="dark" />
       <Text style={{ fontSize: 30, fontWeight: "700", color: colors.text }}>
         {tr(
           "Ton bilan de session",

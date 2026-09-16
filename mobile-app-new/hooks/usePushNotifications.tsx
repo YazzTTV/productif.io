@@ -262,6 +262,10 @@ export function usePushNotifications(options: UsePushNotificationsOptions = {}) 
       const shouldOpenJournal =
         data?.action === 'open_journal' ||
         normalizedType === 'JOURNAL_PROMPT';
+      const shouldOpenDayNote =
+        data?.action === 'open_day_note' ||
+        normalizedType === 'DAY_NOTE' ||
+        normalizedType === 'DAY_NOTE_PROMPT';
 
       // Navigation vers Focus pour MORNING_ANCHOR
       if (shouldOpenFocus) {
@@ -290,7 +294,7 @@ export function usePushNotifications(options: UsePushNotificationsOptions = {}) 
         return;
       }
 
-      // Navigation vers Analytics pour les notifications mood/stress/focus
+      // Navigation vers la saisie dédiée pour les notifications mood/stress/focus
       if (shouldOpenAnalytics && checkInTypeFromNotification) {
         console.log('✅ Conditions remplies - Navigation vers Analytics', {
           type: data.type || normalizedType,
@@ -307,11 +311,8 @@ export function usePushNotifications(options: UsePushNotificationsOptions = {}) 
             return;
           }
           try {
-            console.log('🚀 Navigation vers /(tabs)/assistant avec checkInType pour Analytics');
-            router.push({
-              pathname: '/(tabs)/assistant',
-              params: { checkInType: checkInTypeFromNotification },
-            } as any);
+            console.log('🚀 Navigation vers /check-in');
+            router.push({ pathname: '/check-in', params: { kind: checkInTypeFromNotification } } as any);
             void clearLastNotificationResponse();
             console.log('✅ Navigation vers Analytics déclenchée avec succès');
           } catch (navError) {
@@ -319,6 +320,21 @@ export function usePushNotifications(options: UsePushNotificationsOptions = {}) 
           }
         }, 500);
         
+        return;
+      }
+
+      // Saisie courte de la note de journée (habitude, distincte du journal libre)
+      if (shouldOpenDayNote) {
+        if (navigationTimeoutRef.current) clearTimeout(navigationTimeoutRef.current);
+        navigationTimeoutRef.current = setTimeout(() => {
+          if (!isMountedRef.current) return;
+          try {
+            router.push({ pathname: '/check-in', params: { kind: 'day' } } as any);
+            void clearLastNotificationResponse();
+          } catch (navError) {
+            console.error('❌ Erreur de navigation vers note de journée:', navError);
+          }
+        }, 500);
         return;
       }
 

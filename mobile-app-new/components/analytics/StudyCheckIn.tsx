@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import { View, Text, TouchableOpacity, ActivityIndicator } from "react-native";
 import { queueStudyCheckin } from "@/lib/studyAnalysis";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { useTheme } from "@/contexts/ThemeContext";
 export function StudyCheckIn({
   sessionId,
   initialType = "focus",
@@ -13,7 +12,7 @@ export function StudyCheckIn({
   onSaved?: () => void;
 }) {
   const { language } = useLanguage();
-  const { colors } = useTheme();
+  const colors = { background: "#F4F8F5", surface: "#FFFFFF", text: "#173B35", textSecondary: "#61736D" };
   const tr = (fr: string, en: string, es: string) =>
     language === "en" ? en : language === "es" ? es : fr;
   const [type, setType] = useState(initialType),

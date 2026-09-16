@@ -313,6 +313,8 @@ function AppContent() {
                 gestureEnabled: true,
               }} 
             />
+            <Stack.Screen name="study-summary" options={{ headerShown: false, gestureEnabled: true }} />
+            <Stack.Screen name="check-in" options={{ headerShown: false, gestureEnabled: true }} />
             <Stack.Screen name="+not-found" />
           </Stack>
         <StatusBar style={actualTheme === 'dark' ? 'light' : 'dark'} />
