@@ -1,11 +1,12 @@
 import { StudyCheckIn } from '@/components/analytics/StudyCheckIn';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { maybeAskForReview } from '@/lib/reviewPrompt';
 
 export default function ExamSummaryScreen() {
   const { t } = useLanguage();
@@ -15,7 +16,19 @@ export default function ExamSummaryScreen() {
   
   const duration = parseInt(params.duration as string) || 0;
   const completed = parseInt(params.completed as string) || 0;
-  
+
+  // Moment de valeur : une session de Mode Examen terminée avec au moins une
+  // tâche bouclée. Une session où rien n'a été fait n'est pas un bon moment
+  // pour demander une note, et chaque demande consomme un quota annuel.
+  // Le délai laisse les animations d'entrée finir (la dernière est à 500+400 ms)
+  // pour que la feuille d'Apple ne s'ouvre pas sur un écran encore en mouvement.
+  useEffect(() => {
+    if (completed < 1) return;
+    const timer = setTimeout(() => {
+      maybeAskForReview('exam_session_completed');
+    }, 1200);
+    return () => clearTimeout(timer);
+  }, [completed]);
 
   const handleBackToDashboard = () => {
     router.replace({pathname:'/(tabs)/assistant',params:{tab:'analytics'}});

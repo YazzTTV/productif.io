@@ -14,6 +14,7 @@ import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { useDailyStructureSettings } from '@/hooks/useDailyStructureSettings';
 import { useSuperwall } from '@/hooks/useSuperwall';
 import { SUPERWALL_EVENTS } from '@/lib/superwallEvents';
+import { openStoreListingForReviewWithAlert } from '@/lib/reviewPrompt';
 
 type SettingsView = 'main' | 'editProfile' | 'dailyStructure' | 'notifications';
 
@@ -1143,8 +1144,24 @@ export function SettingsNew() {
         <Animated.View entering={FadeInDown.delay(700).duration(400)} style={styles.section}>
           <Text style={styles.sectionLabel}>{t('supportInfo') || 'Support & Info'}</Text>
           <View style={styles.supportContainer}>
-            <TouchableOpacity 
-              style={styles.settingCard} 
+            <TouchableOpacity
+              style={styles.settingCard}
+              activeOpacity={0.7}
+              onPress={() =>
+                openStoreListingForReviewWithAlert(
+                  t('error') || 'Erreur',
+                  t('rateAppError') || "Impossible d'ouvrir l'App Store."
+                )
+              }
+            >
+              <View style={styles.settingCardRow}>
+                <Text style={styles.settingCardTitle}>{t('rateApp') || "Noter l'application"}</Text>
+                <Ionicons name="chevron-forward" size={20} color="rgba(0, 0, 0, 0.4)" />
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.settingCard}
               activeOpacity={0.7}
               onPress={async () => {
                 const email = 'mailto:contact@productif.io';
