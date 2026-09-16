@@ -144,7 +144,19 @@ export function ModeExamenContent() {
   // dans KNOWN_SOURCES, mais rien ne le lui envoyait : la landing passait
   // toujours "mode-examen", donc un email venu de Product Hunt etait
   // indistinguable d'un email venu de TikTok, et la metrique du lancement
-  // n'etait pas mesurable. Le lien a publier est /mode-examen?src=product-hunt.
+  // n'etait pas mesurable.
+  //
+  // Le 16 septembre, la campagne de QR codes sur les campus a bute sur le
+  // meme mur : la valeur "product-hunt" etait codee en dur ici, donc tout
+  // autre src etait ignore en silence et le lead retombait sur "mode-examen".
+  // On transmet desormais le src tel quel et c'est /api/leads qui tranche :
+  // sa liste KNOWN_SOURCES est la seule autorite, et une valeur inconnue y
+  // devient "inconnu" plutot que d'etre ecrite telle quelle. Ouvrir une
+  // nouvelle campagne ne coute donc plus qu'une ligne, cote serveur.
+  //
+  // Corollaire de mesure, appris le 31 aout : le src n'est pas controle en
+  // provenance, donc il ne doit exister QUE sur le support de la campagne,
+  // ici le QR code imprime. Partout ailleurs, des UTM sans src.
   //
   // On lit window.location plutot que useSearchParams, qui imposerait une
   // frontiere Suspense au rendu de cette page.
@@ -152,8 +164,8 @@ export function ModeExamenContent() {
 
   useEffect(() => {
     if (typeof window === "undefined") return
-    const src = new URLSearchParams(window.location.search).get("src")
-    if (src === "product-hunt") setLeadSource(src)
+    const src = new URLSearchParams(window.location.search).get("src")?.trim()
+    if (src) setLeadSource(src.slice(0, 64))
   }, [])
 
   // Formatage des montants a l'anglaise ou a la francaise, jamais en dur.

@@ -25,7 +25,7 @@ const MAX_SOURCE_LENGTH = 64
 
 /** Sources acceptees. Une valeur inconnue retombe sur "inconnu" plutot que
  *  d'etre ecrite telle quelle, pour que la colonne reste exploitable. */
-const KNOWN_SOURCES = new Set(["mode-examen", "product-hunt", "accueil"])
+const KNOWN_SOURCES = new Set(["mode-examen", "product-hunt", "accueil", "qr-campus"])
 
 export async function POST(request: Request) {
   let body: unknown
