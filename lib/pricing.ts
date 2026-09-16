@@ -50,12 +50,12 @@ export const YEARLY_SAVING_PERCENT = 38.5
 export const TRIAL_DAYS = 7
 
 /** Date de fin de l'offre de rentrée, pour l'affichage. */
-export const BACK_TO_SCHOOL_END_LABEL = '15 septembre'
+export const BACK_TO_SCHOOL_END_LABEL = '30 septembre'
 
 /** Même date en anglais, pour les surfaces bilingues. Doit rester alignée sur
  *  BACK_TO_SCHOOL_END_LABEL : deux dates différentes sur la même offre est un
  *  motif de litige, pas une coquille. */
-export const BACK_TO_SCHOOL_END_LABEL_EN = 'September 15'
+export const BACK_TO_SCHOOL_END_LABEL_EN = 'September 30'
 
 /** Formate un montant en euros à la française : 7,99 € / 59 €. */
 export function formatEur(amount: number): string {
