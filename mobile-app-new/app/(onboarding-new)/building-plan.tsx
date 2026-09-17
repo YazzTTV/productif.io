@@ -28,10 +28,17 @@ interface Step {
   duration: number;
 }
 
+// Cet ecran ne fait AUCUN travail : aucun fetch, aucun await, aucun service
+// importe. Les taches sont deja completes, elles entrent par `params.tasks` et
+// ressortent telles quelles vers ideal-day. Les durees d'origine
+// (2000 + 2500 + 2000, plus 500 ms avant la navigation) etaient donc 7 secondes
+// de fausse progression, ajoutees aux 4 a 6 secondes reelles de l'analyse IA
+// qui vient juste avant. Ramenees a 1,4 s au total : assez pour que la
+// transition se voie, plus assez pour qu'on l'attende.
 const steps: Step[] = [
-  { key: 'priorities', textKey: 'understandingPriorities', duration: 2000 },
-  { key: 'effort', textKey: 'estimatingEffort', duration: 2500 },
-  { key: 'plan', textKey: 'creatingPlan', duration: 2000 },
+  { key: 'priorities', textKey: 'understandingPriorities', duration: 400 },
+  { key: 'effort', textKey: 'estimatingEffort', duration: 400 },
+  { key: 'plan', textKey: 'creatingPlan', duration: 400 },
 ];
 
 export default function BuildingPlanScreen() {
@@ -83,7 +90,7 @@ export default function BuildingPlanScreen() {
           },
         });
       }
-      }, 500);
+      }, 200);
       return () => clearTimeout(timer);
     }
   }, [currentStep]);

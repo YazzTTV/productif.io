@@ -239,22 +239,34 @@ export default function CalendarSyncScreen() {
   };
 
   const handleSkip = async () => {
-    try {
-      await onboardingService.saveOnboardingData({
-        completed: true,
-        currentStep: 11,
-      });
-    } catch {
-      // best-effort
-    }
+    // Garde de re-entrance : le bouton portait deja `disabled={isConnecting}`,
+    // mais ce handler ne posait jamais l'etat, donc rien n'empechait un double
+    // tap de lancer deux fois la sequence de sortie.
+    if (isConnecting) return;
+    setIsConnecting(true);
+
+    // Best-effort, et cette fois REELLEMENT non attendu. La version precedente
+    // enveloppait cet appel dans un `catch {}` vide en le declarant best-effort,
+    // puis l'attendait quand meme. Or `apiCall` plafonne a 30 000 ms par defaut
+    // (lib/api.ts) et n'annule jamais la requete : un reseau en echec figeait
+    // donc le bouton 30 secondes avant de continuer exactement pareil. C'est le
+    // "t'appuies, t'attends 30 secondes" rapporte sur appareil le 17 septembre.
+    // Les donnees sont deja en local, et cet upsert est rejoue au prochain
+    // enregistrement d'onboarding.
+    void onboardingService
+      .saveOnboardingData({ completed: true, currentStep: 11 })
+      .catch(() => {});
+
     await AsyncStorage.setItem('onboarding_completed', 'true');
+    // Pose l'etat du didacticiel AVANT le paywall : l'utilisateur qui le ferme
+    // arrive alors sur des onglets deja prets.
+    await setTutorialCompleted(false);
+    await setTutorialStage('calendar');
     await triggerEvent(SUPERWALL_EVENTS.ONBOARDING_COMPLETED, {
       params: { source: 'calendar_sync_skip' },
       requireNonPremium: false,
       bypassCooldown: true,
     });
-    await setTutorialCompleted(false);
-    await setTutorialStage('calendar');
     router.replace('/(tabs)');
   };
 

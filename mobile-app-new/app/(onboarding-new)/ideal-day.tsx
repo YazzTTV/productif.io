@@ -36,7 +36,7 @@ export default function IdealDayScreen() {
   const { t } = useLanguage();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams();
-  const { saveResponse, forceSync } = useOnboardingData();
+  const { saveResponse } = useOnboardingData();
   const { triggerEvent } = useSuperwall();
   const [priorities, setPriorities] = useState<string[]>([]);
   const [timeline, setTimeline] = useState<TimelineBlock[]>([]);
@@ -44,6 +44,8 @@ export default function IdealDayScreen() {
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [selectedTime, setSelectedTime] = useState(new Date());
+  /** Verrouille les deux sorties de l'ecran : sans lui, un double tap lance deux fois la sequence de fin. */
+  const [isFinishing, setIsFinishing] = useState(false);
 
   useEffect(() => {
     try {
@@ -197,6 +199,9 @@ export default function IdealDayScreen() {
   }, []);
 
   const handleSyncCalendar = async () => {
+    if (isFinishing) return;
+    setIsFinishing(true);
+
     // Récupérer le firstName depuis AsyncStorage pour le passer à calendar-sync
     const storedFirstName = await AsyncStorage.getItem('onboarding_firstName');
     
@@ -213,16 +218,27 @@ export default function IdealDayScreen() {
   };
 
   const handleStartFocus = async () => {
+    if (isFinishing) return;
+    setIsFinishing(true);
+
+    // `saveResponse` ecrit en local ET lance deja la synchronisation backend en
+    // arriere-plan (useOnboardingData.saveResponses, sans await). Le
+    // `forceSync()` qui suivait renvoyait donc le MEME document une seconde
+    // fois, en concurrence avec le premier envoi, et il etait attendu : il
+    // enchaine `checkAuth()` puis `saveOnboardingData()`, soit DEUX appels en
+    // serie plafonnes a 30 000 ms chacun par `apiCall`, donc 60 secondes de
+    // blocage possible sur un simple tap. Et `syncToBackend` avale deja ses
+    // erreurs en disant lui-meme que "les donnees sont deja en local" : on
+    // attendait un resultat dont personne ne faisait rien. Retire.
     await saveResponse('completed', true);
-    await forceSync();
     await AsyncStorage.setItem('onboarding_completed', 'true');
+    await setTutorialCompleted(false);
+    await setTutorialStage('calendar');
     await triggerEvent(SUPERWALL_EVENTS.ONBOARDING_COMPLETED, {
       params: { source: 'ideal_day_start_focus' },
       requireNonPremium: false,
       bypassCooldown: true,
     });
-    await setTutorialCompleted(false);
-    await setTutorialStage('calendar');
     router.replace('/(tabs)');
   };
 
@@ -376,6 +392,7 @@ export default function IdealDayScreen() {
       <View style={styles.footer}>
         <TouchableOpacity
           onPress={handleSyncCalendar}
+          disabled={isFinishing}
           style={styles.syncButton}
           activeOpacity={0.8}
         >
@@ -388,6 +405,7 @@ export default function IdealDayScreen() {
         <View style={styles.secondaryButtons}>
           <TouchableOpacity
             onPress={handleStartFocus}
+            disabled={isFinishing}
             style={styles.startFocusButton}
             activeOpacity={0.8}
           >
