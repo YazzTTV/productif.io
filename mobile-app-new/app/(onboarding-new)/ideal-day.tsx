@@ -156,15 +156,19 @@ export default function IdealDayScreen() {
   /**
    * Demande la permission de notification, une seule fois par appareil.
    *
-   * C'est ici et nulle part ailleurs, parce que cet ecran est le seul point de
-   * passage OBLIGE de la fin de l'onboarding : les deux sorties (lancer une
+   * C'est sur cet ecran et nulle part ailleurs, parce qu'il est le seul point
+   * de passage OBLIGE de la fin de l'onboarding : les deux sorties (lancer une
    * session, ou synchroniser l'agenda) partent de lui. Et c'est le bon moment,
    * l'utilisateur vient de voir sa journee avec des horaires : un rappel a ces
    * heures-la se comprend tout seul.
    *
-   * L'appel est volontairement place AVANT `triggerEvent`, donc avant un
-   * eventuel paywall Superwall : une alerte systeme qui s'ouvrirait par-dessus
-   * un paywall serait perdue pour les deux.
+   * DECLENCHE A L'ARRIVEE SUR L'ECRAN, ET SURTOUT PAS A SA SORTIE. La premiere
+   * version appelait ceci dans les deux handlers de sortie, juste avant
+   * `triggerEvent`. Constate sur appareil le 17 septembre : la boite systeme
+   * d'iOS et le paywall Superwall se sont superposes. `useSuperwall` a bien une
+   * garde `isPresenting`, mais elle ne protege que d'un second PAYWALL, elle ne
+   * sait rien d'une alerte systeme. La seule facon fiable de ne pas les
+   * empiler est de ne jamais les mettre dans le meme geste utilisateur.
    *
    * N'echoue jamais et ne bloque jamais la suite, cf. lib/pushPermission.ts.
    */
@@ -181,9 +185,18 @@ export default function IdealDayScreen() {
     });
   };
 
-  const handleSyncCalendar = async () => {
-    await askForNotifications();
+  // Le delai laisse les animations d'entree se poser : une alerte qui apparait
+  // pendant le FadeInDown donne l'impression que l'ecran a plante. Le timeout
+  // est annule au demontage, sinon l'alerte s'afficherait par-dessus l'ecran
+  // suivant si l'utilisateur va plus vite qu'elle.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      void askForNotifications();
+    }, 900);
+    return () => clearTimeout(timer);
+  }, []);
 
+  const handleSyncCalendar = async () => {
     // Récupérer le firstName depuis AsyncStorage pour le passer à calendar-sync
     const storedFirstName = await AsyncStorage.getItem('onboarding_firstName');
     
@@ -203,7 +216,6 @@ export default function IdealDayScreen() {
     await saveResponse('completed', true);
     await forceSync();
     await AsyncStorage.setItem('onboarding_completed', 'true');
-    await askForNotifications();
     await triggerEvent(SUPERWALL_EVENTS.ONBOARDING_COMPLETED, {
       params: { source: 'ideal_day_start_focus' },
       requireNonPremium: false,
