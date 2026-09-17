@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   ScrollView,
   Modal,
-  TextInput,
   Platform,
 } from 'react-native';
 import Animated, {
@@ -36,7 +35,7 @@ export default function IdealDayScreen() {
   const { t } = useLanguage();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams();
-  const { saveResponse } = useOnboardingData();
+  const { saveResponse, saveResponses } = useOnboardingData();
   const { triggerEvent } = useSuperwall();
   const [priorities, setPriorities] = useState<string[]>([]);
   const [timeline, setTimeline] = useState<TimelineBlock[]>([]);
@@ -144,11 +143,15 @@ export default function IdealDayScreen() {
         setTimeline(blocksWithBreaks);
         
         // Sauvegarder la journée idéale
-        saveResponse('idealDay', {
-          priorities: priorityTasks,
-          timeline: blocksWithBreaks,
+        void saveResponses({
+          idealDay: {
+            priorities: priorityTasks,
+            timeline: blocksWithBreaks,
+          },
+          currentStep: 11,
+        }).catch((error) => {
+          console.error('[Onboarding] Erreur sauvegarde journée idéale:', error);
         });
-        saveResponse('currentStep', 11);
       }
     } catch (error) {
       console.error('Erreur lors du parsing des tâches:', error);
@@ -202,19 +205,22 @@ export default function IdealDayScreen() {
     if (isFinishing) return;
     setIsFinishing(true);
 
-    // Récupérer le firstName depuis AsyncStorage pour le passer à calendar-sync
-    const storedFirstName = await AsyncStorage.getItem('onboarding_firstName');
-    
-    // Récupérer les tâches depuis les paramètres pour les passer à calendar-sync
-    const tasksParam = params.tasks as string;
-    
-    router.push({
-      pathname: '/(onboarding-new)/calendar-sync',
-      params: {
-        ...(storedFirstName ? { firstName: storedFirstName } : {}),
-        ...(tasksParam ? { tasks: tasksParam } : {}),
-      },
-    });
+    try {
+      // Récupérer le firstName depuis AsyncStorage pour le passer à calendar-sync
+      const storedFirstName = await AsyncStorage.getItem('onboarding_firstName');
+      const tasksParam = params.tasks as string;
+
+      router.push({
+        pathname: '/(onboarding-new)/calendar-sync',
+        params: {
+          ...(storedFirstName ? { firstName: storedFirstName } : {}),
+          ...(tasksParam ? { tasks: tasksParam } : {}),
+        },
+      });
+    } catch (error) {
+      console.error('[Onboarding] Navigation vers calendar-sync impossible:', error);
+      setIsFinishing(false);
+    }
   };
 
   const handleStartFocus = async () => {

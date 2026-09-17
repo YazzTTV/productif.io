@@ -31,31 +31,30 @@ export default function ProfileRevealScreen() {
   const profileEmoji = '💭';
   const description = t('achieverDescription') || 'You have big goals and work hard to achieve them. With the right system, you can accomplish even more.';
 
-  const handleStartTrial = async () => {
+  const finishOnboarding = async (
+    placement: typeof SUPERWALL_EVENTS.CAMPAIGN_TRIGGER | typeof SUPERWALL_EVENTS.ONBOARDING_COMPLETED,
+    source: string,
+  ) => {
+    if (isLoading) return;
     setIsLoading(true);
 
+    // Le serveur est best-effort : la fin locale et le paywall ne doivent pas
+    // attendre son timeout de 30 secondes.
+    void onboardingService.saveOnboardingData({
+      completed: true,
+      currentStep: 10,
+    }).catch((error) => {
+      console.error('❌ Erreur lors de la sauvegarde de l\'onboarding:', error);
+    });
+
     try {
-      // L'onboarding est marqué terminé AVANT le paywall : si l'utilisateur
-      // ferme le paywall sans acheter, il arrive quand même dans l'app en
-      // plan gratuit au lieu de rester bloqué sur cet écran.
-      try {
-        await onboardingService.saveOnboardingData({
-          completed: true,
-          currentStep: 10,
-        });
-      } catch (error) {
-        console.error('❌ Erreur lors de la sauvegarde de l\'onboarding:', error);
-      }
-
       await AsyncStorage.setItem('onboarding_completed', 'true');
-
-      // Prix, offres et éligibilité à l'essai sont pilotés par Superwall.
-      await triggerEvent(SUPERWALL_EVENTS.CAMPAIGN_TRIGGER, {
-        params: { source: 'onboarding_profile_reveal' },
+      await triggerEvent(placement, {
+        params: { source },
         requireNonPremium: false,
         bypassCooldown: true,
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error('Erreur lors de l\'affichage du paywall:', error);
     } finally {
       setIsLoading(false);
@@ -63,24 +62,11 @@ export default function ProfileRevealScreen() {
     }
   };
 
-  const handleSkip = async () => {
-    try {
-      await onboardingService.saveOnboardingData({
-        completed: true,
-        currentStep: 10,
-      });
-    } catch (error) {
-      console.error('❌ Erreur lors de la sauvegarde:', error);
-    }
-    
-    await AsyncStorage.setItem('onboarding_completed', 'true');
-    await triggerEvent(SUPERWALL_EVENTS.ONBOARDING_COMPLETED, {
-      params: { source: 'profile_reveal_skip' },
-      requireNonPremium: false,
-      bypassCooldown: true,
-    });
-    router.replace('/(tabs)');
-  };
+  const handleStartTrial = () =>
+    finishOnboarding(SUPERWALL_EVENTS.CAMPAIGN_TRIGGER, 'onboarding_profile_reveal');
+
+  const handleSkip = () =>
+    finishOnboarding(SUPERWALL_EVENTS.ONBOARDING_COMPLETED, 'profile_reveal_skip');
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -179,7 +165,7 @@ export default function ProfileRevealScreen() {
               )}
           </TouchableOpacity>
 
-          <TouchableOpacity onPress={handleSkip} style={styles.skipButton}>
+          <TouchableOpacity onPress={handleSkip} disabled={isLoading} style={styles.skipButton}>
             <Text style={styles.skipText}>{t('skip') || 'Skip for now'}</Text>
           </TouchableOpacity>
         </Animated.View>

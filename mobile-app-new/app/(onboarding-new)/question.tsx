@@ -17,9 +17,18 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { onboardingService } from '@/lib/api';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-interface Option {
-  id: string;
-  textKey: string;
+// Les écrans de question sont démontés à chaque réponse, mais leurs sauvegardes
+// peuvent encore être en vol. Une file au niveau du module conserve l'ordre des
+// currentStep sans retenir la navigation.
+let questionSaveQueue: Promise<unknown> = Promise.resolve();
+
+function enqueueQuestionSave(payload: Record<string, unknown>) {
+  questionSaveQueue = questionSaveQueue
+    .catch(() => {})
+    .then(() => onboardingService.saveOnboardingData(payload))
+    .catch((error: any) => {
+      console.error('❌ [QUESTION] Erreur lors de la sauvegarde des réponses:', error);
+    });
 }
 
 export default function QuestionScreen() {
@@ -134,37 +143,26 @@ export default function QuestionScreen() {
       }
     };
 
-    // Sauvegarder les réponses dans l'API
-    try {
-      console.log('💾 [QUESTION] Tentative de sauvegarde des réponses:', answers);
-      
-      const payload: any = {
-        currentStep: questionIndex + 2, // Prochaine étape
-      };
+    const payload: Record<string, unknown> = {
+      currentStep: questionIndex + 2, // Prochaine étape
+    };
 
-      // Mapper les réponses connues
-      if (answers[0]) payload.diagBehavior = mapAnswerToField(0, answers[0]);
-      if (answers[1]) payload.timeFeeling = mapAnswerToField(1, answers[1]);
-      if (answers[2]) payload.phoneHabit = mapAnswerToField(2, answers[2]);
-      if (answers[5]) payload.mainGoal = mapAnswerToField(5, answers[5]);
+    // Mapper les réponses connues
+    if (answers[0]) payload.diagBehavior = mapAnswerToField(0, answers[0]);
+    if (answers[1]) payload.timeFeeling = mapAnswerToField(1, answers[1]);
+    if (answers[2]) payload.phoneHabit = mapAnswerToField(2, answers[2]);
+    if (answers[5]) payload.mainGoal = mapAnswerToField(5, answers[5]);
 
-      // Sauvegarder toutes les réponses dans utmParams pour référence
-      payload.utmParams = { 
-        allAnswers: answers,
-        q4: answers[3] || null,
-        q5: answers[4] || null,
-      };
+    // Sauvegarder toutes les réponses dans utmParams pour référence
+    payload.utmParams = {
+      allAnswers: answers,
+      q4: answers[3] || null,
+      q5: answers[4] || null,
+    };
 
-      console.log('📤 [QUESTION] Payload à envoyer:', JSON.stringify(payload, null, 2));
-      
-      await onboardingService.saveOnboardingData(payload);
-      console.log('✅ [QUESTION] Réponses sauvegardées dans l\'API avec succès');
-    } catch (error: any) {
-      console.error('❌ [QUESTION] Erreur lors de la sauvegarde des réponses:', error);
-      console.error('❌ [QUESTION] Message d\'erreur:', error?.message);
-      console.error('❌ [QUESTION] Stack:', error?.stack);
-      // Ne pas bloquer le flux si la sauvegarde échoue
-    }
+    // Cette sauvegarde est analytique et best-effort. L'attendre contredisait le
+    // commentaire d'origine et pouvait figer chacune des six questions 30 s.
+    enqueueQuestionSave(payload);
 
     if (questionIndex < totalQuestions - 1) {
       // Aller à la question suivante
@@ -184,7 +182,6 @@ export default function QuestionScreen() {
 
   const handleBack = () => {
     if (questionIndex > 0) {
-      const prevAnswers = previousAnswers.slice(0, -1);
       router.back();
     } else {
       router.back();

@@ -1,9 +1,14 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { onboardingService, authService, TokenStorage } from '@/lib/api';
+import { onboardingService, TokenStorage } from '@/lib/api';
 
 const ONBOARDING_STORAGE_KEY = 'onboarding_responses';
 const ONBOARDING_USER_KEY = 'onboarding_user_id';
+
+// Plusieurs écrans peuvent finir leur sauvegarde après avoir déjà été démontés.
+// Ces files sont donc partagées entre toutes les instances du hook.
+const localWriteQueues = new Map<string, Promise<OnboardingResponses>>();
+const backendSyncQueues = new Map<string, Promise<void>>();
 
 function decodeJWT(token: string): any {
   try {
@@ -81,10 +86,76 @@ export interface OnboardingResponses {
   completed?: boolean;
 }
 
+async function readStoredResponses(userId: string | null, key: string): Promise<OnboardingResponses> {
+  let stored = await AsyncStorage.getItem(key);
+
+  if (stored === null && userId) {
+    const legacyUserId = await AsyncStorage.getItem(ONBOARDING_USER_KEY);
+    // Avant l'inscription, les premières réponses (notamment la langue) vivent
+    // sous la clé anonyme. Le premier utilisateur authentifié peut les réclamer;
+    // une clé déjà attribuée à un autre compte n'est jamais migrée.
+    if (legacyUserId === null || legacyUserId === userId) {
+      stored = await AsyncStorage.getItem(ONBOARDING_STORAGE_KEY);
+      if (stored !== null) {
+        await AsyncStorage.setItem(key, stored);
+        await AsyncStorage.setItem(ONBOARDING_USER_KEY, userId);
+      }
+    }
+  }
+
+  return stored ? JSON.parse(stored) : {};
+}
+
+async function enqueueLocalWrite(
+  updates: Partial<OnboardingResponses>,
+): Promise<OnboardingResponses> {
+  const { userId, key } = await getScopedKey();
+  const previous = localWriteQueues.get(key) ?? Promise.resolve({});
+  const write = previous
+    .catch(() => ({}))
+    .then(async () => {
+      // Relire le stockage dans la file, pas l'état React capturé au rendu. Cela
+      // empêche deux saveResponse rapprochés de repartir du même ancien objet.
+      const persisted = await readStoredResponses(userId, key);
+      const updated = { ...persisted, ...updates };
+      await AsyncStorage.setItem(key, JSON.stringify(updated));
+      if (userId) {
+        await AsyncStorage.setItem(ONBOARDING_USER_KEY, userId);
+      }
+      return updated;
+    });
+
+  localWriteQueues.set(key, write);
+  void write.finally(() => {
+    if (localWriteQueues.get(key) === write) {
+      localWriteQueues.delete(key);
+    }
+  }).catch(() => {});
+  return write;
+}
+
+function enqueueBackendSync(userId: string, data: OnboardingResponses): Promise<void> {
+  const previous = backendSyncQueues.get(userId) ?? Promise.resolve();
+  const sync = previous
+    .catch(() => {})
+    .then(async () => {
+      await onboardingService.saveOnboardingData(data);
+    });
+
+  backendSyncQueues.set(userId, sync);
+  void sync.finally(() => {
+    if (backendSyncQueues.get(userId) === sync) {
+      backendSyncQueues.delete(userId);
+    }
+  }).catch(() => {});
+  return sync;
+}
+
 export function useOnboardingData() {
   const [responses, setResponses] = useState<OnboardingResponses>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const localMutationVersion = useRef(0);
 
   // Charger les données depuis AsyncStorage au démarrage
   useEffect(() => {
@@ -92,23 +163,14 @@ export function useOnboardingData() {
   }, []);
 
   const loadResponses = async () => {
+    const versionAtStart = localMutationVersion.current;
     try {
       const { userId, key } = await getScopedKey();
-      let stored = await AsyncStorage.getItem(key);
-      if (stored === null && userId) {
-        const legacyUserId = await AsyncStorage.getItem(ONBOARDING_USER_KEY);
-        if (legacyUserId && legacyUserId === userId) {
-          stored = await AsyncStorage.getItem(ONBOARDING_STORAGE_KEY);
-          if (stored !== null) {
-            await AsyncStorage.setItem(key, stored);
-          }
-        }
-      }
-      if (stored) {
-        const parsed = JSON.parse(stored);
+      const parsed = await readStoredResponses(userId, key);
+      if (versionAtStart === localMutationVersion.current) {
         setResponses(parsed);
-        console.log('📥 [OnboardingData] Données chargées depuis AsyncStorage');
       }
+      console.log('📥 [OnboardingData] Données chargées depuis AsyncStorage');
     } catch (error) {
       console.error('❌ [OnboardingData] Erreur chargement:', error);
     } finally {
@@ -117,14 +179,10 @@ export function useOnboardingData() {
   };
 
   // Sauvegarder localement dans AsyncStorage
-  const saveToLocal = async (updates: Partial<OnboardingResponses>) => {
+  const saveToLocal = useCallback(async (updates: Partial<OnboardingResponses>) => {
     try {
-      const updated = { ...responses, ...updates };
-      const { userId, key } = await getScopedKey();
-      await AsyncStorage.setItem(key, JSON.stringify(updated));
-      if (userId) {
-        await AsyncStorage.setItem(ONBOARDING_USER_KEY, userId);
-      }
+      localMutationVersion.current += 1;
+      const updated = await enqueueLocalWrite(updates);
       setResponses(updated);
       console.log('💾 [OnboardingData] Sauvegardé localement:', Object.keys(updates));
       return updated;
@@ -132,19 +190,22 @@ export function useOnboardingData() {
       console.error('❌ [OnboardingData] Erreur sauvegarde locale:', error);
       throw error;
     }
-  };
+  }, []);
 
   // Synchroniser avec le backend si l'utilisateur est authentifié
-  const syncToBackend = async (data: OnboardingResponses) => {
+  const syncToBackend = useCallback(async (data: OnboardingResponses) => {
     try {
-      const user = await authService.checkAuth();
-      if (!user?.id) {
+      const userId = await getUserId();
+      if (!userId) {
         console.log('ℹ️ [OnboardingData] Utilisateur non authentifié, pas de sync backend');
         return;
       }
 
       setIsSaving(true);
-      await onboardingService.saveOnboardingData(data);
+      // Le serveur reçoit un document complet. Sans sérialisation, une requête
+      // ancienne qui termine après une nouvelle peut remettre currentStep ou
+      // une réponse à sa valeur précédente.
+      await enqueueBackendSync(userId, data);
       console.log('✅ [OnboardingData] Synchronisé avec le backend');
     } catch (error: any) {
       console.error('❌ [OnboardingData] Erreur sync backend:', error?.message);
@@ -152,7 +213,7 @@ export function useOnboardingData() {
     } finally {
       setIsSaving(false);
     }
-  };
+  }, []);
 
   // Sauvegarder les réponses (local + backend si authentifié)
   const saveResponses = useCallback(async (updates: Partial<OnboardingResponses>) => {
@@ -167,7 +228,7 @@ export function useOnboardingData() {
       console.error('❌ [OnboardingData] Erreur sauvegarde:', error);
       throw error;
     }
-  }, [responses]);
+  }, [saveToLocal, syncToBackend]);
 
   // Sauvegarder une réponse spécifique
   const saveResponse = useCallback(async <K extends keyof OnboardingResponses>(
@@ -188,6 +249,8 @@ export function useOnboardingData() {
   const clearResponses = async () => {
     try {
       const { key } = await getScopedKey();
+      await localWriteQueues.get(key)?.catch(() => {});
+      localMutationVersion.current += 1;
       await AsyncStorage.removeItem(key);
       await AsyncStorage.removeItem(ONBOARDING_STORAGE_KEY);
       setResponses({});
@@ -199,7 +262,10 @@ export function useOnboardingData() {
 
   // Forcer la synchronisation avec le backend
   const forceSync = async () => {
-    await syncToBackend(responses);
+    const { userId, key } = await getScopedKey();
+    await localWriteQueues.get(key)?.catch(() => {});
+    const latest = await readStoredResponses(userId, key);
+    await syncToBackend(latest);
   };
 
   return {

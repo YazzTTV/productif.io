@@ -12,6 +12,7 @@ import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withTiming,
+  withDelay,
   Easing,
 } from 'react-native-reanimated';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -32,9 +33,10 @@ export default function SuccessScreen() {
   const { t } = useLanguage();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams();
-  const { saveResponse, forceSync } = useOnboardingData();
+  const { saveResponse } = useOnboardingData();
   const { triggerEvent } = useSuperwall();
   const [firstName, setFirstName] = useState('');
+  const [isFinishing, setIsFinishing] = useState(false);
 
   // Animation pour les cercles concentriques
   const outerScale = useSharedValue(0);
@@ -65,7 +67,7 @@ export default function SuccessScreen() {
           const first = user.name.split(' ')[0];
           setFirstName(first);
         }
-      } catch (error) {
+      } catch {
         console.log('Impossible de récupérer le nom depuis l\'API');
       }
     };
@@ -73,14 +75,13 @@ export default function SuccessScreen() {
     loadFirstName();
 
     // Animer les cercles
-    outerScale.value = withTiming(1, { duration: 500, delay: 400 });
-    middleScale.value = withTiming(1, { duration: 500, delay: 500 });
-    innerScale.value = withTiming(1, { 
-      duration: 500, 
-      delay: 600,
+    outerScale.value = withDelay(400, withTiming(1, { duration: 500 }));
+    middleScale.value = withDelay(500, withTiming(1, { duration: 500 }));
+    innerScale.value = withDelay(600, withTiming(1, {
+      duration: 500,
       easing: Easing.out(Easing.back(1.2)),
-    });
-    checkmarkOpacity.value = withTiming(1, { duration: 300, delay: 800 });
+    }));
+    checkmarkOpacity.value = withDelay(800, withTiming(1, { duration: 300 }));
   }, [params.firstName]);
 
   const outerStyle = useAnimatedStyle(() => ({
@@ -99,36 +100,41 @@ export default function SuccessScreen() {
     opacity: checkmarkOpacity.value,
   }));
 
-  const handleStartFocus = async () => {
-    // Marquer l'onboarding comme terminé
-    await saveResponse('completed', true);
-    await forceSync(); // Forcer la synchronisation finale avec le backend
-    await AsyncStorage.setItem('onboarding_completed', 'true');
-    await trackEvent('onboarding_completed', { next_action: 'start_focus' });
-    await triggerEvent(SUPERWALL_EVENTS.ONBOARDING_COMPLETED, {
-      params: { source: 'onboarding_success_start_focus' },
-      requireNonPremium: false,
-      bypassCooldown: true,
-    });
-    await setTutorialCompleted(false);
-    await setTutorialStage('calendar');
-    console.log('[Tutorial] Success -> set stage calendar');
-    router.replace('/(tabs)');
+  const finishOnboarding = async (
+    nextAction: 'start_focus' | 'view_calendar',
+    source: string,
+  ) => {
+    if (isFinishing) return;
+    setIsFinishing(true);
+
+    try {
+      // saveResponse persiste localement et programme déjà la synchronisation
+      // backend. Un forceSync ici envoyait deux fois le même document et pouvait
+      // retenir ce bouton jusqu'à 60 secondes.
+      await saveResponse('completed', true);
+      await AsyncStorage.setItem('onboarding_completed', 'true');
+      await setTutorialCompleted(false);
+      await setTutorialStage('calendar');
+      void trackEvent('onboarding_completed', { next_action: nextAction }).catch((error) => {
+        console.error('[Onboarding] Tracking completion impossible:', error);
+      });
+      await triggerEvent(SUPERWALL_EVENTS.ONBOARDING_COMPLETED, {
+        params: { source },
+        requireNonPremium: false,
+        bypassCooldown: true,
+      });
+    } catch (error) {
+      console.error('[Onboarding] Sortie success dégradée:', error);
+    } finally {
+      router.replace('/(tabs)');
+    }
   };
 
-  const handleViewCalendar = async () => {
-    // TODO: Ouvrir le calendrier natif ou l'app
-    await trackEvent('onboarding_completed', { next_action: 'view_calendar' });
-    await triggerEvent(SUPERWALL_EVENTS.ONBOARDING_COMPLETED, {
-      params: { source: 'onboarding_success_view_calendar' },
-      requireNonPremium: false,
-      bypassCooldown: true,
-    });
-    await setTutorialCompleted(false);
-    await setTutorialStage('calendar');
-    console.log('[Tutorial] Success -> set stage calendar (view calendar)');
-    router.replace('/(tabs)');
-  };
+  const handleStartFocus = () =>
+    finishOnboarding('start_focus', 'onboarding_success_start_focus');
+
+  const handleViewCalendar = () =>
+    finishOnboarding('view_calendar', 'onboarding_success_view_calendar');
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -175,6 +181,7 @@ export default function SuccessScreen() {
           <Animated.View entering={FadeInDown.delay(1000).duration(400)} style={styles.ctaContainer}>
             <TouchableOpacity
               onPress={handleStartFocus}
+              disabled={isFinishing}
               style={styles.primaryButton}
               activeOpacity={0.8}
             >
@@ -186,6 +193,7 @@ export default function SuccessScreen() {
 
             <TouchableOpacity
               onPress={handleViewCalendar}
+              disabled={isFinishing}
               style={styles.secondaryButton}
               activeOpacity={0.8}
             >

@@ -199,6 +199,14 @@ export async function apiCall<T>(
 ): Promise<T> {
   const tokenStorage = TokenStorage.getInstance();
   const token = await tokenStorage.getToken();
+  const controller = new AbortController();
+  const externalSignal = options.signal;
+  const abortFromCaller = () => controller.abort();
+  if (externalSignal?.aborted) {
+    controller.abort();
+  } else {
+    externalSignal?.addEventListener('abort', abortFromCaller, { once: true });
+  }
 
   // Log détaillé du token
   if (token) {
@@ -209,12 +217,13 @@ export async function apiCall<T>(
   }
 
   const config: RequestInit = {
+    ...options,
     headers: {
       'Content-Type': 'application/json',
       ...(token && { Authorization: `Bearer ${token}` }),
       ...options.headers,
     },
-    ...options,
+    signal: controller.signal,
   };
 
   // Vérifier que le header Authorization est bien présent
@@ -230,17 +239,24 @@ export async function apiCall<T>(
     console.log('🌐 [apiCall] URL complète:', fullUrl);
     console.log('🔑 [apiCall] Token présent:', !!token);
     console.log('📋 [apiCall] Méthode:', options.method || 'GET');
-    if (options.body) {
+    if (typeof options.body === 'string') {
       console.log('📦 apiCall - Body:', options.body.substring(0, 200));
     }
     
     // Créer une promesse avec timeout
     const fetchPromise = fetch(fullUrl, config);
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
     const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => reject(new Error(`Request timeout after ${timeout}ms`)), timeout);
+      timeoutId = setTimeout(() => {
+        reject(new Error(`Request timeout after ${timeout}ms`));
+        controller.abort();
+      }, timeout);
     });
-    
-    const response = await Promise.race([fetchPromise, timeoutPromise]);
+
+    const response = await Promise.race([fetchPromise, timeoutPromise]).finally(() => {
+      if (timeoutId) clearTimeout(timeoutId);
+      externalSignal?.removeEventListener('abort', abortFromCaller);
+    });
     
     console.log('📊 apiCall - Status:', response.status);
     console.log('📊 apiCall - Status Text:', response.statusText);
@@ -704,13 +720,6 @@ export const tasksService = {
     });
   },
 
-  // Supprimer une tâche
-  async deleteTask(taskId: string): Promise<any> {
-    return await apiCall(`/tasks/${taskId}`, {
-      method: 'DELETE',
-    });
-  },
-
   // Récupérer les tâches d'aujourd'hui
   async getTodayTasks(): Promise<any> {
     return await apiCall('/tasks/today');
@@ -988,7 +997,7 @@ export const onboardingService = {
     console.log('💾 [ONBOARDING] Sauvegarde des données');
 
     try {
-      const result = await apiCall('/onboarding/data', {
+      const result = await apiCall<{ data: any }>('/onboarding/data', {
         method: 'POST',
         body: JSON.stringify(payload),
       });
