@@ -22,6 +22,7 @@ import { useOnboardingData } from '@/hooks/useOnboardingData';
 import { useSuperwall } from '@/hooks/useSuperwall';
 import { SUPERWALL_EVENTS } from '@/lib/superwallEvents';
 import { setTutorialCompleted, setTutorialStage } from '@/tutorial/tutorialStorage';
+import { maybePrimePushPermission } from '@/lib/pushPermission';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
 interface TimelineBlock {
@@ -152,7 +153,37 @@ export default function IdealDayScreen() {
     }
   }, [params.tasks]);
 
+  /**
+   * Demande la permission de notification, une seule fois par appareil.
+   *
+   * C'est ici et nulle part ailleurs, parce que cet ecran est le seul point de
+   * passage OBLIGE de la fin de l'onboarding : les deux sorties (lancer une
+   * session, ou synchroniser l'agenda) partent de lui. Et c'est le bon moment,
+   * l'utilisateur vient de voir sa journee avec des horaires : un rappel a ces
+   * heures-la se comprend tout seul.
+   *
+   * L'appel est volontairement place AVANT `triggerEvent`, donc avant un
+   * eventuel paywall Superwall : une alerte systeme qui s'ouvrirait par-dessus
+   * un paywall serait perdue pour les deux.
+   *
+   * N'echoue jamais et ne bloque jamais la suite, cf. lib/pushPermission.ts.
+   */
+  const askForNotifications = async () => {
+    await maybePrimePushPermission({
+      title: t('pushPrimingTitle', undefined, 'Autoriser les rappels ?'),
+      message: t(
+        'pushPrimingMessage',
+        undefined,
+        "Sans notification, l'app ne peut rien te rappeler : ni ta session du matin, ni ce que tu as prévu de réviser. Tu règles la fréquence, et tu peux tout couper dans les réglages."
+      ),
+      later: t('pushPrimingLater', undefined, 'Plus tard'),
+      enable: t('pushPrimingEnable', undefined, 'Activer'),
+    });
+  };
+
   const handleSyncCalendar = async () => {
+    await askForNotifications();
+
     // Récupérer le firstName depuis AsyncStorage pour le passer à calendar-sync
     const storedFirstName = await AsyncStorage.getItem('onboarding_firstName');
     
@@ -172,6 +203,7 @@ export default function IdealDayScreen() {
     await saveResponse('completed', true);
     await forceSync();
     await AsyncStorage.setItem('onboarding_completed', 'true');
+    await askForNotifications();
     await triggerEvent(SUPERWALL_EVENTS.ONBOARDING_COMPLETED, {
       params: { source: 'ideal_day_start_focus' },
       requireNonPremium: false,

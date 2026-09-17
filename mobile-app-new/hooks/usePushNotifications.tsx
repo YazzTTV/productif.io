@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { Platform } from 'react-native';
 import { notificationService } from '@/src/services/notificationService';
+import { requestPushPermissionAndRegisterToken } from '@/lib/pushPermission';
 import Constants from 'expo-constants';
 import { router } from 'expo-router';
 
@@ -42,98 +43,23 @@ export function usePushNotifications(options: UsePushNotificationsOptions = {}) 
   const handledResponseKeysRef = useRef<Set<string>>(new Set());
 
   const requestPermissions = async (): Promise<boolean> => {
-    // Si le module n'est pas disponible, retourner false
-    if (!Notifications || !isNotificationsAvailable) {
-      console.log('ℹ️ Notifications non disponibles (build natif requis)');
-      return false;
+    // Toute la logique vit desormais dans lib/pushPermission.ts, y compris le
+    // choix du device token APNs natif. Elle etait dupliquee ici ET dans
+    // registerForPushNotificationsAsync plus bas, et les deux copies avaient
+    // diverge : c'est cette divergence qui a produit le BadDeviceToken constate
+    // en production le 15 septembre 2026. Un seul endroit desormais.
+    const { outcome, token } = await requestPushPermissionAndRegisterToken();
+
+    if (!isMountedRef.current) return outcome === 'granted';
+
+    if (outcome === 'granted') {
+      setPermissionStatus('granted');
+      if (token) setExpoPushToken(token);
+      return true;
     }
-    
-    try {
-      // Sur Android, configurer le canal de notification AVANT de demander les permissions
-      // Cela garantit que la demande de permission POST_NOTIFICATIONS fonctionne correctement
-      if (Platform.OS === 'android') {
-        console.log('📱 [Android] Configuration du canal de notification...');
-        await Notifications.setNotificationChannelAsync('default', {
-          name: 'Notifications par défaut',
-          importance: Notifications.AndroidImportance.MAX,
-          vibrationPattern: [0, 250, 250, 250],
-          lightColor: '#00C27A',
-          sound: 'default',
-          enableVibrate: true,
-          showBadge: true,
-        });
-        console.log('✅ [Android] Canal de notification configuré');
-      }
-      
-      // Vérifier d'abord l'état actuel des permissions
-      const currentStatus = await Notifications.getPermissionsAsync();
-      console.log('🔍 [Permissions] État actuel:', currentStatus.status);
-      
-      // Demander les permissions (cela déclenchera la boîte de dialogue sur Android 13+)
-      console.log('📱 [Permissions] Demande des permissions de notification...');
-      const { status } = await Notifications.requestPermissionsAsync({
-        ios: {
-          allowAlert: true,
-          allowBadge: true,
-          allowSound: true,
-          allowAnnouncements: false,
-        },
-      });
-      
-      console.log('📱 [Permissions] Résultat de la demande:', status);
-      
-      if (!isMountedRef.current) return false;
-      setPermissionStatus(status);
-      
-      if (status === 'granted') {
-        console.log('✅ [Permissions] Permissions accordées !');
-        // Obtenir le token maintenant que les permissions sont accordées
-        try {
-          let token: string | null = null;
-          
-          if (Platform.OS === 'ios') {
-            // Token APNs NATIF, jamais le token Expo. Le backend envoie en APNs
-            // direct via @parse/node-apn (lib/apns.ts), qui attend un device token
-            // brut. Un `ExponentPushToken[...]` est rejete par Apple en
-            // `BadDeviceToken` 400, constate en production le 15 septembre.
-            const deviceToken = await Notifications.getDevicePushTokenAsync();
-            token = deviceToken.data;
-          } else {
-            // Sur Android, configurer à nouveau le canal pour être sûr
-            await Notifications.setNotificationChannelAsync('default', {
-              name: 'Notifications par défaut',
-              importance: Notifications.AndroidImportance.MAX,
-              vibrationPattern: [0, 250, 250, 250],
-              lightColor: '#00C27A',
-            });
-            
-            // Pour Android, utiliser getDevicePushTokenAsync() pour obtenir le token FCM natif
-            // Cela permet d'envoyer directement via FCM depuis le backend sans passer par Expo Push Notification Service
-            const deviceToken = await Notifications.getDevicePushTokenAsync();
-            token = deviceToken.data;
-            console.log('📱 [Android] Token FCM natif obtenu:', token.substring(0, 20) + '...');
-          }
-          
-          if (!isMountedRef.current) return false;
-          
-          if (token) {
-            console.log('📱 Token push obtenu:', token);
-            setExpoPushToken(token);
-            registerTokenWithBackend(token);
-            return true;
-          }
-        } catch (tokenError) {
-          console.error('❌ Erreur lors de l\'obtention du token push:', tokenError);
-        }
-      } else {
-        console.warn('⚠️ [Permissions] Permissions refusées:', status);
-      }
-      
-      return false;
-    } catch (error) {
-      console.error('❌ Erreur lors de la demande de permissions:', error);
-      return false;
-    }
+
+    if (outcome === 'denied') setPermissionStatus('denied');
+    return false;
   };
 
   useEffect(() => {
