@@ -257,17 +257,26 @@ export default function CalendarSyncScreen() {
       .saveOnboardingData({ completed: true, currentStep: 11 })
       .catch(() => {});
 
-    await AsyncStorage.setItem('onboarding_completed', 'true');
-    // Pose l'etat du didacticiel AVANT le paywall : l'utilisateur qui le ferme
-    // arrive alors sur des onglets deja prets.
-    await setTutorialCompleted(false);
-    await setTutorialStage('calendar');
-    await triggerEvent(SUPERWALL_EVENTS.ONBOARDING_COMPLETED, {
-      params: { source: 'calendar_sync_skip' },
-      requireNonPremium: false,
-      bypassCooldown: true,
-    });
-    router.replace('/(tabs)');
+    // Meme enveloppe que ideal-day : `triggerEvent` n'a aucun `catch`, donc une
+    // erreur du SDK Superwall remonterait ici, sauterait `router.replace` et
+    // laisserait `isConnecting` a true, c'est-a-dire le bouton definitivement
+    // desactive sur un ecran sans issue.
+    try {
+      await AsyncStorage.setItem('onboarding_completed', 'true');
+      // L'etat du didacticiel est pose AVANT le paywall : l'utilisateur qui le
+      // ferme arrive alors sur des onglets deja prets.
+      await setTutorialCompleted(false);
+      await setTutorialStage('calendar');
+      await triggerEvent(SUPERWALL_EVENTS.ONBOARDING_COMPLETED, {
+        params: { source: 'calendar_sync_skip' },
+        requireNonPremium: false,
+        bypassCooldown: true,
+      });
+    } catch (error) {
+      console.error('[Onboarding] Sortie calendar-sync degradee:', error);
+    } finally {
+      router.replace('/(tabs)');
+    }
   };
 
   return (

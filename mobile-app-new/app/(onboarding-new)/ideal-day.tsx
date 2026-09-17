@@ -230,16 +230,29 @@ export default function IdealDayScreen() {
     // blocage possible sur un simple tap. Et `syncToBackend` avale deja ses
     // erreurs en disant lui-meme que "les donnees sont deja en local" : on
     // attendait un resultat dont personne ne faisait rien. Retire.
-    await saveResponse('completed', true);
-    await AsyncStorage.setItem('onboarding_completed', 'true');
-    await setTutorialCompleted(false);
-    await setTutorialStage('calendar');
-    await triggerEvent(SUPERWALL_EVENTS.ONBOARDING_COMPLETED, {
-      params: { source: 'ideal_day_start_focus' },
-      requireNonPremium: false,
-      bypassCooldown: true,
-    });
-    router.replace('/(tabs)');
+    // Tout ce bloc est enveloppe, et la navigation vit dans le `finally`.
+    // Raison : `useSuperwall.triggerEvent` n'a qu'un `try/finally` et AUCUN
+    // `catch`, donc une erreur du SDK Superwall remonte jusqu'ici. Sans cette
+    // enveloppe, l'exception sautait `router.replace` pendant que la garde
+    // `isFinishing` restait a true : l'utilisateur se retrouvait bloque sur cet
+    // ecran, les deux boutons desactives, sans aucun moyen d'entrer dans l'app.
+    // Le paywall est un bonus, l'entree dans l'app est la promesse : elle ne
+    // doit dependre d'aucun appel qui peut echouer.
+    try {
+      await saveResponse('completed', true);
+      await AsyncStorage.setItem('onboarding_completed', 'true');
+      await setTutorialCompleted(false);
+      await setTutorialStage('calendar');
+      await triggerEvent(SUPERWALL_EVENTS.ONBOARDING_COMPLETED, {
+        params: { source: 'ideal_day_start_focus' },
+        requireNonPremium: false,
+        bypassCooldown: true,
+      });
+    } catch (error) {
+      console.error('[Onboarding] Sortie ideal-day degradee:', error);
+    } finally {
+      router.replace('/(tabs)');
+    }
   };
 
   const handleAdjust = () => {
