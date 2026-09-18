@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -45,6 +45,12 @@ export default function IdealDayScreen() {
   const [selectedTime, setSelectedTime] = useState(new Date());
   /** Verrouille les deux sorties de l'ecran : sans lui, un double tap lance deux fois la sequence de fin. */
   const [isFinishing, setIsFinishing] = useState(false);
+  /**
+   * Meme information que `isFinishing`, mais lisible depuis une closure.
+   * Le `setTimeout` de l'alerte de notification capture l'etat au montage : sans
+   * cette reference il lirait toujours `false`, meme apres un tap.
+   */
+  const isFinishingRef = useRef(false);
 
   useEffect(() => {
     try {
@@ -178,6 +184,14 @@ export default function IdealDayScreen() {
    * N'echoue jamais et ne bloque jamais la suite, cf. lib/pushPermission.ts.
    */
   const askForNotifications = async () => {
+    // Deuxieme garde, en plus de l'annulation du timer au demontage. Elle couvre
+    // le cas que l'annulation ne peut pas couvrir : le timer a DEJA tire et
+    // l'utilisateur tape une sortie dans la meme fraction de seconde. Sans elle,
+    // l'alerte s'ouvrait par-dessus l'ecran de synchronisation du calendrier, ou
+    // par-dessus le paywall, c'est-a-dire exactement l'empilement que le
+    // deplacement de cet appel devait supprimer.
+    if (isFinishingRef.current) return;
+
     await maybePrimePushPermission({
       title: t('pushPrimingTitle', undefined, 'Autoriser les rappels ?'),
       message: t(
@@ -202,7 +216,8 @@ export default function IdealDayScreen() {
   }, []);
 
   const handleSyncCalendar = async () => {
-    if (isFinishing) return;
+    if (isFinishingRef.current) return;
+    isFinishingRef.current = true;
     setIsFinishing(true);
 
     try {
@@ -224,7 +239,8 @@ export default function IdealDayScreen() {
   };
 
   const handleStartFocus = async () => {
-    if (isFinishing) return;
+    if (isFinishingRef.current) return;
+    isFinishingRef.current = true;
     setIsFinishing(true);
 
     // `saveResponse` ecrit en local ET lance deja la synchronisation backend en

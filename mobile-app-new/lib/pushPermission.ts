@@ -93,24 +93,27 @@ export async function getPushPermissionStatus(): Promise<string | null> {
  * iOS, FCM natif cote Android. Le service Expo Push n'est utilise nulle part
  * dans le backend.
  */
-async function registerDeviceToken(): Promise<string | null> {
-  if (!Notifications) return null;
+async function registerDeviceToken(): Promise<{ token: string | null; registered: boolean }> {
+  if (!Notifications) return { token: null, registered: false };
   try {
     const deviceToken = await Notifications.getDevicePushTokenAsync();
     const token: string | undefined = deviceToken?.data;
-    if (!token) return null;
+    if (!token) return { token: null, registered: false };
 
     const platform = Platform.OS === 'ios' ? 'ios' : Platform.OS === 'android' ? 'android' : 'web';
     const result = await notificationService.registerPushToken(token, platform);
     if (!result?.success) {
       console.error('[pushPermission] Le backend a refuse le token push:', result);
     }
-    // Le token est rendu meme si le backend l'a refuse : il est valide cote
-    // appareil, et l'appelant doit pouvoir l'afficher ou le reessayer.
-    return token;
+    // `registered` est distingue de `token` a dessein : la permission peut etre
+    // accordee cote systeme pendant que le token n'arrive pas au backend. Or le
+    // backend envoie en APNs DIRECT, il n'a aucun autre moyen de joindre
+    // l'appareil : annoncer "vous recevrez les notifications" dans ce cas est un
+    // mensonge a l'utilisateur.
+    return { token, registered: Boolean(result?.success) };
   } catch (error) {
     console.error('[pushPermission] Token push non obtenu ou non enregistre:', error);
-    return null;
+    return { token: null, registered: false };
   }
 }
 
@@ -123,8 +126,9 @@ async function registerDeviceToken(): Promise<string | null> {
 export async function requestPushPermissionAndRegisterToken(): Promise<{
   outcome: PushPermissionOutcome;
   token: string | null;
+  registered: boolean;
 }> {
-  if (!Notifications) return { outcome: 'unavailable', token: null };
+  if (!Notifications) return { outcome: 'unavailable', token: null, registered: false };
 
   try {
     await ensureAndroidChannel();
@@ -138,16 +142,16 @@ export async function requestPushPermissionAndRegisterToken(): Promise<{
       },
     });
 
-    if (status !== 'granted') return { outcome: 'denied', token: null };
+    if (status !== 'granted') return { outcome: 'denied', token: null, registered: false };
 
-    const token = await registerDeviceToken();
+    const { token, registered } = await registerDeviceToken();
     // La permission reste accordee meme si le token n'est pas parti : le hook
     // reessaiera au prochain demarrage, puisqu'il enregistre le token des que
     // le statut est `granted`.
-    return { outcome: 'granted', token };
+    return { outcome: 'granted', token, registered };
   } catch (error) {
     console.error('[pushPermission] Demande de permission en echec:', error);
-    return { outcome: 'unavailable', token: null };
+    return { outcome: 'unavailable', token: null, registered: false };
   }
 }
 
@@ -170,9 +174,23 @@ export async function maybePrimePushPermission(copy: {
     if (!Notifications) return 'unavailable';
 
     const alreadyPrimed = await AsyncStorage.getItem(KEY_PRIMED);
+    const status = await getPushPermissionStatus();
+
+    // REPRISE APRES INTERRUPTION. Le drapeau vaut 'accepted' quand l'utilisateur
+    // a dit oui a l'alerte in-app mais que la boite systeme n'a pas encore rendu
+    // de reponse : app tuee, plantee, ou balayee hors du selecteur pendant que
+    // la boite etait affichee. Sans ce cas, le drapeau seul faisait passer en
+    // `skipped` pour toujours et la boite n'etait PLUS JAMAIS proposee, alors
+    // meme que la permission est restee `undetermined`. On rejoue donc la boite
+    // directement, sans reposer une question a laquelle il a deja repondu oui.
+    if (alreadyPrimed === 'accepted' && status === 'undetermined') {
+      const { outcome } = await requestPushPermissionAndRegisterToken();
+      await AsyncStorage.setItem(KEY_PRIMED, 'done');
+      return outcome;
+    }
+
     if (alreadyPrimed) return 'skipped';
 
-    const status = await getPushPermissionStatus();
     // `granted` : le hook a deja le token. `denied` : la boite systeme ne
     // s'affichera plus, autant garder le priming pour un futur ecran de reglages.
     if (status !== 'undetermined') return 'skipped';
@@ -189,14 +207,18 @@ export async function maybePrimePushPermission(copy: {
       );
     });
 
-    // Le drapeau se pose dans les deux cas : on ne redemande pas a chaque
-    // passage. Un refus in-app reste rattrapable par les reglages de l'app,
-    // qui gardent leur propre chemin.
-    await AsyncStorage.setItem(KEY_PRIMED, String(Date.now()));
+    // Le drapeau se pose dans les deux cas, pour ne pas redemander a chaque
+    // passage, mais avec une valeur DIFFERENTE selon le cas : un refus in-app
+    // est definitif, une acceptation ne l'est qu'une fois la boite systeme
+    // reellement repondue. Cf. le cas de reprise en tete de fonction.
+    if (!accepted) {
+      await AsyncStorage.setItem(KEY_PRIMED, 'declined');
+      return 'denied';
+    }
 
-    if (!accepted) return 'denied';
-
+    await AsyncStorage.setItem(KEY_PRIMED, 'accepted');
     const { outcome } = await requestPushPermissionAndRegisterToken();
+    await AsyncStorage.setItem(KEY_PRIMED, 'done');
     return outcome;
   } catch (error) {
     console.error('[pushPermission] Priming en echec:', error);

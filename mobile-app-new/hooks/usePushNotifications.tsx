@@ -48,14 +48,20 @@ export function usePushNotifications(options: UsePushNotificationsOptions = {}) 
     // registerForPushNotificationsAsync plus bas, et les deux copies avaient
     // diverge : c'est cette divergence qui a produit le BadDeviceToken constate
     // en production le 15 septembre 2026. Un seul endroit desormais.
-    const { outcome, token } = await requestPushPermissionAndRegisterToken();
+    const { outcome, token, registered } = await requestPushPermissionAndRegisterToken();
 
-    if (!isMountedRef.current) return outcome === 'granted';
+    if (!isMountedRef.current) return outcome === 'granted' && registered;
 
     if (outcome === 'granted') {
+      // Le statut passe a `granted` dans tous les cas : la permission EST
+      // accordee cote systeme. Mais la valeur de retour ne vaut `true` que si le
+      // token est reellement arrive au backend, car c'est elle qui fait ecrire
+      // "notifications activees" cote serveur et afficher "vous recevrez
+      // maintenant les notifications push" a l'utilisateur. Le backend envoie en
+      // APNs direct : sans token enregistre, cette promesse serait fausse.
       setPermissionStatus('granted');
       if (token) setExpoPushToken(token);
-      return true;
+      return registered;
     }
 
     if (outcome === 'denied') setPermissionStatus('denied');
