@@ -163,7 +163,7 @@ export default function SuccessScreen() {
           </Animated.View>
 
           {/* Text content */}
-          <Animated.View entering={FadeInDown.delay(800).duration(400)} style={styles.textContainer}>
+          <Animated.View entering={FadeInDown.delay(400).duration(400)} style={styles.textContainer}>
             <Text style={styles.title}>
               {t('dayIsReady') || 'Your day is ready.'}
             </Text>
@@ -178,7 +178,7 @@ export default function SuccessScreen() {
           </Animated.View>
 
           {/* CTAs */}
-          <Animated.View entering={FadeInDown.delay(1000).duration(400)} style={styles.ctaContainer}>
+          <Animated.View entering={FadeInDown.delay(500).duration(400)} style={styles.ctaContainer}>
             <TouchableOpacity
               onPress={handleStartFocus}
               disabled={isFinishing}
@@ -205,7 +205,7 @@ export default function SuccessScreen() {
           </Animated.View>
 
           {/* Free plan indicator */}
-          <Animated.View entering={FadeIn.delay(1200).duration(400)} style={styles.freePlanContainer}>
+          <Animated.View entering={FadeIn.delay(700).duration(400)} style={styles.freePlanContainer}>
             <View style={styles.freePlanBadge}>
               <View style={styles.freePlanDot} />
               <Text style={styles.freePlanText}>

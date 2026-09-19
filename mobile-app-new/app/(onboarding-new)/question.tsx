@@ -110,19 +110,25 @@ export default function QuestionScreen() {
     
     const newAnswers = [...previousAnswers, optionId];
     
-    // Si c'est la question avec social proof, montrer le message
+    // LE PLUS GROS POSTE D'ATTENTE DU PARCOURS, avant reduction : 2 questions
+    // portent un socialProofKey et bloquaient 2500 ms chacune, les 4 autres
+    // 400 ms, soit 6600 ms de setTimeout purs sur les six questions. Aucun
+    // travail n'a lieu pendant ce temps, la navigation est juste retardee.
+    // Le message de preuve sociale reste affiche assez longtemps pour etre lu
+    // (une phrase courte), et le simple accuse de reception visuel de la
+    // selection n'a pas besoin de 400 ms.
     if (currentQuestion.socialProofKey) {
       setTimeout(() => {
         setShowSocialProof(true);
-      }, 300);
-      
+      }, 200);
+
       setTimeout(() => {
         handleNext(newAnswers);
-      }, 2500);
+      }, 1200);
     } else {
       setTimeout(() => {
         handleNext(newAnswers);
-      }, 400);
+      }, 250);
     }
   };
 

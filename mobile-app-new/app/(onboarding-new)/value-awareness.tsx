@@ -26,16 +26,22 @@ export default function ValueAwarenessScreen() {
     t('feelsScattered') || 'But everything feels scattered.',
   ];
 
+  // Enchainement narratif : les trois phrases apparaissent l'une apres l'autre,
+  // puis le bouton. Ce n'est pas un faux chargement, mais c'est une VRAIE
+  // attente : le bouton vit derriere `{showAll && ...}`, donc il n'est pas
+  // monte du tout avant la fin de la sequence. A 800 + 800 + 800 + 500, cela
+  // faisait 2900 ms pendant lesquelles l'ecran n'offrait aucune action, plus
+  // 800 ms de fondu ou le bouton restait invisible. Le recit tient en 1600 ms.
   useEffect(() => {
     if (currentStatement < statements.length) {
       const timer = setTimeout(() => {
         setCurrentStatement(prev => prev + 1);
-      }, 800);
+      }, 450);
       return () => clearTimeout(timer);
     } else {
       const timer = setTimeout(() => {
         setShowAll(true);
-      }, 500);
+      }, 250);
       return () => clearTimeout(timer);
     }
   }, [currentStatement, statements.length]);
@@ -85,7 +91,7 @@ export default function ValueAwarenessScreen() {
 
           {/* CTA */}
           {showAll && (
-            <Animated.View entering={FadeInDown.delay(800).duration(400)} style={styles.buttonContainer}>
+            <Animated.View entering={FadeInDown.delay(200).duration(400)} style={styles.buttonContainer}>
               <TouchableOpacity
                 onPress={handleContinue}
                 style={styles.continueButton}

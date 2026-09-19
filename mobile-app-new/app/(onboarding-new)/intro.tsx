@@ -48,7 +48,7 @@ export default function IntroScreen() {
 
         {/* CTAs */}
         <Animated.View
-          entering={FadeInDown.delay(600).duration(600)}
+          entering={FadeInDown.delay(300).duration(400)}
           style={styles.ctaContainer}
         >
           <TouchableOpacity
