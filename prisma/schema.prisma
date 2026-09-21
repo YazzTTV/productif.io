@@ -969,6 +969,37 @@ model ScanCapture {
   @@map("scan_captures")
 }
 
+model QrRedirect {
+  id          String           @id @default(cuid())
+  slug        String           @unique
+  targetUrl   String           @db.Text
+  label       String?
+  description String?
+  isActive    Boolean          @default(true)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  scans       QrRedirectScan[]
+
+  @@index([isActive])
+  @@map("qr_redirects")
+}
+
+model QrRedirectScan {
+  id           String     @id @default(cuid())
+  qrRedirectId String
+  qrRedirect   QrRedirect @relation(fields: [qrRedirectId], references: [id], onDelete: Cascade)
+  createdAt    DateTime   @default(now())
+  referer      String?    @db.Text
+  userAgent    String?    @db.Text
+  ipHash       String?
+  destination  String     @db.Text
+  query        Json?
+
+  @@index([qrRedirectId])
+  @@index([createdAt])
+  @@map("qr_redirect_scans")
+}
+
 model SubscriptionEvent {
   id            String   @id @default(cuid())
   userId        String

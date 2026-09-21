@@ -51,6 +51,8 @@ const publicRoutes = [
   "/inscription",
   "/createur",
   "/verify-email",
+  // QR codes dynamiques imprimes : doivent rester accessibles sans compte.
+  "/r/",
 ]
 
 export async function middleware(request: NextRequest) {
