@@ -281,8 +281,17 @@ export async function apiCall<T>(
 
       // Gérer les erreurs 401 (Non authentifié) - nettoyer le token invalide
       if (response.status === 401) {
-        // Nettoyer le token invalide pour éviter les appels répétés
-        await TokenStorage.getInstance().clearToken();
+        // Ne nettoyer que le token qui a été REFUSÉ, et seulement s'il est
+        // encore celui en place. Au lancement, les hooks racine appellent
+        // /auth/me avant toute connexion, donc sans token ; sur un réseau lent
+        // leur 401 revenait APRÈS le setToken de l'inscription et effaçait le
+        // token neuf, d'où un « Non authentifié » plus loin dans l'onboarding.
+        if (token) {
+          const current = await TokenStorage.getInstance().getToken();
+          if (current === token) {
+            await TokenStorage.getInstance().clearToken();
+          }
+        }
         const message = errorData?.error || errorData?.message || 'Non authentifié';
         // Ne pas logger comme erreur critique - c'est normal si l'utilisateur n'est pas connecté
         console.log('ℹ️ apiCall - Non authentifié (401), token nettoyé');

@@ -25,20 +25,21 @@ const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 interface Step {
   key: string;
   textKey: string;
-  duration: number;
 }
 
 // Cet ecran ne fait AUCUN travail : aucun fetch, aucun await, aucun service
 // importe. Les taches sont deja completes, elles entrent par `params.tasks` et
-// ressortent telles quelles vers ideal-day. Les durees d'origine
-// (2000 + 2500 + 2000, plus 500 ms avant la navigation) etaient donc 7 secondes
-// de fausse progression, ajoutees aux 4 a 6 secondes reelles de l'analyse IA
-// qui vient juste avant. Ramenees a 1,4 s au total : assez pour que la
-// transition se voie, plus assez pour qu'on l'attende.
+// ressortent telles quelles vers ideal-day. On garde une transition tres breve
+// pour rendre le changement d'ecran lisible, sans simuler un calcul inexistant.
+// Les trois minuteurs partent ensemble depuis le montage : s'ils sont retardes
+// par le runtime, leur retard ne se cumule plus et ils se rattrapent d'un coup.
+const STEP_INTERVAL_MS = 200;
+const NAVIGATION_DELAY_MS = STEP_INTERVAL_MS * 3 + 100;
+
 const steps: Step[] = [
-  { key: 'priorities', textKey: 'understandingPriorities', duration: 400 },
-  { key: 'effort', textKey: 'estimatingEffort', duration: 400 },
-  { key: 'plan', textKey: 'creatingPlan', duration: 400 },
+  { key: 'priorities', textKey: 'understandingPriorities' },
+  { key: 'effort', textKey: 'estimatingEffort' },
+  { key: 'plan', textKey: 'creatingPlan' },
 ];
 
 export default function BuildingPlanScreen() {
@@ -71,29 +72,30 @@ export default function BuildingPlanScreen() {
   }, []);
 
   useEffect(() => {
-    if (currentStep < steps.length) {
-      const timer = setTimeout(() => {
-      if (!isMountedRef.current) return;
-        setCompletedSteps(prev => [...prev, currentStep]);
-        setCurrentStep(prev => prev + 1);
-      }, steps[currentStep].duration);
-      return () => clearTimeout(timer);
-    } else {
-      // All steps complete - navigate to ideal day with tasks
-      const timer = setTimeout(() => {
-      if (isMountedRef.current && !isNavigatingRef.current) {
-        isNavigatingRef.current = true;
-        router.push({
-          pathname: '/(onboarding-new)/ideal-day',
-          params: {
-            tasks: params.tasks as string || '[]',
-          },
-        });
-      }
-      }, 200);
-      return () => clearTimeout(timer);
-    }
-  }, [currentStep]);
+    const stepTimers = steps.map((_, index) =>
+      setTimeout(() => {
+        if (!isMountedRef.current) return;
+        setCompletedSteps(steps.slice(0, index + 1).map((__, stepIndex) => stepIndex));
+        setCurrentStep(index + 1);
+      }, STEP_INTERVAL_MS * (index + 1))
+    );
+
+    const navigationTimer = setTimeout(() => {
+      if (!isMountedRef.current || isNavigatingRef.current) return;
+      isNavigatingRef.current = true;
+      router.push({
+        pathname: '/(onboarding-new)/ideal-day',
+        params: {
+          tasks: params.tasks as string || '[]',
+        },
+      });
+    }, NAVIGATION_DELAY_MS);
+
+    return () => {
+      stepTimers.forEach(clearTimeout);
+      clearTimeout(navigationTimer);
+    };
+  }, [params.tasks]);
 
   const spinnerStyle = useAnimatedStyle(() => ({
     transform: [{ rotate: `${spinnerRotation.value}deg` }],
@@ -109,14 +111,14 @@ export default function BuildingPlanScreen() {
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.content}>
         {/* Title */}
-        <Animated.View entering={FadeIn.duration(400)} style={styles.header}>
+        <Animated.View entering={FadeIn.duration(200)} style={styles.header}>
           <Text style={styles.title}>
             {t('designingDay') || 'Designing your ideal day…'}
           </Text>
         </Animated.View>
 
         {/* Circular Progress */}
-        <Animated.View entering={FadeIn.delay(200).duration(400)} style={styles.circularProgress}>
+        <Animated.View entering={FadeIn.delay(50).duration(200)} style={styles.circularProgress}>
           <Svg width="160" height="160" style={styles.progressSvg}>
             {/* Background Circle */}
             <Circle
@@ -159,7 +161,7 @@ export default function BuildingPlanScreen() {
             return (
             <Animated.View
                 key={step.key}
-                entering={FadeInDown.delay(300 + index * 100).duration(400)}
+                entering={FadeInDown.delay(75 + index * 50).duration(200)}
                 style={[
                   styles.stepItem,
                   isCurrent && styles.stepItemCurrent,
