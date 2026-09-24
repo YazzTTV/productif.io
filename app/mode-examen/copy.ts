@@ -141,7 +141,7 @@ const fr: PageCopy = {
       exam: {
         title: "Mode Examen",
         description:
-          "Tu rentres tes chapitres et tes dates d'examen. L'app les classe par priorité et découpe tes révisions jour par jour. Chaque matin, tu sais quoi ouvrir.",
+          "Tu rentres tes matières, leurs coefficients, tes chapitres et tes dates d'examen. À chaque session, l'app choisit quoi réviser en premier selon le coefficient et l'examen le plus proche.",
       },
       blocking: {
         title: "Blocage des distractions",
@@ -149,9 +149,9 @@ const fr: PageCopy = {
           "Pendant un bloc de révision, les applications qui te sortent du travail sont bloquées. Tu ne peux pas les rouvrir toi-même, et tout se déverrouille à la fin du bloc.",
       },
       day: {
-        title: "La journée déjà décidée",
+        title: "Ta semaine planifiée en un clic",
         description:
-          "Tu coches le soir, tu ouvres le matin, la journée est prête. Tes deux meilleures heures passent dans les révisions au lieu de l'arbitrage.",
+          "Un bouton place tes révisions dans les créneaux libres de ton agenda Google, par priorité. Tes deux meilleures heures passent dans les révisions au lieu de l'arbitrage.",
       },
       streak: {
         title: "Régularité",
@@ -281,7 +281,7 @@ const en: PageCopy = {
       exam: {
         title: "Exam Mode",
         description:
-          "You enter your chapters and your exam dates. The app ranks them by priority and splits your revision day by day. Every morning, you know what to open.",
+          "You enter your subjects, their weights, your chapters and your exam dates. At each session, the app picks what to revise first based on weight and the nearest exam.",
       },
       blocking: {
         title: "Distraction blocking",
@@ -289,9 +289,9 @@ const en: PageCopy = {
           "During a revision block, the apps that pull you out of work are blocked. You can't unlock them yourself, and everything reopens when the block ends.",
       },
       day: {
-        title: "The day already decided",
+        title: "Your week planned in one tap",
         description:
-          "You tick the boxes at night, you open the app in the morning, the day is ready. Your two best hours go into revision instead of deciding.",
+          "One button places your revision in the free slots of your Google Calendar, by priority. Your two best hours go into revision instead of deciding.",
       },
       streak: {
         title: "Consistency",
@@ -375,7 +375,7 @@ export function faqItems(
     return [
       {
         q: "I've already abandoned plenty of apps. Why would this one be different?",
-        a: "Because this one acts even when you don't open it: the schedule is ready in the morning, the nudges land at the right moment, and the phone locks during your blocks. You don't need discipline to get started.",
+        a: "Because once your session starts, there is no going back: your apps stay blocked until the block ends, with no button to reopen them. And if you don't open the app, reminders come and find you. The only discipline you need is to press start.",
       },
       {
         q: "How is this different from a normal planner?",
@@ -383,7 +383,7 @@ export function faqItems(
       },
       {
         q: "Is it really built for heavy revision loads and competitive exams?",
-        a: "Yes. Exam Mode is designed for large volumes and fixed exam dates: you enter your chapters and your dates, it spreads everything out and tells you what to revise each day.",
+        a: "Yes. Exam Mode is designed for large volumes and fixed exam dates: you enter your chapters and your dates, it ranks everything by priority and tells you what to revise at each session.",
       },
       {
         q: "How much does it cost?",
@@ -399,7 +399,7 @@ export function faqItems(
   return [
     {
       q: "J'ai déjà abandonné plein d'applications. Pourquoi pas celle-là ?",
-      a: "Parce que celle-là agit même quand tu ne l'ouvres pas : le planning est déjà prêt le matin, les relances tombent au bon moment, et le téléphone se bloque pendant les blocs. Tu n'as pas besoin de discipline pour démarrer.",
+      a: "Parce qu'une fois ta session lancée, tu ne peux plus revenir en arrière : tes applis restent bloquées jusqu'à la fin du bloc, sans aucun bouton pour les rouvrir. Et si tu n'ouvres pas l'app, des rappels viennent te chercher. La seule discipline qu'il te faut, c'est d'appuyer sur démarrer.",
     },
     {
       q: "En quoi c'est différent d'un planificateur classique ?",
@@ -407,7 +407,7 @@ export function faqItems(
     },
     {
       q: "C'est vraiment fait pour le PASS ou la prépa ?",
-      a: "Oui. Le Mode Examen est pensé pour les gros volumes et les dates de concours : tu rentres tes chapitres et tes dates, il répartit tout et t'indique quoi réviser chaque jour.",
+      a: "Oui. Le Mode Examen est pensé pour les gros volumes et les dates de concours : tu rentres tes chapitres et tes dates, il classe tout par priorité et t'indique quoi réviser à chaque session.",
     },
     {
       q: "Combien ça coûte ?",

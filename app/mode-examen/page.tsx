@@ -8,7 +8,9 @@ import { PRICE_MONTHLY, PRICE_YEARLY } from "@/lib/pricing"
  * Volontairement distincte de la homepage : celle-ci vouvoie et s'adresse à un
  * public large ("coach IA", "Transformez la concentration en discipline"), alors
  * que les créas et les bios des comptes tutoient et promettent deux choses
- * précises, le planning qui se construit seul et le téléphone qui se bloque.
+ * précises, le choix des chapitres par priorité et les applis qui restent bloquées.
+ * Corrigé le 24 septembre : la page disait "le planning se construit tout seul",
+ * or la planification demande un clic, une confirmation et Google Calendar.
  * Servir la homepage à ce trafic crée une rupture entre la pub et la page.
  *
  * Ce fichier ne porte plus que les métadonnées et le JSON-LD, qui exigent un
@@ -50,12 +52,12 @@ const OG_IMAGE = {
 }
 
 const OG_DESCRIPTION =
-  "Ton planning de révisions se construit tout seul. Et ton téléphone se bloque jusqu'à ce que tu l'aies fait."
+  "Tu lances ta session de révision, et tes applis restent bloquées jusqu'à la fin. Aucun bouton pour les rouvrir."
 
 export const metadata: Metadata = {
-  title: "Mode Examen - productif.io | Ton planning de révisions se construit tout seul",
+  title: "Mode Examen - productif.io | Tes applis bloquées, zéro triche",
   description:
-    "Tu sais quoi faire, le problème c'est de t'y mettre. Ton planning de révisions se construit tout seul et ton téléphone se bloque jusqu'à la fin du bloc. Conçu pour le PASS, la prépa, le droit et les concours.",
+    "Tu sais quoi faire, le problème c'est de t'y mettre. Tu lances ta session, l'app choisit quoi réviser en premier, et tes applis restent bloquées jusqu'à la fin du bloc. Conçu pour le PASS, la prépa, le droit et les concours.",
   openGraph: {
     title: "Mode Examen - productif.io",
     description: OG_DESCRIPTION,
