@@ -20,6 +20,9 @@ model User {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
   managedCompanyId String?
+  /// Fuseau IANA de l'appareil (ex. "America/Toronto"), envoye par l'app mobile dans l'en-tete
+  /// `x-timezone` et enregistre par GET /api/auth/me. Null = inconnu, a traiter comme Europe/Paris.
+  timezone         String?
   emailVerifiedAt             DateTime?
   emailVerificationToken      String?
   emailVerificationExpiresAt  DateTime?

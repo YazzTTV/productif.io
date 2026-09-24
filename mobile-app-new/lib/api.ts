@@ -192,6 +192,15 @@ export async function getAuthToken(): Promise<string | null> {
 }
 
 // Fonction utilitaire pour les appels API avec timeout
+/** Fuseau IANA de l'appareil, ou chaine vide si le runtime ne le fournit pas. */
+function deviceTimeZone(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+  } catch {
+    return '';
+  }
+}
+
 export async function apiCall<T>(
   endpoint: string,
   options: RequestInit = {},
@@ -220,6 +229,8 @@ export async function apiCall<T>(
     ...options,
     headers: {
       'Content-Type': 'application/json',
+      // Fuseau de l'appareil, enregistre par GET /api/auth/me pour les rappels et la planification.
+      'X-Timezone': deviceTimeZone(),
       ...(token && { Authorization: `Bearer ${token}` }),
       ...options.headers,
     },
