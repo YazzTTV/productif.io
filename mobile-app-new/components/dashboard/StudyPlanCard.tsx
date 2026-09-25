@@ -1,11 +1,36 @@
 import React, { useCallback, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Platform, Switch, Alert } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { studyPlanService, type StudyBlock } from '@/lib/api';
 import { syncStudyPlan } from '@/lib/studyPlanSync';
 import { useStudyPlanCopy } from '@/hooks/useStudyPlanSync';
 import { useLanguage } from '@/contexts/LanguageContext';
+import {
+  getAuthorizationStatus,
+  hasBlockedAppsConfigured,
+  isAppBlockingSupported,
+  requestAuthorization,
+} from '@/utils/appBlocking';
+import { getScheduledAutoBlocks, isAutoBlockEnabled, setAutoBlockEnabled } from '@/utils/autoBlocking';
+import { hasExamModeAccess } from '@/utils/premium';
+
+type AutoBlockView =
+  | { kind: 'hidden' }
+  | { kind: 'off' }
+  | { kind: 'on'; scheduled: number }
+  | { kind: 'not_authorized' }
+  | { kind: 'no_selection' };
+
+async function readAutoBlockView(): Promise<AutoBlockView> {
+  if (Platform.OS !== 'ios' || !isAppBlockingSupported()) return { kind: 'hidden' };
+  if (!(await isAutoBlockEnabled())) return { kind: 'off' };
+  if (getAuthorizationStatus() !== 'approved') return { kind: 'not_authorized' };
+  if (!hasBlockedAppsConfigured()) return { kind: 'no_selection' };
+  const now = Date.now();
+  const scheduled = (await getScheduledAutoBlocks()).filter((b) => b.end > now).length;
+  return { kind: 'on', scheduled };
+}
 
 const MAX_ROWS = 6;
 
@@ -33,6 +58,7 @@ export function StudyPlanCard() {
   const { t } = useLanguage();
   const copy = useStudyPlanCopy();
   const [blocks, setBlocks] = useState<StudyBlock[] | null>(null);
+  const [autoBlock, setAutoBlock] = useState<AutoBlockView>({ kind: 'hidden' });
 
   const load = useCallback(async () => {
     try {
@@ -41,6 +67,7 @@ export function StudyPlanCard() {
       await syncStudyPlan(copy);
       const { blocks: fresh } = await studyPlanService.getBlocks(7);
       setBlocks(fresh.filter((b) => new Date(b.end).getTime() > Date.now()));
+      setAutoBlock(await readAutoBlockView());
     } catch {
       setBlocks((current) => current ?? []);
     }
@@ -51,6 +78,34 @@ export function StudyPlanCard() {
       load();
     }, [load])
   );
+
+  const onToggleAutoBlock = async (next: boolean) => {
+    if (!next) {
+      await setAutoBlockEnabled(false);
+      setAutoBlock(await readAutoBlockView());
+      return;
+    }
+    // Premium, comme le Mode Examen dont c'est le prolongement.
+    if (!(await hasExamModeAccess())) {
+      router.push('/exam/preview');
+      return;
+    }
+    if (getAuthorizationStatus() !== 'approved') {
+      const granted = await requestAuthorization();
+      if (!granted) {
+        Alert.alert(t('autoBlockToggle'), t('autoBlockAuthDenied'));
+        return;
+      }
+    }
+    await setAutoBlockEnabled(true);
+    if (!hasBlockedAppsConfigured()) {
+      setAutoBlock({ kind: 'no_selection' });
+      router.push('/exam/blocked-apps');
+      return;
+    }
+    await syncStudyPlan(copy, { force: true });
+    setAutoBlock(await readAutoBlockView());
+  };
 
   if (blocks === null) return null;
 
@@ -117,6 +172,32 @@ export function StudyPlanCard() {
             })}
             {moreThisWeek > 0 ? (
               <Text style={styles.more}>{t('studyPlanMore', { count: moreThisWeek })}</Text>
+            ) : null}
+            {autoBlock.kind !== 'hidden' ? (
+              <View style={styles.autoBlock}>
+                <View style={styles.autoBlockRow}>
+                  <Text style={styles.autoBlockLabel}>{t('autoBlockToggle')}</Text>
+                  <Switch
+                    value={autoBlock.kind !== 'off'}
+                    onValueChange={onToggleAutoBlock}
+                    trackColor={{ false: 'rgba(0, 0, 0, 0.15)', true: '#16A34A' }}
+                    thumbColor="#FFFFFF"
+                  />
+                </View>
+                {autoBlock.kind === 'on' ? (
+                  <Text style={styles.autoBlockHint}>{t('autoBlockOn', { count: autoBlock.scheduled })}</Text>
+                ) : null}
+                {autoBlock.kind === 'not_authorized' ? (
+                  <Text style={styles.autoBlockWarning}>{t('autoBlockNotAuthorized')}</Text>
+                ) : null}
+                {autoBlock.kind === 'no_selection' ? (
+                  <TouchableOpacity onPress={() => router.push('/exam/blocked-apps')} activeOpacity={0.7}>
+                    <Text style={styles.autoBlockWarning}>
+                      {t('autoBlockNoSelection')} <Text style={styles.autoBlockLink}>{t('autoBlockChooseApps')}</Text>
+                    </Text>
+                  </TouchableOpacity>
+                ) : null}
+              </View>
             ) : null}
           </>
         )}
@@ -191,6 +272,39 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: 'rgba(0, 0, 0, 0.5)',
     marginTop: 6,
+  },
+  autoBlock: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0, 0, 0, 0.08)',
+    gap: 6,
+  },
+  autoBlockRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  autoBlockLabel: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#000000',
+  },
+  autoBlockHint: {
+    fontSize: 13,
+    lineHeight: 18,
+    color: 'rgba(0, 0, 0, 0.55)',
+  },
+  autoBlockWarning: {
+    fontSize: 13,
+    lineHeight: 18,
+    color: '#B45309',
+  },
+  autoBlockLink: {
+    fontWeight: '700',
+    textDecorationLine: 'underline',
   },
   empty: {
     gap: 14,

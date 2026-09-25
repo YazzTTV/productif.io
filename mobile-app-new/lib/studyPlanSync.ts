@@ -23,6 +23,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import { studyPlanService, getAuthToken, type StudyBlock } from '@/lib/api';
 import { trackBackendProductEvent } from '@/lib/productEvents';
+import { scheduleAutoBlocks, type AutoBlockStatus } from '@/utils/autoBlocking';
+import { getManualSessionUntil } from '@/utils/appBlocking';
+import { hasExamModeAccess } from '@/utils/premium';
 
 let Notifications: any = null;
 try {
@@ -66,6 +69,8 @@ export interface StudyPlanCopy {
   recapTitle: string;
   recapBody: (count: number, firstTime: string) => string;
   eventTitle: (subject: string, title: string) => string;
+  autoBlockTitle: (subject: string) => string;
+  autoBlockBody: (endTime: string) => string;
 }
 
 export interface StudyPlanSyncResult {
@@ -75,6 +80,7 @@ export interface StudyPlanSyncResult {
   replanned: boolean;
   calendar: { created: number; updated: number; deleted: number } | null;
   reminders: number | null;
+  autoBlock: { status: AutoBlockStatus; scheduled: number } | null;
 }
 
 let inFlight: Promise<StudyPlanSyncResult> | null = null;
@@ -274,6 +280,7 @@ async function run(copy: StudyPlanCopy): Promise<StudyPlanSyncResult> {
     replanned: false,
     calendar: null,
     reminders: null,
+    autoBlock: null,
   };
 
   const token = await getAuthToken();
@@ -321,6 +328,19 @@ async function run(copy: StudyPlanCopy): Promise<StudyPlanSyncResult> {
 
   result.reminders = await scheduleReminders(blocks, copy);
 
+  // Blocage automatique a l'heure des blocs (option par appareil, premium).
+  if (Platform.OS === 'ios') {
+    try {
+      result.autoBlock = await scheduleAutoBlocks(
+        blocks,
+        { startTitle: copy.autoBlockTitle, startBody: copy.autoBlockBody },
+        { premium: await hasExamModeAccess(), manualSessionUntil: await getManualSessionUntil() }
+      );
+    } catch (error) {
+      console.warn('[studyPlanSync] blocage automatique non programme', error);
+    }
+  }
+
   // Un seul evenement par jour : de quoi savoir que la chaine tourne, sans
   // remplir la table a chaque retour au premier plan.
   const today = new Date().toDateString();
@@ -331,6 +351,8 @@ async function run(copy: StudyPlanCopy): Promise<StudyPlanSyncResult> {
       busy_slots: result.busySlotsSent,
       calendar_created: result.calendar?.created ?? null,
       reminders: result.reminders,
+      auto_block: result.autoBlock?.status ?? null,
+      auto_block_scheduled: result.autoBlock?.scheduled ?? null,
     });
     await AsyncStorage.setItem(KEY_LAST_EVENT_DAY, today).catch(() => {});
   }
@@ -349,7 +371,7 @@ export async function syncStudyPlan(copy: StudyPlanCopy, options: { force?: bool
   inFlight = run(copy)
     .catch((error) => {
       console.warn('[studyPlanSync] echec', error);
-      return { ran: false, blocks: 0, busySlotsSent: null, replanned: false, calendar: null, reminders: null };
+      return { ran: false, blocks: 0, busySlotsSent: null, replanned: false, calendar: null, reminders: null, autoBlock: null };
     })
     .finally(() => {
       inFlight = null;

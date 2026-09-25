@@ -15,6 +15,9 @@ export function useStudyPlanCopy(): StudyPlanCopy {
       recapBody: (count, time) =>
         count === 1 ? t('studyRecapBodyOne', { time }) : t('studyRecapBodyMany', { count, time }),
       eventTitle: (subject, title) => (subject ? t('studyEventTitle', { subject, title }) : title),
+      autoBlockTitle: (subject) =>
+        subject ? t('autoBlockStartTitle', { subject }) : t('autoBlockStartTitleNoSubject'),
+      autoBlockBody: (time) => t('autoBlockStartBody', { time }),
     }),
     [t]
   );

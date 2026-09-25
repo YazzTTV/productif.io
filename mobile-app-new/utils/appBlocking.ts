@@ -32,6 +32,35 @@ interface ActiveBlockRecord {
   expiresAt: number;
 }
 
+/**
+ * Blocages programmes a l'heure des blocs planifies (utils/autoBlocking.ts).
+ * Declare ici, et non dans autoBlocking.ts, pour que la reconciliation les
+ * connaisse sans import circulaire : un bouclier pose par l'extension app
+ * fermee n'a pas de trace ACTIVE_BLOCK_KEY, et sans cette liste la
+ * reconciliation le prenait pour un orphelin et le levait a l'ouverture.
+ */
+export const AUTO_BLOCKS_KEY = '@productif_auto_blocks_v1';
+export const AUTO_BLOCK_PREFIX = 'autoBlock_';
+const AUTO_SESSION_PREFIX = 'auto_';
+
+export interface ScheduledAutoBlock {
+  name: string;
+  taskId: string;
+  start: number;
+  end: number;
+  subjectName: string;
+}
+
+async function readAutoBlocks(): Promise<ScheduledAutoBlock[]> {
+  try {
+    const raw = await AsyncStorage.getItem(AUTO_BLOCKS_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
 export function isAppBlockingSupported(): boolean {
   if (Platform.OS !== 'ios') return false;
   try {
@@ -156,6 +185,53 @@ function buildShieldActions(): DeviceActivity.ShieldActions {
   };
 }
 
+/** Pose la configuration du bouclier, relue par l'extension quand elle bloque seule. */
+export function prepareShield(): void {
+  if (!isAppBlockingSupported()) return;
+  try {
+    DeviceActivity.updateShield(buildShieldConfiguration(), buildShieldActions());
+  } catch (error) {
+    console.error('[appBlocking] Configuration du bouclier:', error);
+  }
+}
+
+/** Fin de la session manuelle en cours, ou null. Sert a ne pas programmer un blocage automatique par-dessus. */
+export async function getManualSessionUntil(): Promise<number | null> {
+  try {
+    const raw = await AsyncStorage.getItem(ACTIVE_BLOCK_KEY);
+    const record: ActiveBlockRecord | null = raw ? JSON.parse(raw) : null;
+    if (!record || record.sessionId.startsWith(AUTO_SESSION_PREFIX)) return null;
+    return record.expiresAt > Date.now() ? record.expiresAt : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Une session manuelle prend la main : on arrete les blocages automatiques qui
+ * la chevauchent, sinon la fin de l'un leverait le bouclier de l'autre. Le
+ * filet de securite de la session manuelle couvre la levee finale.
+ */
+async function releaseOverlappingAutoBlocks(from: number, to: number): Promise<void> {
+  const blocks = await readAutoBlocks();
+  const keep: ScheduledAutoBlock[] = [];
+  for (const b of blocks) {
+    if (b.start < to && b.end > from) {
+      try {
+        DeviceActivity.stopMonitoring([b.name]);
+        DeviceActivity.cleanUpAfterActivity(b.name);
+      } catch (error) {
+        console.error('[appBlocking] Arret du blocage automatique', b.name, error);
+      }
+    } else {
+      keep.push(b);
+    }
+  }
+  if (keep.length !== blocks.length) {
+    await AsyncStorage.setItem(AUTO_BLOCKS_KEY, JSON.stringify(keep)).catch(() => {});
+  }
+}
+
 /**
  * Filet de sécurité indépendant de l'app.
  *
@@ -187,7 +263,7 @@ const MIN_MONITORING_MINUTES = 16;
  * `intervalEnd` à 0h "avant" un `intervalStart` à 23h n'a pas de sens sans la
  * date. C'est un cas fréquent chez des étudiants qui révisent le soir.
  */
-function toDateComponents(date: Date) {
+export function toDateComponents(date: Date) {
   return {
     year: date.getFullYear(),
     month: date.getMonth() + 1, // DateComponents attend 1-12
@@ -261,6 +337,8 @@ export async function startBlocking(
   if (!hasBlockedAppsConfigured()) return { started: false, reason: 'no_selection' };
 
   try {
+    await releaseOverlappingAutoBlocks(Date.now(), Date.now() + durationMinutes * 60 * 1000);
+
     DeviceActivity.updateShield(buildShieldConfiguration(), buildShieldActions());
 
     DeviceActivity.blockSelection(
@@ -366,9 +444,18 @@ export async function reconcileBlockingState(): Promise<void> {
       return;
     }
 
-    // Trace absente alors que le bouclier est posé : bouclier orphelin, par
-    // exemple après une réinstallation. On lève.
+    // Trace absente alors que le bouclier est posé : soit c'est un blocage
+    // automatique pose par l'extension app fermee (legitime, on ecrit sa trace
+    // pour que la suite le traite comme une session), soit c'est un orphelin,
+    // par exemple apres une reinstallation, et on leve.
     if (!record) {
+      const now = Date.now();
+      const auto = (await readAutoBlocks()).find((b) => b.start <= now && now < b.end);
+      if (auto) {
+        const adopted: ActiveBlockRecord = { sessionId: `${AUTO_SESSION_PREFIX}${auto.taskId}`, expiresAt: auto.end };
+        await AsyncStorage.setItem(ACTIVE_BLOCK_KEY, JSON.stringify(adopted));
+        return;
+      }
       await stopBlocking('reconcile_orphan');
       return;
     }
