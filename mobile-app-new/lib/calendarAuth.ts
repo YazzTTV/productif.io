@@ -2,6 +2,7 @@ import { Platform, Alert } from 'react-native';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import Constants from 'expo-constants';
 import { googleCalendarService, appleCalendarService } from './api';
+import { getStudyCalendarId } from './studyPlanSync';
 
 // Import conditionnel d'expo-calendar pour éviter l'erreur au démarrage
 let Calendar: typeof import('expo-calendar') | null = null;
@@ -287,6 +288,9 @@ export async function getAppleTodayEvents(): Promise<
 
     const evenements = await CalendarModule.getEventsAsync(ids, debut, fin);
     const fuseau = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    // Le calendrier dedie cree par lib/studyPlanSync.ts : ses evenements sont les
+    // blocs de revision de l'app, et c'est le seul cas ou on peut l'affirmer.
+    const studyCalendarId = await getStudyCalendarId();
 
     return (evenements || []).map((ev: any) => ({
       id: String(ev.id),
@@ -296,9 +300,7 @@ export async function getAppleTodayEvents(): Promise<
       end: new Date(ev.endDate).toISOString(),
       timeZone: ev.timeZone || fuseau,
       isAllDay: Boolean(ev.allDay),
-      // On ne sait pas distinguer de façon fiable un événement écrit par
-      // l'app d'un événement personnel : on ne le prétend donc pas.
-      isProductif: false,
+      isProductif: !!studyCalendarId && ev.calendarId === studyCalendarId,
     }));
   } catch (error) {
     console.error('❌ [CalendarAuth] Lecture des événements Apple:', error);

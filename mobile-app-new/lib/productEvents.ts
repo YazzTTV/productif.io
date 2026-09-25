@@ -8,6 +8,8 @@ const BACKEND_EVENTS = new Set<ProductEvent>([
   'paywall_dismissed',
   'purchase_completed',
   'purchase_restored',
+  'study_plan_synced',
+  'study_reminder_opened',
 ]);
 
 export async function trackBackendProductEvent(

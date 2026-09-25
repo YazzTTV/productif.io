@@ -18,6 +18,7 @@ import {
   setTutorialStage,
 } from '@/tutorial/tutorialStorage';
 import { Coachmark } from '@/tutorial/Coachmark';
+import { StudyPlanCard } from '@/components/dashboard/StudyPlanCard';
 
 interface KeyMoment {
   time: string;
@@ -551,6 +552,11 @@ export function DashboardEnhanced() {
                 <Text style={styles.startFocusText}>{t('startFocus')}</Text>
               </TouchableOpacity>
             </View>
+          </Animated.View>
+
+          {/* Revisions placees par le planificateur automatique */}
+          <Animated.View entering={FadeInDown.delay(225).duration(400)}>
+            <StudyPlanCard />
           </Animated.View>
 
           {/* Key Moments Timeline */}

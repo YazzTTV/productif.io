@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { Platform } from 'react-native';
 import { notificationService } from '@/src/services/notificationService';
 import { requestPushPermissionAndRegisterToken } from '@/lib/pushPermission';
+import { trackBackendProductEvent } from '@/lib/productEvents';
 import Constants from 'expo-constants';
 import { router } from 'expo-router';
 
@@ -180,6 +181,28 @@ export function usePushNotifications(options: UsePushNotificationsOptions = {}) 
             : normalizedType === 'FOCUS_CHECK_PREMIUM' || normalizedType === 'FOCUS_CHECK'
               ? 'focus'
               : undefined);
+      // Rappels locaux du planning de revisions (lib/studyPlanSync.ts) : on
+      // ouvre l'accueil, qui affiche les blocs du jour.
+      if (data?.action === 'open_study_block') {
+        void trackBackendProductEvent('study_reminder_opened', {
+          kind: typeof data.kind === 'string' ? data.kind : null,
+          task_id: typeof data.taskId === 'string' ? data.taskId : null,
+        });
+        if (navigationTimeoutRef.current) {
+          clearTimeout(navigationTimeoutRef.current);
+        }
+        navigationTimeoutRef.current = setTimeout(() => {
+          if (!isMountedRef.current) return;
+          try {
+            router.push('/(tabs)' as any);
+            void clearLastNotificationResponse();
+          } catch (navError) {
+            console.error('❌ Erreur de navigation vers l\'accueil:', navError);
+          }
+        }, 500);
+        return;
+      }
+
       const shouldOpenFocus =
         data?.action === 'open_focus' ||
         normalizedType === 'MORNING_ANCHOR';

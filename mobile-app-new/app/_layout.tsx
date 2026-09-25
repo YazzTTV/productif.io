@@ -19,6 +19,7 @@ import { initAppCheck } from '@/lib/appCheck';
 import { useAppsFlyer, flushQueuedAttribution, queueAttribution } from '@/hooks/useAppsFlyer';
 import { useBlockingReconciliation } from '@/hooks/useBlockingReconciliation';
 import { useProductAnalytics } from '@/hooks/useProductAnalytics';
+import { useStudyPlanSync } from '@/hooks/useStudyPlanSync';
 
 import { useStudySync } from '@/lib/studyAnalysis';
 
@@ -34,6 +35,7 @@ function AppContent() {
   useBlockingReconciliation();
   useProductAnalytics();
   useStudySync();
+  useStudyPlanSync();
 
   useEffect(() => {
     const onUrl = async (event: { url: string }) => {

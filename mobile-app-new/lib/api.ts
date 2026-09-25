@@ -1170,6 +1170,39 @@ export const appleCalendarService = {
   },
 };
 
+// Planning de revisions automatique (serveur : lib/planning/autoPlan.ts)
+export interface StudyBlock {
+  taskId: string;
+  title: string;
+  subjectId: string | null;
+  subjectName: string | null;
+  examDate: string | null;
+  start: string;
+  end: string;
+  minutes: number;
+  autoPlanned: boolean;
+}
+
+export const studyPlanService = {
+  // Blocs a venir, depuis le debut du jour local
+  async getBlocks(days = 14): Promise<{ timeZone: string; lastPlannedAt: string | null; blocks: StudyBlock[] }> {
+    return await apiCall(`/planning/blocks?days=${days}`);
+  },
+
+  // Creneaux occupes du calendrier Apple, heures seulement. Le serveur replanifie si ca a change.
+  async sendBusySlots(payload: {
+    source: 'apple';
+    rangeStart: string;
+    rangeEnd: string;
+    slots: { start: string; end: string }[];
+  }): Promise<{ success: boolean; stored: number; changed: boolean; replanned: boolean }> {
+    return await apiCall('/calendar/busy-slots', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }, 20000);
+  },
+};
+
 // Service de trial
 export const trialService = {
   // Démarrer un free trial de 7 jours

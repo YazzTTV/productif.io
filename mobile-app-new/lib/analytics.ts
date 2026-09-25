@@ -18,7 +18,9 @@ export type ProductEvent =
   | 'paywall_viewed'
   | 'paywall_dismissed'
   | 'purchase_completed'
-  | 'purchase_restored';
+  | 'purchase_restored'
+  | 'study_plan_synced'
+  | 'study_reminder_opened';
 
 type EventParams = Record<string, string | number | boolean | null | undefined>;
 
