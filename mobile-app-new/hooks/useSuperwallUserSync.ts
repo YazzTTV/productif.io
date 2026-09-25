@@ -1,13 +1,18 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Platform } from 'react-native';
 import { useUser } from 'expo-superwall';
-import { authService } from '@/lib/api';
+import { authService, onAuthTokenChange } from '@/lib/api';
 import { useLanguage } from '@/contexts/LanguageContext';
 
 export function useSuperwallUserSync() {
   const { identify, update, signOut } = useUser();
   const { language } = useLanguage();
   const lastUserId = useRef<string | null>(null);
+  // Incremente a chaque connexion ou deconnexion : sans lui, l'effet ne tournait
+  // qu'au montage, et un compte cree en cours de session n'etait jamais
+  // identifie avant le paywall de fin d'onboarding.
+  const [authVersion, setAuthVersion] = useState(0);
+  useEffect(() => onAuthTokenChange(() => setAuthVersion((v) => v + 1)), []);
   const normalizedLanguage = language.toLowerCase().startsWith('fr') ? 'fr' : 'en';
 
   useEffect(() => {
@@ -15,7 +20,8 @@ export function useSuperwallUserSync() {
 
     async function syncUser() {
       try {
-        const user = await authService.checkAuth();
+        // Apres un changement de compte, jamais le cache : il peut dater d'avant.
+        const user = await authService.checkAuth(authVersion > 0 ? { force: true } : undefined);
 
         if (cancelled) return;
 
@@ -46,5 +52,5 @@ export function useSuperwallUserSync() {
     syncUser();
 
     return () => { cancelled = true; };
-  }, [normalizedLanguage, identify, signOut, update]);
+  }, [normalizedLanguage, identify, signOut, update, authVersion]);
 }

@@ -80,6 +80,33 @@ export interface ApiError {
   error: string;
 }
 
+/**
+ * Previent les abonnes quand le compte connecte change (connexion, inscription,
+ * deconnexion). Sert a Superwall : son identify n'etait appele qu'au montage de
+ * l'app, donc un nouvel utilisateur, qui cree son compte en cours de session,
+ * atteignait le paywall de fin d'onboarding sans etre identifie, et son achat
+ * arrivait sous un alias que le webhook ignore (25 septembre).
+ */
+type AuthTokenListener = () => void;
+const authTokenListeners = new Set<AuthTokenListener>();
+
+export function onAuthTokenChange(listener: AuthTokenListener): () => void {
+  authTokenListeners.add(listener);
+  return () => {
+    authTokenListeners.delete(listener);
+  };
+}
+
+function notifyAuthTokenChange() {
+  for (const listener of authTokenListeners) {
+    try {
+      listener();
+    } catch (error) {
+      console.error('[TokenStorage] abonne en echec', error);
+    }
+  }
+}
+
 // Service de stockage local pour les tokens
 export class TokenStorage {
   private static instance: TokenStorage;
@@ -105,6 +132,7 @@ export class TokenStorage {
     } else {
       console.warn('⚠️ [TokenStorage] AsyncStorage not available, token stored in memory only');
     }
+    notifyAuthTokenChange();
   }
 
   async getToken(): Promise<string | null> {
@@ -155,6 +183,7 @@ export class TokenStorage {
     } else {
       console.warn('AsyncStorage not available, token cleared from memory only');
     }
+    notifyAuthTokenChange();
   }
 }
 
