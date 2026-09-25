@@ -241,6 +241,27 @@ async function scheduleReminders(blocks: StudyBlock[], copy: StudyPlanCopy): Pro
     const now = Date.now();
     let count = 0;
 
+    // Les rappels deja affiches restaient empiles sur l'ecran verrouille apres
+    // leur bloc (« Dans 10 min » de 9h00 encore la a 10h33, 25 septembre). On
+    // retire ceux d'un bloc commence ou disparu du planning, et le recap d'un
+    // jour passe.
+    try {
+      const startOfToday = new Date();
+      startOfToday.setHours(0, 0, 0, 0);
+      const starts = new Map(blocks.map((b) => [b.taskId, new Date(b.start).getTime()]));
+      const presented = await Notifications.getPresentedNotificationsAsync();
+      for (const n of presented || []) {
+        const data = n?.request?.content?.data;
+        const blockStart = data?.taskId ? starts.get(data.taskId) : undefined;
+        const stale =
+          (data?.kind === 'study_block' && (blockStart === undefined || blockStart <= now)) ||
+          (data?.kind === 'study_recap' && typeof n.date === 'number' && n.date < startOfToday.getTime());
+        if (stale) await Notifications.dismissNotificationAsync(n.request.identifier);
+      }
+    } catch (error) {
+      console.warn('[studyPlanSync] nettoyage des rappels affiches impossible', error);
+    }
+
     for (const block of blocks) {
       const fireAt = new Date(block.start).getTime() - REMINDER_LEAD_MIN * 60 * 1000;
       if (fireAt <= now + 30 * 1000 || fireAt > now + REMINDER_WINDOW_MS || count >= MAX_REMINDERS) continue;

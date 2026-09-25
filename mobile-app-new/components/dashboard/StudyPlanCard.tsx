@@ -1,5 +1,5 @@
 import React, { useCallback, useRef, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Platform, Switch, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Platform, Switch, Alert, Linking } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { studyPlanService, type StudyBlock } from '@/lib/api';
@@ -15,7 +15,7 @@ import {
 } from '@/utils/appBlocking';
 import { getLastAutoBlockReport, getScheduledAutoBlocks, isAutoBlockEnabled, setAutoBlockEnabled } from '@/utils/autoBlocking';
 import { hasExamModeAccess } from '@/utils/premium';
-import { maybePrimePushPermission } from '@/lib/pushPermission';
+import { getPushPermissionStatus, maybePrimePushPermission, requestPushPermissionAndRegisterToken } from '@/lib/pushPermission';
 
 type AutoBlockView =
   | { kind: 'hidden' }
@@ -63,6 +63,10 @@ export function StudyPlanCard() {
   const [blocks, setBlocks] = useState<StudyBlock[] | null>(null);
   const [autoBlock, setAutoBlock] = useState<AutoBlockView>({ kind: 'hidden' });
   const [toggling, setToggling] = useState(false);
+  // Statut des notifications : sans elles, ni rappel 10 min avant ni « Bloc
+  // demarre ». Un compte reconnecte sur une nouvelle installation n'etait
+  // sollicite nulle part hors onboarding.
+  const [pushStatus, setPushStatus] = useState<string | null>(null);
   // Pose quand l'interrupteur envoie choisir les applis : au retour, la
   // synchronisation doit etre FORCEE. Sans ca elle tombait dans la limite des
   // 3 min et la carte affichait « 0 programme » juste apres le choix des applis
@@ -76,11 +80,20 @@ export function StudyPlanCard() {
       // demarrage a froid.
       const { blocks: fresh } = await studyPlanService.getBlocks(7);
       setBlocks(fresh.filter((b) => new Date(b.end).getTime() > Date.now()));
+      getPushPermissionStatus().then(setPushStatus).catch(() => {});
       // La synchronisation (creneaux Apple, calendrier, rappels) est limitee a
-      // une toutes les 3 min, sauf au retour du choix des applis.
-      const force = pendingSelectionRef.current && hasBlockedAppsConfigured();
-      if (force) pendingSelectionRef.current = false;
-      await syncStudyPlan(copy, { force });
+      // une toutes les 3 min, sauf au retour du choix des applis, et sauf si un
+      // blocage programme ne correspond plus a aucun bloc du planning (chapitre
+      // coche, bloc deplace) : sans ca, cocher un chapitre puis verrouiller le
+      // telephone laissait partir le blocage a l'ancienne heure (test A9).
+      const selectionForce = pendingSelectionRef.current && hasBlockedAppsConfigured();
+      if (selectionForce) pendingSelectionRef.current = false;
+      const now = Date.now();
+      const planned = new Set(fresh.map((b) => `${b.taskId}@${new Date(b.start).getTime()}`));
+      const stale = (await getScheduledAutoBlocks()).some(
+        (b) => b.start > now && !planned.has(`${b.taskId}@${b.start}`)
+      );
+      await syncStudyPlan(copy, { force: selectionForce || stale });
       setAutoBlock(await readAutoBlockView());
     } catch {
       setBlocks((current) => current ?? []);
@@ -92,6 +105,17 @@ export function StudyPlanCard() {
       load();
     }, [load])
   );
+
+  const onEnablePush = async () => {
+    if (pushStatus === 'denied') {
+      // iOS ne reaffiche jamais la boite apres un refus : seuls les Reglages le peuvent.
+      Linking.openSettings().catch(() => {});
+      return;
+    }
+    const { outcome } = await requestPushPermissionAndRegisterToken();
+    setPushStatus(outcome === 'granted' ? 'granted' : outcome === 'denied' ? 'denied' : pushStatus);
+    if (outcome === 'granted') await syncStudyPlan(copy, { force: true });
+  };
 
   const onToggleAutoBlock = async (next: boolean) => {
     if (toggling) return;
@@ -216,6 +240,18 @@ export function StudyPlanCard() {
             })}
             {moreThisWeek > 0 ? (
               <Text style={styles.more}>{t('studyPlanMore', { count: moreThisWeek })}</Text>
+            ) : null}
+            {pushStatus === 'undetermined' || pushStatus === 'denied' ? (
+              <TouchableOpacity onPress={onEnablePush} activeOpacity={0.7} style={styles.pushPrompt}>
+                <Text style={styles.autoBlockWarning}>
+                  {t('studyPlanPushOff', undefined, 'Rappels désactivés : tu ne seras pas prévenu avant tes blocs.')}{' '}
+                  <Text style={styles.autoBlockLink}>
+                    {pushStatus === 'denied'
+                      ? t('studyPlanPushOpenSettings', undefined, 'Ouvrir les réglages')
+                      : t('studyPlanPushEnable', undefined, 'Activer les rappels')}
+                  </Text>
+                </Text>
+              </TouchableOpacity>
             ) : null}
             {autoBlock.kind !== 'hidden' ? (
               <View style={styles.autoBlock}>
@@ -352,6 +388,9 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
     color: '#B45309',
+  },
+  pushPrompt: {
+    paddingTop: 8,
   },
   autoBlockLink: {
     fontWeight: '700',
