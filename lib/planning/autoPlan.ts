@@ -41,7 +41,14 @@ const MS_PER_DAY = 24 * 60 * MS_PER_MINUTE
 const SNAPSHOT_MAX_AGE_MS = 3 * MS_PER_DAY
 const GOOGLE_TIMEOUT_MS = 8000
 
-export type ReplanReason = 'nightly' | 'subject_change' | 'chapters_import' | 'task_created' | 'busy_slots' | 'manual'
+export type ReplanReason =
+  | 'nightly'
+  | 'subject_change'
+  | 'chapters_import'
+  | 'task_created'
+  | 'busy_slots'
+  | 'google_changed'
+  | 'manual'
 
 export interface ReplanResult {
   userId: string
