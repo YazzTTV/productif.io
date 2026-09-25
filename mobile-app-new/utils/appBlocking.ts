@@ -88,6 +88,28 @@ export function getAuthorizationStatus(): 'notDetermined' | 'denied' | 'approved
 }
 
 /**
+ * Statut d'autorisation FIABLE, a utiliser avant toute decision qui efface ou
+ * refuse un blocage.
+ *
+ * Au demarrage a froid, iOS repond `notDetermined` pendant un court instant
+ * avant de charger le vrai statut : lu tel quel, un utilisateur autorise passe
+ * pour non autorise. Constate le 25 septembre sur 1.4 (19) : chaque ouverture
+ * a froid envoyait `not_authorized` et annulait les 5 blocages programmes.
+ * On attend donc jusqu'a 5 s qu'iOS tranche. Un `notDetermined` qui dure
+ * au-dela est reel (autorisation jamais donnee ou retiree).
+ */
+export async function resolveAuthorizationStatus(): Promise<ReturnType<typeof getAuthorizationStatus>> {
+  const first = getAuthorizationStatus();
+  if (first !== 'notDetermined') return first;
+  try {
+    await DeviceActivity.pollAuthorizationStatus({ pollIntervalMs: 250, maxAttempts: 20 });
+  } catch (error) {
+    console.error('[appBlocking] Attente du statut impossible:', error);
+  }
+  return getAuthorizationStatus();
+}
+
+/**
  * Ouvre la demande d'autorisation système. `forIndividualOrChild: individual`
  * est capital : c'est ce qui distingue l'auto-restriction du contrôle parental,
  * et c'est le cas d'usage sur lequel l'entitlement a été accordé.
@@ -331,7 +353,7 @@ export async function startBlocking(
   durationMinutes: number
 ): Promise<StartBlockingResult> {
   if (!isAppBlockingSupported()) return { started: false, reason: 'unsupported' };
-  if (getAuthorizationStatus() !== 'approved') {
+  if ((await resolveAuthorizationStatus()) !== 'approved') {
     return { started: false, reason: 'not_authorized' };
   }
   if (!hasBlockedAppsConfigured()) return { started: false, reason: 'no_selection' };

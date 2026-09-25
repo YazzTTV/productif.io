@@ -5,10 +5,10 @@ import {
   BLOCKED_APPS_SELECTION_ID,
   AUTO_BLOCKS_KEY,
   AUTO_BLOCK_PREFIX,
-  getAuthorizationStatus,
   hasBlockedAppsConfigured,
   isAppBlockingSupported,
   prepareShield,
+  resolveAuthorizationStatus,
   toDateComponents,
   type ScheduledAutoBlock,
 } from '@/utils/appBlocking';
@@ -173,7 +173,10 @@ export async function scheduleAutoBlocks(
     await cancelAutoBlocks();
     return { status: 'not_premium', scheduled: 0 };
   }
-  if (getAuthorizationStatus() !== 'approved') {
+  // Jamais la lecture instantanee ici : au demarrage a froid elle repond
+  // `notDetermined` a tort, et annuler sur cette reponse effacait tous les
+  // blocages a chaque ouverture de l'app (25 septembre, 1.4 (19)).
+  if ((await resolveAuthorizationStatus()) !== 'approved') {
     await cancelAutoBlocks();
     return { status: 'not_authorized', scheduled: 0 };
   }

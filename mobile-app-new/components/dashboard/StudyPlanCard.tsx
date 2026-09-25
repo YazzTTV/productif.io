@@ -7,10 +7,10 @@ import { syncStudyPlan } from '@/lib/studyPlanSync';
 import { useStudyPlanCopy } from '@/hooks/useStudyPlanSync';
 import { useLanguage } from '@/contexts/LanguageContext';
 import {
-  getAuthorizationStatus,
   hasBlockedAppsConfigured,
   isAppBlockingSupported,
   requestAuthorization,
+  resolveAuthorizationStatus,
 } from '@/utils/appBlocking';
 import { getLastAutoBlockReport, getScheduledAutoBlocks, isAutoBlockEnabled, setAutoBlockEnabled } from '@/utils/autoBlocking';
 import { hasExamModeAccess } from '@/utils/premium';
@@ -25,7 +25,7 @@ type AutoBlockView =
 async function readAutoBlockView(): Promise<AutoBlockView> {
   if (Platform.OS !== 'ios' || !isAppBlockingSupported()) return { kind: 'hidden' };
   if (!(await isAutoBlockEnabled())) return { kind: 'off' };
-  if (getAuthorizationStatus() !== 'approved') return { kind: 'not_authorized' };
+  if ((await resolveAuthorizationStatus()) !== 'approved') return { kind: 'not_authorized' };
   if (!hasBlockedAppsConfigured()) return { kind: 'no_selection' };
   const now = Date.now();
   const scheduled = (await getScheduledAutoBlocks()).filter((b) => b.end > now).length;
@@ -91,7 +91,7 @@ export function StudyPlanCard() {
       router.push('/exam/preview');
       return;
     }
-    if (getAuthorizationStatus() !== 'approved') {
+    if ((await resolveAuthorizationStatus()) !== 'approved') {
       const granted = await requestAuthorization();
       if (!granted) {
         Alert.alert(t('autoBlockToggle'), t('autoBlockAuthDenied'));
