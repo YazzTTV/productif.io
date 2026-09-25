@@ -65,7 +65,9 @@ export function SettingsNew() {
   const isMountedRef = useRef(true);
 
   // Connection status
-  const [calendarConnected, setCalendarConnected] = useState(false);
+  // null tant que le statut n'est pas revenu du serveur : afficher « Non connecte »
+  // pendant le chargement faisait croire a une deconnexion (25 septembre).
+  const [calendarConnected, setCalendarConnected] = useState<boolean | null>(null);
   const [calendarLoading, setCalendarLoading] = useState(false);
 
   // Plan d'abonnement. null = statut encore inconnu : on n'affiche aucun plan
@@ -150,6 +152,8 @@ export function SettingsNew() {
         const connected = await isGoogleCalendarConnected();
         setCalendarConnected(connected);
       } catch (error) {
+        // Sans ce repli, un echec plus haut laissait « … » affiche pour toujours.
+        setCalendarConnected((current) => current ?? false);
         console.log('User not loaded');
       }
     };
@@ -1020,7 +1024,11 @@ export function SettingsNew() {
                 <View style={styles.settingCardContent}>
                   <Text style={styles.settingCardTitle}>{t('googleCalendar')}</Text>
                   <Text style={styles.settingCardSubtitle}>
-                    {calendarConnected ? (t('connected') || 'Connected') : (t('notConnected') || 'Not connected')}
+                    {calendarConnected === null
+                      ? '…'
+                      : calendarConnected
+                        ? (t('connected') || 'Connected')
+                        : (t('notConnected') || 'Not connected')}
                   </Text>
                 </View>
                 <View
@@ -1030,7 +1038,7 @@ export function SettingsNew() {
                   ]}
                 />
               </View>
-              {calendarConnected ? (
+              {calendarConnected === null ? null : calendarConnected ? (
                 <TouchableOpacity
                   style={styles.disconnectButton}
                   onPress={handleDisconnectCalendar}
