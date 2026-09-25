@@ -118,6 +118,11 @@ export async function POST(req: NextRequest) {
               scheduledFor: session.start,
               proposedSlotStart: session.start,
               proposedSlotEnd: session.end,
+              // Sans cet identifiant, le rattrapage (/api/planning/catch-up) ne
+              // savait pas que le bloc avait un evenement et ne le deplacait jamais.
+              googleCalendarEventId: result.eventId,
+              // Applique par l'utilisateur : creneau fixe pour le planificateur automatique.
+              autoPlannedAt: null,
             },
           })
 
