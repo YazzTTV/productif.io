@@ -43,6 +43,18 @@ async function replanIfGoogleOverlaps(userId: string, blocks: TimedBlock[], last
     const until = new Date(Math.max(...upcoming.map((b) => new Date(b.end).getTime())))
     const busy = await googleCalendarService.getBusyTimes(userId, new Date(now), until)
     if (!hasBusyOverlap(upcoming, busy, now)) return
+    // Prise du creneau atomique : deux lectures des blocs arrivees ensemble
+    // replanifiaient deux fois a la meme seconde (25 septembre, 15:50:14). Seule
+    // la requete qui fait passer autoPlanRunAt replanifie ; replanUser le
+    // reecrit de toute facon a la fin.
+    const claimed = await prisma.user.updateMany({
+      where: {
+        id: userId,
+        OR: [{ autoPlanRunAt: null }, { autoPlanRunAt: { lt: new Date(now - GOOGLE_RECHECK_MS) } }],
+      },
+      data: { autoPlanRunAt: new Date(now) },
+    })
+    if (claimed.count === 0) return
     const result = await replanUserSafely(userId, 'google_changed')
     console.log(`[planning/blocks] agenda Google change pour ${userId}, replanifie :`, result?.blocksWritten ?? 'echec')
   } catch (error) {
