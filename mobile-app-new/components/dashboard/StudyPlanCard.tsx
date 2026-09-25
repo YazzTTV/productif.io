@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Platform, Switch, Alert } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -7,6 +7,7 @@ import { syncStudyPlan } from '@/lib/studyPlanSync';
 import { useStudyPlanCopy } from '@/hooks/useStudyPlanSync';
 import { useLanguage } from '@/contexts/LanguageContext';
 import {
+  getAuthorizationStatus,
   hasBlockedAppsConfigured,
   isAppBlockingSupported,
   requestAuthorization,
@@ -14,6 +15,7 @@ import {
 } from '@/utils/appBlocking';
 import { getLastAutoBlockReport, getScheduledAutoBlocks, isAutoBlockEnabled, setAutoBlockEnabled } from '@/utils/autoBlocking';
 import { hasExamModeAccess } from '@/utils/premium';
+import { maybePrimePushPermission } from '@/lib/pushPermission';
 
 type AutoBlockView =
   | { kind: 'hidden' }
@@ -60,14 +62,25 @@ export function StudyPlanCard() {
   const copy = useStudyPlanCopy();
   const [blocks, setBlocks] = useState<StudyBlock[] | null>(null);
   const [autoBlock, setAutoBlock] = useState<AutoBlockView>({ kind: 'hidden' });
+  const [toggling, setToggling] = useState(false);
+  // Pose quand l'interrupteur envoie choisir les applis : au retour, la
+  // synchronisation doit etre FORCEE. Sans ca elle tombait dans la limite des
+  // 3 min et la carte affichait « 0 programme » juste apres le choix des applis
+  // (25 septembre, 1.4 (20)) : le premier usage de chaque utilisateur.
+  const pendingSelectionRef = useRef(false);
 
   const load = useCallback(async () => {
     try {
-      // La synchronisation (creneaux Apple, calendrier, rappels) est limitee a
-      // une toutes les 3 min ; la lecture des blocs, elle, est toujours fraiche.
-      await syncStudyPlan(copy);
+      // Les blocs d'abord : la carte s'affiche sans attendre la synchronisation,
+      // qui peut attendre plusieurs secondes le statut Temps d'ecran au
+      // demarrage a froid.
       const { blocks: fresh } = await studyPlanService.getBlocks(7);
       setBlocks(fresh.filter((b) => new Date(b.end).getTime() > Date.now()));
+      // La synchronisation (creneaux Apple, calendrier, rappels) est limitee a
+      // une toutes les 3 min, sauf au retour du choix des applis.
+      const force = pendingSelectionRef.current && hasBlockedAppsConfigured();
+      if (force) pendingSelectionRef.current = false;
+      await syncStudyPlan(copy, { force });
       setAutoBlock(await readAutoBlockView());
     } catch {
       setBlocks((current) => current ?? []);
@@ -81,6 +94,16 @@ export function StudyPlanCard() {
   );
 
   const onToggleAutoBlock = async (next: boolean) => {
+    if (toggling) return;
+    setToggling(true);
+    try {
+      await applyToggle(next);
+    } finally {
+      setToggling(false);
+    }
+  };
+
+  const applyToggle = async (next: boolean) => {
     if (!next) {
       await setAutoBlockEnabled(false);
       setAutoBlock(await readAutoBlockView());
@@ -91,7 +114,12 @@ export function StudyPlanCard() {
       router.push('/exam/preview');
       return;
     }
-    if ((await resolveAuthorizationStatus()) !== 'approved') {
+    // Lecture instantanee ici, pas resolveAuthorizationStatus : l'utilisateur
+    // vient de toucher l'interrupteur, et si le statut est vraiment inconnu
+    // l'attente de 5 s repoussait d'autant la boite d'autorisation (15 s
+    // mesurees le 25 septembre). requestAuthorization rend la main tout de
+    // suite quand l'autorisation est deja donnee.
+    if (getAuthorizationStatus() !== 'approved') {
       const granted = await requestAuthorization();
       if (!granted) {
         Alert.alert(t('autoBlockToggle'), t('autoBlockAuthDenied'));
@@ -99,8 +127,23 @@ export function StudyPlanCard() {
       }
     }
     await setAutoBlockEnabled(true);
+    // La notification « Bloc demarre » est envoyee par l'extension : sans
+    // permission, le blocage marche mais l'utilisateur n'en sait rien. Le seul
+    // autre endroit qui la demande est l'onboarding, donc un compte reconnecte
+    // sur une nouvelle installation n'etait jamais sollicite.
+    await maybePrimePushPermission({
+      title: t('pushPrimingTitle', undefined, 'Autoriser les rappels ?'),
+      message: t(
+        'pushPrimingMessage',
+        undefined,
+        "Sans notification, l'app ne peut rien te rappeler : ni ta session du matin, ni ce que tu as prévu de réviser. Tu règles la fréquence, et tu peux tout couper dans les réglages."
+      ),
+      later: t('pushPrimingLater', undefined, 'Plus tard'),
+      enable: t('pushPrimingEnable', undefined, 'Activer'),
+    });
     if (!hasBlockedAppsConfigured()) {
       setAutoBlock({ kind: 'no_selection' });
+      pendingSelectionRef.current = true;
       router.push('/exam/blocked-apps');
       return;
     }
@@ -181,6 +224,7 @@ export function StudyPlanCard() {
                   <Switch
                     value={autoBlock.kind !== 'off'}
                     onValueChange={onToggleAutoBlock}
+                    disabled={toggling}
                     trackColor={{ false: 'rgba(0, 0, 0, 0.15)', true: '#16A34A' }}
                     thumbColor="#FFFFFF"
                   />
