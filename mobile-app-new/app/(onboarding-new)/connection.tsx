@@ -62,9 +62,15 @@ export default function ConnectionScreen() {
         // Flush l'attribution AppsFlyer en queue (si elle existait avant le login)
         flushQueuedAttribution();
 
-        const isNewUser = response.message?.includes('créé') || 
-          (response.user?.createdAt && 
-           new Date().getTime() - new Date(response.user.createdAt).getTime() < 5000);
+        // Le serveur dit si le compte vient d'etre cree. L'ancienne heuristique
+        // (ecart de 5 s sur createdAt) ne sert plus que de repli pour un serveur
+        // plus ancien : elle classait un nouvel inscrit lent comme ancien.
+        const isNewUser =
+          typeof response.isNewUser === 'boolean'
+            ? response.isNewUser
+            : response.message?.includes('créé') ||
+              (response.user?.createdAt &&
+                new Date().getTime() - new Date(response.user.createdAt).getTime() < 5000);
         
         if (!isNewUser) {
           await AsyncStorage.setItem('onboarding_completed', 'true');
@@ -118,9 +124,15 @@ export default function ConnectionScreen() {
       if (response.success) {
         flushQueuedAttribution();
 
-        const isNewUser = response.message?.includes('créé') || 
-          (response.user?.createdAt && 
-           new Date().getTime() - new Date(response.user.createdAt).getTime() < 5000);
+        // Le serveur dit si le compte vient d'etre cree. L'ancienne heuristique
+        // (ecart de 5 s sur createdAt) ne sert plus que de repli pour un serveur
+        // plus ancien : elle classait un nouvel inscrit lent comme ancien.
+        const isNewUser =
+          typeof response.isNewUser === 'boolean'
+            ? response.isNewUser
+            : response.message?.includes('créé') ||
+              (response.user?.createdAt &&
+                new Date().getTime() - new Date(response.user.createdAt).getTime() < 5000);
         
         if (!isNewUser) {
           await AsyncStorage.setItem('onboarding_completed', 'true');

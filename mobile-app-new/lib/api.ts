@@ -74,6 +74,8 @@ export interface AuthResponse {
   token?: string; // Ajouter le token dans la réponse
   company?: any;
   message?: string;
+  /** Renvoye par les connexions Google et Apple depuis le 25 septembre. */
+  isNewUser?: boolean;
 }
 
 export interface ApiError {

@@ -86,6 +86,10 @@ export async function POST(req: NextRequest) {
     })
 
     // Si l'utilisateur n'existe pas, le créer
+    // Le mobile decide de l'onboarding sur ce champ. Il devinait avant avec un
+    // ecart de 5 s sur createdAt : une reponse lente ou une horloge en avance
+    // classait un nouvel inscrit comme ancien, qui sautait onboarding et paywall.
+    const isNewUser = !user
     if (!user) {
       user = await prisma.user.create({
         data: {
@@ -142,6 +146,7 @@ export async function POST(req: NextRequest) {
       success: true,
       user: userWithoutPassword,
       token,
+      isNewUser,
     })
   } catch (error) {
     console.error("Erreur lors de l'authentification Apple:", error)

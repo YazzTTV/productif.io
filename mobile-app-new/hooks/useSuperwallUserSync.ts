@@ -32,6 +32,9 @@ export function useSuperwallUserSync() {
           }
 
           await update({
+            // Filet du webhook : si un achat arrive malgre tout sous un alias,
+            // le serveur retrouve le compte par cet attribut.
+            productifUserId: user.id,
             name: user.name,
             email: user.email,
             plan: user.plan ?? 'free',
