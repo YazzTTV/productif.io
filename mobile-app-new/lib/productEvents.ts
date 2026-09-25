@@ -10,6 +10,7 @@ const BACKEND_EVENTS = new Set<ProductEvent>([
   'purchase_restored',
   'study_plan_synced',
   'study_reminder_opened',
+  'auto_block_scheduled',
 ]);
 
 export async function trackBackendProductEvent(

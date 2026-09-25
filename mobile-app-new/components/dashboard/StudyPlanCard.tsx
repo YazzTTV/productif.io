@@ -12,13 +12,13 @@ import {
   isAppBlockingSupported,
   requestAuthorization,
 } from '@/utils/appBlocking';
-import { getScheduledAutoBlocks, isAutoBlockEnabled, setAutoBlockEnabled } from '@/utils/autoBlocking';
+import { getLastAutoBlockReport, getScheduledAutoBlocks, isAutoBlockEnabled, setAutoBlockEnabled } from '@/utils/autoBlocking';
 import { hasExamModeAccess } from '@/utils/premium';
 
 type AutoBlockView =
   | { kind: 'hidden' }
   | { kind: 'off' }
-  | { kind: 'on'; scheduled: number }
+  | { kind: 'on'; scheduled: number; failed: number; error: string | null }
   | { kind: 'not_authorized' }
   | { kind: 'no_selection' };
 
@@ -29,7 +29,8 @@ async function readAutoBlockView(): Promise<AutoBlockView> {
   if (!hasBlockedAppsConfigured()) return { kind: 'no_selection' };
   const now = Date.now();
   const scheduled = (await getScheduledAutoBlocks()).filter((b) => b.end > now).length;
-  return { kind: 'on', scheduled };
+  const report = await getLastAutoBlockReport();
+  return { kind: 'on', scheduled, failed: report?.failed ?? 0, error: report?.error ?? null };
 }
 
 const MAX_ROWS = 6;
@@ -186,6 +187,12 @@ export function StudyPlanCard() {
                 </View>
                 {autoBlock.kind === 'on' ? (
                   <Text style={styles.autoBlockHint}>{t('autoBlockOn', { count: autoBlock.scheduled })}</Text>
+                ) : null}
+                {autoBlock.kind === 'on' && autoBlock.failed > 0 ? (
+                  <Text style={styles.autoBlockWarning}>
+                    {t('autoBlockFailed', { count: autoBlock.failed })}
+                    {autoBlock.error ? ` (${autoBlock.error})` : ''}
+                  </Text>
                 ) : null}
                 {autoBlock.kind === 'not_authorized' ? (
                   <Text style={styles.autoBlockWarning}>{t('autoBlockNotAuthorized')}</Text>

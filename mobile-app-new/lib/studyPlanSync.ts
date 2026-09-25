@@ -336,6 +336,15 @@ async function run(copy: StudyPlanCopy): Promise<StudyPlanSyncResult> {
         { startTitle: copy.autoBlockTitle, startBody: copy.autoBlockBody },
         { premium: await hasExamModeAccess(), manualSessionUntil: await getManualSessionUntil() }
       );
+      if (result.autoBlock && result.autoBlock.status !== 'off' && result.autoBlock.status !== 'unsupported') {
+        await trackBackendProductEvent('auto_block_scheduled', {
+          status: result.autoBlock.status,
+          scheduled: result.autoBlock.scheduled,
+          candidates: (result.autoBlock as any).candidates ?? null,
+          failed: (result.autoBlock as any).failed ?? null,
+          error: (result.autoBlock as any).error ?? null,
+        });
+      }
     } catch (error) {
       console.warn('[studyPlanSync] blocage automatique non programme', error);
     }
@@ -365,6 +374,13 @@ async function run(copy: StudyPlanCopy): Promise<StudyPlanSyncResult> {
  * les 3 minutes sauf `force` (apres une modification faite dans l'app).
  */
 export async function syncStudyPlan(copy: StudyPlanCopy, options: { force?: boolean } = {}): Promise<StudyPlanSyncResult | null> {
+  // Une synchronisation forcee suit un changement (interrupteur, matiere) : elle
+  // ne doit pas reutiliser une synchronisation partie AVANT ce changement, qui
+  // lirait l'ancien etat. Elle attend la precedente puis repart.
+  if (inFlight && options.force) {
+    const previous = inFlight;
+    return previous.then(() => syncStudyPlan(copy, options));
+  }
   if (inFlight) return inFlight;
   if (!options.force && Date.now() - lastRunAt < MIN_INTERVAL_MS) return null;
   lastRunAt = Date.now();

@@ -46,6 +46,29 @@ const WINDOW_MS = 24 * 60 * 60 * 1000;
 const MAX_SCHEDULED = 8;
 const MIN_BLOCK_MINUTES = 16;
 const START_MARGIN_MS = 60 * 1000;
+const KEY_LAST_REPORT = 'auto_block_last_report_v1';
+
+export interface AutoBlockReport {
+  at: number;
+  status: AutoBlockStatus;
+  candidates: number;
+  scheduled: number;
+  failed: number;
+  error: string | null;
+}
+
+export async function getLastAutoBlockReport(): Promise<AutoBlockReport | null> {
+  try {
+    const raw = await AsyncStorage.getItem(KEY_LAST_REPORT);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+async function saveReport(report: AutoBlockReport) {
+  await AsyncStorage.setItem(KEY_LAST_REPORT, JSON.stringify(report)).catch(() => {});
+}
 
 export type AutoBlockStatus =
   | 'off'
@@ -133,7 +156,7 @@ export async function scheduleAutoBlocks(
   blocks: AutoBlockInput[],
   copy: AutoBlockCopy,
   context: { premium: boolean; manualSessionUntil: number | null }
-): Promise<{ status: AutoBlockStatus; scheduled: number }> {
+): Promise<{ status: AutoBlockStatus; scheduled: number; candidates?: number; failed?: number; error?: string | null }> {
   if (Platform.OS !== 'ios' || !isAppBlockingSupported()) return { status: 'unsupported', scheduled: 0 };
   if (!(await isAutoBlockEnabled())) {
     await cancelAutoBlocks();
@@ -186,6 +209,8 @@ export async function scheduleAutoBlocks(
     const kept = desired.filter((d) => scheduled.some((b) => same(d, b)));
     const toStart = desired.filter((d) => !kept.includes(d) && !inProgress.some((b) => b.name === d.name));
     const started: ScheduledAutoBlock[] = [];
+    let failed = 0;
+    let lastError: string | null = null;
 
     for (const b of toStart) {
       try {
@@ -223,15 +248,27 @@ export async function scheduleAutoBlocks(
         // Un bloc refuse par iOS (trop d'activites, intervalle invalide) ne doit
         // pas empecher les autres ; il est simplement absent de la liste.
         console.error('[autoBlocking] programmation refusee pour', b.name, error);
+        failed++;
+        lastError = error instanceof Error ? error.message : String(error);
         stopActivity(b.name);
       }
     }
 
     const next = [...inProgress, ...kept, ...started];
     await AsyncStorage.setItem(AUTO_BLOCKS_KEY, JSON.stringify(next));
-    return { status: 'active', scheduled: kept.length + started.length };
+    await saveReport({
+      at: Date.now(),
+      status: 'active',
+      candidates: desired.length,
+      scheduled: kept.length + started.length,
+      failed,
+      error: lastError,
+    });
+    return { status: 'active', scheduled: kept.length + started.length, candidates: desired.length, failed, error: lastError };
   } catch (error) {
     console.error('[autoBlocking] programmation impossible', error);
-    return { status: 'error', scheduled: 0 };
+    const message = error instanceof Error ? error.message : String(error);
+    await saveReport({ at: Date.now(), status: 'error', candidates: 0, scheduled: 0, failed: 0, error: message });
+    return { status: 'error', scheduled: 0, candidates: 0, failed: 0, error: message };
   }
 }

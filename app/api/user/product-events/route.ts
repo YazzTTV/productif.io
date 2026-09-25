@@ -12,6 +12,7 @@ const ALLOWED_EVENTS = new Set([
   // Planning automatique (phase 2) : synchronisation et rappels.
   "study_plan_synced",
   "study_reminder_opened",
+  "auto_block_scheduled",
 ])
 
 function sanitizeParams(value: unknown): Record<string, string | number | boolean | null> | undefined {

@@ -20,7 +20,8 @@ export type ProductEvent =
   | 'purchase_completed'
   | 'purchase_restored'
   | 'study_plan_synced'
-  | 'study_reminder_opened';
+  | 'study_reminder_opened'
+  | 'auto_block_scheduled';
 
 type EventParams = Record<string, string | number | boolean | null | undefined>;
 
