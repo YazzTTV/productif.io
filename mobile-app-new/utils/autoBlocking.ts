@@ -155,12 +155,19 @@ export async function getScheduledAutoBlocks(): Promise<ScheduledAutoBlock[]> {
 export async function scheduleAutoBlocks(
   blocks: AutoBlockInput[],
   copy: AutoBlockCopy,
-  context: { premium: boolean; manualSessionUntil: number | null }
+  context: { premium: boolean | null; manualSessionUntil: number | null }
 ): Promise<{ status: AutoBlockStatus; scheduled: number; candidates?: number; failed?: number; error?: string | null }> {
   if (Platform.OS !== 'ios' || !isAppBlockingSupported()) return { status: 'unsupported', scheduled: 0 };
   if (!(await isAutoBlockEnabled())) {
     await cancelAutoBlocks();
     return { status: 'off', scheduled: 0 };
+  }
+  if (context.premium === null) {
+    // Statut premium inconnu (reseau) : on ne touche a rien. Annuler ici
+    // effacait des blocages valides sur un simple echec de requete.
+    const kept = (await readScheduled()).filter((b) => b.end > Date.now()).length;
+    await saveReport({ at: Date.now(), status: 'error', candidates: 0, scheduled: kept, failed: 0, error: 'premium_unknown' });
+    return { status: 'error', scheduled: kept, error: 'premium_unknown' };
   }
   if (!context.premium) {
     await cancelAutoBlocks();

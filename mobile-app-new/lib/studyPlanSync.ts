@@ -21,11 +21,10 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
-import { studyPlanService, getAuthToken, type StudyBlock } from '@/lib/api';
+import { studyPlanService, getAuthToken, authService, type StudyBlock } from '@/lib/api';
 import { trackBackendProductEvent } from '@/lib/productEvents';
 import { scheduleAutoBlocks, type AutoBlockStatus } from '@/utils/autoBlocking';
 import { getManualSessionUntil } from '@/utils/appBlocking';
-import { hasExamModeAccess } from '@/utils/premium';
 
 let Notifications: any = null;
 try {
@@ -59,7 +58,7 @@ const REMINDER_WINDOW_MS = 48 * 60 * 60 * 1000;
 const MAX_REMINDERS = 30;
 const RECAP_HOUR = 7;
 const RECAP_MINUTE = 30;
-const MIN_INTERVAL_MS = 3 * 60 * 1000;
+const MIN_INTERVAL_MS = 60 * 1000;
 
 export const STUDY_NOTIFICATION_KINDS = ['study_block', 'study_recap'] as const;
 
@@ -80,7 +79,7 @@ export interface StudyPlanSyncResult {
   replanned: boolean;
   calendar: { created: number; updated: number; deleted: number } | null;
   reminders: number | null;
-  autoBlock: { status: AutoBlockStatus; scheduled: number } | null;
+  autoBlock: { status: AutoBlockStatus; scheduled: number; candidates?: number; failed?: number; error?: string | null } | null;
 }
 
 let inFlight: Promise<StudyPlanSyncResult> | null = null;
@@ -111,21 +110,36 @@ async function ensureStudyCalendar(Calendar: typeof import('expo-calendar')): Pr
     return byTitle.id;
   }
 
-  // Meme source que le calendrier par defaut (iCloud si active, sinon local),
-  // pour que le calendrier apparaisse la ou l'utilisateur regarde deja.
-  const fallback = await Calendar.getDefaultCalendarAsync();
-  const id = await Calendar.createCalendarAsync({
-    title: CALENDAR_TITLE,
-    color: CALENDAR_COLOR,
-    entityType: Calendar.EntityTypes.EVENT,
-    sourceId: fallback.source?.id,
-    source: fallback.source,
-    name: 'productif',
-    ownerAccount: 'personal',
-    accessLevel: Calendar.CalendarAccessLevel.OWNER,
-  });
-  await AsyncStorage.setItem(KEY_CALENDAR_ID, id).catch(() => {});
-  return id;
+  // iOS refuse de creer un calendrier sur certaines sources (un compte Google ou
+  // Exchange ajoute au telephone, par exemple). On essaie donc, dans l'ordre :
+  // iCloud, la source du calendrier par defaut, puis la source locale.
+  const sources: any[] = await Calendar.getSourcesAsync().catch(() => []);
+  const fallback = await Calendar.getDefaultCalendarAsync().catch(() => null);
+  const candidates: any[] = [
+    sources.find((src) => src.type === Calendar.SourceType.CALDAV && /icloud/i.test(src.name ?? '')),
+    fallback?.source,
+    sources.find((src) => src.type === Calendar.SourceType.LOCAL),
+  ].filter(Boolean);
+  let lastError: unknown = null;
+  for (const source of candidates) {
+    try {
+      const id = await Calendar.createCalendarAsync({
+        title: CALENDAR_TITLE,
+        color: CALENDAR_COLOR,
+        entityType: Calendar.EntityTypes.EVENT,
+        sourceId: source.id,
+        source,
+        name: 'productif',
+        ownerAccount: 'personal',
+        accessLevel: Calendar.CalendarAccessLevel.OWNER,
+      });
+      await AsyncStorage.setItem(KEY_CALENDAR_ID, id).catch(() => {});
+      return id;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError ?? new Error('aucune source de calendrier utilisable');
 }
 
 /** Creneaux occupes de tous les calendriers sauf le notre : heures seulement. */
@@ -272,6 +286,23 @@ async function scheduleReminders(blocks: StudyBlock[], copy: StudyPlanCopy): Pro
   }
 }
 
+/**
+ * Premium : vrai, faux, ou null si on ne sait pas (reseau, reponse degradee).
+ * null ne doit JAMAIS annuler des blocages deja programmes : un echec passager
+ * de la verification effacait tout, et la carte affichait "0 programme(s)".
+ */
+async function readPremium(): Promise<boolean | null> {
+  try {
+    const user: any = await authService.checkAuth();
+    if (!user) return null;
+    if (user.planLimits) return user.planLimits.examModeEnabled === true;
+    if (typeof user.isPremium === 'boolean') return user.isPremium;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 async function run(copy: StudyPlanCopy): Promise<StudyPlanSyncResult> {
   const result: StudyPlanSyncResult = {
     ran: false,
@@ -295,12 +326,27 @@ async function run(copy: StudyPlanCopy): Promise<StudyPlanSyncResult> {
   const to = new Date(from.getTime() + HORIZON_DAYS * 24 * 60 * 60 * 1000);
 
   const Calendar = await getCalendar();
-  const canUseCalendar = Calendar ? await calendarGranted(Calendar) : false;
+  const calendarStatus = Calendar
+    ? await Calendar.getCalendarPermissionsAsync().then((r) => r.status).catch(() => 'error')
+    : 'unavailable';
+  const canUseCalendar = calendarStatus === 'granted';
   let studyCalendarId: string | null = null;
+  const errors: string[] = [];
+  const note = (step: string, error: unknown) => {
+    const message = error instanceof Error ? error.message : String(error);
+    errors.push(`${step}: ${message}`.slice(0, 200));
+    console.warn(`[studyPlanSync] ${step}`, error);
+  };
 
+  // Les deux etapes calendrier sont separees : si la creation du calendrier
+  // "Productif" echoue, les creneaux occupes doivent quand meme partir.
   if (Calendar && canUseCalendar) {
     try {
       studyCalendarId = await ensureStudyCalendar(Calendar);
+    } catch (error) {
+      note('calendar_create', error);
+    }
+    try {
       const slots = await readBusySlots(Calendar, studyCalendarId, from, to);
       const sent = await studyPlanService.sendBusySlots({
         source: 'apple',
@@ -311,7 +357,7 @@ async function run(copy: StudyPlanCopy): Promise<StudyPlanSyncResult> {
       result.busySlotsSent = slots.length;
       result.replanned = !!sent?.replanned;
     } catch (error) {
-      console.warn('[studyPlanSync] creneaux Apple non envoyes', error);
+      note('busy_slots', error);
     }
   }
 
@@ -322,11 +368,14 @@ async function run(copy: StudyPlanCopy): Promise<StudyPlanSyncResult> {
     try {
       result.calendar = await writeBlocksToCalendar(Calendar, studyCalendarId, blocks, copy, from, to);
     } catch (error) {
-      console.warn('[studyPlanSync] calendrier Productif non mis a jour', error);
+      note('calendar_write', error);
     }
   }
 
   result.reminders = await scheduleReminders(blocks, copy);
+  const notificationStatus = Notifications
+    ? await Notifications.getPermissionsAsync().then((r: any) => r.status).catch(() => 'error')
+    : 'unavailable';
 
   // Blocage automatique a l'heure des blocs (option par appareil, premium).
   if (Platform.OS === 'ios') {
@@ -334,34 +383,40 @@ async function run(copy: StudyPlanCopy): Promise<StudyPlanSyncResult> {
       result.autoBlock = await scheduleAutoBlocks(
         blocks,
         { startTitle: copy.autoBlockTitle, startBody: copy.autoBlockBody },
-        { premium: await hasExamModeAccess(), manualSessionUntil: await getManualSessionUntil() }
+        { premium: await readPremium(), manualSessionUntil: await getManualSessionUntil() }
       );
       if (result.autoBlock && result.autoBlock.status !== 'off' && result.autoBlock.status !== 'unsupported') {
         await trackBackendProductEvent('auto_block_scheduled', {
           status: result.autoBlock.status,
           scheduled: result.autoBlock.scheduled,
-          candidates: (result.autoBlock as any).candidates ?? null,
-          failed: (result.autoBlock as any).failed ?? null,
-          error: (result.autoBlock as any).error ?? null,
+          candidates: result.autoBlock.candidates ?? null,
+          failed: result.autoBlock.failed ?? null,
+          error: result.autoBlock.error ?? null,
         });
       }
     } catch (error) {
-      console.warn('[studyPlanSync] blocage automatique non programme', error);
+      note('auto_block', error);
     }
   }
 
-  // Un seul evenement par jour : de quoi savoir que la chaine tourne, sans
-  // remplir la table a chaque retour au premier plan.
+  // Un evenement le premier passage du jour, et a chaque passage qui a echoue
+  // quelque part : c'est le seul moyen de voir une panne sans les journaux du
+  // telephone.
   const today = new Date().toDateString();
   const lastDay = await AsyncStorage.getItem(KEY_LAST_EVENT_DAY).catch(() => null);
-  if (lastDay !== today) {
+  if (lastDay !== today || errors.length > 0) {
     await trackBackendProductEvent('study_plan_synced', {
       blocks: result.blocks,
       busy_slots: result.busySlotsSent,
+      replanned: result.replanned,
+      calendar_status: calendarStatus,
+      calendar_ready: !!studyCalendarId,
       calendar_created: result.calendar?.created ?? null,
+      notification_status: notificationStatus,
       reminders: result.reminders,
       auto_block: result.autoBlock?.status ?? null,
       auto_block_scheduled: result.autoBlock?.scheduled ?? null,
+      errors: errors.length ? errors.join(' | ').slice(0, 500) : null,
     });
     await AsyncStorage.setItem(KEY_LAST_EVENT_DAY, today).catch(() => {});
   }
@@ -370,8 +425,8 @@ async function run(copy: StudyPlanCopy): Promise<StudyPlanSyncResult> {
 }
 
 /**
- * Point d'entree. Au plus une synchronisation a la fois, et au plus une toutes
- * les 3 minutes sauf `force` (apres une modification faite dans l'app).
+ * Point d'entree. Au plus une synchronisation a la fois, et au plus une par
+ * minute sauf `force` (apres une modification faite dans l'app).
  */
 export async function syncStudyPlan(copy: StudyPlanCopy, options: { force?: boolean } = {}): Promise<StudyPlanSyncResult | null> {
   // Une synchronisation forcee suit un changement (interrupteur, matiere) : elle
