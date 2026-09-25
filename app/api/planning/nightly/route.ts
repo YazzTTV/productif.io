@@ -6,7 +6,9 @@
  * POST /api/planning/nightly   meme chose a la main, en-tete x-scheduler-key
  *
  * Traite chaque utilisateur qui a des chapitres non termines et dont le planning
- * n'a pas ete recalcule depuis 20 h. Le cron tourne une fois par jour a 4h UTC,
+ * n'a pas ete recalcule depuis le debut de SA journee locale. Une regle "20 h"
+ * sautait un compte replanifie la veille au soir (par une modification de
+ * matiere), et ses blocs rates de la journee n'etaient pas rattrapes le matin. Le cron tourne une fois par jour a 4h UTC,
  * soit 6h a Paris et minuit a Montreal : le planning est pret avant le reveil.
  *
  * Ferme par defaut : sans secret configure, la route refuse tout.
@@ -15,11 +17,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { replanUser, type ReplanResult } from '@/lib/planning/autoPlan'
+import { resolveTimezone } from '@/lib/timezone'
+import { localDateKey, localTime } from '@/lib/planning/StudyPlanner'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
-const MIN_INTERVAL_MS = 20 * 60 * 60 * 1000
 const TIME_BUDGET_MS = 50 * 1000
 
 function isAuthorized(req: NextRequest): boolean {
@@ -45,11 +48,16 @@ async function run(req: NextRequest) {
     // Les comptes supprimes gardent leurs taches sous une adresse +deleted : on les ignore.
     where: { completed: false, subjectId: { not: null }, user: { email: { not: { endsWith: '+deleted@productif.io' } } } },
     distinct: ['userId'],
-    select: { userId: true, user: { select: { autoPlanRunAt: true } } },
+    select: { userId: true, user: { select: { autoPlanRunAt: true, timezone: true } } },
   })
 
   const due = candidates
-    .filter((c) => force || !c.user.autoPlanRunAt || now.getTime() - c.user.autoPlanRunAt.getTime() >= MIN_INTERVAL_MS)
+    .filter((c) => {
+      if (force || !c.user.autoPlanRunAt) return true
+      const timeZone = resolveTimezone(c.user)
+      const startOfLocalDay = localTime(localDateKey(now, timeZone), '00:00', timeZone)
+      return c.user.autoPlanRunAt < startOfLocalDay
+    })
     .map((c) => c.userId)
 
   const results: ReplanResult[] = []
