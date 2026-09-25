@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { getAuthUserFromRequest } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { priorityIntToLabel } from "@/lib/tasks"
+import { replanUserSafely } from "@/lib/planning/autoPlan"
 
 // PATCH /api/subjects/[id] - Modifier une matière (nom, coefficient, date d'examen)
 export async function PATCH(
@@ -102,9 +103,14 @@ export async function PATCH(
       )
     }
 
-    const updated = await prisma.subject.update({
+    await prisma.subject.update({ where: { id }, data })
+
+    // Un coefficient ou une date d'examen qui change deplace les blocs : on
+    // replanifie avant de repondre pour que le mobile recoive les bons creneaux.
+    await replanUserSafely(user.id, "subject_change")
+
+    const updated = await prisma.subject.findUniqueOrThrow({
       where: { id },
-      data,
       include: {
         tasks: {
           where: { completed: false },
@@ -166,6 +172,13 @@ export async function DELETE(
       )
     }
 
+    // Les blocs poses par le planificateur n'ont plus de sens sans leur matiere :
+    // on les retire du planning. Les creneaux choisis a la main restent.
+    await prisma.task.updateMany({
+      where: { subjectId: id, userId: user.id, autoPlannedAt: { not: null }, completed: false },
+      data: { scheduledFor: null, schedulingStatus: "draft", proposedSlotStart: null, proposedSlotEnd: null, autoPlannedAt: null },
+    })
+
     // Mettre à null le subjectId des tâches liées avant de supprimer
     await prisma.task.updateMany({
       where: { subjectId: id },
@@ -175,6 +188,9 @@ export async function DELETE(
     await prisma.subject.delete({
       where: { id },
     })
+
+    // Le temps libere revient aux autres matieres.
+    await replanUserSafely(user.id, "subject_change")
 
     return NextResponse.json({ success: true })
   } catch (error) {

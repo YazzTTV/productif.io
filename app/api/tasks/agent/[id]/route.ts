@@ -46,6 +46,8 @@ export async function PATCH(
     
     if (updateData.scheduledFor !== undefined) {
       updateData.scheduledFor = updateData.scheduledFor ? new Date(updateData.scheduledFor) : null
+      // Creneau choisi explicitement : il sort du planning automatique.
+      updateData.autoPlannedAt = null
     }
     
     // Traiter la priorité et le niveau d'énergie

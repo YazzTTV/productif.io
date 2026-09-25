@@ -23,6 +23,9 @@ model User {
   /// Fuseau IANA de l'appareil (ex. "America/Toronto"), envoye par l'app mobile dans l'en-tete
   /// `x-timezone` et enregistre par GET /api/auth/me. Null = inconnu, a traiter comme Europe/Paris.
   timezone         String?
+  /// Dernier passage du planificateur automatique pour cet utilisateur.
+  autoPlanRunAt    DateTime?
+  calendarBusySnapshot CalendarBusySnapshot?
   emailVerifiedAt             DateTime?
   emailVerificationToken      String?
   emailVerificationExpiresAt  DateTime?
@@ -211,6 +214,9 @@ model Task {
   schedulingStatus      String?   @default("draft") // draft | proposed | scheduled | done | not_done | snoozed
   proposedSlotStart     DateTime? // Créneau proposé (début)
   proposedSlotEnd       DateTime? // Créneau proposé (fin)
+  /// Non nul = le creneau a ete choisi par le planificateur automatique (lib/planning/autoPlan.ts),
+  /// qui peut donc le deplacer. Nul = creneau choisi par l'utilisateur, jamais touche.
+  autoPlannedAt         DateTime?
 
   process         Process?             @relation("TaskProcess", fields: [processId], references: [id])
   project         Project?             @relation(fields: [projectId], references: [id])
@@ -1128,4 +1134,19 @@ model TaskHistory {
   nextDate DateTime?
   createdAt DateTime @default(now())
   @@index([userId, createdAt])
+}
+
+/// Creneaux occupes lus sur le telephone (Apple Calendar), que le serveur ne peut
+/// pas lire lui-meme. Une ligne par utilisateur, remplacee a chaque envoi.
+model CalendarBusySnapshot {
+  userId     String   @id
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// [{ start: ISO, end: ISO }]
+  slots      Json
+  source     String
+  rangeStart DateTime
+  rangeEnd   DateTime
+  updatedAt  DateTime @updatedAt
+
+  @@map("calendar_busy_snapshots")
 }

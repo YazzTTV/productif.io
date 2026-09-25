@@ -232,6 +232,9 @@ export async function PATCH(
           ? {
               scheduledFor: body.scheduledFor ? new Date(body.scheduledFor) : null,
               schedulingStatus: body.scheduledFor ? "scheduled" : "draft",
+              // L'utilisateur reprend la main sur ce creneau : le planificateur
+              // automatique ne le deplacera plus.
+              autoPlannedAt: null,
             }
           : {}),
       }

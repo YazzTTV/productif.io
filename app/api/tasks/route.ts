@@ -7,6 +7,7 @@ import { formatInTimezone, USER_TIMEZONE, localDateToUTC } from "@/lib/date-util
 import { parse, parseISO, isWithinInterval } from "date-fns"
 import { toZonedTime } from "date-fns-tz"
 import { GamificationService } from "@/services/gamification"
+import { replanUserSafely } from "@/lib/planning/autoPlan"
 
 // Augmenter le timeout pour les requêtes complexes (30 secondes)
 export const maxDuration = 30
@@ -460,6 +461,14 @@ export async function POST(request: NextRequest) {
     })
 
     console.log("[TASKS_POST] Tâche créée avec succès:", task.id);
+
+    // Un chapitre sans creneau choisi rejoint le planning automatique.
+    if (task.subjectId && !task.scheduledFor) {
+      await replanUserSafely(targetUserId, "task_created")
+      const planned = await prisma.task.findUnique({ where: { id: task.id } })
+      return NextResponse.json(planned ?? task)
+    }
+
     return NextResponse.json(task)
   } catch (error) {
     console.error("[TASKS_POST] Error", error);

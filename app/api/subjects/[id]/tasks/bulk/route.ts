@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { getAuthUserFromRequest } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { calculateTaskOrder, priorityIntToLabel } from "@/lib/tasks"
+import { replanUserSafely } from "@/lib/planning/autoPlan"
 
 // Garde-fous : une saisie collée peut contenir n'importe quoi, et cette route
 // crée en masse. Sans plafond, un copier-coller d'un poly entier crée des
@@ -132,6 +133,10 @@ export async function POST(
         order,
       })),
     })
+
+    // Les nouveaux chapitres sont places dans le planning tout de suite, avant la
+    // relecture, pour que le mobile recoive directement leurs creneaux.
+    await replanUserSafely(user.id, "chapters_import")
 
     // createMany ne retourne pas les lignes créées : on relit pour que le mobile
     // puisse afficher les chapitres sans un aller-retour supplémentaire.
