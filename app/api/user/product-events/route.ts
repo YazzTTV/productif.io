@@ -9,6 +9,9 @@ const ALLOWED_EVENTS = new Set([
   "paywall_dismissed",
   "purchase_completed",
   "purchase_restored",
+  // Planning automatique (phase 2) : synchronisation et rappels.
+  "study_plan_synced",
+  "study_reminder_opened",
 ])
 
 function sanitizeParams(value: unknown): Record<string, string | number | boolean | null> | undefined {
