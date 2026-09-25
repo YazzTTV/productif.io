@@ -23,7 +23,7 @@ async function main() {
       const k = formatInTimeZone(new Date(b.start), tz, 'EEE dd/MM')
       perDay.set(k, (perDay.get(k) ?? 0) + b.minutes)
     }
-    console.log(`\n${c.user.email}  tz=${tz}  a_ecrire=${r.blocksWritten} retires=${r.unscheduled} non_places=${r.unplaced} rattrapage=${r.catchUp} agendas=${r.busySources.join(',') || 'aucun'}`)
+    console.log(`\n${c.user.email}  tz=${tz}  a_ecrire=${r.blocksWritten} retires=${r.unscheduled} non_places=${r.unplaced}${r.unplaced ? JSON.stringify(r.unplacedReasons) : ''} rattrapage=${r.catchUp} agendas=${r.busySources.join(',') || 'aucun'}`)
     console.log('   premiers blocs :', r.preview!.blocks.slice(0, 4).map((b) => formatInTimeZone(new Date(b.start), tz, 'EEE dd HH:mm') + ` (${b.minutes}m)`).join(' | '))
     console.log('   minutes/jour   :', [...perDay.entries()].slice(0, 7).map(([k, v]) => `${k} ${v}`).join(' | '))
   }

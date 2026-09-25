@@ -20,9 +20,17 @@ export function isValidTimeZone(tz: unknown): tz is string {
 export async function syncUserTimezone(
   userId: string,
   reported: string | null,
-  stored: string | null
+  stored: string | null,
+  ipFallback: string | null = null
 ): Promise<string | null> {
-  if (!isValidTimeZone(reported) || reported === stored) return stored
+  // Le fuseau de l'appareil fait foi. A defaut (app anterieure a 1.4, web), on
+  // prend celui que Vercel deduit de l'IP, mais seulement si rien n'est connu :
+  // un VPN ne doit pas ecraser le fuseau qu'un telephone a deja donne.
+  if (!isValidTimeZone(reported)) {
+    if (stored || !isValidTimeZone(ipFallback)) return stored
+    reported = ipFallback
+  }
+  if (reported === stored) return stored
   try {
     await prisma.user.update({ where: { id: userId }, data: { timezone: reported } })
     return reported

@@ -50,6 +50,7 @@ export interface ReplanResult {
   blocksWritten: number
   unscheduled: number
   unplaced: number
+  unplacedReasons?: Record<string, number>
   catchUp: boolean
   busySources: string[]
   /** Rempli en mode simulation seulement. */
@@ -175,14 +176,25 @@ export async function replanUser(
 
   try {
     if (await googleCalendarService.isConnected(userId)) {
-      const periods = await withTimeout(
-        googleCalendarService.getBusyTimes(userId, now, horizonEnd),
-        GOOGLE_TIMEOUT_MS,
-        null as any
-      )
-      if (Array.isArray(periods)) {
-        busy.push(...periods.map((p: any) => ({ start: new Date(p.start), end: new Date(p.end) })))
-        busySources.push('google')
+      // Un jeton expire ou revoque fait renvoyer [] par getBusyTimes, comme un
+      // agenda vide : on verifie le jeton d'abord pour ne pas planifier par-dessus
+      // des cours en croyant l'agenda lu. Le jeton valide est mis en cache, donc
+      // getBusyTimes ne le rafraichit pas une seconde fois.
+      const token = await withTimeout(googleCalendarService.refreshTokenIfNeeded(userId), GOOGLE_TIMEOUT_MS, null)
+      if (!token) {
+        busySources.push('google_unreadable')
+      } else {
+        const periods = await withTimeout(
+          googleCalendarService.getBusyTimes(userId, now, horizonEnd),
+          GOOGLE_TIMEOUT_MS,
+          null as any
+        )
+        if (Array.isArray(periods)) {
+          busy.push(...periods.map((p: any) => ({ start: new Date(p.start), end: new Date(p.end) })))
+          busySources.push('google')
+        } else {
+          busySources.push('google_timeout')
+        }
       }
     }
   } catch (error) {
@@ -269,6 +281,10 @@ export async function replanUser(
       unplaced: plan.summary.unplacedCount,
       catchUp,
       busySources,
+      unplacedReasons: plan.unplaced.reduce<Record<string, number>>((acc, u) => {
+        acc[u.reason] = (acc[u.reason] ?? 0) + 1
+        return acc
+      }, {}),
       preview: {
         timeZone,
         blocks: plan.blocks.map((b) => ({ taskId: b.taskId, start: b.start.toISOString(), end: b.end.toISOString(), minutes: b.minutes })),

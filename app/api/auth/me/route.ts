@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma"
 import { getPlanInfo } from "@/lib/plans"
 import { getEmailVerificationBlockAt } from "@/lib/email-verification"
 import { syncUserTimezone } from "@/lib/timezone"
+import { replanUserSafely } from "@/lib/planning/autoPlan"
 
 async function minimalUserFromToken(req: NextRequest) {
   try {
@@ -73,7 +74,17 @@ export async function GET(req: NextRequest) {
 
     // L'app mobile envoie le fuseau de l'appareil a chaque appel ; on le garde a jour
     // pour les rappels et la planification (un etudiant a Montreal n'est pas a Paris).
-    const timezone = await syncUserTimezone(user.id, req.headers.get("x-timezone"), userInfo.timezone)
+    const timezone = await syncUserTimezone(
+      user.id,
+      req.headers.get("x-timezone"),
+      userInfo.timezone,
+      req.headers.get("x-vercel-ip-timezone")
+    )
+    // Le planning a ete calcule dans l'ancien fuseau : on le recalcule. Rare
+    // (premier lancement, voyage), donc le cout ne tombe presque jamais.
+    if (timezone !== userInfo.timezone) {
+      await replanUserSafely(user.id, "manual", 5000)
+    }
 
     const planInfo = getPlanInfo(user)
     const emailVerificationDueAt = getEmailVerificationBlockAt(userInfo.createdAt)

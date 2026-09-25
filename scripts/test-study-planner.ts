@@ -185,5 +185,16 @@ console.log('\n9. Changement d\'heure : les blocs restent a l\'heure locale')
   }), plan.blocks.map((b) => formatInTimeZone(b.start, PARIS, 'EEE HH:mm')))
 }
 
+// ---------------------------------------------------------------------------
+console.log('\n10. Echeance personnelle deja passee : le chapitre est place au plus tot, pas abandonne')
+{
+  const now = new Date('2026-09-24T22:00:00Z')
+  const subjects: PlannerSubject[] = [{ id: 'a', name: 'A', coefficient: 2, deadline: null }]
+  const late: PlannerTask[] = chapters('a', 2).map((t) => ({ ...t, dueDate: new Date('2026-04-08T10:00:00Z') }))
+  const plan = planStudy(subjects, late, [], { now, timeZone: PARIS })
+  check('les 2 chapitres en retard sont places', plan.blocks.length === 2, plan.unplaced)
+  check('des le premier jour', plan.blocks.every((b) => localDateKey(b.start, PARIS) === '2026-09-25'))
+}
+
 console.log(`\n${checks - failures}/${checks} verifications passees`)
 if (failures > 0) process.exit(1)

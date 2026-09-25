@@ -200,8 +200,10 @@ export function planStudy(
       last = Math.min(last, withBuffer >= 0 ? withBuffer : examIndex - 1)
     }
     if (task.dueDate) {
+      // Une echeance personnelle deja passee ne doit pas faire disparaitre le
+      // chapitre du planning : il reste a faire, au plus tot, borne par l'examen.
       const dueIndex = daysBetweenKeys(todayKey, localDateKey(task.dueDate, timeZone))
-      last = Math.min(last, dueIndex)
+      if (dueIndex >= 0) last = Math.min(last, dueIndex)
     }
     return last
   }
