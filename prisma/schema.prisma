@@ -1015,7 +1015,7 @@ model SubscriptionEvent {
   user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   eventName     String   // subscription_start, renewal, cancellation, refund, trial_start, trial_conversion, expiration
   productId     String?
-  transactionId String?  @unique
+  transactionId String?
   price         Float?
   currency      String?  @default("EUR")
   provider      String   @default("superwall") // superwall | stripe
@@ -1024,6 +1024,7 @@ model SubscriptionEvent {
 
   commissions CommissionLedger[]
 
+  @@unique([transactionId, eventName])
   @@index([userId])
   @@index([eventName])
   @@index([transactionId])

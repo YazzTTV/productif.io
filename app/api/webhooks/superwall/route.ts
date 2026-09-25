@@ -41,10 +41,21 @@ interface SuperwallWebhookPayload {
   };
 }
 
-function resolveUserId(originalAppUserId: string | null): string | null {
-  if (!originalAppUserId) return null;
-  if (originalAppUserId.startsWith('$SuperwallAlias:')) return null;
-  return originalAppUserId;
+/**
+ * L'identifiant du compte. Un achat fait avant identify arrive sous un alias
+ * `$SuperwallAlias:` ; on se rabat alors sur l'attribut `productifUserId` que
+ * l'app pose sur l'utilisateur Superwall depuis le 25 septembre.
+ */
+function resolveUserId(
+  originalAppUserId: string | null,
+  userAttributes?: Record<string, unknown>
+): string | null {
+  if (originalAppUserId && !originalAppUserId.startsWith('$SuperwallAlias:')) return originalAppUserId;
+  const fromAttributes = userAttributes?.productifUserId ?? userAttributes?.appUserId;
+  if (typeof fromAttributes === 'string' && fromAttributes && !fromAttributes.startsWith('$SuperwallAlias:')) {
+    return fromAttributes;
+  }
+  return null;
 }
 
 function mapEventToSubscriptionStatus(eventName: string, periodType: string): string | null {
@@ -55,11 +66,15 @@ function mapEventToSubscriptionStatus(eventName: string, periodType: string): st
       return 'active';
     case 'non_renewing_purchase':
       return 'paid';
+    // Une annulation (ou son retrait) ne change pas l'acces : Apple laisse
+    // l'abonnement, ou l'essai, courir jusqu'a sa date de fin. C'est
+    // l'expiration qui coupe. Avant, une annulation pendant l'essai passait le
+    // statut a 'cancelled' et coupait l'acces sur-le-champ.
     case 'uncancellation':
-      return 'active';
     case 'cancellation':
-      return 'cancelled';
+      return null;
     case 'expiration':
+    case 'refund':
       return 'expired';
     default:
       return null;
@@ -81,12 +96,12 @@ export async function POST(req: NextRequest) {
     const payload: SuperwallWebhookPayload = await req.json();
     const { type, data } = payload;
 
-    if (data.environment === 'SANDBOX') {
-      console.log(`[Superwall Webhook] Sandbox event ignoré: ${type}`);
-      return NextResponse.json({ received: true, sandbox: true });
-    }
+    // Les achats de test (TestFlight, et surtout le reviewer Apple) debloquent
+    // aussi le compte : ignores, le reviewer achetait et restait en gratuit, ce
+    // qui est un motif de rejet. Pas de commission sur un achat de test.
+    const isSandbox = data.environment === 'SANDBOX';
 
-    const userId = resolveUserId(data.originalAppUserId);
+    const userId = resolveUserId(data.originalAppUserId, data.userAttributes);
     if (!userId) {
       console.warn(`[Superwall Webhook] Pas de userId résolvable pour event ${type}, originalAppUserId=${data.originalAppUserId}`);
       return NextResponse.json({ received: true, skipped: 'no_user_id' });
@@ -114,13 +129,13 @@ export async function POST(req: NextRequest) {
           transactionId: data.transactionId || null,
           price: data.price,
           currency: data.currencyCode || 'USD',
-          provider: 'superwall',
+          provider: isSandbox ? 'superwall_sandbox' : 'superwall',
           rawPayload: payload as unknown as Record<string, unknown>,
         },
       });
     } catch (e: unknown) {
       if (e && typeof e === 'object' && 'code' in e && (e as { code: string }).code === 'P2002') {
-        console.log(`[Superwall Webhook] Event dupliqué (transactionId=${data.transactionId})`);
+        console.log(`[Superwall Webhook] Event dupliqué (transactionId=${data.transactionId}, event=${eventName})`);
         return NextResponse.json({ received: true, duplicate: true });
       }
       throw e;
@@ -140,12 +155,22 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Le tier 'premium' suffit a donner l'acces (lib/plans.ts, PREMIUM_TIERS) :
+    // sans cette remise a zero, un abonne expire ou rembourse restait premium
+    // pour toujours.
+    if (newStatus === 'expired') {
+      updateData.subscriptionTier = null;
+    }
+
     if (data.expirationAt) {
       updateData.subscriptionEndDate = new Date(data.expirationAt);
     }
 
     if (eventName === 'cancellation') {
       updateData.cancelledAt = new Date();
+    }
+    if (eventName === 'uncancellation') {
+      updateData.cancelledAt = null;
     }
 
     if (Object.keys(updateData).length > 0) {
@@ -155,7 +180,9 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    if (isRefund) {
+    if (isSandbox) {
+      // aucune commission sur un achat de test
+    } else if (isRefund) {
       const reversed = await CommissionService.reverseCommissions(
         user.id,
         `refund_${data.transactionId}`,
@@ -175,7 +202,7 @@ export async function POST(req: NextRequest) {
     }
 
     console.log(
-      `[Superwall Webhook] ${eventName} user=${user.id} price=${data.price} ` +
+      `[Superwall Webhook] ${isSandbox ? '[sandbox] ' : ''}${eventName} user=${user.id} price=${data.price} ` +
       `product=${data.productId} status→${newStatus || '(unchanged)'}`
     );
 
