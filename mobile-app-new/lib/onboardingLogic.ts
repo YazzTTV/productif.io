@@ -60,9 +60,23 @@ export interface DraftSubject {
   /** Identifiant local, seulement pour les listes React. Jamais envoye. */
   id: string;
   name: string;
-  /** Grosse matiere : coefficient 5 cote serveur, 2 sinon. */
+  /** Ancien interrupteur « grosse matiere », garde pour les brouillons deja enregistres. */
   big: boolean;
+  /** Coefficient choisi, 1 a 10. Absent dans un brouillon d'avant le 26 septembre. */
+  coefficient?: number;
   chapters: DraftChapters | null;
+}
+
+export const MIN_SUBJECT_COEFFICIENT = 1;
+export const MAX_SUBJECT_COEFFICIENT = 10;
+export const DEFAULT_SUBJECT_COEFFICIENT = 2;
+
+/** Coefficient d'une matiere du brouillon, y compris d'un brouillon d'avant le selecteur. */
+export function subjectCoefficient(subject: Pick<DraftSubject, 'big' | 'coefficient'>): number {
+  if (typeof subject.coefficient === 'number' && Number.isFinite(subject.coefficient)) {
+    return Math.min(MAX_SUBJECT_COEFFICIENT, Math.max(MIN_SUBJECT_COEFFICIENT, Math.round(subject.coefficient)));
+  }
+  return subject.big ? 5 : DEFAULT_SUBJECT_COEFFICIENT;
 }
 
 /** Corps de POST /api/onboarding/plan (contrat commun aux lots serveur et mobile). */
@@ -72,6 +86,7 @@ export interface OnboardingPlanRequest {
   subjects: Array<{
     name: string;
     big: boolean;
+    coefficient: number;
     chapters?: { titles?: string[]; count?: number };
   }>;
   classesEndHour: ClassesEndHour | null;
@@ -384,7 +399,10 @@ export function buildPlanRequest(
     if (!name || seen.has(key)) continue;
     seen.add(key);
     const chapters = toApiChapters(subject.chapters);
-    subjects.push(chapters ? { name, big: !!subject.big, chapters } : { name, big: !!subject.big });
+    const coefficient = subjectCoefficient(subject);
+    // big reste envoye pour un serveur plus ancien, qui ne lit pas coefficient.
+    const base = { name, big: coefficient >= 5, coefficient };
+    subjects.push(chapters ? { ...base, chapters } : base);
     if (subjects.length >= MAX_SUBJECTS) break;
   }
 

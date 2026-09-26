@@ -202,11 +202,11 @@ console.log('\nbuildPlanRequest')
     idempotencyKey: 'k-1',
     examDate: '2026-12-15',
     subjects: [
-      { name: 'Anatomie', big: true, chapters: { titles: ['Os', 'Muscles'] } },
-      { name: 'SHS', big: false, chapters: { count: 80 } },
-      { name: 'Biochimie', big: false },
-      { name: 'Chimie', big: false },
-      { name: 'Liste vide', big: true },
+      { name: 'Anatomie', big: true, coefficient: 5, chapters: { titles: ['Os', 'Muscles'] } },
+      { name: 'SHS', big: false, coefficient: 2, chapters: { count: 80 } },
+      { name: 'Biochimie', big: false, coefficient: 2 },
+      { name: 'Chimie', big: false, coefficient: 2 },
+      { name: 'Liste vide', big: true, coefficient: 5 },
     ],
     classesEndHour: 16,
     answers: { focusQuality: 2 },
@@ -237,6 +237,30 @@ console.log('\nbuildPlanRequest')
     now
   )
   check(`plafond a ${MAX_SUBJECTS} matieres`, tooMany.subjects.length === MAX_SUBJECTS)
+}
+
+{
+  const now = new Date(2026, 8, 25, 12)
+  const req = buildPlanRequest(
+    {
+      idempotencyKey: 'k',
+      examDate: null,
+      examDateUnknown: true,
+      subjects: [
+        { id: 'a', name: 'Droit', big: false, coefficient: 7, chapters: null },
+        { id: 'b', name: 'Maths', big: true, chapters: null },
+        { id: 'c', name: 'Eco', big: false, chapters: null },
+        { id: 'd', name: 'Anglais', big: false, coefficient: 42, chapters: null },
+      ] as DraftSubject[],
+      classesEndHour: null,
+    },
+    {},
+    now
+  )
+  check('coefficient choisi envoye', req.subjects[0].coefficient === 7 && req.subjects[0].big === true)
+  check('brouillon ancien : big vaut 5', req.subjects[1].coefficient === 5)
+  check('brouillon ancien sans big : 2', req.subjects[2].coefficient === 2 && req.subjects[2].big === false)
+  check('coefficient borne a 10 cote app', req.subjects[3].coefficient === 10)
 }
 
 console.log(`\n${checks - failures}/${checks} verifications passees`)

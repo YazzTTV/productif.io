@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -7,10 +7,14 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useOnboardingDraft } from '@/lib/onboardingDraft';
 import { trackStepCompleted, useOnboardingStep } from '@/lib/onboardingTracking';
 import {
+  DEFAULT_SUBJECT_COEFFICIENT,
+  MAX_SUBJECT_COEFFICIENT,
   MAX_SUBJECTS,
   MAX_SUBJECT_NAME,
+  MIN_SUBJECT_COEFFICIENT,
   SUBJECT_SUGGESTIONS,
   normalizeSubjectName,
+  subjectCoefficient,
   subjectKey,
   type DraftSubject,
 } from '@/lib/onboardingLogic';
@@ -60,7 +64,7 @@ export default function SubjectsScreen() {
     setSubjects((current) => {
       if (current.length >= MAX_SUBJECTS) return current;
       if (current.some((s) => subjectKey(s.name) === subjectKey(name))) return current;
-      return [...current, { id: newLocalId(), name, big: false, chapters: null }];
+      return [...current, { id: newLocalId(), name, big: false, coefficient: DEFAULT_SUBJECT_COEFFICIENT, chapters: null }];
     });
   };
 
@@ -81,8 +85,17 @@ export default function SubjectsScreen() {
     inputRef.current?.focus();
   };
 
-  const toggleBig = (id: string, big: boolean) => {
-    setSubjects((current) => current.map((s) => (s.id === id ? { ...s, big } : s)));
+  // Le coefficient remplace l'interrupteur « grosse matiere » (demande de Noah,
+  // 26 septembre) : l'etudiant connait ses coefficients, le planificateur les
+  // utilise tels quels pour repartir le temps.
+  const changeCoefficient = (id: string, delta: number) => {
+    setSubjects((current) =>
+      current.map((s) => {
+        if (s.id !== id) return s;
+        const next = Math.min(MAX_SUBJECT_COEFFICIENT, Math.max(MIN_SUBJECT_COEFFICIENT, subjectCoefficient(s) + delta));
+        return { ...s, coefficient: next, big: next >= 5 };
+      })
+    );
   };
 
   const finish = async (skip: boolean) => {
@@ -94,12 +107,13 @@ export default function SubjectsScreen() {
       let final = skip ? [] : subjects;
       const pending = normalizeSubjectName(input);
       if (!skip && pending && !final.some((s) => subjectKey(s.name) === subjectKey(pending)) && final.length < MAX_SUBJECTS) {
-        final = [...final, { id: newLocalId(), name: pending, big: false, chapters: null }];
+        final = [...final, { id: newLocalId(), name: pending, big: false, coefficient: DEFAULT_SUBJECT_COEFFICIENT, chapters: null }];
       }
       await update({ subjects: final });
       trackStepCompleted('subjects', {
         count: final.length,
-        big_count: final.filter((s) => s.big).length,
+        big_count: final.filter((s) => subjectCoefficient(s) >= 5).length,
+        coefficients: final.map((s) => subjectCoefficient(s)).join(','),
         skipped: skip,
       });
       // Sans matiere, il n'y a aucun chapitre a demander.
@@ -135,7 +149,7 @@ export default function SubjectsScreen() {
           {t(
             'onbSubjectsSubtitle',
             undefined,
-            'Touche celles que tu as, ajoute les autres. « Grosse matière » pour les plus gros coefficients.'
+            'Touche celles que tu as, ajoute les autres, puis règle leur coefficient : les plus gros passent en priorité.'
           )}
         </Text>
       </Animated.View>
@@ -196,18 +210,31 @@ export default function SubjectsScreen() {
                 <Text style={styles.rowName} numberOfLines={2}>
                   {subject.name}
                 </Text>
-                <Text style={styles.rowHint}>
-                  {subject.big
-                    ? t('onbSubjectsBig', undefined, 'Grosse matière : passe en priorité')
-                    : t('onbSubjectsNormal', undefined, 'Grosse matière ? Active-la')}
-                </Text>
+                <Text style={styles.rowHint}>{t('onbSubjectsCoefLabel', undefined, 'Coefficient')}</Text>
               </View>
-              <Switch
-                value={subject.big}
-                onValueChange={(value) => toggleBig(subject.id, value)}
-                trackColor={{ false: 'rgba(0, 0, 0, 0.12)', true: ONBOARDING_GREEN }}
-                accessibilityLabel={t('onbSubjectsBigA11y', { name: subject.name }, 'Grosse matière : {name}')}
-              />
+              <View style={styles.stepper}>
+                <TouchableOpacity
+                  onPress={() => changeCoefficient(subject.id, -1)}
+                  disabled={subjectCoefficient(subject) <= MIN_SUBJECT_COEFFICIENT}
+                  style={[styles.stepButton, subjectCoefficient(subject) <= MIN_SUBJECT_COEFFICIENT && styles.stepButtonDisabled]}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 4 }}
+                  accessibilityLabel={t('onbSubjectsCoefLess', { name: subject.name }, 'Baisser le coefficient de {name}')}
+                >
+                  <Ionicons name="remove" size={18} color={ONBOARDING_GREEN} />
+                </TouchableOpacity>
+                <Text style={styles.stepValue} accessibilityLabel={t('onbSubjectsCoefA11y', { name: subject.name, value: subjectCoefficient(subject) }, 'Coefficient de {name} : {value}')}>
+                  {subjectCoefficient(subject)}
+                </Text>
+                <TouchableOpacity
+                  onPress={() => changeCoefficient(subject.id, 1)}
+                  disabled={subjectCoefficient(subject) >= MAX_SUBJECT_COEFFICIENT}
+                  style={[styles.stepButton, subjectCoefficient(subject) >= MAX_SUBJECT_COEFFICIENT && styles.stepButtonDisabled]}
+                  hitSlop={{ top: 8, bottom: 8, left: 4, right: 8 }}
+                  accessibilityLabel={t('onbSubjectsCoefMore', { name: subject.name }, 'Monter le coefficient de {name}')}
+                >
+                  <Ionicons name="add" size={18} color={ONBOARDING_GREEN} />
+                </TouchableOpacity>
+              </View>
               <TouchableOpacity
                 onPress={() => removeSubject(subjectKey(subject.name))}
                 style={styles.remove}
@@ -287,6 +314,29 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: 'rgba(0, 0, 0, 0.45)',
     marginTop: 2,
+  },
+  stepper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  stepButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(22, 163, 74, 0.10)',
+  },
+  stepButtonDisabled: {
+    opacity: 0.35,
+  },
+  stepValue: {
+    minWidth: 22,
+    textAlign: 'center',
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#000000',
   },
   remove: {
     padding: 2,

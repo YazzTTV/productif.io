@@ -25,6 +25,9 @@ import { googleCalendarService } from '@/lib/calendar/GoogleCalendarService'
 
 export const BIG_COEFFICIENT = 5
 export const DEFAULT_COEFFICIENT = 2
+/** Bornes du coefficient choisi a l'onboarding (selecteur 1 a 10 cote app, marge serveur). */
+export const MIN_COEFFICIENT = 1
+export const MAX_COEFFICIENT = 20
 export const CHAPTER_MINUTES = 30
 /** Seances generiques d'une matiere sans chapitres (« pas encore »). */
 export const GENERATED_SESSIONS = 6
@@ -53,6 +56,8 @@ export interface SubjectInput {
   name: string
   key: string
   big: boolean
+  /** Coefficient choisi par l'etudiant ; a defaut, deduit de big (anciennes versions). */
+  coefficient: number
   chapters: ChaptersInput
 }
 
@@ -202,7 +207,7 @@ export function parseRequest(body: unknown): PlanRequest {
   let totalChapters = 0
   for (const item of rawSubjects) {
     if (!item || typeof item !== 'object' || Array.isArray(item)) throw new BadRequest('Matière invalide')
-    const { name, big, chapters } = item as { name?: unknown; big?: unknown; chapters?: unknown }
+    const { name, big, chapters, coefficient } = item as { name?: unknown; big?: unknown; chapters?: unknown; coefficient?: unknown }
     if (typeof name !== 'string') throw new BadRequest('Nom de matière invalide')
     const clean = normalizeName(name)
     if (!clean) continue
@@ -213,7 +218,15 @@ export function parseRequest(body: unknown): PlanRequest {
     seen.add(key)
     const parsed = parseChapters(chapters)
     totalChapters += parsed.kind === 'titles' ? parsed.titles.length : parsed.kind === 'count' ? parsed.count : 0
-    subjects.push({ name: clean, key, big: big === true, chapters: parsed })
+    // Le coefficient remplace l'interrupteur « grosse matiere » (demande de Noah,
+    // 26 septembre) ; big reste lu pour les versions de l'app qui l'envoient.
+    const coef =
+      typeof coefficient === 'number' && Number.isFinite(coefficient)
+        ? Math.min(MAX_COEFFICIENT, Math.max(MIN_COEFFICIENT, Math.round(coefficient)))
+        : big === true
+          ? BIG_COEFFICIENT
+          : DEFAULT_COEFFICIENT
+    subjects.push({ name: clean, key, big: big === true || coef >= BIG_COEFFICIENT, coefficient: coef, chapters: parsed })
   }
   if (totalChapters > MAX_TOTAL_CHAPTERS) throw new BadRequest(`Maximum ${MAX_TOTAL_CHAPTERS} chapitres`)
 
@@ -349,7 +362,7 @@ export async function createFromRequest(
         const created = await tx.subject.create({
           data: {
             name: input.name,
-            coefficient: input.big ? BIG_COEFFICIENT : DEFAULT_COEFFICIENT,
+            coefficient: input.coefficient,
             deadline,
             userId,
           },
