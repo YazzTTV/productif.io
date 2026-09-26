@@ -533,14 +533,18 @@ export const authService = {
 
   // Déconnexion
   async logout(): Promise<void> {
-    try {
-      await apiCall('/auth/logout', {
+    // La deconnexion locale ne doit jamais attendre le reseau : l'ecran restait
+    // fige jusqu'a la reponse (20 s constatees le 26 septembre). On previent le
+    // serveur avec le jeton encore en main, sans attendre, puis on nettoie.
+    const token = await TokenStorage.getInstance().getToken();
+    if (token) {
+      fetch(`${API_BASE_URL}/auth/logout`, {
         method: 'POST',
-      });
-    } finally {
-      invalidateAuthCache();
-      await TokenStorage.getInstance().clearToken();
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      }).catch(() => {});
     }
+    invalidateAuthCache();
+    await TokenStorage.getInstance().clearToken();
   },
 
   // Connexion avec Google (nouvelle méthode avec idToken dans le header)
