@@ -1,5 +1,5 @@
 import { StudyCheckIn } from '@/components/analytics/StudyCheckIn';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
@@ -7,15 +7,73 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { maybeAskForReview } from '@/lib/reviewPrompt';
+import { useSuperwall } from '@/hooks/useSuperwall';
+import { SUPERWALL_EVENTS } from '@/lib/superwallEvents';
+import { freeSessionsLeftLabel, getExamAccess } from '@/utils/premium';
 
 export default function ExamSummaryScreen() {
   const { t } = useLanguage();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams();
-  
+  const { triggerEvent } = useSuperwall();
+
   const duration = parseInt(params.duration as string) || 0;
   const completed = parseInt(params.completed as string) || 0;
+  // Fin d'une séance offerte : c'est l'un des trois moments où le paywall
+  // revient (spec 1.5, section 3).
+  const isFreeSession = params.free === '1';
+  const [freeRemaining, setFreeRemaining] = useState<number | null>(null);
+  const [isPremiumNow, setIsPremiumNow] = useState(false);
+  const paywallShownRef = useRef(false);
+  const leavingRef = useRef(false);
+
+  useEffect(() => {
+    if (!isFreeSession) return;
+    let cancelled = false;
+    (async () => {
+      // Hors cache : la séance vient d'être décomptée.
+      const access = await getExamAccess({ force: true });
+      if (cancelled) return;
+      setIsPremiumNow(access.premium);
+      setFreeRemaining(access.freeRemaining);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isFreeSession]);
+
+  const openPremiumPaywall = async (source: string) => {
+    paywallShownRef.current = true;
+    await triggerEvent(SUPERWALL_EVENTS.FEATURE_LOCKED, {
+      params: { source },
+      bypassCooldown: true,
+    });
+    const access = await getExamAccess({ force: true });
+    setIsPremiumNow(access.premium);
+    setFreeRemaining(access.freeRemaining);
+  };
+
+  /**
+   * Le paywall ne s'ouvre pas tout seul à l'arrivée : il couvrirait le
+   * questionnaire de ressenti et entrerait en collision avec la demande de note,
+   * qui part à 1,2 s. Il s'ouvre quand l'étudiant quitte l'écran, une fois.
+   */
+  const leave = async (navigate: () => void) => {
+    if (leavingRef.current) return;
+    leavingRef.current = true;
+    try {
+      if (isFreeSession && !isPremiumNow && !paywallShownRef.current) {
+        await openPremiumPaywall('exam_free_session_end');
+      }
+    } catch (error) {
+      // Un paywall en échec ne doit jamais retenir l'étudiant sur cet écran.
+      console.warn('[ExamSummary] paywall de fin de séance offerte en échec', error);
+    } finally {
+      leavingRef.current = false;
+    }
+    navigate();
+  };
 
   // Moment de valeur : une session de Mode Examen terminée avec au moins une
   // tâche bouclée. Une session où rien n'a été fait n'est pas un bon moment
@@ -31,11 +89,13 @@ export default function ExamSummaryScreen() {
   }, [completed]);
 
   const handleBackToDashboard = () => {
-    router.replace({pathname:'/(tabs)/assistant',params:{tab:'analytics'}});
+    void leave(() => router.replace({pathname:'/(tabs)/assistant',params:{tab:'analytics'}}));
   };
 
   const handleStartAnother = () => {
-    router.replace('/exam/setup');
+    // `setup` refait le contrôle : à zéro séance offerte, il renvoie vers la
+    // présentation, qui est la porte du paywall.
+    void leave(() => router.replace('/exam/setup'));
   };
 
   return (
@@ -69,6 +129,33 @@ export default function ExamSummaryScreen() {
         </Animated.View>
 
         {!!params.studySessionId && <StudyCheckIn sessionId={String(params.studySessionId)} />}
+
+        {isFreeSession && !isPremiumNow ? (
+          <Animated.View entering={FadeInDown.delay(400).duration(400)} style={styles.freeCard}>
+            <Text style={styles.freeCardTitle}>
+              {t('examFreeSummaryTitle', undefined, 'Séance offerte terminée')}
+            </Text>
+            {freeRemaining !== null ? (
+              <Text style={styles.freeCardText}>{freeSessionsLeftLabel(t, freeRemaining)}</Text>
+            ) : null}
+            <Text style={styles.freeCardText}>
+              {t(
+                'examFreeSummaryPitch',
+                undefined,
+                "Avec Premium, chaque séance bloque tes applis, et le blocage se lance tout seul à l'heure de ton planning."
+              )}
+            </Text>
+            <TouchableOpacity
+              style={styles.freeCardButton}
+              onPress={() => openPremiumPaywall('exam_free_session_summary_card')}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.freeCardButtonText}>
+                {t('examFreeSummaryCta', undefined, 'Voir Premium')}
+              </Text>
+            </TouchableOpacity>
+          </Animated.View>
+        ) : null}
 
         {/* CTAs */}
         <Animated.View entering={FadeInDown.delay(500).duration(400)} style={styles.ctaSection}>
@@ -210,6 +297,38 @@ const styles = StyleSheet.create({
   },
   ctaSection: {
     gap: 12,
+  },
+  freeCard: {
+    backgroundColor: 'rgba(22, 163, 74, 0.05)',
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(22, 163, 74, 0.2)',
+    marginBottom: 24,
+    gap: 8,
+  },
+  freeCardTitle: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#000',
+  },
+  freeCardText: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: 'rgba(0, 0, 0, 0.65)',
+  },
+  freeCardButton: {
+    alignSelf: 'flex-start',
+    marginTop: 4,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    backgroundColor: '#16A34A',
+  },
+  freeCardButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
   },
   primaryButton: {
     backgroundColor: '#16A34A',

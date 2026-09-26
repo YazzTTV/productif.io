@@ -234,7 +234,12 @@ export function useAppsFlyer() {
         appId: APPSFLYER_APP_ID,
         onInstallConversionDataListener: true,
         onDeepLinkListener: true,
-        timeToWaitForATTUserAuthorization: 10,
+        // Pas de `timeToWaitForATTUserAuthorization` : l'app ne demande jamais
+        // l'autorisation de suivi (aucune boite ATT, aucun
+        // NSUserTrackingUsageDescription). Le SDK attendait donc 10 s une
+        // reponse qui ne viendra jamais avant d'envoyer l'installation, ce qui
+        // retardait d'autant les donnees de conversion et le deep link differe
+        // au premier lancement, pendant l'onboarding.
       },
       (result: unknown) => {
         console.log('[AppsFlyer] SDK initialisé:', result);

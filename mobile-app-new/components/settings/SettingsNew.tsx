@@ -15,6 +15,8 @@ import { useDailyStructureSettings } from '@/hooks/useDailyStructureSettings';
 import { useSuperwall } from '@/hooks/useSuperwall';
 import { SUPERWALL_EVENTS } from '@/lib/superwallEvents';
 import { openStoreListingForReviewWithAlert } from '@/lib/reviewPrompt';
+import { readStoreSubscriptionActive } from '@/utils/premium';
+import { trackBackendProductEvent } from '@/lib/productEvents';
 
 type SettingsView = 'main' | 'editProfile' | 'dailyStructure' | 'notifications';
 
@@ -73,6 +75,7 @@ export function SettingsNew() {
   // Plan d'abonnement. null = statut encore inconnu : on n'affiche aucun plan
   // plutôt qu'un "Gratuit" qui serait faux pour un abonné.
   const [plan, setPlan] = useState<'free' | 'premium' | null>(null);
+  const [restoring, setRestoring] = useState(false);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -96,7 +99,17 @@ export function SettingsNew() {
         setPlan(null);
         return;
       }
-      setPlan(user.isPremium || user.plan === 'premium' ? 'premium' : 'free');
+      if (user.isPremium || user.plan === 'premium') {
+        setPlan('premium');
+        return;
+      }
+      // Le serveur n'a pas encore vu l'achat (webhook en retard, ou achat
+      // restauré, qui ne produit aucun webhook) : StoreKit le sait déjà, et
+      // l'app débloque déjà le Mode Examen sur ce signal. Afficher « Gratuit »
+      // ici renverrait vers un paywall un abonné qui vient de payer.
+      const storeActive = await readStoreSubscriptionActive({ waitMs: 0 });
+      if (!isMountedRef.current) return;
+      setPlan(storeActive ? 'premium' : 'free');
     } catch (error) {
       // Réseau HS : on laisse le plan inconnu au lieu d'afficher "Gratuit".
       if (!isMountedRef.current) return;
@@ -449,6 +462,76 @@ export function SettingsNew() {
     // Le paywall vient de se fermer et il a pu aboutir à un achat : on relit
     // le statut hors cache pour que la carte affiche Premium immédiatement.
     await refreshPlan({ force: true });
+  };
+
+  /**
+   * « Restaurer mes achats », exigé par Apple (règle 3.1.1) : il n'existait
+   * nulle part dans l'app, ni ici ni dans les 6 paywalls.
+   *
+   * CE QUE LE BOUTON FAIT VRAIMENT : expo-superwall 1.0.3 n'expose AUCUNE
+   * fonction de restauration à JavaScript (vérifié dans
+   * `node_modules/expo-superwall/ios/SuperwallExpoModule.swift`, aucune
+   * `AsyncFunction` de restauration). On relit donc l'abonnement tel que
+   * Superwall le tient de StoreKit 2, qui synchronise lui-même les achats de
+   * l'identifiant Apple sur l'appareil, puis le serveur hors cache. Un achat
+   * retrouvé par StoreKit débloque l'app tout de suite (repli de
+   * `utils/premium.ts`), même si le serveur ne l'a pas encore vu : une
+   * restauration ne produit aucun webhook.
+   */
+  const handleRestorePurchases = async () => {
+    if (restoring) return;
+    setRestoring(true);
+    try {
+      const storeActive = await readStoreSubscriptionActive({ waitMs: 3000 });
+      const user = await authService.checkAuth({ force: true });
+      const serverPremium = !!user && (user.isPremium === true || user.plan === 'premium');
+      if (isMountedRef.current) {
+        setPlan(user ? (serverPremium || storeActive ? 'premium' : 'free') : storeActive ? 'premium' : null);
+      }
+
+      if (storeActive) {
+        void trackBackendProductEvent('purchase_restored', {
+          placement: 'settings_restore',
+          server_premium: serverPremium,
+        });
+      }
+
+      if (serverPremium) {
+        Alert.alert(
+          t('restorePurchasesTitle', undefined, 'Restaurer mes achats'),
+          t('restorePurchasesServerActive', undefined, 'Premium est bien actif sur ton compte.')
+        );
+      } else if (storeActive) {
+        Alert.alert(
+          t('restorePurchasesTitle', undefined, 'Restaurer mes achats'),
+          t(
+            'restorePurchasesStoreActive',
+            undefined,
+            'Achat retrouvé sur ton identifiant Apple : Premium est débloqué sur cet iPhone. Ton compte sera mis à jour dans quelques minutes.'
+          )
+        );
+      } else if (!user) {
+        Alert.alert(
+          t('restorePurchasesTitle', undefined, 'Restaurer mes achats'),
+          t(
+            'restorePurchasesOffline',
+            undefined,
+            'Impossible de vérifier pour le moment. Vérifie ta connexion, puis réessaie.'
+          )
+        );
+      } else {
+        Alert.alert(
+          t('restorePurchasesTitle', undefined, 'Restaurer mes achats'),
+          t(
+            'restorePurchasesNothing',
+            undefined,
+            "Aucun abonnement actif trouvé pour l'identifiant Apple de cet iPhone. Si tu as payé avec un autre identifiant, connecte-le dans Réglages, puis ton nom, puis Contenu multimédia et achats, et réessaie."
+          )
+        );
+      }
+    } finally {
+      if (isMountedRef.current) setRestoring(false);
+    }
   };
 
   if (view === 'editProfile') {
@@ -1146,6 +1229,20 @@ export function SettingsNew() {
             </View>
             {plan !== null && <Ionicons name="chevron-forward" size={24} color="#16A34A" />}
           </TouchableOpacity>
+          {Platform.OS === 'ios' ? (
+            <TouchableOpacity
+              style={styles.restoreButton}
+              onPress={handleRestorePurchases}
+              disabled={restoring}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.restoreButtonText}>
+                {restoring
+                  ? t('restorePurchasesInProgress', undefined, 'Vérification…')
+                  : t('restorePurchases', undefined, 'Restaurer mes achats')}
+              </Text>
+            </TouchableOpacity>
+          ) : null}
         </Animated.View>
 
         {/* SECTION 6 — SUPPORT & INFO */}
@@ -1574,6 +1671,18 @@ const styles = StyleSheet.create({
   subscriptionSubtitle: {
     fontSize: 14,
     color: 'rgba(0, 0, 0, 0.6)',
+  },
+  restoreButton: {
+    alignSelf: 'center',
+    marginTop: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+  },
+  restoreButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#16A34A',
+    textDecorationLine: 'underline',
   },
   supportContainer: {
     gap: 12,

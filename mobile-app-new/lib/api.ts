@@ -2,6 +2,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 
 // Configuration de l'API
+import { notifyPlanChanged } from '@/lib/planRefresh';
+
 const DEFAULT_API_BASE_URL = 'https://www.productif.io/api';
 const API_BASE_URL = (process.env.EXPO_PUBLIC_API_BASE_URL || DEFAULT_API_BASE_URL).replace(/\/$/, '');
 
@@ -746,29 +748,36 @@ export const tasksService = {
     });
     
     console.log('📥 tasksService.create - Réponse reçue:', result);
+    notifyPlanChanged();
     return result;
   },
 
   // Mettre à jour une tâche
   async updateTask(taskId: string, updates: any): Promise<any> {
-    return await apiCall(`/tasks/${taskId}`, {
+    const result = await apiCall(`/tasks/${taskId}`, {
       method: 'PATCH', // Utiliser PATCH au lieu de PUT
       body: JSON.stringify(updates),
     });
+    notifyPlanChanged();
+    return result;
   },
 
   // Marquer une tâche comme complétée
   async complete(taskId: string): Promise<any> {
-    return await apiCall(`/tasks/${taskId}/complete`, {
+    const result = await apiCall(`/tasks/${taskId}/complete`, {
       method: 'POST',
     });
+    notifyPlanChanged();
+    return result;
   },
 
   // Supprimer une tâche
   async deleteTask(taskId: string): Promise<any> {
-    return await apiCall(`/tasks/${taskId}`, {
+    const result = await apiCall(`/tasks/${taskId}`, {
       method: 'DELETE',
     });
+    notifyPlanChanged();
+    return result;
   },
 
   // Récupérer les tâches d'aujourd'hui
@@ -851,17 +860,21 @@ export const subjectsService = {
     subjectId: string,
     subjectData: { name?: string; coefficient?: number; deadline?: string | null }
   ): Promise<any> {
-    return await apiCall(`/subjects/${subjectId}`, {
+    const result = await apiCall(`/subjects/${subjectId}`, {
       method: 'PATCH',
       body: JSON.stringify(subjectData),
     });
+    notifyPlanChanged();
+    return result;
   },
 
   // Supprimer une matière
   async delete(subjectId: string): Promise<{ success: boolean }> {
-    return await apiCall(`/subjects/${subjectId}`, {
+    const result = await apiCall<{ success: boolean }>(`/subjects/${subjectId}`, {
       method: 'DELETE',
     });
+    notifyPlanChanged();
+    return result;
   },
 
   // Créer plusieurs chapitres d'un coup dans une matière
@@ -1064,7 +1077,34 @@ export const onboardingService = {
   async getOnboardingData(): Promise<{ data: any }> {
     return await apiCall('/onboarding/data');
   },
+
+  /**
+   * Onboarding 1.5 : cree matieres et chapitres puis calcule le planning, en un
+   * seul appel (serveur : app/api/onboarding/plan/route.ts). Idempotent sur
+   * `idempotencyKey` : un second envoi avec la meme cle ne recree rien et
+   * renvoie les blocs actuels, on peut donc le rejouer sans risque.
+   * `partial` = le calcul rapide n'a pas fini a temps : relire
+   * studyPlanService.getBlocks un peu plus tard.
+   */
+  async buildPlan(
+    request: OnboardingPlanRequestBody,
+    timeoutMs = 20000
+  ): Promise<{ success: boolean; timeZone: string; partial: boolean; blocks: StudyBlock[] }> {
+    return await apiCall('/onboarding/plan', {
+      method: 'POST',
+      body: JSON.stringify(request),
+    }, timeoutMs);
+  },
 };
+
+/** Corps de POST /api/onboarding/plan (contrat commun, construit par lib/onboardingLogic.ts). */
+export interface OnboardingPlanRequestBody {
+  idempotencyKey: string;
+  examDate: string | null;
+  subjects: Array<{ name: string; big: boolean; chapters?: { titles?: string[]; count?: number } }>;
+  classesEndHour: 12 | 14 | 16 | 18 | null;
+  answers?: Record<string, unknown>;
+}
 
 // Service Google Calendar (mobile)
 export const googleCalendarService = {
@@ -1231,6 +1271,45 @@ export const studyPlanService = {
       method: 'POST',
       body: JSON.stringify(payload),
     }, 20000);
+  },
+};
+
+// Seances Mode Examen offertes (serveur : app/api/exam/start et app/api/exam/cancel).
+// Le compteur vit cote serveur, pour qu'on puisse changer la regle sans build.
+export type ExamStartResult =
+  | { allowed: true; premium: boolean; sessionToken: string | null; freeRemaining: number | null }
+  | { allowed: false; reason: 'quota_exhausted' };
+
+export const examService = {
+  /**
+   * Un premium passe toujours ; un gratuit consomme une seance offerte. Le 403
+   * de quota epuise est une reponse attendue, pas une panne : il est rendu
+   * comme un resultat. Toute autre erreur remonte, et l'appelant refuse le
+   * lancement (fail-closed).
+   */
+  async start(plannedMinutes: number, launchKey?: string): Promise<ExamStartResult> {
+    try {
+      return await apiCall<ExamStartResult>('/exam/start', {
+        method: 'POST',
+        body: JSON.stringify({ plannedMinutes, launchKey }),
+      }, 15000);
+    } catch (error: any) {
+      if (error?.status === 403 && error?.errorData?.reason === 'quota_exhausted') {
+        return { allowed: false, reason: 'quota_exhausted' };
+      }
+      throw error;
+    }
+  },
+
+  // Rend la seance si l'annulation arrive assez tot. C'est le serveur qui juge.
+  async cancel(payload: { sessionToken: string; elapsedSeconds: number }): Promise<{
+    refunded: boolean;
+    freeRemaining: number | null;
+  }> {
+    return await apiCall('/exam/cancel', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }, 15000);
   },
 };
 

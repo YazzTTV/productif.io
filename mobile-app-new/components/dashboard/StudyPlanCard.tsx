@@ -1,11 +1,15 @@
-import React, { useCallback, useRef, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Platform, Switch, Alert, Linking } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Platform, Switch, Alert, Linking, AppState } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { studyPlanService, type StudyBlock } from '@/lib/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { studyPlanService, subjectsService, type StudyBlock } from '@/lib/api';
 import { syncStudyPlan } from '@/lib/studyPlanSync';
+import { onPlanChanged } from '@/lib/planRefresh';
 import { useStudyPlanCopy } from '@/hooks/useStudyPlanSync';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useSuperwall } from '@/hooks/useSuperwall';
+import { SUPERWALL_EVENTS } from '@/lib/superwallEvents';
 import {
   getAuthorizationStatus,
   hasBlockedAppsConfigured,
@@ -14,8 +18,27 @@ import {
   resolveAuthorizationStatus,
 } from '@/utils/appBlocking';
 import { getLastAutoBlockReport, getScheduledAutoBlocks, isAutoBlockEnabled, setAutoBlockEnabled } from '@/utils/autoBlocking';
-import { hasExamModeAccess } from '@/utils/premium';
+import { freeSessionsLeftLabel, getExamAccess, hasExamModeAccess, type ExamAccess } from '@/utils/premium';
 import { getPushPermissionStatus, maybePrimePushPermission, requestPushPermissionAndRegisterToken } from '@/lib/pushPermission';
+
+/**
+ * Derniere proposition Premium faite depuis un bloc du planning. Une par jour au
+ * plus : a chaque toucher, ce serait une alerte de plus entre l'etudiant et sa
+ * revision, et le Focus gratuit doit rester a un geste.
+ */
+const PLAN_PREMIUM_OFFER_KEY = 'study_plan_premium_offer_at';
+const PLAN_PREMIUM_OFFER_EVERY_MS = 24 * 60 * 60 * 1000;
+
+async function shouldOfferPremiumFromPlan(): Promise<boolean> {
+  try {
+    const last = Number(await AsyncStorage.getItem(PLAN_PREMIUM_OFFER_KEY));
+    if (Number.isFinite(last) && last > 0 && Date.now() - last < PLAN_PREMIUM_OFFER_EVERY_MS) return false;
+    await AsyncStorage.setItem(PLAN_PREMIUM_OFFER_KEY, String(Date.now()));
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 type AutoBlockView =
   | { kind: 'hidden' }
@@ -60,7 +83,15 @@ export function StudyPlanCard() {
   const router = useRouter();
   const { t } = useLanguage();
   const copy = useStudyPlanCopy();
+  const { triggerEvent } = useSuperwall();
   const [blocks, setBlocks] = useState<StudyBlock[] | null>(null);
+  // Premium ou seances offertes : decide ou mene le toucher d'un bloc.
+  const [examAccess, setExamAccess] = useState<ExamAccess | null>(null);
+  // Lu seulement quand le planning est vide : sans matiere, la carte propose de
+  // construire le planning ; avec des matieres, il manque des chapitres ou des
+  // dates, et c'est l'ecran des taches qui les ajoute.
+  const [hasSubjects, setHasSubjects] = useState<boolean | null>(null);
+  const [openingBlock, setOpeningBlock] = useState(false);
   const [autoBlock, setAutoBlock] = useState<AutoBlockView>({ kind: 'hidden' });
   const [toggling, setToggling] = useState(false);
   // Statut des notifications : sans elles, ni rappel 10 min avant ni « Bloc
@@ -79,8 +110,18 @@ export function StudyPlanCard() {
       // qui peut attendre plusieurs secondes le statut Temps d'ecran au
       // demarrage a froid.
       const { blocks: fresh } = await studyPlanService.getBlocks(7);
-      setBlocks(fresh.filter((b) => new Date(b.end).getTime() > Date.now()));
+      const upcoming = fresh.filter((b) => new Date(b.end).getTime() > Date.now());
+      setBlocks(upcoming);
       getPushPermissionStatus().then(setPushStatus).catch(() => {});
+      getExamAccess().then(setExamAccess).catch(() => {});
+      if (upcoming.length === 0) {
+        subjectsService
+          .getAll()
+          .then((subjects: unknown) => setHasSubjects(Array.isArray(subjects) ? subjects.length > 0 : null))
+          .catch(() => setHasSubjects(null));
+      } else {
+        setHasSubjects(true);
+      }
       // La synchronisation (creneaux Apple, calendrier, rappels) est limitee a
       // une toutes les 3 min, sauf au retour du choix des applis, et sauf si un
       // blocage programme ne correspond plus a aucun bloc du planning (chapitre
@@ -105,6 +146,23 @@ export function StudyPlanCard() {
       load();
     }, [load])
   );
+
+  // Au-dela du retour sur l'onglet : un chapitre coche dans une feuille ouverte
+  // par-dessus l'accueil, et le retour depuis les Reglages de l'iPhone (ou l'on
+  // vient d'accorder les notifications). Les deux laissaient la carte perimee
+  // jusqu'a ce qu'on tue l'app (test du 26 septembre sur 1.4 (22)).
+  useEffect(() => {
+    const offPlan = onPlanChanged(() => {
+      load();
+    });
+    const appState = AppState.addEventListener('change', (state) => {
+      if (state === 'active') load();
+    });
+    return () => {
+      offPlan();
+      appState.remove();
+    };
+  }, [load]);
 
   const onEnablePush = async () => {
     if (pushStatus === 'denied') {
@@ -133,10 +191,18 @@ export function StudyPlanCard() {
       setAutoBlock(await readAutoBlockView());
       return;
     }
-    // Premium, comme le Mode Examen dont c'est le prolongement.
+    // Premium, comme le Mode Examen dont c'est le prolongement. Les seances
+    // offertes n'y donnent PAS droit (spec 1.5, section 4), donc plus de passage
+    // par `/exam/preview` : pour un gratuit qui a encore des seances, cet ecran
+    // renvoie desormais vers le lancement d'une seance, pas vers l'offre. C'est
+    // l'un des trois moments ou le paywall revient.
     if (!(await hasExamModeAccess())) {
-      router.push('/exam/preview');
-      return;
+      await triggerEvent(SUPERWALL_EVENTS.FEATURE_LOCKED, {
+        params: { source: 'auto_block_toggle' },
+        bypassCooldown: true,
+      });
+      // Achat fait dans le paywall : StoreKit le sait avant le webhook.
+      if (!(await hasExamModeAccess({ force: true }))) return;
     }
     // Lecture instantanee ici, pas resolveAuthorizationStatus : l'utilisateur
     // vient de toucher l'interrupteur, et si le statut est vraiment inconnu
@@ -175,6 +241,97 @@ export function StudyPlanCard() {
     setAutoBlock(await readAutoBlockView());
   };
 
+  const openFocusOn = (block: StudyBlock) => {
+    router.push({
+      pathname: '/focus',
+      params: {
+        taskId: block.taskId,
+        title: block.title,
+        subject: block.subjectName ?? '',
+        duration: block.minutes,
+        // Lu par focus.tsx pour `first_planned_block_started` : un gratuit sans
+        // seance offerte lance son premier bloc ici, pas dans le Mode Examen.
+        fromPlan: '1',
+      },
+    } as any);
+  };
+
+  const openExamOn = (block: StudyBlock) => {
+    router.push({
+      pathname: '/exam/setup',
+      params: {
+        taskId: block.taskId,
+        title: block.title,
+        subjectId: block.subjectId ?? '',
+        subjectName: block.subjectName ?? '',
+        minutes: String(block.minutes),
+        fromPlan: '1',
+      },
+    });
+  };
+
+  /**
+   * Toucher une seance du planning ouvre le Mode Examen sur CE chapitre, et plus
+   * `/focus` : c'est le Mode Examen qui bloque les applis, donc c'est lui qui
+   * fait respecter le planning.
+   *
+   * Sauf pour un gratuit sans seance offerte restante (critique de la spec 1.5,
+   * point 5) : l'y envoyer lui ferait perdre le Focus gratuit depuis son propre
+   * planning, alors que le planning est gratuit. Il garde donc le Focus, avec
+   * une proposition Premium au plus une fois par jour.
+   */
+  const onOpenBlock = async (block: StudyBlock) => {
+    if (openingBlock) return;
+    setOpeningBlock(true);
+    try {
+      const access = await getExamAccess();
+      setExamAccess(access);
+      if (access.canStart) {
+        openExamOn(block);
+        return;
+      }
+      if (!(await shouldOfferPremiumFromPlan())) {
+        openFocusOn(block);
+        return;
+      }
+      Alert.alert(
+        t('studyPlanPremiumOfferTitle', undefined, 'Réviser avec tes applis bloquées ?'),
+        t(
+          'studyPlanPremiumOfferMessage',
+          undefined,
+          "Tes séances Mode Examen offertes sont utilisées. Avec Premium, tes applis se bloquent pendant chaque séance, et le blocage se lance tout seul à l'heure de ton planning. Sinon, révise ce chapitre en Focus, sans blocage."
+        ),
+        [
+          {
+            text: t('studyPlanPremiumOfferFocus', undefined, 'Continuer en Focus'),
+            style: 'cancel',
+            onPress: () => openFocusOn(block),
+          },
+          {
+            text: t('studyPlanPremiumOfferCta', undefined, 'Voir Premium'),
+            onPress: async () => {
+              try {
+                await triggerEvent(SUPERWALL_EVENTS.FEATURE_LOCKED, {
+                  params: { source: 'study_plan_block' },
+                  bypassCooldown: true,
+                });
+              } catch (error) {
+                console.warn('[StudyPlanCard] paywall en échec', error);
+              }
+              if (await hasExamModeAccess({ force: true })) {
+                openExamOn(block);
+              } else {
+                openFocusOn(block);
+              }
+            },
+          },
+        ]
+      );
+    } finally {
+      setOpeningBlock(false);
+    }
+  };
+
   if (blocks === null) return null;
 
   const soon = blocks.filter((b) => dayOffset(b.start) <= 1);
@@ -185,7 +342,41 @@ export function StudyPlanCard() {
     <View style={styles.section}>
       <Text style={styles.sectionLabel}>{t('studyPlanTitle')}</Text>
       <View style={styles.card}>
-        {rows.length === 0 ? (
+        {rows.length === 0 && hasSubjects === false ? (
+          /*
+            Compte sans aucune matiere, typiquement un utilisateur d'avant la
+            1.5 qui met a jour : il n'a jamais vu les ecrans examens, matieres,
+            chapitres et cours, donc on l'y emmene au lieu de l'envoyer creer
+            des taches a la main. Le parcours est celui de l'onboarding, a
+            partir de l'ecran des examens (ecrans 3 a 10 de la spec 1.5).
+          */
+          <View style={styles.empty}>
+            <Text style={styles.buildTitle}>
+              {t('studyPlanBuildTitle', undefined, 'Construis ton planning')}
+            </Text>
+            <Text style={styles.emptyText}>
+              {t(
+                'studyPlanBuildText',
+                undefined,
+                "Ta date d'examen, tes matières et tes chapitres : l'app place tes séances dans ta semaine, autour de tes cours."
+              )}
+            </Text>
+            <TouchableOpacity
+              style={styles.emptyButton}
+              onPress={() =>
+                router.push({
+                  pathname: '/(onboarding-new)/exams',
+                  params: { entry: 'study_plan_card' },
+                } as any)
+              }
+              activeOpacity={0.8}
+            >
+              <Text style={styles.emptyButtonText}>
+                {t('studyPlanBuildCta', undefined, 'Construire mon planning')}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        ) : rows.length === 0 ? (
           <View style={styles.empty}>
             <Text style={styles.emptyText}>{t('studyPlanEmpty')}</Text>
             <TouchableOpacity
@@ -199,6 +390,16 @@ export function StudyPlanCard() {
         ) : (
           <>
             <Text style={styles.subtitle}>{t('studyPlanSubtitle')}</Text>
+            {examAccess && !examAccess.premium && (examAccess.freeRemaining ?? 0) > 0 ? (
+              <Text style={styles.freeHint}>
+                {t(
+                  'studyPlanFreeHint',
+                  undefined,
+                  'Touche une séance pour la lancer en Mode Examen, applis bloquées.'
+                )}{' '}
+                {freeSessionsLeftLabel(t, examAccess.freeRemaining ?? 0)}
+              </Text>
+            ) : null}
             {rows.map((block, index) => {
               const offset = dayOffset(block.start);
               const showDay = index === 0 || dayOffset(rows[index - 1].start) !== offset;
@@ -212,17 +413,8 @@ export function StudyPlanCard() {
                   <TouchableOpacity
                     style={styles.row}
                     activeOpacity={0.7}
-                    onPress={() =>
-                      router.push({
-                        pathname: '/focus',
-                        params: {
-                          taskId: block.taskId,
-                          title: block.title,
-                          subject: block.subjectName ?? '',
-                          duration: block.minutes,
-                        },
-                      } as any)
-                    }
+                    disabled={openingBlock}
+                    onPress={() => onOpenBlock(block)}
                   >
                     <Text style={styles.time}>{hhmm(block.start)}</Text>
                     <View style={styles.rowBody}>
@@ -398,6 +590,17 @@ const styles = StyleSheet.create({
   },
   empty: {
     gap: 14,
+  },
+  buildTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#000000',
+  },
+  freeHint: {
+    fontSize: 13,
+    lineHeight: 18,
+    color: '#15803D',
+    marginBottom: 4,
   },
   emptyText: {
     fontSize: 15,

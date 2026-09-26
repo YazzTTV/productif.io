@@ -79,7 +79,10 @@ export function DashboardEnhanced() {
   const [userName, setUserName] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
-  const [isCalendarConnected, setIsCalendarConnected] = useState(false);
+  // null tant que le statut n'est pas connu : « Connectez votre Google Calendar »
+  // s'affichait pendant le chargement et apres une lecture ratee, alors que
+  // l'agenda etait connecte (26 septembre).
+  const [isCalendarConnected, setIsCalendarConnected] = useState<boolean | null>(null);
   const [isPremium, setIsPremium] = useState(false);
   const [primaryTask, setPrimaryTask] = useState<TaskForExam | null>(null);
   const [nextTasks, setNextTasks] = useState<TaskForExam[]>([]);
@@ -235,7 +238,7 @@ export function DashboardEnhanced() {
       // Un calendrier Apple connecté doit compter ici au même titre que Google :
       // cet état commande l'affichage ET l'avance du didacticiel, qui restait
       // donc bloqué à l'étape « calendrier » pour tout utilisateur sur Apple.
-      let calendarConnected = false;
+      let calendarConnected: boolean | null = false;
       try {
         const calendarData = await googleCalendarService.getTodayEvents();
         calendarConnected = Boolean(calendarData.connected);
@@ -246,7 +249,8 @@ export function DashboardEnhanced() {
         }
       } catch (error) {
         console.error('Erreur récupération événements Google Calendar:', error);
-        setCalendarEvents([]);
+        // Lecture ratee : on ne sait pas, ce n'est pas « pas connecte ».
+        calendarConnected = null;
       }
 
       if (!calendarConnected) {
@@ -254,12 +258,16 @@ export function DashboardEnhanced() {
         // directement sur l'appareil, sans quoi l'accueil affichait « connecté »
         // au-dessus d'une journée vide alors que les blocs créés par l'app
         // étaient bien visibles dans l'app Calendrier d'iOS.
+        const googleUnknown = calendarConnected === null;
         calendarConnected = await isAppleCalendarConnected();
         if (calendarConnected) {
           setCalendarEvents(await getAppleTodayEvents());
+        } else if (googleUnknown) {
+          calendarConnected = null;
         }
       }
-      setIsCalendarConnected(calendarConnected);
+      // Un statut inconnu garde le dernier connu au lieu de repasser a « non ».
+      setIsCalendarConnected((previous) => calendarConnected ?? previous);
 
       if (user) {
         const storedFavoriteGroupId = await AsyncStorage.getItem(FAVORITE_GROUP_KEY);
@@ -619,7 +627,7 @@ export function DashboardEnhanced() {
               </ScrollView>
             ) : (
               <View style={styles.emptyCalendarContainer}>
-                {isCalendarConnected ? (
+                {isCalendarConnected === null ? null : isCalendarConnected ? (
                   <Text style={styles.emptyCalendarText}>{t('noEventsToday')}</Text>
                 ) : (
                   <View style={styles.connectCalendarContainer}>

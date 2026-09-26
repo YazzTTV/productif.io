@@ -5,8 +5,8 @@ import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { selectExamTasks, TaskForExam } from '@/utils/taskSelection';
-import { subjectsService, authService } from '@/lib/api';
-import { checkPremiumStatus } from '@/utils/premium';
+import { subjectsService } from '@/lib/api';
+import { getExamAccess, freeSessionsLeftLabel } from '@/utils/premium';
 import { getRestorableFocusSession } from '@/utils/focusSession';
 import { getActiveExamSession } from '@/utils/examSession';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -37,6 +37,8 @@ export function ExamMode() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [upcomingExam, setUpcomingExam] = useState<ExamInfo | null>(null);
   const [loading, setLoading] = useState(true);
+  // Séances offertes restantes d'un compte gratuit ; null pour un premium.
+  const [freeRemaining, setFreeRemaining] = useState<number | null>(null);
 
   const completedCount = tasks.filter(t => t.completed).length;
   const allTasksCompleted = tasks.every(t => t.completed);
@@ -70,26 +72,19 @@ export function ExamMode() {
         return;
       }
 
-      // Vérifier le statut Premium via l'API
-      const user = await authService.checkAuth();
-      
-      if (user && user.planLimits) {
-        // Vérifier si Exam Mode est activé
-        if (!user.planLimits.examModeEnabled) {
-          // Rediriger vers la page preview avec paywall
-          router.replace('/exam/preview');
-          return;
-        }
-      } else {
-        // Fallback : vérifier via checkPremiumStatus
-        const status = await checkPremiumStatus();
-        if (!status.isPremium) {
-          router.replace('/exam/preview');
-          return;
-        }
+      // Premium, ou compte gratuit avec au moins une séance offerte. Sans ni
+      // l'un ni l'autre, la présentation, qui est la porte du paywall.
+      // Ne JAMAIS se fier à `planLimits.examModeEnabled` seul ici : il vaut
+      // faux pour tout gratuit, séances offertes comprises, parce que le
+      // blocage automatique le lit pour décider du premium.
+      const access = await getExamAccess();
+      if (!access.canStart) {
+        router.replace('/exam/preview');
+        return;
       }
-      
-      // Si on arrive ici, l'utilisateur a accès à Exam Mode
+      setFreeRemaining(access.premium ? null : access.freeRemaining);
+
+      // Si on arrive ici, l'utilisateur peut lancer une séance
       loadExamData();
     } catch (error) {
       console.error('Error checking Exam Mode access:', error);
@@ -278,6 +273,20 @@ export function ExamMode() {
             </Animated.View>
           )}
 
+          {freeRemaining !== null && (
+            <Animated.View entering={FadeInDown.delay(250).duration(400)} style={styles.freeBanner}>
+              <Ionicons name="gift-outline" size={18} color="#16A34A" />
+              <Text style={styles.freeBannerText}>
+                {freeSessionsLeftLabel(t, freeRemaining)}{' '}
+                {t(
+                  'examFreeDashboardHint',
+                  undefined,
+                  'Pendant une séance, tes applis restent bloquées jusqu\'à la fin, sans bouton pour tricher.'
+                )}
+              </Text>
+            </Animated.View>
+          )}
+
           {/* Today's Priorities */}
           <Animated.View entering={FadeInDown.delay(300).duration(400)} style={styles.section}>
             <Text style={styles.sectionLabel}>{t('todaysPriorities')}</Text>
@@ -431,6 +440,23 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(0, 0, 0, 0.05)',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  freeBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    padding: 14,
+    borderRadius: 16,
+    marginBottom: 24,
+    backgroundColor: 'rgba(22, 163, 74, 0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(22, 163, 74, 0.2)',
+  },
+  freeBannerText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 19,
+    color: 'rgba(0, 0, 0, 0.7)',
   },
   examCard: {
     marginBottom: 32,

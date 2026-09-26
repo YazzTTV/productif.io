@@ -44,6 +44,20 @@ export interface ExamSession {
    * compte à rebours comme si les applications étaient bloquées.
    */
   blockApps?: boolean;
+  /**
+   * Séance offerte à un compte gratuit, décomptée par `POST /api/exam/start`.
+   *
+   * C'est ce qui l'autorise à survivre à un démarrage à froid : l'écran de
+   * session efface toute session non démo d'un compte non premium, et sans ce
+   * champ une séance offerte mourait dès que l'app était tuée, après avoir été
+   * décomptée.
+   */
+  freeSession?: boolean;
+  /**
+   * Jeton rendu par `POST /api/exam/start`, renvoyé à `POST /api/exam/cancel`
+   * pour qu'une annulation précoce rende la séance.
+   */
+  freeSessionToken?: string | null;
 }
 
 const SESSION_KEY = 'exam_session_active';

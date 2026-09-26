@@ -1,23 +1,37 @@
-import React, { useEffect, useRef, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'react-native';
+import React, { useEffect, useRef, useCallback, useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { saveExamSession } from '@/utils/examSession';
-import { hasExamModeAccess } from '@/utils/premium';
-import { selectExamTasks } from '@/utils/taskSelection';
+import { getExamAccess, freeSessionsLeftLabel } from '@/utils/premium';
 import { useSuperwall } from '@/hooks/useSuperwall';
 import { SUPERWALL_EVENTS } from '@/lib/superwallEvents';
 
+/**
+ * Présentation payante du Mode Examen. Depuis la 1.5, on n'y arrive plus que
+ * sans accès : ni premium, ni séance offerte restante.
+ *
+ * DÉMO DE 5 MIN RETIRÉE (décision du 25 septembre, lot mobile 3). Elle lançait
+ * une session SANS blocage, et chaque compte gratuit a désormais de vraies
+ * séances offertes AVEC blocage : la démo montrait une version appauvrie de ce
+ * que l'étudiant a déjà eu, et elle aurait remplacé le paywall au moment exact
+ * où il doit revenir, la 3e séance. Le code des démos reste dans `session.tsx`
+ * pour une démo encore en cours au moment de la mise à jour, et `afterDemo`
+ * reste géré ici pour la même raison.
+ */
 export default function ExamPreviewScreen() {
   const { t } = useLanguage();
   const router = useRouter();
-  const params = useLocalSearchParams<{ afterDemo?: string }>();
+  const params = useLocalSearchParams<{ afterDemo?: string; reason?: string; at?: string }>();
   const insets = useSafeAreaInsets();
   const { triggerEvent } = useSuperwall();
   const afterDemoTokenHandledRef = useRef<string | null>(null);
+  const quotaTokenHandledRef = useRef<string | null>(null);
+  // null tant que le serveur n'a pas répondu, ou pour un serveur antérieur à la 1.5.
+  const [freeRemaining, setFreeRemaining] = useState<number | null>(null);
+  const quotaExhausted = params.reason === 'quota_exhausted';
 
   const openExamSuperwall = useCallback(
     async (source: string) => {
@@ -28,6 +42,12 @@ export default function ExamPreviewScreen() {
     },
     [triggerEvent],
   );
+  // `triggerEvent` change à chaque rendu, donc `openExamSuperwall` aussi. En
+  // dépendance d'un effet à minuterie, le moindre re-rendu (celui du nombre de
+  // séances restantes, par exemple) annulait la minuterie et le paywall ne
+  // s'ouvrait jamais. Les effets passent par cette référence.
+  const openExamSuperwallRef = useRef(openExamSuperwall);
+  openExamSuperwallRef.current = openExamSuperwall;
 
   /**
    * Un abonné n'a rien à faire sur l'écran de démonstration payante.
@@ -40,7 +60,6 @@ export default function ExamPreviewScreen() {
    */
   const accessRedirectRef = useRef(false);
   useEffect(() => {
-    if (params.afterDemo) return;
     // Une seule tentative par montage. `setup` renvoie ici quand l'accès est
     // refusé, et cet effet renvoie là-bas quand il est accordé : les deux
     // conditions sont complémentaires, mais si une réponse d'API incohérente
@@ -50,15 +69,36 @@ export default function ExamPreviewScreen() {
     accessRedirectRef.current = true;
     let cancelled = false;
     (async () => {
-      const allowed = await hasExamModeAccess();
-      if (!cancelled && allowed) {
+      const access = await getExamAccess();
+      if (cancelled) return;
+      setFreeRemaining(access.premium ? null : access.freeRemaining);
+      // Premium, ou séance offerte restante : l'écran de lancement. Pas au
+      // retour d'une démo ni après un refus de quota, où l'écran doit rester
+      // pour présenter l'offre.
+      if (access.canStart && !params.afterDemo && !quotaExhausted) {
         router.replace('/exam/setup');
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [params.afterDemo, router]);
+  }, [params.afterDemo, quotaExhausted, router]);
+
+  /**
+   * Le serveur vient de refuser une 3e séance : c'est le moment où le paywall
+   * revient (spec 1.5, section 3). Jeton `at` : un seul affichage par refus.
+   */
+  useEffect(() => {
+    if (!quotaExhausted) return;
+    const token = params.at ?? 'once';
+    if (quotaTokenHandledRef.current === token) return;
+    quotaTokenHandledRef.current = token;
+    setFreeRemaining(0);
+    const timer = setTimeout(() => {
+      openExamSuperwallRef.current('exam_quota_exhausted');
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [quotaExhausted, params.at]);
 
   useEffect(() => {
     const token = params.afterDemo;
@@ -66,65 +106,13 @@ export default function ExamPreviewScreen() {
     if (afterDemoTokenHandledRef.current === token) return;
     afterDemoTokenHandledRef.current = token;
     const t = setTimeout(() => {
-      openExamSuperwall('exam_preview_after_demo');
+      openExamSuperwallRef.current('exam_preview_after_demo');
     }, 400);
     return () => clearTimeout(t);
-  }, [params.afterDemo, openExamSuperwall]);
+  }, [params.afterDemo]);
 
   const handleUnlock = () => {
     openExamSuperwall('exam_preview_unlock_button');
-  };
-
-  const handleStartDemo = async () => {
-    try {
-      // Charger les vraies tâches de l'utilisateur
-      const { primary, next } = await selectExamTasks();
-      
-      // Créer une liste de toutes les tâches (primary + next)
-      const allTasks = [primary, ...next].filter(Boolean);
-      
-      if (allTasks.length === 0) {
-        // Si pas de tâches, afficher un message et proposer le paywall
-        Alert.alert(
-          t('noTasks'),
-          t('noTasksForDemo'),
-          [
-            { text: t('cancel'), style: 'cancel' },
-            { text: t('unlockExamMode'), onPress: () => openExamSuperwall('exam_preview_no_tasks_alert') }
-          ]
-        );
-        return;
-      }
-      
-      // Créer une session de démo de 5 minutes avec les vraies tâches
-      const demoSessionId = `exam_demo_${Date.now()}`;
-      const taskIds = allTasks.map(task => task.id);
-      
-      await saveExamSession({
-        sessionId: demoSessionId,
-        startedAt: Date.now(),
-        plannedDuration: 5, // 5 minutes pour la démo
-        hardMode: false, // Mode démo plus souple
-        breaks: false,
-        currentTaskIndex: 0,
-        plannedTaskIds: taskIds, // Utiliser les vraies tâches
-        completedTaskIds: [],
-        isDemo: true,
-      });
-
-      // Rediriger vers la page de session avec le paramètre demo
-      router.push({
-        pathname: '/exam/session',
-        params: { 
-          sessionId: demoSessionId,
-          demo: 'true' // Marquer comme démo
-        },
-      });
-    } catch (error) {
-      console.error('Error starting demo:', error);
-      // En cas d'erreur, afficher le paywall
-      openExamSuperwall('exam_preview_demo_error');
-    }
   };
 
   return (
@@ -202,6 +190,16 @@ export default function ExamPreviewScreen() {
 
         {/* CTA */}
         <Animated.View entering={FadeInDown.delay(600).duration(400)} style={styles.ctaSection}>
+          {freeRemaining === 0 ? (
+            <Text style={styles.freeUsedText}>
+              {freeSessionsLeftLabel(t, 0)}{' '}
+              {t(
+                'examFreeUsedPreviewHint',
+                undefined,
+                "Avec Premium, chaque séance bloque tes applis, et le blocage se lance tout seul à l'heure de ton planning."
+              )}
+            </Text>
+          ) : null}
           <TouchableOpacity
             style={styles.unlockButton}
             onPress={handleUnlock}
@@ -210,13 +208,6 @@ export default function ExamPreviewScreen() {
             <Text style={styles.unlockButtonText}>{t('unlockExamMode')}</Text>
           </TouchableOpacity>
           
-          <TouchableOpacity
-            style={styles.demoButton}
-            onPress={handleStartDemo}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.demoButtonText}>{t('tryDemo') || 'Try 5-min demo'}</Text>
-          </TouchableOpacity>
         </Animated.View>
 
         <View style={{ height: 40 }} />
@@ -365,6 +356,12 @@ const styles = StyleSheet.create({
   ctaSection: {
     gap: 12,
   },
+  freeUsedText: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: 'rgba(0, 0, 0, 0.6)',
+    textAlign: 'center',
+  },
   unlockButton: {
     backgroundColor: '#16A34A',
     paddingVertical: 16,
@@ -380,18 +377,6 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 18,
     fontWeight: '600',
-  },
-  demoButton: {
-    paddingVertical: 14,
-    borderRadius: 24,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.1)',
-  },
-  demoButtonText: {
-    color: 'rgba(0, 0, 0, 0.6)',
-    fontSize: 16,
-    fontWeight: '500',
   },
   modalOverlay: {
     flex: 1,

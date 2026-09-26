@@ -1,14 +1,16 @@
 import { beginStudySession } from '@/lib/studyAnalysis';
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Switch, ActivityIndicator, Alert } from 'react-native';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { selectExamTasks, TaskForExam } from '@/utils/taskSelection';
 import { saveExamSession, getActiveExamSession } from '@/utils/examSession';
+import { getRestorableFocusSession } from '@/utils/focusSession';
 import { startSessionLiveActivity } from '@/utils/liveActivity';
-import { hasExamModeAccess } from '@/utils/premium';
+import { getExamAccess, freeSessionsLeftLabel, type ExamAccess } from '@/utils/premium';
+import { clampExamDuration, withPlannedTaskFirst, type PlannedBlockParams } from '@/utils/examAccessRules';
 import {
   getAuthorizationStatus,
   getBlockedSelectionCount,
@@ -17,6 +19,9 @@ import {
 } from '@/utils/appBlocking';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { trackEvent } from '@/lib/analytics';
+import { trackFirstPlannedBlockStarted } from '@/lib/firstPlannedBlock';
+import { trackBackendProductEvent } from '@/lib/productEvents';
+import { examService, invalidateAuthCache, type ExamStartResult } from '@/lib/api';
 import { readCache, writeCache, CACHE_KEYS } from '@/lib/dataCache';
 
 const MIN_DURATION = 25;
@@ -27,7 +32,13 @@ export default function ExamSetupScreen() {
   const { t } = useLanguage();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const [duration, setDuration] = useState(DEFAULT_DURATION);
+  // Poses par la carte du planning quand on touche un bloc : la seance doit
+  // partir sur CE chapitre, avec la duree du bloc.
+  const planned = useLocalSearchParams<PlannedBlockParams>();
+  const fromPlan = planned.fromPlan === '1';
+  const [duration, setDuration] = useState(
+    () => clampExamDuration(Number(planned.minutes), MIN_DURATION, MAX_DURATION) ?? DEFAULT_DURATION
+  );
   const [hardMode, setHardMode] = useState(true);
   const [breaks, setBreaks] = useState(false);
   const [primaryTask, setPrimaryTask] = useState<TaskForExam | null>(null);
@@ -45,6 +56,9 @@ export default function ExamSetupScreen() {
   const [starting, setStarting] = useState(false);
   const [blockAppsEnabled, setBlockAppsEnabled] = useState(false);
   const [blockedCount, setBlockedCount] = useState(0);
+  // Premium ou seances offertes : sert au controle d'acces ET a l'affichage du
+  // nombre de seances offertes restantes.
+  const [access, setAccess] = useState<ExamAccess | null>(null);
 
   const blockingSupported = isAppBlockingSupported();
 
@@ -82,6 +96,13 @@ export default function ExamSetupScreen() {
     // spinner et rendre l'écran utilisable avant la réponse de checkAccess,
     // laissant un compte gratuit démarrer une vraie session sur réseau lent.
     (async () => {
+      // Une session focus tourne encore : on y retourne. ExamMode fait deja ce
+      // test, mais la carte du planning ouvre cet ecran directement, sans passer
+      // par lui, et deux minuteurs actifs affichaient deux comptes a rebours.
+      if (await getRestorableFocusSession()) {
+        router.replace('/focus');
+        return;
+      }
       const allowed = await checkAccess();
       if (!allowed) return;
       if (await checkActiveSession()) return;
@@ -101,21 +122,30 @@ export default function ExamSetupScreen() {
     return false;
   };
 
-  const checkAccess = async (): Promise<boolean> => {
-    const allowed = await hasExamModeAccess();
-    if (!allowed) {
+  /**
+   * Premium, ou compte gratuit avec au moins une seance offerte. A zero, retour
+   * a l'ecran de presentation, qui est la porte du paywall.
+   */
+  const checkAccess = async (): Promise<ExamAccess | null> => {
+    const result = await getExamAccess();
+    setAccess(result);
+    if (!result.canStart) {
       router.replace('/exam/preview');
+      return null;
     }
-    return allowed;
+    return result;
   };
 
   const loadTasks = async () => {
     try {
       if (!hasLoadedOnceRef.current) setLoading(true);
-      const { primary, next } = await selectExamTasks();
+      const selected = await selectExamTasks();
+      // Le cache garde la selection brute : le chapitre touche dans le planning
+      // ne vaut que pour cette ouverture de l'ecran.
+      void writeCache(CACHE_KEYS.examTasks, selected);
+      const { primary, next } = withPlannedTaskFirst(selected.primary, selected.next, planned);
       setPrimaryTask(primary);
       setNextTasks(next);
-      void writeCache(CACHE_KEYS.examTasks, { primary, next });
     } catch (error) {
       console.error('Error loading tasks:', error);
     } finally {
@@ -133,12 +163,31 @@ export default function ExamSetupScreen() {
         CACHE_KEYS.examTasks
       );
       if (annule || !cached || hasLoadedOnceRef.current) return;
-      setPrimaryTask(cached.primary);
-      setNextTasks(cached.next || []);
+      const { primary, next } = withPlannedTaskFirst(cached.primary, cached.next || [], planned);
+      setPrimaryTask(primary);
+      setNextTasks(next);
       setLoading(false);
     })();
     return () => { annule = true; };
   }, []);
+
+  const askFreeSessionWithoutBlocking = () =>
+    new Promise<'choose' | 'start' | 'cancel'>((resolve) => {
+      Alert.alert(
+        t('examFreeNoBlockingTitle', undefined, 'Tes applis ne seront pas bloquées'),
+        t(
+          'examFreeNoBlockingMessage',
+          undefined,
+          "Aucune appli n'est choisie pour cette séance offerte. Choisis celles qui te déconcentrent : elles resteront verrouillées jusqu'à la fin, sans bouton pour les rouvrir."
+        ),
+        [
+          { text: t('examFreeNoBlockingChoose', undefined, 'Choisir mes applis'), onPress: () => resolve('choose') },
+          { text: t('examFreeNoBlockingStart', undefined, 'Lancer sans blocage'), onPress: () => resolve('start') },
+          { text: t('cancel'), style: 'cancel', onPress: () => resolve('cancel') },
+        ],
+        { cancelable: true, onDismiss: () => resolve('cancel') }
+      );
+    });
 
   const handleStart = async () => {
     if (!primaryTask) {
@@ -150,8 +199,91 @@ export default function ExamSetupScreen() {
     try {
       // Revérifié au moment de l'action : l'écran a pu rester ouvert, et c'est
       // ici qu'on crée une vraie session (non démo) avec durée et hardMode libres.
-      if (!(await checkAccess())) {
+      const current = await checkAccess();
+      if (!current) {
         return;
+      }
+
+      // Une séance offerte sans blocage perd l'essentiel de ce qu'elle doit
+      // montrer, et il n'y en a que très peu : on le dit AVANT de la décompter.
+      if (!current.premium && blockingSupported && !blockAppsEnabled) {
+        const choice = await askFreeSessionWithoutBlocking();
+        if (choice === 'choose') {
+          router.push('/exam/blocked-apps');
+          return;
+        }
+        if (choice === 'cancel') return;
+      }
+
+      // Séance offerte : c'est le serveur qui la décompte, et lui seul qui dit
+      // non. Fail-closed : sans sa réponse, on ne lance rien, sinon une coupure
+      // réseau donnerait des séances illimitées.
+      let freeSession = false;
+      let freeSessionToken: string | null = null;
+      let freeRemainingAfter: number | null = null;
+      if (!current.premium) {
+        let result: ExamStartResult | null = null;
+        // Une cle par lancement : si la reponse se perd, le 2e essai rejoue la
+        // meme cle et le serveur renvoie le meme jeton sans decompter une 2e fois.
+        const launchKey = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+        try {
+          result = await examService.start(duration, launchKey);
+        } catch (error) {
+          console.error('Error starting free exam session, retrying once:', error);
+          try {
+            result = await examService.start(duration, launchKey);
+          } catch (retryError) {
+            console.error('Error starting free exam session:', retryError);
+          }
+        } finally {
+          // Le nombre de séances restantes vient de /auth/me, mis en cache 45 s.
+          invalidateAuthCache();
+        }
+        if (!result) {
+          // La reponse a pu se perdre APRES le decompte (delai de 15 s depasse,
+          // reseau coupe au retour) : sans jeton, cette seance ne pourrait pas
+          // etre rendue, et un nouvel essai en decompterait une seconde. On relit
+          // donc le compteur hors cache : s'il a baisse d'une seance depuis la
+          // lecture d'avant l'appel, la seance est deja payee et on la lance.
+          // Seul manque le jeton, donc le remboursement d'une annulation dans
+          // les 2 minutes. Ce cas ne reste possible que si les deux essais avec
+          // la meme cle de lancement ont echoue.
+          const before = current.freeRemaining;
+          const recheck = before !== null ? await getExamAccess({ force: true }) : null;
+          if (
+            recheck &&
+            !recheck.premium &&
+            before !== null &&
+            recheck.freeRemaining !== null &&
+            recheck.freeRemaining === before - 1
+          ) {
+            result = { allowed: true, premium: false, sessionToken: null, freeRemaining: recheck.freeRemaining };
+          }
+        }
+        if (!result) {
+          Alert.alert(
+            t('examFreeStartErrorTitle', undefined, 'Séance non lancée'),
+            t(
+              'examFreeStartErrorMessage',
+              undefined,
+              'Impossible de vérifier ta séance offerte. Vérifie ta connexion, puis réessaie.'
+            )
+          );
+          return;
+        }
+        if (!result.allowed) {
+          // La 3e séance : c'est ici que le paywall revient (spec 1.5, section 3).
+          router.replace({
+            pathname: '/exam/preview',
+            params: { reason: 'quota_exhausted', at: String(Date.now()) },
+          });
+          return;
+        }
+        if (!result.premium) {
+          freeSession = true;
+          freeSessionToken = result.sessionToken;
+          freeRemainingAfter = result.freeRemaining;
+        }
       }
 
       const sessionId = `exam_${Date.now()}`;
@@ -179,6 +311,8 @@ export default function ExamSetupScreen() {
         isDemo: false,
         liveActivityId,
         blockApps: blockAppsEnabled,
+        freeSession,
+        freeSessionToken,
       });
 
       await beginStudySession('exam', sessionId, duration, primaryTask.id);
@@ -189,7 +323,27 @@ export default function ExamSetupScreen() {
         breaks_enabled: breaks,
         app_blocking_enabled: blockAppsEnabled,
         task_count: allTaskIds.length,
+        free_session: freeSession,
       });
+      if (freeSession) {
+        // Firebase ET la base, comme les evenements de l'onboarding : sans la
+        // base, la seance offerte n'existe pas dans product_analytics_events.
+        const freeStartParams = {
+          planned_minutes: duration,
+          free_remaining: freeRemainingAfter,
+          app_blocking_enabled: blockAppsEnabled,
+          from_plan: fromPlan,
+        };
+        void trackEvent('exam_free_session_started', freeStartParams);
+        void trackBackendProductEvent('exam_free_session_started', freeStartParams);
+      }
+      if (fromPlan) {
+        void trackFirstPlannedBlockStarted({
+          mode: 'exam',
+          planned_minutes: duration,
+          free_session: freeSession,
+        });
+      }
 
       // Le blocage est un bonus, pas une condition : une session sans bouclier
       // reste une session de révision. On ne la fait donc jamais échouer ici.
@@ -320,7 +474,10 @@ export default function ExamSetupScreen() {
             <View style={styles.taskCard}>
               <Text style={styles.taskTitle} numberOfLines={0}>{primaryTask.title}</Text>
               <Text style={styles.taskSubject} numberOfLines={0}>{primaryTask.subjectName}</Text>
-              <Text style={styles.taskCoeff}>Coef {primaryTask.subjectCoefficient}</Text>
+              {/* 0 = chapitre reconstruit depuis le planning, coefficient inconnu. */}
+              {primaryTask.subjectCoefficient > 0 ? (
+                <Text style={styles.taskCoeff}>Coef {primaryTask.subjectCoefficient}</Text>
+              ) : null}
             </View>
           ) : (
             <View style={styles.emptyTaskCard}>
@@ -413,6 +570,19 @@ export default function ExamSetupScreen() {
 
         {/* CTA */}
         <Animated.View entering={FadeInDown.delay(600).duration(400)} style={styles.ctaSection}>
+          {access && !access.premium && access.freeRemaining !== null ? (
+            <View style={styles.freeBanner}>
+              <Ionicons name="gift-outline" size={18} color="#16A34A" />
+              <Text style={styles.freeBannerText}>
+                {freeSessionsLeftLabel(t, access.freeRemaining)}{' '}
+                {t(
+                  'examFreeSetupHint',
+                  undefined,
+                  "Lancer cette séance en utilise une. Annulée dans les 2 premières minutes, elle t'est rendue, une seule fois."
+                )}
+              </Text>
+            </View>
+          ) : null}
           <TouchableOpacity
             style={[styles.startButton, !primaryTask && styles.startButtonDisabled]}
             onPress={handleStart}
@@ -678,6 +848,22 @@ const styles = StyleSheet.create({
   ctaSection: {
     marginTop: 8,
     gap: 12,
+  },
+  freeBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    padding: 14,
+    borderRadius: 16,
+    backgroundColor: 'rgba(22, 163, 74, 0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(22, 163, 74, 0.2)',
+  },
+  freeBannerText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 19,
+    color: 'rgba(0, 0, 0, 0.7)',
   },
   startButton: {
     backgroundColor: '#16A34A',

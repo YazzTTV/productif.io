@@ -9,8 +9,38 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle } from 'react-native-svg';
 import { getActiveExamSession, clearExamSession, calculateTimeRemaining, saveExamSession, isDemoSession, ExamSession } from '@/utils/examSession';
 import { hasExamModeAccess } from '@/utils/premium';
-import { tasksService, subjectsService } from '@/lib/api';
+import { canLeaveExamSession, freeCancelSecondsLeft, wallClockElapsedSeconds } from '@/utils/examAccessRules';
+import { tasksService, subjectsService, examService, invalidateAuthCache } from '@/lib/api';
+import { trackBackendProductEvent } from '@/lib/productEvents';
+import { trackEvent } from '@/lib/analytics';
 import { useLanguage } from '@/contexts/LanguageContext';
+
+/**
+ * Demande au serveur de rendre une séance offerte annulée. Le serveur juge
+ * seul (délai, une seule fois par compte) : l'app ne pré-filtre rien, pour
+ * qu'un changement de règle ne demande pas de nouveau build.
+ *
+ * Temps envoyé : l'horloge réelle et non le temps de révision. Sinon lancer une
+ * séance, la mettre en pause une heure applis bloquées, puis annuler, rendrait
+ * la séance. Le serveur ne s'y fie d'ailleurs pas : il mesure lui-même le temps
+ * écoulé depuis l'heure signée dans le jeton (lib/exam/freeSessionToken.ts).
+ */
+async function cancelFreeSession(session: ExamSession | null): Promise<boolean> {
+  if (!session?.freeSession || !session.freeSessionToken) return false;
+  try {
+    const result = await examService.cancel({
+      sessionToken: session.freeSessionToken,
+      elapsedSeconds: wallClockElapsedSeconds(session.startedAt),
+    });
+    return result.refunded === true;
+  } catch (error) {
+    console.error('[ExamSession] Annulation de la séance offerte non transmise', error);
+    return false;
+  } finally {
+    // Le nombre de séances restantes vient de /auth/me, mis en cache 45 s.
+    invalidateAuthCache();
+  }
+}
 
 const RING_SIZE = 280;
 const RADIUS = 130;
@@ -128,8 +158,19 @@ export default function ExamSessionScreen() {
       // Garde d'accès. Cet écran délivre la fonctionnalité premium, il ne peut
       // pas se contenter de la présence d'une session en stockage local :
       // une vraie session (non démo) exige un plan premium. Fail-closed.
-      if (!isDemoSession(activeSession)) {
-        const hasAccess = await hasExamModeAccess();
+      //
+      // Exception : la séance offerte, déjà décomptée par le serveur au
+      // lancement. Sans elle, une app tuée en pleine séance offerte perdait la
+      // séance au redémarrage, après l'avoir consommée. Le jeton n'est pas
+      // revérifié ici : ce serait un appel réseau de plus au démarrage à froid,
+      // et falsifier le stockage local ne donne qu'une séance déjà bornée par
+      // sa durée et par l'expiration de `getActiveExamSession`.
+      //
+      // `storeWaitMs` : au démarrage à froid, Superwall n'est pas encore
+      // configuré ; un abonné dont le webhook n'est pas passé perdrait sinon sa
+      // session.
+      if (!isDemoSession(activeSession) && !activeSession.freeSession) {
+        const hasAccess = await hasExamModeAccess({ storeWaitMs: 3000 });
         if (!hasAccess) {
           await clearExamSession();
           router.replace('/exam/preview');
@@ -348,7 +389,7 @@ export default function ExamSessionScreen() {
         },
         {
           text: t('finishSession'),
-          onPress: handleEndSession,
+          onPress: () => handleEndSession({ allTasksDone: true }),
           style: 'default',
         },
       ]
@@ -389,7 +430,14 @@ export default function ExamSessionScreen() {
     setSession(updatedSession);
   };
 
-  const handleEndSession = async () => {
+  /**
+   * `allTasksDone` : fin demandée depuis l'alerte « toutes les tâches sont
+   * faites ». Elle vaut aussi en hard mode (c'est la sortie normale d'une
+   * session réussie), et ce n'est jamais une annulation : on ne demande donc
+   * pas au serveur de rendre la séance offerte.
+   */
+  const handleEndSession = async (options: { allTasksDone?: boolean } = {}) => {
+    const { allTasksDone = false } = options;
     const isDemo = session?.sessionId.startsWith('exam_demo_') || params.demo === 'true';
     
     if (isDemo) {
@@ -414,20 +462,59 @@ export default function ExamSessionScreen() {
       return;
     }
 
+    // Séance offerte arrêtée tôt : l'annulation peut la rendre, et le texte le dit.
+    const inFreeGrace = !allTasksDone && !!session && freeCancelSecondsLeft(session) > 0;
+
     Alert.alert(
-      t('endSession') || 'Terminer la session',
-      t('endSessionConfirm') || 'Êtes-vous sûr de vouloir terminer cette session ?',
+      inFreeGrace
+        ? t('examFreeCancelTitle', undefined, 'Annuler la séance ?')
+        : t('endSession') || 'Terminer la session',
+      inFreeGrace
+        ? t(
+            'examFreeCancelMessage',
+            undefined,
+            "Annulée dans les 2 premières minutes, une séance offerte t'est rendue, une seule fois par compte."
+          )
+        : t('endSessionConfirm') || 'Êtes-vous sûr de vouloir terminer cette session ?',
       [
-        { text: t('cancel') || 'Annuler', style: 'cancel' },
         {
-          text: t('end') || 'Terminer',
+          // « Annuler » à côté de « Annuler la séance » se lisait comme deux
+          // fois la même action.
+          text: inFreeGrace
+            ? t('examFreeCancelKeep', undefined, 'Continuer la séance')
+            : t('cancel') || 'Annuler',
+          style: 'cancel',
+        },
+        {
+          text: inFreeGrace ? t('examFreeCancelConfirm', undefined, 'Annuler la séance') : t('end') || 'Terminer',
           style: 'destructive',
           onPress: async () => {
             if (finishingRef.current) return;
+            const latest = (await getActiveExamSession()) ?? session;
+            // Le hard mode n'a pas de sortie. Seule exception, la fenêtre
+            // d'annulation d'une séance offerte, revérifiée ici : l'alerte a pu
+            // rester ouverte au-delà.
+            if (latest && !canLeaveExamSession(latest, { allTasksDone })) {
+              Alert.alert(t('hardModeActive'), t('hardModeWarning'), [{ text: t('ok') }]);
+              return;
+            }
             finishingRef.current = true;
-            const latest = await getActiveExamSession();
             const recorded = await changeStudySession('exam', 'stopped');
+            // Avant clearExamSession, qui efface le jeton du stockage.
+            const refunded = allTasksDone ? false : await cancelFreeSession(latest);
             await clearExamSession();
+            if (refunded) {
+              Alert.alert(
+                t('examFreeRefundedTitle', undefined, 'Séance rendue'),
+                t(
+                  'examFreeRefundedMessage',
+                  undefined,
+                  "Cette séance offerte n'a pas été décomptée. Tu peux la relancer quand tu veux."
+                ),
+                [{ text: t('ok'), onPress: () => router.replace('/exam/setup') }]
+              );
+              return;
+            }
             const completedCount = latest?.completedTaskIds.length ?? session?.completedTaskIds.length ?? 0;
             router.replace({
               pathname: '/exam/summary',
@@ -435,6 +522,7 @@ export default function ExamSessionScreen() {
                 duration: String(Math.round((recorded?.seconds ?? 0) / 60)),
                 studySessionId: recorded?.clientId ?? '',
                 completed: completedCount.toString(),
+                free: latest?.freeSession ? '1' : '',
               },
             });
           },
@@ -452,7 +540,19 @@ export default function ExamSessionScreen() {
     
     const recorded = !isDemo ? await changeStudySession('exam', 'completed') : null;
     await clearExamSession();
-    
+
+    const endedSession = latest ?? session;
+    const wasFree = !isDemo && !!endedSession?.freeSession;
+    if (wasFree) {
+      const freeDoneParams = {
+        planned_minutes: endedSession?.plannedDuration ?? null,
+        completed_tasks: endedSession?.completedTaskIds.length ?? 0,
+        app_blocking_enabled: !!endedSession?.blockApps,
+      };
+      void trackEvent('exam_free_session_completed', freeDoneParams);
+      void trackBackendProductEvent('exam_free_session_completed', freeDoneParams);
+    }
+
     if (isDemo) {
       // Pour la démo, rediriger vers le paywall
       Alert.alert(
@@ -480,6 +580,7 @@ export default function ExamSessionScreen() {
         duration: String(Math.round((recorded?.seconds ?? 0) / 60)),
         studySessionId: recorded?.clientId ?? '',
         completed: completedCount.toString(),
+        free: wasFree ? '1' : '',
       },
     });
   };
@@ -498,6 +599,9 @@ export default function ExamSessionScreen() {
     ? 1 - (timeRemaining / (session.plannedDuration * 60))
     : 0;
   const strokeDashoffset = CIRCUMFERENCE * (1 - progress);
+  // Fenêtre d'annulation d'une séance offerte. Recalculée à chaque tic du
+  // minuteur, qui fait déjà re-rendre l'écran toutes les secondes.
+  const freeGraceLeft = freeCancelSecondsLeft(session);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -506,10 +610,28 @@ export default function ExamSessionScreen() {
         {!session.hardMode && (
           <TouchableOpacity
             style={styles.endButton}
-            onPress={handleEndSession}
+            onPress={() => handleEndSession()}
             activeOpacity={0.7}
           >
             <Text style={styles.endButtonText}>{t('end')}</Text>
+          </TouchableOpacity>
+        )}
+        {/*
+          Le hard mode n'a aucune sortie, et il est activé par défaut : sans ce
+          bouton, la règle « annulée dans les 2 minutes, la séance est rendue »
+          ne servait à personne. Il ne vaut que pour une séance offerte (lancée
+          par erreur, mauvais chapitre) et disparaît au bout de la fenêtre, donc
+          il n'ouvre aucune porte de sortie en pleine révision.
+        */}
+        {session.hardMode && freeGraceLeft > 0 && (
+          <TouchableOpacity
+            style={styles.endButton}
+            onPress={() => handleEndSession()}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.endButtonText}>
+              {t('examFreeCancelButton', { seconds: freeGraceLeft }, 'Annuler ({seconds} s)')}
+            </Text>
           </TouchableOpacity>
         )}
       </View>
