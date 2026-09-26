@@ -24,6 +24,8 @@ import { authService } from '@/lib/api';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { flushQueuedAttribution } from '@/hooks/useAppsFlyer';
+import { startOnboardingDraft } from '@/lib/onboardingDraft';
+import { trackStepCompleted, useOnboardingStep } from '@/lib/onboardingTracking';
 
 export default function ConnectionScreen() {
   const { t } = useLanguage();
@@ -36,6 +38,7 @@ export default function ConnectionScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const isMountedRef = useRef(true);
+  useOnboardingStep('connection');
   
   useEffect(() => {
     isMountedRef.current = true;
@@ -74,6 +77,10 @@ export default function ConnectionScreen() {
         
         if (!isNewUser) {
           await AsyncStorage.setItem('onboarding_completed', 'true');
+        } else {
+          // Brouillon de l'onboarding 1.5 et drapeau de reprise (lib/onboardingDraft.ts).
+          await startOnboardingDraft().catch(() => {});
+          trackStepCompleted('connection', { method: 'google', new_user: true });
         }
         
         InteractionManager.runAfterInteractions(() => {
@@ -136,6 +143,10 @@ export default function ConnectionScreen() {
         
         if (!isNewUser) {
           await AsyncStorage.setItem('onboarding_completed', 'true');
+        } else {
+          // Brouillon de l'onboarding 1.5 et drapeau de reprise (lib/onboardingDraft.ts).
+          await startOnboardingDraft().catch(() => {});
+          trackStepCompleted('connection', { method: 'apple', new_user: true });
         }
         
         InteractionManager.runAfterInteractions(() => {
@@ -195,6 +206,8 @@ export default function ConnectionScreen() {
         const response = await authService.signup({ name, email, password });
         if (response.success) {
           flushQueuedAttribution();
+          await startOnboardingDraft().catch(() => {});
+          trackStepCompleted('connection', { method: 'email', new_user: true });
           InteractionManager.runAfterInteractions(() => {
             setTimeout(() => {
               router.replace('/(onboarding-new)/value-awareness');

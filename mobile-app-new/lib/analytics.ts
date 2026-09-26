@@ -21,7 +21,18 @@ export type ProductEvent =
   | 'purchase_restored'
   | 'study_plan_synced'
   | 'study_reminder_opened'
-  | 'auto_block_scheduled';
+  | 'auto_block_scheduled'
+  // Onboarding 1.5 (contrat commun, point 6). Meme liste que la liste blanche
+  // de lib/productEvents.ts et de app/api/user/product-events/route.ts.
+  | 'onboarding_step_viewed'
+  | 'onboarding_step_completed'
+  | 'onboarding_calendar_choice'
+  | 'onboarding_plan_built'
+  | 'trial_cta_tapped'
+  | 'paywall_skipped'
+  | 'exam_free_session_started'
+  | 'exam_free_session_completed'
+  | 'first_planned_block_started';
 
 type EventParams = Record<string, string | number | boolean | null | undefined>;
 

@@ -7,6 +7,22 @@ import { useFocusEffect } from '@react-navigation/native';
 /** Écrans du groupe (onboarding-new) qu’on doit pouvoir ouvrir après `onboarding_completed=true` (ex. didacticiel → sync calendrier). */
 const SKIP_COMPLETED_ONBOARDING_REDIRECT = new Set([
   'calendar-sync',
+  // Onboarding 1.5 : un utilisateur existant sans matiere doit pouvoir etre
+  // envoye sur les ecrans du planning par la carte « Construis ton planning »
+  // (spec, cas limites). Sans cette exception, `onboarding_completed=true` le
+  // renverrait aussitot sur les onglets.
+  'exams',
+  'subjects',
+  'chapters',
+  'courses',
+  // La suite du meme chemin, jusqu'au bout : calcul, planning, ecran d'essai et
+  // ses deux sorties. Sans elles, l'utilisateur existant qui construit son
+  // planning depuis la carte etait renvoye sur les onglets des le calcul.
+  'building-plan',
+  'planning',
+  'trial',
+  'premium-setup',
+  'free-sessions',
 ]);
 
 export default function OnboardingNewLayout() {

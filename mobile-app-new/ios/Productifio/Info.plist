@@ -68,9 +68,9 @@
 		<true/>
 	</dict>
 	<key>NSCalendarsFullAccessUsageDescription</key>
-	<string>Nous avons besoin d'accéder à votre calendrier pour synchroniser vos tâches.</string>
+	<string>Productif lit les horaires de ton agenda, emploi du temps compris, pour placer tes révisions autour de tes cours, et ajoute tes séances dans un calendrier « Productif ». Seules les heures sont envoyées à nos serveurs, jamais les titres ni les lieux.</string>
 	<key>NSCalendarsUsageDescription</key>
-	<string>Nous avons besoin d'accéder à votre calendrier pour synchroniser vos tâches.</string>
+	<string>Productif lit les horaires de ton agenda, emploi du temps compris, pour placer tes révisions autour de tes cours, et ajoute tes séances dans un calendrier « Productif ». Seules les heures sont envoyées à nos serveurs, jamais les titres ni les lieux.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Nous avons besoin d'accéder à votre appareil photo pour photographier vos listes de matières.</string>
 	<key>NSMicrophoneUsageDescription</key>

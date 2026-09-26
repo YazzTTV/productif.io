@@ -13,6 +13,7 @@ import Animated, {
 import { router } from 'expo-router';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { trackStepCompleted, useOnboardingStep } from '@/lib/onboardingTracking';
 import { Slider } from '@/components/ui/Slider';
 import { useOnboardingData } from '@/hooks/useOnboardingData';
 
@@ -27,6 +28,7 @@ const goalOptions = [
 export default function GoalsPressureScreen() {
   const { t } = useLanguage();
   const insets = useSafeAreaInsets();
+  useOnboardingStep('goals-pressure');
   const { saveResponse, getResponse } = useOnboardingData();
   const [selectedGoals, setSelectedGoals] = useState<string[]>([]);
   const [pressureLevel, setPressureLevel] = useState(3);
@@ -63,6 +65,7 @@ export default function GoalsPressureScreen() {
       await saveResponse('goals', selectedGoals);
       await saveResponse('pressureLevel', pressureLevel);
       await saveResponse('currentStep', 4);
+      trackStepCompleted('goals-pressure');
       router.push('/(onboarding-new)/academic-context');
     }
   };

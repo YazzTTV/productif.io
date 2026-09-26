@@ -13,10 +13,12 @@ import Animated, {
 import { router } from 'expo-router';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { trackStepCompleted, useOnboardingStep } from '@/lib/onboardingTracking';
 
 export default function ValueAwarenessScreen() {
   const { t } = useLanguage();
   const insets = useSafeAreaInsets();
+  useOnboardingStep('value-awareness');
   const [currentStatement, setCurrentStatement] = useState(0);
   const [showAll, setShowAll] = useState(false);
 
@@ -47,6 +49,7 @@ export default function ValueAwarenessScreen() {
   }, [currentStatement, statements.length]);
 
   const handleContinue = () => {
+    trackStepCompleted('value-awareness');
     router.push('/(onboarding-new)/identity');
   };
 

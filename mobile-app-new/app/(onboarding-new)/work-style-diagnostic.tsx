@@ -13,12 +13,14 @@ import Animated, {
 import { router } from 'expo-router';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { trackStepCompleted, useOnboardingStep } from '@/lib/onboardingTracking';
 import { Slider } from '@/components/ui/Slider';
 import { useOnboardingData } from '@/hooks/useOnboardingData';
 
 export default function WorkStyleDiagnosticScreen() {
   const { t } = useLanguage();
   const insets = useSafeAreaInsets();
+  useOnboardingStep('work-style-diagnostic');
   const { saveResponse, getResponse } = useOnboardingData();
   const [mentalLoad, setMentalLoad] = useState(3);
   const [focusQuality, setFocusQuality] = useState(3);
@@ -92,6 +94,7 @@ export default function WorkStyleDiagnosticScreen() {
       await saveResponse('overthinkTasks', overthinkTasks);
       await saveResponse('shouldDoMore', shouldDoMore);
       await saveResponse('currentStep', 7);
+      trackStepCompleted('work-style-diagnostic');
       router.push('/(onboarding-new)/goals-intent');
     }
   };

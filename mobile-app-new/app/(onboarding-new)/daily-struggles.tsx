@@ -13,6 +13,7 @@ import Animated, {
 import { router } from 'expo-router';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { trackStepCompleted, useOnboardingStep } from '@/lib/onboardingTracking';
 import { useOnboardingData } from '@/hooks/useOnboardingData';
 
 const struggles = [
@@ -26,6 +27,7 @@ const struggles = [
 export default function DailyStrugglesScreen() {
   const { t } = useLanguage();
   const insets = useSafeAreaInsets();
+  useOnboardingStep('daily-struggles');
   const { saveResponse, getResponse } = useOnboardingData();
   const [selectedStruggles, setSelectedStruggles] = useState<string[]>([]);
 
@@ -53,6 +55,7 @@ export default function DailyStrugglesScreen() {
   const handleContinue = async () => {
     await saveResponse('dailyStruggles', selectedStruggles);
     await saveResponse('currentStep', 6);
+    trackStepCompleted('daily-struggles');
     router.push('/(onboarding-new)/work-style-diagnostic');
   };
 

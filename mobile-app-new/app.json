@@ -19,8 +19,8 @@
         "NSPhotoLibraryUsageDescription": "We need access to your photo library to let you select images for your tasks and journal entries.",
         "NSPhotoLibraryAddUsageDescription": "We need permission to save images to your photo library.",
         "NSUserNotificationsUsageDescription": "Nous avons besoin de votre permission pour vous envoyer des notifications importantes concernant vos tâches, habitudes et rappels.",
-        "NSCalendarsUsageDescription": "Nous avons besoin d'accéder à votre calendrier pour synchroniser vos tâches et créer des événements.",
-        "NSCalendarsFullAccessUsageDescription": "Nous avons besoin d'un accès complet à votre calendrier pour synchroniser vos tâches et créer des événements.",
+        "NSCalendarsUsageDescription": "Productif lit les horaires de ton agenda, emploi du temps compris, pour placer tes révisions autour de tes cours, et ajoute tes séances dans un calendrier « Productif ». Seules les heures sont envoyées à nos serveurs, jamais les titres ni les lieux.",
+        "NSCalendarsFullAccessUsageDescription": "Productif lit les horaires de ton agenda, emploi du temps compris, pour placer tes révisions autour de tes cours, et ajoute tes séances dans un calendrier « Productif ». Seules les heures sont envoyées à nos serveurs, jamais les titres ni les lieux.",
         "NSRemindersUsageDescription": "Nous avons besoin d'accéder à vos rappels pour synchroniser vos tâches.",
         "ITSAppUsesNonExemptEncryption": false
       },
@@ -97,7 +97,7 @@
       [
         "expo-calendar",
         {
-          "calendarPermission": "Nous avons besoin d'accéder à votre calendrier pour synchroniser vos tâches."
+          "calendarPermission": "Productif lit les horaires de ton agenda, emploi du temps compris, pour placer tes révisions autour de tes cours, et ajoute tes séances dans un calendrier « Productif ». Seules les heures sont envoyées à nos serveurs, jamais les titres ni les lieux."
         }
       ],
       [

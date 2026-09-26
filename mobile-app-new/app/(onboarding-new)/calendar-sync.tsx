@@ -20,7 +20,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { connectGoogleCalendar, connectAppleCalendar, createAppleCalendarEvent } from '@/lib/calendarAuth';
 import { googleCalendarService, onboardingService } from '@/lib/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getTutorialStage, setTutorialCompleted, setTutorialStage } from '@/tutorial/tutorialStorage';
+import { getTutorialCompleted, getTutorialStage, setTutorialCompleted, setTutorialStage } from '@/tutorial/tutorialStorage';
 import { useSuperwall } from '@/hooks/useSuperwall';
 import { SUPERWALL_EVENTS } from '@/lib/superwallEvents';
 
@@ -264,9 +264,13 @@ export default function CalendarSyncScreen() {
     try {
       await AsyncStorage.setItem('onboarding_completed', 'true');
       // L'etat du didacticiel est pose AVANT le paywall : l'utilisateur qui le
-      // ferme arrive alors sur des onglets deja prets.
-      await setTutorialCompleted(false);
-      await setTutorialStage('calendar');
+      // ferme arrive alors sur des onglets deja prets. Jamais rearme s'il est
+      // deja termine : depuis l'onboarding 1.5 (qui le termine a l'ecran
+      // d'essai), on n'arrive plus ici que depuis PlanMyDay ou le didacticiel.
+      if (!(await getTutorialCompleted())) {
+        await setTutorialCompleted(false);
+        await setTutorialStage('calendar');
+      }
       await triggerEvent(SUPERWALL_EVENTS.ONBOARDING_COMPLETED, {
         params: { source: 'calendar_sync_skip' },
         requireNonPremium: false,

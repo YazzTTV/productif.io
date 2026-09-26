@@ -151,6 +151,23 @@ function enqueueBackendSync(userId: string, data: OnboardingResponses): Promise<
   return sync;
 }
 
+/**
+ * Lecture hors composant des réponses du questionnaire, pour le brouillon de
+ * l'onboarding 1.5 (lib/onboardingDraft.ts). Attend les écritures locales en
+ * file : sinon la dernière réponse, sauvegardée juste avant la navigation,
+ * pourrait manquer à la requête de planification.
+ */
+export async function readOnboardingResponses(): Promise<OnboardingResponses> {
+  try {
+    const { userId, key } = await getScopedKey();
+    await localWriteQueues.get(key)?.catch(() => {});
+    return await readStoredResponses(userId, key);
+  } catch (error) {
+    console.error('❌ [OnboardingData] Erreur lecture hors composant:', error);
+    return {};
+  }
+}
+
 export function useOnboardingData() {
   const [responses, setResponses] = useState<OnboardingResponses>({});
   const [isLoading, setIsLoading] = useState(true);

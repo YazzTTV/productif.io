@@ -1,316 +1,275 @@
-import React, { useEffect, useState, useRef } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-} from 'react-native';
-import Animated, {
-  FadeIn,
-  FadeInDown,
-  useSharedValue,
-  useAnimatedStyle,
-  withTiming,
-  withRepeat,
-  cancelAnimation,
-  Easing,
-} from 'react-native-reanimated';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
+import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { router, useLocalSearchParams } from 'expo-router';
-import Svg, { Circle } from 'react-native-svg';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { onboardingService, type StudyBlock } from '@/lib/api';
+import { buildOnboardingPlanRequest, useOnboardingDraft } from '@/lib/onboardingDraft';
+import { trackOnboardingEvent, trackStepCompleted, useOnboardingStep } from '@/lib/onboardingTracking';
+import { loadPlanBlocks, rememberPlanBlocks } from '@/lib/onboardingFlow';
+import { isPlanTimeout } from '@/lib/onboardingPlanView';
+import { parseLocalYmd, sanitizeExamDate } from '@/lib/onboardingLogic';
+import {
+  ONBOARDING_GREEN,
+  OnboardingScreen,
+  PrimaryButton,
+  SecondaryButton,
+  onboardingText,
+} from '@/components/onboarding/OnboardingUI';
 
-const AnimatedCircle = Animated.createAnimatedComponent(Circle);
+/**
+ * Ecran de calcul (spec 1.5, ecran 8). Il remplace la minuterie qui simulait un
+ * calcul : cet ecran FAIT le calcul, par POST /api/onboarding/plan, qui cree
+ * matieres et chapitres puis place les seances.
+ *
+ * Les delais, et pourquoi :
+ *   - 20 s au plus cote app. Le serveur borne son calcul rapide (sans Google) a
+ *     3 s et fait le calcul complet apres sa reponse (after()), donc au-dela
+ *     c'est le reseau qui manque, pas le calcul ;
+ *   - `partial` sans aucun bloc : le calcul rapide n'a pas fini, le complet
+ *     tourne encore sur le serveur. On relit GET /api/planning/blocks quelques
+ *     secondes avant d'avancer, sinon l'ecran du planning s'afficherait vide
+ *     alors que les seances arrivent ;
+ *   - echec ou delai : repli HONNETE. GET /api/planning/blocks ne calcule rien,
+ *     il lit ce qui existe (critique de la spec, point 6). On dit donc ce qu'on
+ *     montre, et on propose de reessayer : la cle d'idempotence du brouillon
+ *     garantit qu'un second envoi ne cree pas les matieres en double.
+ *
+ * `onboarding_plan_built {ms, timeout, blocks}` part a chaque tentative : le
+ * seuil de la spec est « moins de 10 % de depassements de delai ».
+ */
 
-interface Step {
-  key: string;
-  textKey: string;
+const PLAN_TIMEOUT_MS = 20_000;
+const PARTIAL_POLL_STEP_MS = 2_000;
+const PARTIAL_POLL_MAX_MS = 8_000;
+/** Au-dela, on le dit : rien n'est pire qu'une roue qui tourne sans explication. */
+const SLOW_HINT_MS = 8_000;
+
+type Phase = { kind: 'computing' } | { kind: 'fallback'; blocks: number } | { kind: 'failed' };
+
+function errorLabel(error: unknown): string {
+  const status = (error as { status?: unknown } | null)?.status;
+  return typeof status === 'number' ? `http_${status}` : 'network';
 }
 
-// Cet ecran ne fait AUCUN travail : aucun fetch, aucun await, aucun service
-// importe. Les taches sont deja completes, elles entrent par `params.tasks` et
-// ressortent telles quelles vers ideal-day. On garde une transition tres breve
-// pour rendre le changement d'ecran lisible, sans simuler un calcul inexistant.
-// Les trois minuteurs partent ensemble depuis le montage : s'ils sont retardes
-// par le runtime, leur retard ne se cumule plus et ils se rattrapent d'un coup.
-const STEP_INTERVAL_MS = 200;
-const NAVIGATION_DELAY_MS = STEP_INTERVAL_MS * 3 + 100;
-
-const steps: Step[] = [
-  { key: 'priorities', textKey: 'understandingPriorities' },
-  { key: 'effort', textKey: 'estimatingEffort' },
-  { key: 'plan', textKey: 'creatingPlan' },
-];
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export default function BuildingPlanScreen() {
-  const { t } = useLanguage();
-  const insets = useSafeAreaInsets();
-  const params = useLocalSearchParams();
-  
-  const [currentStep, setCurrentStep] = useState(0);
-  const [completedSteps, setCompletedSteps] = useState<number[]>([]);
-  const isMountedRef = useRef(true);
-  const isNavigatingRef = useRef(false);
+  const { t, language } = useLanguage();
+  const { draft } = useOnboardingDraft();
+  const [phase, setPhase] = useState<Phase>({ kind: 'computing' });
+  const [slow, setSlow] = useState(false);
+  const aliveRef = useRef(true);
+  const runningRef = useRef(false);
+  const attemptRef = useRef(0);
 
-  const spinnerRotation = useSharedValue(0);
+  useOnboardingStep('building-plan');
 
   useEffect(() => {
-    isMountedRef.current = true;
-    isNavigatingRef.current = false;
-    
-    // Spinner animation
-    spinnerRotation.value = withRepeat(
-      withTiming(360, { duration: 1000, easing: Easing.linear }),
-      -1,
-      false
-    );
-    
+    aliveRef.current = true;
     return () => {
-      isMountedRef.current = false;
-      cancelAnimation(spinnerRotation);
+      aliveRef.current = false;
     };
   }, []);
 
+  /** Relit les blocs tant que le calcul complet du serveur n'a rien ecrit, jusqu'a `deadline`. */
+  const waitForBlocks = useCallback(async (deadline: number): Promise<StudyBlock[]> => {
+    while (aliveRef.current && Date.now() + PARTIAL_POLL_STEP_MS <= deadline) {
+      await sleep(PARTIAL_POLL_STEP_MS);
+      const fresh = await loadPlanBlocks({ force: true });
+      if (fresh && fresh.length > 0) return fresh;
+    }
+    return [];
+  }, []);
+
+  const run = useCallback(async () => {
+    if (runningRef.current) return;
+    runningRef.current = true;
+    attemptRef.current += 1;
+    setPhase({ kind: 'computing' });
+    setSlow(false);
+    const started = Date.now();
+    const slowTimer = setTimeout(() => {
+      if (aliveRef.current) setSlow(true);
+    }, SLOW_HINT_MS);
+
+    try {
+      const request = await buildOnboardingPlanRequest();
+      try {
+        const response = await onboardingService.buildPlan(request, PLAN_TIMEOUT_MS);
+        const partial = response?.partial === true;
+        let blocks: StudyBlock[] = Array.isArray(response?.blocks) ? response.blocks : [];
+        if (partial && blocks.length === 0 && request.subjects.length > 0) {
+          blocks = await waitForBlocks(Math.min(started + PLAN_TIMEOUT_MS, Date.now() + PARTIAL_POLL_MAX_MS));
+        }
+        rememberPlanBlocks(blocks);
+        trackOnboardingEvent('onboarding_plan_built', {
+          ms: Date.now() - started,
+          timeout: false,
+          blocks: blocks.length,
+          partial,
+          fallback: false,
+          subjects: request.subjects.length,
+          attempt: attemptRef.current,
+        });
+        trackStepCompleted('building-plan', { outcome: 'built', blocks: blocks.length, partial });
+        if (aliveRef.current) router.replace('/(onboarding-new)/planning');
+      } catch (error) {
+        const ms = Date.now() - started;
+        const timeout = isPlanTimeout(error, ms, PLAN_TIMEOUT_MS);
+        console.warn('[Onboarding] calcul du planning en echec', error);
+        // Ce qui existe deja cote serveur, sans rien calculer.
+        const existing = await loadPlanBlocks({ force: true });
+        trackOnboardingEvent('onboarding_plan_built', {
+          ms,
+          timeout,
+          blocks: existing?.length ?? 0,
+          partial: true,
+          fallback: true,
+          error: timeout ? 'timeout' : errorLabel(error),
+          subjects: request.subjects.length,
+          attempt: attemptRef.current,
+        });
+        if (!aliveRef.current) return;
+        setPhase(existing && existing.length > 0 ? { kind: 'fallback', blocks: existing.length } : { kind: 'failed' });
+      }
+    } finally {
+      clearTimeout(slowTimer);
+      runningRef.current = false;
+    }
+  }, [waitForBlocks]);
+
   useEffect(() => {
-    const stepTimers = steps.map((_, index) =>
-      setTimeout(() => {
-        if (!isMountedRef.current) return;
-        setCompletedSteps(steps.slice(0, index + 1).map((__, stepIndex) => stepIndex));
-        setCurrentStep(index + 1);
-      }, STEP_INTERVAL_MS * (index + 1))
+    void run();
+  }, [run]);
+
+  const continueAnyway = (outcome: 'fallback' | 'failed') => {
+    trackStepCompleted('building-plan', { outcome });
+    router.replace('/(onboarding-new)/planning');
+  };
+
+  // Ce que le calcul utilise, pour que l'attente ait un contenu reel.
+  const subjectCount = draft?.subjects.length ?? 0;
+  // Meme nettoyage que la requete : une date passee part en « je ne sais pas ».
+  const examDate = draft && !draft.examDateUnknown ? parseLocalYmd(sanitizeExamDate(draft.examDate)) : null;
+  const locale = language === 'en' ? 'en-US' : language === 'es' ? 'es-ES' : 'fr-FR';
+  const facts = (() => {
+    if (!draft) return null;
+    if (subjectCount === 0) {
+      return t('onbBuildFactsNoSubject', undefined, 'Sans matière pour le moment : tu pourras les ajouter depuis ton accueil.');
+    }
+    const subjects =
+      subjectCount === 1
+        ? t('onbBuildFactsOneSubject', undefined, '1 matière')
+        : t('onbBuildFactsSubjects', { count: subjectCount }, '{count} matières');
+    if (examDate) {
+      const date = examDate.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' });
+      return t('onbBuildFactsWithDate', { subjects, date }, '{subjects}, examens le {date}, autour de tes cours.');
+    }
+    return t('onbBuildFactsNoDate', { subjects }, '{subjects}, autour de tes cours.');
+  })();
+
+  if (phase.kind === 'computing') {
+    return (
+      <OnboardingScreen centered>
+        <Animated.View entering={FadeIn.duration(250)} style={styles.center}>
+          <ActivityIndicator size="large" color={ONBOARDING_GREEN} style={styles.spinner} />
+          <Text style={onboardingText.title}>{t('onbBuildTitle', undefined, 'Ton planning se calcule…')}</Text>
+          {facts ? <Text style={[onboardingText.subtitle, styles.facts]}>{facts}</Text> : null}
+          {slow ? (
+            <Animated.View entering={FadeInDown.duration(300)}>
+              <Text style={onboardingText.help}>
+                {t('onbBuildSlow', undefined, "Ça prend un peu plus longtemps que d'habitude. Encore quelques secondes.")}
+              </Text>
+            </Animated.View>
+          ) : null}
+        </Animated.View>
+      </OnboardingScreen>
     );
+  }
 
-    const navigationTimer = setTimeout(() => {
-      if (!isMountedRef.current || isNavigatingRef.current) return;
-      isNavigatingRef.current = true;
-      router.push({
-        pathname: '/(onboarding-new)/ideal-day',
-        params: {
-          tasks: params.tasks as string || '[]',
-        },
-      });
-    }, NAVIGATION_DELAY_MS);
-
-    return () => {
-      stepTimers.forEach(clearTimeout);
-      clearTimeout(navigationTimer);
-    };
-  }, [params.tasks]);
-
-  const spinnerStyle = useAnimatedStyle(() => ({
-    transform: [{ rotate: `${spinnerRotation.value}deg` }],
-  }));
-
-  // Calculate circular progress
-  const radius = 56;
-  const circumference = 2 * Math.PI * radius;
-  const progress = completedSteps.length / steps.length;
-  const strokeDashoffset = circumference - progress * circumference;
-
-  return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      <View style={styles.content}>
-        {/* Title */}
-        <Animated.View entering={FadeIn.duration(200)} style={styles.header}>
-          <Text style={styles.title}>
-            {t('designingDay') || 'Designing your ideal day…'}
+  if (phase.kind === 'fallback') {
+    return (
+      <OnboardingScreen
+        centered
+        footer={
+          <>
+            <PrimaryButton
+              label={t('onbBuildSeePlan', undefined, 'Voir mon planning')}
+              onPress={() => continueAnyway('fallback')}
+            />
+            <SecondaryButton label={t('onbBuildRetry', undefined, 'Réessayer le calcul')} onPress={() => void run()} />
+          </>
+        }
+      >
+        <Animated.View entering={FadeIn.duration(250)} style={styles.center}>
+          <View style={styles.icon}>
+            <Ionicons name="time-outline" size={32} color={ONBOARDING_GREEN} />
+          </View>
+          <Text style={onboardingText.title}>{t('onbBuildFallbackTitle', undefined, 'Le calcul prend plus de temps que prévu')}</Text>
+          <Text style={onboardingText.subtitle}>
+            {phase.blocks === 1
+              ? t(
+                  'onbBuildFallbackOne',
+                  undefined,
+                  "1 séance est déjà placée, c'est elle que tu vas voir. Le reste arrivera dans ton accueil dès que le calcul sera terminé."
+                )
+              : t(
+                  'onbBuildFallbackMany',
+                  { count: phase.blocks },
+                  "{count} séances sont déjà placées, ce sont elles que tu vas voir. Le reste arrivera dans ton accueil dès que le calcul sera terminé."
+                )}
           </Text>
         </Animated.View>
+      </OnboardingScreen>
+    );
+  }
 
-        {/* Circular Progress */}
-        <Animated.View entering={FadeIn.delay(50).duration(200)} style={styles.circularProgress}>
-          <Svg width="160" height="160" style={styles.progressSvg}>
-            {/* Background Circle */}
-            <Circle
-              cx="80"
-              cy="80"
-              r={radius}
-              stroke="rgba(0, 0, 0, 0.05)"
-              strokeWidth="8"
-              fill="none"
-            />
-            
-            {/* Progress Circle */}
-            <AnimatedCircle
-              cx="80"
-              cy="80"
-              r={radius}
-              stroke="#16A34A"
-              strokeWidth="8"
-              fill="none"
-              strokeLinecap="round"
-              strokeDasharray={circumference}
-              strokeDashoffset={strokeDashoffset}
-            />
-          </Svg>
-
-          {/* Center content */}
-          <View style={styles.progressCenter}>
-            <Text style={styles.progressText}>
-              {completedSteps.length}/{steps.length}
-            </Text>
-          </View>
-        </Animated.View>
-
-        {/* Steps list */}
-        <View style={styles.stepsList}>
-          {steps.map((step, index) => {
-            const isCompleted = completedSteps.includes(index);
-            const isCurrent = currentStep === index;
-
-            return (
-            <Animated.View
-                key={step.key}
-                entering={FadeInDown.delay(75 + index * 50).duration(200)}
-                style={[
-                  styles.stepItem,
-                  isCurrent && styles.stepItemCurrent,
-                  isCompleted && styles.stepItemCompleted,
-                ]}
-              >
-                <View style={[
-                  styles.stepIcon,
-                  isCompleted && styles.stepIconCompleted,
-                  isCurrent && styles.stepIconCurrent,
-                ]}>
-                  {isCompleted ? (
-                    <Ionicons name="checkmark" size={18} color="#FFFFFF" />
-                  ) : (
-                    <View style={[
-                      styles.stepDot,
-                      isCurrent && styles.stepDotCurrent,
-                    ]} />
-                  )}
-                </View>
-
-                <Text style={[
-                  styles.stepText,
-                  isCompleted && styles.stepTextCompleted,
-                  isCurrent && styles.stepTextCurrent,
-                ]}>
-                  {t(step.textKey) || step.textKey}
-                </Text>
-
-                {isCurrent && (
-                  <Animated.View style={[styles.spinner, spinnerStyle]}>
-                    <View style={styles.spinnerCircle} />
-                  </Animated.View>
-                )}
-              </Animated.View>
-            );
-          })}
+  return (
+    <OnboardingScreen
+      centered
+      footer={
+        <>
+          <PrimaryButton label={t('onbBuildRetry', undefined, 'Réessayer le calcul')} onPress={() => void run()} />
+          <SecondaryButton label={t('onbBuildContinue', undefined, 'Continuer sans attendre')} onPress={() => continueAnyway('failed')} />
+        </>
+      }
+    >
+      <Animated.View entering={FadeIn.duration(250)} style={styles.center}>
+        <View style={styles.icon}>
+          <Ionicons name="cloud-offline-outline" size={32} color={ONBOARDING_GREEN} />
         </View>
-      </View>
-    </View>
+        <Text style={onboardingText.title}>{t('onbBuildFailedTitle', undefined, "Ton planning n'a pas pu être calculé")}</Text>
+        <Text style={onboardingText.subtitle}>
+          {t(
+            'onbBuildFailedText',
+            undefined,
+            "La connexion au serveur a échoué. Tes réponses sont gardées sur ton téléphone : relance le calcul, rien ne sera créé en double."
+          )}
+        </Text>
+      </Animated.View>
+    </OnboardingScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-  },
-  content: {
-    flex: 1,
-    justifyContent: 'center',
+  center: {
     alignItems: 'center',
-    paddingHorizontal: 24,
-  },
-  header: {
-    marginBottom: 48,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: '600',
-    color: '#000000',
-    textAlign: 'center',
-    letterSpacing: -0.03 * 24,
-  },
-  circularProgress: {
-    marginBottom: 48,
-    position: 'relative',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  progressSvg: {
-    transform: [{ rotate: '-90deg' }],
-  },
-  progressCenter: {
-    position: 'absolute',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  progressText: {
-    fontSize: 24,
-    fontWeight: '600',
-    color: '#000000',
-    letterSpacing: -0.03 * 24,
-  },
-  stepsList: {
-    width: '100%',
-    gap: 12,
-  },
-  stepItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderRadius: 16,
-    backgroundColor: 'rgba(0, 0, 0, 0.05)',
-    gap: 16,
-  },
-  stepItemCurrent: {
-    backgroundColor: 'rgba(22, 163, 74, 0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(22, 163, 74, 0.2)',
-  },
-  stepItemCompleted: {
-    backgroundColor: 'rgba(22, 163, 74, 0.05)',
-  },
-  stepIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(0, 0, 0, 0.1)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  stepIconCurrent: {
-    backgroundColor: 'rgba(22, 163, 74, 0.2)',
-  },
-  stepIconCompleted: {
-    backgroundColor: '#16A34A',
-  },
-  stepDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
-  },
-  stepDotCurrent: {
-    backgroundColor: '#16A34A',
-  },
-  stepText: {
-    flex: 1,
-    fontSize: 16,
-    color: 'rgba(0, 0, 0, 0.4)',
-  },
-  stepTextCurrent: {
-    color: '#000000',
-    fontWeight: '500',
-  },
-  stepTextCompleted: {
-    color: '#16A34A',
   },
   spinner: {
-    width: 20,
-    height: 20,
+    marginBottom: 28,
   },
-  spinnerCircle: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 2,
-    borderColor: 'rgba(22, 163, 74, 0.3)',
-    borderTopColor: '#16A34A',
+  facts: {
+    marginBottom: 16,
+  },
+  icon: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: 'rgba(22, 163, 74, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 24,
   },
 });

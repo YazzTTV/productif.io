@@ -13,6 +13,7 @@ import Animated, {
 import { router } from 'expo-router';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { trackStepCompleted, useOnboardingStep } from '@/lib/onboardingTracking';
 import { useOnboardingData } from '@/hooks/useOnboardingData';
 
 const situations = [
@@ -26,6 +27,7 @@ const situations = [
 export default function AcademicContextScreen() {
   const { t } = useLanguage();
   const insets = useSafeAreaInsets();
+  useOnboardingStep('academic-context');
   const { saveResponse, getResponse } = useOnboardingData();
   const [currentSituation, setCurrentSituation] = useState('');
 
@@ -46,6 +48,7 @@ export default function AcademicContextScreen() {
     if (currentSituation) {
       await saveResponse('currentSituation', currentSituation);
       await saveResponse('currentStep', 5);
+      trackStepCompleted('academic-context');
       router.push('/(onboarding-new)/daily-struggles');
     }
   };

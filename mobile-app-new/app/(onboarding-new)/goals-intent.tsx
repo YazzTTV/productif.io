@@ -13,6 +13,7 @@ import Animated, {
 import { router } from 'expo-router';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { trackStepCompleted, useOnboardingStep } from '@/lib/onboardingTracking';
 import { useOnboardingData } from '@/hooks/useOnboardingData';
 
 const goals = [
@@ -32,6 +33,7 @@ const horizons = [
 export default function GoalsIntentScreen() {
   const { t } = useLanguage();
   const insets = useSafeAreaInsets();
+  useOnboardingStep('goals-intent');
   const { saveResponse, getResponse } = useOnboardingData();
   const [wantToChange, setWantToChange] = useState<string[]>([]);
   const [timeHorizon, setTimeHorizon] = useState('');
@@ -70,7 +72,12 @@ export default function GoalsIntentScreen() {
       await saveResponse('wantToChange', wantToChange);
       await saveResponse('timeHorizon', timeHorizon);
       await saveResponse('currentStep', 8);
-      router.push('/(onboarding-new)/tasks-awareness');
+      trackStepCompleted('goals-intent');
+      // Onboarding 1.5 : tasks-awareness et task-clarification sortent du
+      // parcours. Elles creaient des taches « demain » sans matiere, que le
+      // planificateur ignore (autoPlan.ts), en doublon des ecrans matieres et
+      // chapitres. Les fichiers restent, seul le chemin change.
+      router.push('/(onboarding-new)/tried-before');
     }
   };
 

@@ -24,7 +24,7 @@ import { authService } from '@/lib/api';
 import { useOnboardingData } from '@/hooks/useOnboardingData';
 import { useSuperwall } from '@/hooks/useSuperwall';
 import { SUPERWALL_EVENTS } from '@/lib/superwallEvents';
-import { setTutorialCompleted, setTutorialStage } from '@/tutorial/tutorialStorage';
+import { getTutorialCompleted, setTutorialCompleted, setTutorialStage } from '@/tutorial/tutorialStorage';
 import { trackEvent } from '@/lib/analytics';
 
 const AnimatedView = Animated.createAnimatedComponent(View);
@@ -113,8 +113,14 @@ export default function SuccessScreen() {
       // retenir ce bouton jusqu'à 60 secondes.
       await saveResponse('completed', true);
       await AsyncStorage.setItem('onboarding_completed', 'true');
-      await setTutorialCompleted(false);
-      await setTutorialStage('calendar');
+      // Depuis l'onboarding 1.5, cet ecran n'est plus dans le parcours : on n'y
+      // arrive que par calendar-sync, ouvert depuis PlanMyDay. Un didacticiel
+      // deja termine (l'ecran d'essai le marque) ne doit pas etre rearme, sinon
+      // l'accueil renvoie l'etudiant redonner ses matieres (/tasks-new).
+      if (!(await getTutorialCompleted())) {
+        await setTutorialCompleted(false);
+        await setTutorialStage('calendar');
+      }
       void trackEvent('onboarding_completed', { next_action: nextAction }).catch((error) => {
         console.error('[Onboarding] Tracking completion impossible:', error);
       });

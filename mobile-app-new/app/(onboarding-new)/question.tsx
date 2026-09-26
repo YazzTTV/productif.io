@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -16,6 +16,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { onboardingService } from '@/lib/api';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { trackStepCompleted, trackStepViewed } from '@/lib/onboardingTracking';
 
 // Les écrans de question sont démontés à chaque réponse, mais leurs sauvegardes
 // peuvent encore être en vol. Une file au niveau du module conserve l'ordre des
@@ -105,6 +106,17 @@ export default function QuestionScreen() {
   const totalQuestions = questions.length;
   const progress = ((questionIndex + 1) / totalQuestions) * 100;
 
+  // Chemin d'inscription par /signup (depuis l'ecran de connexion), distinct du
+  // questionnaire de connection.tsx : ces six questions menent aussi a `exams`,
+  // donc elles comptent dans l'entonnoir. Nom par question, puisque l'ecran se
+  // pousse lui-meme et que la mesure dedoublonne par nom d'etape. Pas de
+  // rememberOnboardingStep : la route de reprise perdrait l'index et les
+  // reponses deja donnees, et ce chemin ne pose pas le drapeau de reprise.
+  const trackingStep = `signup-question-${questionIndex + 1}`;
+  useEffect(() => {
+    trackStepViewed(trackingStep);
+  }, [trackingStep]);
+
   const handleSelect = async (optionId: string) => {
     setSelectedOption(optionId);
     
@@ -169,6 +181,7 @@ export default function QuestionScreen() {
     // Cette sauvegarde est analytique et best-effort. L'attendre contredisait le
     // commentaire d'origine et pouvait figer chacune des six questions 30 s.
     enqueueQuestionSave(payload);
+    trackStepCompleted(trackingStep, { answer: answers[questionIndex] ?? null });
 
     if (questionIndex < totalQuestions - 1) {
       // Aller à la question suivante
@@ -180,9 +193,13 @@ export default function QuestionScreen() {
         }
       });
     } else {
-      // Toutes les questions sont répondues, aller au chargement
+      // Toutes les questions sont répondues : on enchaîne sur les écrans du
+      // planning de l'onboarding 1.5 (examens, matières, chapitres, cours).
+      // Avant, on allait droit à building-plan, qui n'était qu'une minuterie ;
+      // il calcule maintenant le vrai planning à partir de ces écrans, et y
+      // arriver sans eux (inscription par /signup) donnait un planning vide.
       await AsyncStorage.setItem('onboarding_answers', JSON.stringify(answers));
-      router.push('/(onboarding-new)/building-plan');
+      router.push('/(onboarding-new)/exams');
     }
   };
 

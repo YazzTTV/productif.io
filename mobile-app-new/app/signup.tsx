@@ -18,6 +18,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { flushQueuedAttribution } from '@/hooks/useAppsFlyer';
 import { identifyAnalyticsUser, trackEvent } from '@/lib/analytics';
+import { startOnboardingDraft } from '@/lib/onboardingDraft';
+import { trackStepCompleted } from '@/lib/onboardingTracking';
 
 export default function SignupScreen() {
   const { t } = useLanguage();
@@ -107,11 +109,15 @@ export default function SignupScreen() {
           // Ne pas bloquer le flux - on continue quand même
         }
         
-        // Rediriger vers le questionnaire d'onboarding
-        router.replace({
-          pathname: '/(onboarding-new)/question',
-          params: { index: 0, answers: '[]' }
-        });
+        // Onboarding 1.5, comme une inscription depuis connection.tsx. Avant,
+        // ce chemin passait par les 6 anciennes questions (question.tsx) : il
+        // sautait le questionnaire garde (value-awareness a goals-intent) et
+        // « Tu as deja essaye quoi ? », donc les ecrans planning et Premium ne
+        // pouvaient reprendre aucune reponse, et sans drapeau de reprise une
+        // app tuee en cours de route renvoyait sur l'accueil sans paywall.
+        await startOnboardingDraft().catch(() => {});
+        trackStepCompleted('connection', { method: 'email', new_user: true, from: 'signup' });
+        router.replace('/(onboarding-new)/value-awareness');
       } else {
         console.error('❌ [SIGNUP] Réponse d\'inscription invalide:', response);
         Alert.alert(

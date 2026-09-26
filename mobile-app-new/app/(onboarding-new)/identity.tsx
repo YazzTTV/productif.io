@@ -14,6 +14,7 @@ import Animated, {
 import { router } from 'expo-router';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { trackStepCompleted, useOnboardingStep } from '@/lib/onboardingTracking';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useOnboardingData } from '@/hooks/useOnboardingData';
 
@@ -28,6 +29,7 @@ const studentTypes = [
 export default function IdentityScreen() {
   const { t } = useLanguage();
   const insets = useSafeAreaInsets();
+  useOnboardingStep('identity');
   const { saveResponse, getResponse } = useOnboardingData();
   const [firstName, setFirstName] = useState('');
   const [studentType, setStudentType] = useState('');
@@ -60,6 +62,7 @@ export default function IdentityScreen() {
       await saveResponse('firstName', firstName);
       await saveResponse('studentType', studentType);
       await saveResponse('currentStep', 3);
+      trackStepCompleted('identity');
       router.push('/(onboarding-new)/goals-pressure');
     }
   };

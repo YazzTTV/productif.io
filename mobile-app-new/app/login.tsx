@@ -20,6 +20,8 @@ import { signInWithApple, isAppleSignInAvailable } from '@/lib/appleAuth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { flushQueuedAttribution } from '@/hooks/useAppsFlyer';
+import { startOnboardingDraft } from '@/lib/onboardingDraft';
+import { trackStepCompleted } from '@/lib/onboardingTracking';
 
 export default function LoginScreen() {
   const { t } = useLanguage();
@@ -44,6 +46,34 @@ export default function LoginScreen() {
     isAppleSignInAvailable().then(setAppleAvailable);
   }, []);
 
+  /**
+   * Apres une connexion Apple ou Google reussie. « J'ai deja un compte » ne
+   * garantit pas qu'il existe : un identifiant Apple ou Google inconnu CREE le
+   * compte, et le serveur le dit par isNewUser. Un nouvel inscrit passe alors
+   * par l'onboarding 1.5 (questionnaire, planning, ecran Premium, paywall),
+   * comme depuis connection.tsx. Seul `true` compte : un serveur plus ancien
+   * ne renvoie rien, et sur cet ecran le cas normal est un compte existant.
+   */
+  const routeAfterSocialLogin = async (
+    response: { isNewUser?: boolean },
+    method: 'apple' | 'google',
+    delayMs: number
+  ) => {
+    const isNewUser = response.isNewUser === true;
+    if (isNewUser) {
+      await startOnboardingDraft().catch(() => {});
+      trackStepCompleted('connection', { method, new_user: true, from: 'login' });
+    } else {
+      await AsyncStorage.setItem('onboarding_completed', 'true');
+    }
+    InteractionManager.runAfterInteractions(() => {
+      setTimeout(() => {
+        if (!isMountedRef.current) return;
+        router.replace(isNewUser ? '/(onboarding-new)/value-awareness' : '/(tabs)');
+      }, delayMs);
+    });
+  };
+
   const handleAppleLogin = async () => {
     setIsLoadingApple(true);
     
@@ -60,12 +90,7 @@ export default function LoginScreen() {
       
       if (response.success) {
         flushQueuedAttribution();
-        await AsyncStorage.setItem('onboarding_completed', 'true');
-        InteractionManager.runAfterInteractions(() => {
-          setTimeout(() => {
-            router.replace('/(tabs)');
-          }, 100);
-        });
+        await routeAfterSocialLogin(response, 'apple', 100);
       } else {
         Alert.alert(t('error'), t('appleLoginFailed', undefined, 'Échec de la connexion avec Apple'));
       }
@@ -130,14 +155,7 @@ export default function LoginScreen() {
       
       if (response.success) {
         flushQueuedAttribution();
-        await AsyncStorage.setItem('onboarding_completed', 'true');
-        InteractionManager.runAfterInteractions(() => {
-          setTimeout(() => {
-            if (isMountedRef.current) {
-              router.replace('/(tabs)');
-            }
-          }, 300);
-        });
+        await routeAfterSocialLogin(response, 'google', 300);
       } else {
         if (isMountedRef.current) {
           Alert.alert(t('error'), t('googleLoginFailed', undefined, 'Échec de la connexion avec Google'));

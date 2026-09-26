@@ -1,4 +1,5 @@
 import { beginStudySession, changeStudySession } from '@/lib/studyAnalysis';
+import { trackFirstPlannedBlockStarted } from '@/lib/firstPlannedBlock';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
@@ -822,6 +823,9 @@ export default function FocusScreen() {
       studyClockRef.current = { startedAt, pausedSeconds: 0, pausedAt: 0 };
       finishingRef.current = false;
       await beginStudySession('focus', result?.session?.id ?? `focus_${startedAt}`, effectiveDuration, currentTask.id, result?.session?.id, typeof params.recommendationId === 'string' ? params.recommendationId : undefined);
+      if (params.fromPlan === '1') {
+        void trackFirstPlannedBlockStarted({ mode: 'focus', planned_minutes: effectiveDuration, free_session: false });
+      }
       const endsAt = startedAt + effectiveDuration * 60 * 1000;
       const liveActivityId = startSessionLiveActivity('focus', endsAt, currentTask?.title);
       liveActivityIdRef.current = liveActivityId;
@@ -866,6 +870,9 @@ export default function FocusScreen() {
         studyClockRef.current = { startedAt, pausedSeconds: 0, pausedAt: 0 };
         finishingRef.current = false;
         await beginStudySession('focus', `focus_${startedAt}`, selectedDuration, currentTask.id, null, typeof params.recommendationId === 'string' ? params.recommendationId : undefined);
+        if (params.fromPlan === '1') {
+          void trackFirstPlannedBlockStarted({ mode: 'focus', planned_minutes: selectedDuration, free_session: false });
+        }
         await saveFocusSession({sessionId:null,startedAt,durationMinutes:selectedDuration,taskIndex:0});
         setTimeLeft(Math.round(selectedDuration * 60));
         setPhase('active'); setIsRunning(true); setCurrentTaskIndex(0);
