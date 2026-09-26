@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { verifySvixSignature } from '@/lib/superwall/svix';
 import { prisma } from '@/lib/prisma';
 import { CommissionService } from '@/lib/affiliate/CommissionService';
 
@@ -83,17 +84,30 @@ function mapEventToSubscriptionStatus(eventName: string, periodType: string): st
 
 export async function POST(req: NextRequest) {
   try {
+    const rawBody = await req.text();
     if (SUPERWALL_WEBHOOK_SECRET) {
+      const svixOk = verifySvixSignature(
+        rawBody,
+        {
+          id: req.headers.get('svix-id'),
+          timestamp: req.headers.get('svix-timestamp'),
+          signature: req.headers.get('svix-signature'),
+        },
+        SUPERWALL_WEBHOOK_SECRET
+      );
+      // Ancien mode, garde pour un appel manuel : secret en clair dans un en-tete.
       const authHeader = req.headers.get('authorization');
       const secretHeader = req.headers.get('x-webhook-secret');
       const token = authHeader?.replace('Bearer ', '') || secretHeader;
-      if (token !== SUPERWALL_WEBHOOK_SECRET) {
-        console.warn('[Superwall Webhook] Secret invalide');
+      if (!svixOk && token !== SUPERWALL_WEBHOOK_SECRET) {
+        console.warn(
+          `[Superwall Webhook] Signature invalide (svix-id=${req.headers.get('svix-id') ?? 'absent'})`
+        );
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
       }
     }
 
-    const payload: SuperwallWebhookPayload = await req.json();
+    const payload: SuperwallWebhookPayload = JSON.parse(rawBody);
     const { type, data } = payload;
 
     // Les achats de test (TestFlight, et surtout le reviewer Apple) debloquent
