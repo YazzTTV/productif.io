@@ -26,7 +26,6 @@ import {
   ONBOARDING_GREEN,
   OnboardingScreen,
   PrimaryButton,
-  SecondaryButton,
   onboardingText,
 } from '@/components/onboarding/OnboardingUI';
 
@@ -45,7 +44,9 @@ import {
  *   - avant le paywall, l'identite Superwall est ATTENDUE (critique, point 8) :
  *     un achat fait sous l'alias anonyme n'est rattache a aucun compte.
  *
- * Sorties : achat ou deja premium vers premium-setup, refus ou « Plus tard »
+ * Pas de lien « Plus tard » (decision de Noah, 26 septembre) : tout le monde
+ * voit le paywall, qui se referme par sa croix.
+ * Sorties : achat ou deja premium vers premium-setup, refus
  * vers free-sessions. Placement absent du tableau de bord (Superwall rend
  * `presented` sans rien afficher) : `paywall_skipped`, puis on continue. Les
  * regles de sortie sont dans lib/onboardingPlanView.ts (decideTrialExit).
@@ -201,12 +202,6 @@ export default function TrialScreen() {
     leave(target, outcome.kind === 'result' && outcome.reason === 'premium_user' ? 'already_premium' : 'paywall');
   };
 
-  const handleLater = () => {
-    if (busyRef.current) return;
-    busyRef.current = true;
-    trackStepCompleted('trial', { choice: 'later' });
-    leave('free-sessions', 'later');
-  };
 
   return (
     <OnboardingScreen
@@ -218,7 +213,6 @@ export default function TrialScreen() {
             loading={busy}
             disabled={blocks === null}
           />
-          <SecondaryButton label={t('onbTrialLater', undefined, 'Plus tard')} onPress={handleLater} disabled={busy} />
         </>
       }
     >
