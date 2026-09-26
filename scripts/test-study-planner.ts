@@ -138,7 +138,23 @@ console.log('\n6. Capacite : jamais plus de 3 h par jour, et les matieres se mel
     subjectsByDay.set(k, (subjectsByDay.get(k) ?? new Set()).add(b.subjectId))
   }
   check('aucun jour au-dessus de 180 min', [...byDay.values()].every((m) => m <= 180), Object.fromEntries(byDay))
-  check('au moins 2 matieres par jour', [...subjectsByDay.values()].every((s) => s.size >= 2))
+  // Tant qu'au moins deux matieres ont encore des chapitres a placer. Les
+  // matieres a fort coefficient finissent leurs 20 chapitres avant la fin de
+  // l'horizon, et la derniere reste alors seule : c'est normal. L'ancienne
+  // version de ce test passait grace au faux regime critique (horizon tronque a
+  // 14 jours), qui melangeait les derniers jours par accident.
+  const lastDayOf = new Map<string, string>()
+  for (const b of plan.blocks) {
+    const k = localDateKey(b.start, PARIS)
+    if ((lastDayOf.get(b.subjectId) ?? '') < k) lastDayOf.set(b.subjectId, k)
+  }
+  for (const u of plan.unplaced) lastDayOf.set(u.subjectId, '9999-12-31')
+  const mixedWhilePossible = [...subjectsByDay.entries()].every(([k, s]) => {
+    const stillOpen = [...lastDayOf.values()].filter((last) => last >= k).length
+    return stillOpen < 2 || s.size >= 2
+  })
+  check('au moins 2 matieres par jour tant que 2 matieres ont des chapitres', mixedWhilePossible,
+    Object.fromEntries([...subjectsByDay.entries()].map(([k, s]) => [k, [...s].join('')])))
   const minutesBySubject = (id: string) => plan.blocks.filter((b) => b.subjectId === id).reduce((s, b) => s + b.minutes, 0)
   check('la matiere coef 5 recoit plus que la coef 1', minutesBySubject('a') > minutesBySubject('c'), {
     a: minutesBySubject('a'),
@@ -194,6 +210,102 @@ console.log('\n10. Echeance personnelle deja passee : le chapitre est place au p
   const plan = planStudy(subjects, late, [], { now, timeZone: PARIS })
   check('les 2 chapitres en retard sont places', plan.blocks.length === 2, plan.unplaced)
   check('des le premier jour', plan.blocks.every((b) => localDateKey(b.start, PARIS) === '2026-09-25'))
+}
+
+// ---------------------------------------------------------------------------
+// 11 a 15 : le regime critique. Avant le correctif du 26 septembre, il comptait
+// les jours restants jusqu'au dernier jour de l'horizon (13) mais TOUS les
+// chapitres de la matiere : au-dela de 63 chapitres de 30 min (14 x 180 x 0,75
+// = 1 890 min), une matiere passait critique quelle que soit sa date d'examen et
+// prenait toute la capacite de chaque jour.
+
+const minutesOn = (plan: ReturnType<typeof planStudy>, subjectId: string, fromKey: string, toKey: string, tz: string) =>
+  plan.blocks
+    .filter((b) => b.subjectId === subjectId && localDateKey(b.start, tz) >= fromKey && localDateKey(b.start, tz) <= toKey)
+    .reduce((s, b) => s + b.minutes, 0)
+
+console.log('\n11. Grosse UE de PASS, examen en decembre : elle ne mange plus les autres UE')
+{
+  const now = new Date('2026-09-24T22:00:00Z') // vendredi 25, minuit a Paris
+  const exam = new Date('2026-12-15T08:00:00Z')
+  const subjects: PlannerSubject[] = [
+    { id: 'ue1', name: 'UE1 Chimie', coefficient: 5, deadline: exam },
+    { id: 'ue2', name: 'UE2', coefficient: 2, deadline: exam },
+    { id: 'ue3', name: 'UE3', coefficient: 2, deadline: exam },
+    { id: 'ue4', name: 'UE4', coefficient: 2, deadline: exam },
+  ]
+  const tasks = [...chapters('ue1', 80, 30), ...chapters('ue2', 10, 30), ...chapters('ue3', 10, 30), ...chapters('ue4', 10, 30)]
+  const plan = planStudy(subjects, tasks, [], { now, timeZone: PARIS })
+  const day0 = plan.blocks.filter((b) => localDateKey(b.start, PARIS) === '2026-09-25')
+  check('le premier jour n\'est pas entierement pris par la grosse UE', day0.some((b) => b.subjectId !== 'ue1'), day0.map((b) => b.subjectId))
+  const firstWeek = ['ue1', 'ue2', 'ue3', 'ue4'].map((id) => minutesOn(plan, id, '2026-09-25', '2026-10-01', PARIS))
+  const weekTotal = firstWeek.reduce((s, m) => s + m, 0)
+  check('la grosse UE a moins de 60 % de la premiere semaine', firstWeek[0] < weekTotal * 0.6, firstWeek)
+  check('chaque petite UE a du temps la premiere semaine', firstWeek.slice(1).every((m) => m > 0), firstWeek)
+  check('et la grosse UE recoit plus que chacune des petites', firstWeek.slice(1).every((m) => firstWeek[0] > m), firstWeek)
+}
+
+console.log('\n12. 80 chapitres sans date d\'examen : pas critique, la petite matiere passe aussi')
+{
+  const now = new Date('2026-09-24T22:00:00Z')
+  const subjects: PlannerSubject[] = [
+    { id: 'gros', name: 'Gros', coefficient: 2, deadline: null },
+    { id: 'petit', name: 'Petit', coefficient: 2, deadline: null },
+  ]
+  const plan = planStudy(subjects, [...chapters('gros', 80, 30), ...chapters('petit', 5, 30)], [], { now, timeZone: PARIS })
+  const petit = plan.blocks.filter((b) => b.subjectId === 'petit')
+  check('la petite matiere a un bloc des le premier jour', petit.some((b) => localDateKey(b.start, PARIS) === '2026-09-25'), petit.map((b) => b.start))
+  check('et ses 5 chapitres dans les 3 premiers jours', petit.length === 5 && petit.every((b) => localDateKey(b.start, PARIS) <= '2026-09-27'), petit.map((b) => b.start))
+}
+
+console.log('\n13. Critique pour de vrai : l\'examen dans 5 jours passe devant et finit a temps')
+{
+  const now = new Date('2026-09-24T06:00:00Z') // jeudi 24, 8h a Paris
+  const soon = new Date('2026-09-29T07:00:00Z') // mardi 29 : chapitres jusqu'au samedi 26
+  const subjects: PlannerSubject[] = [
+    { id: 'urgent', name: 'Urgent', coefficient: 2, deadline: soon },
+    { id: 'loin', name: 'Loin', coefficient: 5, deadline: new Date('2026-12-15T08:00:00Z') },
+  ]
+  // 12 x 45 min = 540 min, soit exactement 3 jours de capacite.
+  const plan = planStudy(subjects, [...chapters('urgent', 12, 45), ...chapters('loin', 20, 45)], [], { now, timeZone: PARIS })
+  const urgent = plan.blocks.filter((b) => b.subjectId === 'urgent')
+  check('les 12 chapitres urgents sont tous places', urgent.length === 12, plan.unplaced.filter((u) => u.subjectId === 'urgent'))
+  check('avant les 2 jours de revision generale', urgent.every((b) => localDateKey(b.start, PARIS) <= '2026-09-26'), urgent.map((b) => b.start))
+  check('la matiere lointaine reprend ensuite', plan.blocks.some((b) => b.subjectId === 'loin'), plan.summary)
+}
+
+console.log('\n14. Deux UE critiques au meme concours : elles s\'alternent, aucune n\'attend')
+{
+  const now = new Date('2026-09-24T06:00:00Z')
+  const exam = new Date('2026-09-30T07:00:00Z') // chapitres jusqu'au dimanche 27
+  const subjects: PlannerSubject[] = [
+    { id: 's1', name: 'S1', coefficient: 3, deadline: exam },
+    { id: 's2', name: 'S2', coefficient: 3, deadline: exam },
+  ]
+  // 2 x 900 min pour 720 min de capacite : impossible de tout faire.
+  const plan = planStudy(subjects, [...chapters('s1', 20, 45), ...chapters('s2', 20, 45)], [], { now, timeZone: PARIS })
+  const day0 = new Set(plan.blocks.filter((b) => localDateKey(b.start, PARIS) === '2026-09-24').map((b) => b.subjectId))
+  check('les deux UE travaillees des le premier jour', day0.has('s1') && day0.has('s2'), [...day0])
+  const m1 = minutesOn(plan, 's1', '2026-09-24', '2026-09-27', PARIS)
+  const m2 = minutesOn(plan, 's2', '2026-09-24', '2026-09-27', PARIS)
+  check('et a peu pres autant de temps chacune', Math.abs(m1 - m2) <= 45, { m1, m2 })
+}
+
+console.log('\n15. Chapitres dus demain dans une matiere a examen lointain : servis avant demain soir')
+{
+  const now = new Date('2026-09-24T06:00:00Z')
+  const tomorrow = new Date('2026-09-25T16:00:00Z')
+  const subjects: PlannerSubject[] = [
+    { id: 'td', name: 'TD', coefficient: 1, deadline: new Date('2026-12-15T08:00:00Z') },
+    { id: 'autre', name: 'Autre', coefficient: 5, deadline: new Date('2026-12-15T08:00:00Z') },
+  ]
+  // Les 6 chapitres dus demain sont en fin de file (ordre de creation) : le
+  // regime critique doit aller les chercher, pas servir les 4 premiers.
+  const td = chapters('td', 10, 45).map((t, i) => (i >= 4 ? { ...t, dueDate: tomorrow } : t))
+  const plan = planStudy(subjects, [...td, ...chapters('autre', 20, 45)], [], { now, timeZone: PARIS })
+  const due = plan.blocks.filter((b) => b.subjectId === 'td' && Number(b.taskId.slice(-2)) >= 5)
+  check('les 6 chapitres dus demain sont places', due.length === 6, plan.unplaced.filter((u) => u.subjectId === 'td'))
+  check('au plus tard demain', due.every((b) => localDateKey(b.start, PARIS) <= '2026-09-25'), due.map((b) => b.start))
 }
 
 console.log(`\n${checks - failures}/${checks} verifications passees`)

@@ -8,6 +8,7 @@ import { parse, parseISO, isWithinInterval } from "date-fns"
 import { toZonedTime } from "date-fns-tz"
 import { GamificationService } from "@/services/gamification"
 import { replanUserSafely } from "@/lib/planning/autoPlan"
+import { deleteGeneratedSessions } from "@/lib/planning/generatedSessions"
 
 // Augmenter le timeout pour les requêtes complexes (30 secondes)
 export const maxDuration = 30
@@ -462,8 +463,23 @@ export async function POST(request: NextRequest) {
 
     console.log("[TASKS_POST] Tâche créée avec succès:", task.id);
 
-    // Un chapitre sans creneau choisi rejoint le planning automatique.
-    if (task.subjectId && !task.scheduledFor) {
+    // Un vrai chapitre remplace les seances generiques de l'onboarding dans sa
+    // matiere. Cette route ne cree jamais de seance generique (generated reste a
+    // false), donc la tache qu'on vient de creer n'est pas concernee.
+    let removedGenerated = 0
+    if (task.subjectId) {
+      try {
+        removedGenerated = (await deleteGeneratedSessions(targetUserId, task.subjectId)).count
+      } catch (error) {
+        // La tache est creee : un echec ici laisse des seances en trop, que le
+        // prochain import retirera, et ne doit pas faire croire a un echec.
+        console.error("[TASKS_POST] Suppression des seances generiques impossible:", error)
+      }
+    }
+
+    // Un chapitre sans creneau choisi rejoint le planning automatique. Des seances
+    // generiques retirees liberent aussi du temps a redistribuer.
+    if (task.subjectId && (!task.scheduledFor || removedGenerated > 0)) {
       await replanUserSafely(targetUserId, "task_created")
       const planned = await prisma.task.findUnique({ where: { id: task.id } })
       return NextResponse.json(planned ?? task)

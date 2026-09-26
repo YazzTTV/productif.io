@@ -17,15 +17,13 @@ import { NextRequest, NextResponse, after } from 'next/server'
 import { getAuthUserFromRequest } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { resolveTimezone } from '@/lib/timezone'
-import { localDateKey, localTime } from '@/lib/planning/StudyPlanner'
 import { googleCalendarService } from '@/lib/calendar/GoogleCalendarService'
+import { readPlanningBlocks } from '@/lib/planning/planningBlocks'
 import { replanUserSafely } from '@/lib/planning/autoPlan'
 import { hasBusyOverlap, upcomingBlocks, type TimedBlock } from '@/lib/planning/googleOverlap'
 
 export const dynamic = 'force-dynamic'
 
-const MS_PER_DAY = 24 * 60 * 60 * 1000
-const DEFAULT_MINUTES = 30
 /**
  * Pas plus d'une replanification « Google » toutes les 5 min par compte. Si la
  * lecture de Google echoue pendant la replanification, le chevauchement reste,
@@ -76,42 +74,8 @@ export async function GET(req: NextRequest) {
     select: { timezone: true, autoPlanRunAt: true },
   })
   const timeZone = resolveTimezone(record ?? {})
-  const todayStart = localTime(localDateKey(new Date(), timeZone), '00:00', timeZone)
-  const rangeEnd = new Date(todayStart.getTime() + days * MS_PER_DAY)
-
-  const tasks = await prisma.task.findMany({
-    where: {
-      userId: user.id,
-      completed: false,
-      subjectId: { not: null },
-      scheduledFor: { gte: todayStart, lt: rangeEnd },
-    },
-    orderBy: { scheduledFor: 'asc' },
-    select: {
-      id: true,
-      title: true,
-      scheduledFor: true,
-      estimatedMinutes: true,
-      autoPlannedAt: true,
-      subject: { select: { id: true, name: true, deadline: true } },
-    },
-  })
-
-  const blocks = tasks.map((task) => {
-    const start = task.scheduledFor as Date
-    const minutes = task.estimatedMinutes && task.estimatedMinutes > 0 ? task.estimatedMinutes : DEFAULT_MINUTES
-    return {
-      taskId: task.id,
-      title: task.title,
-      subjectId: task.subject?.id ?? null,
-      subjectName: task.subject?.name ?? null,
-      examDate: task.subject?.deadline?.toISOString() ?? null,
-      start: start.toISOString(),
-      end: new Date(start.getTime() + minutes * 60 * 1000).toISOString(),
-      minutes,
-      autoPlanned: !!task.autoPlannedAt,
-    }
-  })
+  // Lecture partagee avec POST /api/onboarding/plan (lib/planning/planningBlocks.ts).
+  const blocks = await readPlanningBlocks(user.id, timeZone, days)
 
   // Apres la reponse : l'accueil ne doit pas attendre Google. `after` est tenu
   // par Vercel jusqu'au bout, contrairement a une promesse non attendue, que le

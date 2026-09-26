@@ -26,6 +26,29 @@ model User {
   /// Dernier passage du planificateur automatique pour cet utilisateur.
   autoPlanRunAt    DateTime?
   calendarBusySnapshot CalendarBusySnapshot?
+  /// Reponses du questionnaire d'onboarding (1.5), telles qu'envoyees par l'app a
+  /// POST /api/onboarding/plan. Relues pour personnaliser le planning et l'essai.
+  onboardingAnswers Json?
+  /// Cle d'idempotence du dernier POST /api/onboarding/plan reussi : une requete
+  /// rejouee avec la meme cle ne recree ni matieres ni chapitres.
+  onboardingPlanKey String?
+  /// Emploi du temps approximatif quand aucun agenda n'est lisible :
+  /// { classesEndHour: 16, days: [1, 2, 3, 4, 5] } (jours ISO, 1 = lundi). Lu par
+  /// lib/planning/weeklyBusy.ts : occupe de 8h a classesEndHour ces jours-la.
+  weeklyBusy        Json?
+  /// Seances Mode Examen gratuites (avec blocage) consommees, sur toute la vie du
+  /// compte, NET des seances rendues : POST /api/exam/start l'incremente,
+  /// POST /api/exam/cancel le decremente quand il rend une seance. Plafond :
+  /// EXAM_FREE_SESSIONS dans lib/plans.ts.
+  examFreeUsed      Int      @default(0)
+  /// Seances gratuites rendues apres une annulation rapide. Plafonne a 1
+  /// (EXAM_FREE_REFUND_LIMIT) : sans plafond, annuler avant 2 min donnerait un
+  /// blocage gratuit illimite.
+  examFreeRefunded  Int      @default(0)
+  /// Derniere cle de lancement de POST /api/exam/start et son jeton : une requete
+  /// rejouee apres une reponse perdue recoit le meme jeton sans second decompte.
+  examFreeLastKey   String?
+  examFreeLastToken String?
   emailVerifiedAt             DateTime?
   emailVerificationToken      String?
   emailVerificationExpiresAt  DateTime?
@@ -217,6 +240,11 @@ model Task {
   /// Non nul = le creneau a ete choisi par le planificateur automatique (lib/planning/autoPlan.ts),
   /// qui peut donc le deplacer. Nul = creneau choisi par l'utilisateur, jamais touche.
   autoPlannedAt         DateTime?
+  /// Vrai = seance generique creee par le serveur pour une matiere sans chapitres
+  /// (onboarding « pas encore »). Sans elle la matiere ne produit aucun bloc.
+  /// Supprimee, si non terminee, des que de vrais chapitres arrivent dans la
+  /// matiere (lib/planning/generatedSessions.ts).
+  generated             Boolean   @default(false)
 
   process         Process?             @relation("TaskProcess", fields: [processId], references: [id])
   project         Project?             @relation(fields: [projectId], references: [id])

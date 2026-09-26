@@ -19,6 +19,11 @@
  * meilleur score (coefficient x urgence x besoin), divise par ce qu'elle a deja
  * recu dans la journee. Ca melange les matieres au lieu de passer la journee
  * sur une seule.
+ *
+ * Exception, le regime critique : une matiere qui ne finira pas a temps si elle
+ * n'est pas servie en premier passe devant, mais seulement pour ce qui lui
+ * manque aujourd'hui. Le test porte sur ses vraies echeances (examen, echeance
+ * personnelle), jamais sur l'horizon de 14 jours : voir criticalNeed.
  */
 
 import { fromZonedTime, formatInTimeZone } from 'date-fns-tz'
@@ -109,6 +114,13 @@ export const DEFAULT_OPTIONS = {
   breakMinutes: 10,
 }
 
+/**
+ * Part de la capacite des jours a venir sur laquelle on compte pour une matiere.
+ * Pas 100 % : les fenetres, les cours et les autres matieres en prennent, donc
+ * une matiere qui a besoin de toute la capacite restante est deja en retard.
+ */
+export const CRITICAL_SHARE = 0.75
+
 /** "yyyy-MM-dd" du jour local contenant `date`. */
 export function localDateKey(date: Date, timeZone: string): string {
   return formatInTimeZone(date, timeZone, 'yyyy-MM-dd')
@@ -165,6 +177,62 @@ function ceilTo5(date: Date): Date {
   return new Date(Math.ceil(date.getTime() / step) * step)
 }
 
+interface QueueItem {
+  task: PlannerTask
+  /** Dernier jour de l'horizon ou le chapitre peut etre place. */
+  lastDay: number
+  /**
+   * Dernier jour ou il doit etre fait, sans le plafond de l'horizon.
+   * Infinity = aucune echeance (ni examen, ni echeance personnelle a venir).
+   */
+  deadlineDay: number
+  minutes: number
+}
+
+/**
+ * Minutes qu'une matiere doit recevoir AUJOURD'HUI (jour `day`) pour que ce qui
+ * lui reste tienne ensuite dans CRITICAL_SHARE de la capacite des jours
+ * suivants, echeance par echeance. null = pas critique.
+ *
+ * Deux choix, et pourquoi :
+ *   - les jours restants sont comptes jusqu'a la VRAIE echeance. L'ancien test
+ *     les plafonnait au dernier jour de l'horizon (13) tout en comptant TOUS
+ *     les chapitres de la matiere : une matiere de 63 chapitres de 30 min ou
+ *     plus (1 890 min = 14 x 180 x 0,75) passait critique meme avec un examen
+ *     dans trois mois, ou sans examen du tout, et prenait toute la capacite de
+ *     chaque jour. Une grosse UE de PASS privait ainsi les autres matieres
+ *     pendant douze jours sur quatorze ;
+ *   - la matiere critique ne passe devant que pour ce qui lui MANQUE, pas pour
+ *     toute la journee. Une fois ce minimum servi, elle retourne au partage
+ *     proportionnel avec les autres.
+ *
+ * Le test est fait par echeance (examen de la matiere, echeances personnelles
+ * de certains chapitres) : quelques chapitres dus demain peuvent rendre une
+ * matiere critique meme si son examen est loin.
+ */
+function criticalNeed(
+  pending: QueueItem[],
+  day: number,
+  capacity: number
+): { minutes: number; deadlineDay: number } | null {
+  const minutesByDeadline = new Map<number, number>()
+  for (const item of pending) {
+    if (!Number.isFinite(item.deadlineDay)) continue
+    minutesByDeadline.set(item.deadlineDay, (minutesByDeadline.get(item.deadlineDay) ?? 0) + item.minutes)
+  }
+
+  let worst: { minutes: number; deadlineDay: number } | null = null
+  let dueSoFar = 0
+  for (const deadlineDay of [...minutesByDeadline.keys()].sort((a, b) => a - b)) {
+    dueSoFar += minutesByDeadline.get(deadlineDay)!
+    // Jours apres aujourd'hui, jusqu'a l'echeance comprise.
+    const laterDays = Math.max(0, deadlineDay - day)
+    const need = dueSoFar - laterDays * capacity * CRITICAL_SHARE
+    if (need > 0 && (!worst || need > worst.minutes)) worst = { minutes: need, deadlineDay }
+  }
+  return worst
+}
+
 export function planStudy(
   subjects: PlannerSubject[],
   tasks: PlannerTask[],
@@ -186,10 +254,12 @@ export function planStudy(
   const earliest = new Date(options.now.getTime() + leadMs)
   const subjectById = new Map(subjects.map((s) => [s.id, s]))
 
-  // Dernier jour (index dans l'horizon) ou chaque chapitre peut encore etre place.
-  // -1 = l'examen est aujourd'hui ou deja passe.
-  const lastDayFor = (task: PlannerTask): number => {
-    let last = horizonDays - 1
+  // Dernier jour (index a partir d'aujourd'hui) ou chaque chapitre doit etre
+  // fait, SANS plafond d'horizon : le regime critique en a besoin (voir
+  // criticalNeed). -1 = l'examen est aujourd'hui ou deja passe. Infinity = aucune
+  // echeance.
+  const deadlineDayFor = (task: PlannerTask): number => {
+    let last = Number.POSITIVE_INFINITY
     const subject = subjectById.get(task.subjectId)
     if (subject?.deadline) {
       const examIndex = daysBetweenKeys(todayKey, localDateKey(subject.deadline, timeZone))
@@ -197,7 +267,7 @@ export function planStudy(
       // Garder les jours de revision generale libres, sauf si l'examen est trop
       // proche pour se le permettre : on place alors jusqu'a la veille.
       const withBuffer = examIndex - 1 - reviewBuffer
-      last = Math.min(last, withBuffer >= 0 ? withBuffer : examIndex - 1)
+      last = withBuffer >= 0 ? withBuffer : examIndex - 1
     }
     if (task.dueDate) {
       // Une echeance personnelle deja passee ne doit pas faire disparaitre le
@@ -211,7 +281,7 @@ export function planStudy(
   const unplaced: StudyPlan['unplaced'] = []
 
   // File de chapitres par matiere, dans l'ordre ou l'etudiant les a crees.
-  const queues = new Map<string, { task: PlannerTask; lastDay: number; minutes: number }[]>()
+  const queues = new Map<string, QueueItem[]>()
   const sorted = [...tasks].sort(
     (a, b) =>
       a.order - b.order ||
@@ -220,13 +290,13 @@ export function planStudy(
   )
   for (const task of sorted) {
     if (!subjectById.has(task.subjectId)) continue
-    const lastDay = lastDayFor(task)
-    if (lastDay < 0) {
+    const deadlineDay = deadlineDayFor(task)
+    if (deadlineDay < 0) {
       unplaced.push({ taskId: task.id, subjectId: task.subjectId, reason: 'deadline_passed' })
       continue
     }
     const queue = queues.get(task.subjectId) ?? []
-    queue.push({ task, lastDay, minutes: blockMinutes(task) })
+    queue.push({ task, lastDay: Math.min(horizonDays - 1, deadlineDay), deadlineDay, minutes: blockMinutes(task) })
     queues.set(task.subjectId, queue)
   }
 
@@ -249,13 +319,14 @@ export function planStudy(
 
     while (remaining >= MIN_BLOCK_MINUTES) {
       // Deux regimes :
-      //  - une matiere "critique" (ce qui lui reste ne tient plus sans elle, avant
-      //    son dernier jour possible) passe devant tout, la plus pressee d'abord ;
+      //  - une matiere "critique" (ce qui lui reste ne tiendra plus a son
+      //    echeance si elle n'est pas servie aujourd'hui) passe devant, la plus
+      //    pressee d'abord, et seulement pour ce qui lui manque (criticalNeed) ;
       //  - sinon partage proportionnel : chaque matiere recoit du temps au prorata
       //    de coefficient x urgence, sur tout l'horizon (file equitable ponderee).
       //    Ca melange les matieres chaque jour au lieu de finir la plus lourde
       //    avant d'ouvrir les autres.
-      let critical: { subjectId: string; daysLeft: number } | null = null
+      let critical: { subjectId: string; deadlineDay: number; need: number } | null = null
       let fair: { subjectId: string; virtual: number } | null = null
 
       for (const [subjectId, queue] of queues) {
@@ -264,10 +335,17 @@ export function planStudy(
         if (pending.length === 0) continue
         const subject = subjectById.get(subjectId)!
 
-        const pendingMinutes = pending.reduce((sum, item) => sum + item.minutes, 0)
-        const daysLeft = Math.max(1, Math.max(...pending.map((item) => item.lastDay)) - day + 1)
-        if (pendingMinutes >= daysLeft * capacity * 0.75) {
-          if (!critical || daysLeft < critical.daysLeft) critical = { subjectId, daysLeft }
+        const need = criticalNeed(pending, day, capacity)
+        if (need) {
+          // Echeance la plus proche d'abord ; a echeance egale (les UE d'un meme
+          // concours), le plus gros manque. Comme le manque baisse a chaque bloc
+          // servi, deux matieres critiques en meme temps s'alternent au lieu que
+          // la premiere de la liste prenne tout.
+          const before =
+            !critical ||
+            need.deadlineDay < critical.deadlineDay ||
+            (need.deadlineDay === critical.deadlineDay && need.minutes > critical.need)
+          if (before) critical = { subjectId, deadlineDay: need.deadlineDay, need: need.minutes }
         }
 
         const daysToExam = subject.deadline
@@ -282,7 +360,11 @@ export function planStudy(
       if (!best) break
 
       const queue = queues.get(best.subjectId)!
-      const index = queue.findIndex((item) => item.lastDay >= day)
+      // En regime critique, on sert un chapitre de l'echeance qui presse, pas le
+      // premier de la file : sinon trois chapitres dus demain attendent derriere
+      // des chapitres de fin de semestre, et le manque ne baisse jamais.
+      const crunch = critical ? critical.deadlineDay : Number.POSITIVE_INFINITY
+      const index = queue.findIndex((item) => item.lastDay >= day && item.deadlineDay <= crunch)
       const item = queue[index]
       const needMs = item.minutes * MS_PER_MINUTE
 

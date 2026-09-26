@@ -3,6 +3,7 @@ import { getAuthUserFromRequest } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { calculateTaskOrder, priorityIntToLabel } from "@/lib/tasks"
 import { replanUserSafely } from "@/lib/planning/autoPlan"
+import { deleteGeneratedSessions } from "@/lib/planning/generatedSessions"
 
 // Garde-fous : une saisie collée peut contenir n'importe quoi, et cette route
 // crée en masse. Sans plafond, un copier-coller d'un poly entier crée des
@@ -87,8 +88,15 @@ export async function POST(
 
     // Ne pas recréer un chapitre déjà présent dans la matière : l'import est
     // typiquement rejoué après une correction de la liste collée.
+    // Les seances generiques en attente ne comptent pas : elles vont etre
+    // supprimees, et un vrai chapitre qui porterait le meme titre serait sinon
+    // ecarte comme doublon, puis perdu avec elles.
     const existing = await prisma.task.findMany({
-      where: { subjectId: id, userId: user.id },
+      where: {
+        subjectId: id,
+        userId: user.id,
+        NOT: { generated: true, completed: false },
+      },
       select: { title: true },
     })
     const existingTitles = new Set(existing.map(t => t.title.trim().toLowerCase()))
@@ -121,18 +129,23 @@ export async function POST(
 
     const order = calculateTaskOrder(`P${normalizedPriority}`, "Moyen")
 
-    await prisma.task.createMany({
-      data: titlesToCreate.map(title => ({
-        title,
-        description: "",
-        priority: normalizedPriority,
-        estimatedMinutes: normalizedEstimatedMinutes,
-        subjectId: id,
-        userId: user.id,
-        completed: false,
-        order,
-      })),
-    })
+    // Les vrais chapitres remplacent les seances generiques de l'onboarding, dans
+    // la meme transaction : jamais de matiere qui a les deux, ni aucun des deux.
+    await prisma.$transaction([
+      deleteGeneratedSessions(user.id, id),
+      prisma.task.createMany({
+        data: titlesToCreate.map(title => ({
+          title,
+          description: "",
+          priority: normalizedPriority,
+          estimatedMinutes: normalizedEstimatedMinutes,
+          subjectId: id,
+          userId: user.id,
+          completed: false,
+          order,
+        })),
+      }),
+    ])
 
     // Les nouveaux chapitres sont places dans le planning tout de suite, avant la
     // relecture, pour que le mobile recoive directement leurs creneaux.

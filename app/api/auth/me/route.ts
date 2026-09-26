@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getAuthUserFromRequest, verifyToken } from "@/lib/auth"
+import type { Prisma } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
-import { getPlanInfo } from "@/lib/plans"
+import { getExamFreeRemaining, getPlanInfo } from "@/lib/plans"
 import { getEmailVerificationBlockAt } from "@/lib/email-verification"
 import { syncUserTimezone } from "@/lib/timezone"
 import { replanUserSafely } from "@/lib/planning/autoPlan"
@@ -52,25 +53,45 @@ export async function GET(req: NextRequest) {
     }
 
     // Récupérer les informations complètes de l'utilisateur
-    const userInfo = await prisma.user.findUnique({
-      where: { id: user.id },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true,
-        managedCompanyId: true,
-        createdAt: true,
-        updatedAt: true,
-        emailVerifiedAt: true,
-        emailVerificationSentAt: true,
-        timezone: true,
-      }
-    })
+    const baseSelect = {
+      id: true,
+      name: true,
+      email: true,
+      role: true,
+      managedCompanyId: true,
+      createdAt: true,
+      updatedAt: true,
+      emailVerifiedAt: true,
+      emailVerificationSentAt: true,
+      timezone: true,
+    } as const
+    // Toutes les versions de l'app appellent cette route. Si le code part en
+    // production avant la migration 20260926000000 (migrate deploy rate ou
+    // expire, et le message du script de build s'affiche sans condition), la
+    // colonne examFreeUsed n'existe pas et Prisma leve P2022 : sans ce repli,
+    // chaque /auth/me renverrait 500 et les 1.3 et 1.4 en boutique
+    // deconnecteraient leurs utilisateurs. On relit alors sans le compteur, et
+    // examFreeRemaining est OMIS (pas null, qui voudrait dire premium) : l'app
+    // suppose alors aucune seance offerte (fail-closed, utils/premium.ts).
+    let userInfo: (Prisma.UserGetPayload<{ select: typeof baseSelect }> & { examFreeUsed?: number }) | null
+    let examCounterKnown = true
+    try {
+      userInfo = await prisma.user.findUnique({
+        where: { id: user.id },
+        select: { ...baseSelect, examFreeUsed: true },
+      })
+    } catch (error: any) {
+      if (error?.code !== "P2022") throw error
+      console.error("[auth/me] colonne absente, migration 20260926000000 non appliquee ?", error?.meta ?? error?.message)
+      examCounterKnown = false
+      userInfo = await prisma.user.findUnique({ where: { id: user.id }, select: baseSelect })
+    }
 
     if (!userInfo) {
       return NextResponse.json({ error: "Utilisateur non trouvé" }, { status: 404 })
     }
+    // Compteur interne : on renvoie les seances restantes, pas le compteur brut.
+    const { examFreeUsed, ...publicUserInfo } = userInfo
 
     // L'app mobile envoie le fuseau de l'appareil a chaque appel ; on le garde a jour
     // pour les rappels et la planification (un etudiant a Montreal n'est pas a Paris).
@@ -107,12 +128,16 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       user: {
-        ...userInfo,
+        ...publicUserInfo,
         timezone,
         companyName: userCompany?.company?.name || null,
         plan: planInfo.plan,
         planLimits: planInfo.limits,
         isPremium: planInfo.isPremium,
+        // Seances Mode Examen offertes restantes (onboarding 1.5), null pour
+        // un premium. Absent des reponses degradees (repli minimal sur le
+        // JWT) : l'app suppose alors AUCUNE seance (fail-closed, utils/premium.ts).
+        ...(examCounterKnown ? { examFreeRemaining: getExamFreeRemaining({ ...user, examFreeUsed: examFreeUsed ?? 0 }) } : {}),
         emailVerified: !!userInfo.emailVerifiedAt || !emailVerificationRequired,
         emailVerificationRequired,
         emailVerificationDueAt,

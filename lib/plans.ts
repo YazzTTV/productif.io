@@ -100,6 +100,41 @@ export function getPlanInfo(user: Pick<User, "subscriptionStatus" | "subscriptio
   }
 }
 
+/**
+ * Seances Mode Examen offertes a un compte gratuit, AVEC blocage, sur toute la
+ * vie du compte (spec onboarding 1.5, section 4). Pas « par jour » : a 2 par
+ * jour, un etudiant qui revise matin et soir aurait le differenciateur gratuit
+ * pour toujours.
+ *
+ * Le compteur est tenu cote serveur (User.examFreeUsed, decompte par
+ * POST /api/exam/start) pour qu'on puisse changer ces trois valeurs sans build.
+ *
+ * NE JAMAIS passer examModeEnabled a true pour le gratuit a la place : le
+ * mobile (studyPlanSync) lit ce champ pour decider du blocage AUTOMATIQUE, qui
+ * reste premium.
+ */
+export const EXAM_FREE_SESSIONS = 2
+/**
+ * Seances rendues au plus, par compte, apres une annulation rapide. Sans
+ * plafond, annuler avant le delai et relancer donnerait un blocage gratuit
+ * illimite par tranches de 2 minutes (critique du 25 septembre, point 13).
+ */
+export const EXAM_FREE_REFUND_LIMIT = 1
+/** Une seance annulee avant ce delai (horloge reelle) est rendue. */
+export const EXAM_FREE_REFUND_WINDOW_SECONDS = 120
+
+/**
+ * Seances offertes restantes, ou null pour un compte qui a le Mode Examen en
+ * illimite (premium). examFreeUsed est un compte NET : une seance rendue le
+ * decremente (voir app/api/exam/cancel).
+ */
+export function getExamFreeRemaining(
+  user: Pick<User, "subscriptionStatus" | "subscriptionTier" | "stripeSubscriptionId" | "examFreeUsed">
+): number | null {
+  if (getPlanInfo(user).limits.examModeEnabled) return null
+  return Math.max(0, EXAM_FREE_SESSIONS - (user.examFreeUsed ?? 0))
+}
+
 export function buildLockedFeature(feature: string, message?: string): LockedFeature {
   return {
     locked: true,

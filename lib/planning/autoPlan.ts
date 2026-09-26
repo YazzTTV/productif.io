@@ -16,6 +16,11 @@
  *     seulement en premium (catchUpMode "full"). En gratuit il reste en retard,
  *     et c'est la banniere de rattrapage qui le montre.
  *
+ * Creneaux occupes, par ordre de confiance : blocs fixes, agenda Google (lu par
+ * le serveur), instantane Apple (envoye par le telephone), et l'emploi du
+ * temps declare a l'onboarding (User.weeklyBusy), qui s'ajoute aux agendas sur
+ * tout l'horizon. Regle exacte dans weeklyBusy.ts (weeklyBusyCoverage).
+ *
  * Tout est attendu par l'appelant : une ecriture non attendue dans une route
  * Vercel est tuee par le gel serverless des la reponse renvoyee.
  */
@@ -34,6 +39,7 @@ import {
   type PlannerTask,
   type StudyPlan,
 } from '@/lib/planning/StudyPlanner'
+import { parseWeeklyBusy, weeklyBusyCoverage, weeklyBusyIntervals } from '@/lib/planning/weeklyBusy'
 
 const MS_PER_MINUTE = 60 * 1000
 const MS_PER_DAY = 24 * 60 * MS_PER_MINUTE
@@ -49,6 +55,19 @@ export type ReplanReason =
   | 'busy_slots'
   | 'google_changed'
   | 'manual'
+  | 'onboarding'
+
+export interface ReplanOptions {
+  /** Calcule sans rien ecrire, et renvoie les blocs dans `preview`. */
+  dryRun?: boolean
+  /**
+   * Ne lit PAS Google. Pour l'onboarding : Google peut prendre 16 s (deux appels
+   * de 8 s), et l'ecran de calcul n'attend pas. L'appelant relance ensuite un
+   * calcul complet, avec Google, en tache de fond (after() de next/server).
+   * busySources contient alors 'google_skipped'.
+   */
+  skipGoogle?: boolean
+}
 
 export interface ReplanResult {
   userId: string
@@ -85,7 +104,7 @@ export async function replanUser(
   userId: string,
   reason: ReplanReason,
   now: Date = new Date(),
-  options: { dryRun?: boolean } = {}
+  options: ReplanOptions = {}
 ): Promise<ReplanResult> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
@@ -96,6 +115,7 @@ export async function replanUser(
       subscriptionTier: true,
       stripeSubscriptionId: true,
       calendarBusySnapshot: true,
+      weeklyBusy: true,
     },
   })
   if (!user) throw new Error(`replanUser: utilisateur ${userId} introuvable`)
@@ -182,7 +202,9 @@ export async function replanUser(
   const busySources: string[] = []
 
   try {
-    if (await googleCalendarService.isConnected(userId)) {
+    if (options.skipGoogle) {
+      busySources.push('google_skipped')
+    } else if (await googleCalendarService.isConnected(userId)) {
       // Un jeton expire ou revoque fait renvoyer [] par getBusyTimes, comme un
       // agenda vide : on verifie le jeton d'abord pour ne pas planifier par-dessus
       // des cours en croyant l'agenda lu. Le jeton valide est mis en cache, donc
@@ -212,6 +234,27 @@ export async function replanUser(
   if (snapshot && now.getTime() - snapshot.updatedAt.getTime() < SNAPSHOT_MAX_AGE_MS) {
     busy.push(...parseSnapshotSlots(snapshot.slots))
     busySources.push(snapshot.source)
+  } else if (snapshot) {
+    busySources.push(`${snapshot.source}_expired`)
+  }
+
+  // Emploi du temps declare a l'onboarding : s'ajoute aux agendas lus, un
+  // agenda lu ne contient pas forcement les cours (weeklyBusyCoverage).
+  const weekly = parseWeeklyBusy(user.weeklyBusy)
+  if (weekly) {
+    const coverage = weeklyBusyCoverage({
+      googleRead: busySources.includes('google'),
+      snapshot: snapshot ? { updatedAt: snapshot.updatedAt, rangeEnd: snapshot.rangeEnd } : null,
+      now,
+      snapshotMaxAgeMs: SNAPSHOT_MAX_AGE_MS,
+    })
+    if (coverage.use) {
+      const slots = weeklyBusyIntervals(weekly, todayKey, horizonDays + 1, timeZone, coverage.from)
+      if (slots.length > 0) {
+        busy.push(...slots)
+        busySources.push('weekly')
+      }
+    }
   }
 
   const plan: StudyPlan = planStudy(
@@ -320,10 +363,11 @@ export async function replanUser(
 export async function replanUserSafely(
   userId: string,
   reason: ReplanReason,
-  timeoutMs = 10_000
+  timeoutMs = 10_000,
+  options: Pick<ReplanOptions, 'skipGoogle'> = {}
 ): Promise<ReplanResult | null> {
   try {
-    return await withTimeout(replanUser(userId, reason), timeoutMs, null)
+    return await withTimeout(replanUser(userId, reason, new Date(), options), timeoutMs, null)
   } catch (error) {
     console.error(`[autoPlan] replanification ${reason} echouee pour ${userId}`, error)
     return null

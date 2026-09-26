@@ -3,6 +3,7 @@ import { getAuthUserFromRequest } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { priorityIntToLabel } from "@/lib/tasks"
 import { replanUserSafely } from "@/lib/planning/autoPlan"
+import { deleteGeneratedSessions } from "@/lib/planning/generatedSessions"
 
 // PATCH /api/subjects/[id] - Modifier une matière (nom, coefficient, date d'examen)
 export async function PATCH(
@@ -178,6 +179,11 @@ export async function DELETE(
       where: { subjectId: id, userId: user.id, autoPlannedAt: { not: null }, completed: false },
       data: { scheduledFor: null, schedulingStatus: "draft", proposedSlotStart: null, proposedSlotEnd: null, autoPlannedAt: null },
     })
+
+    // Les seances generiques de l'onboarding n'ont aucun sens sans leur matiere :
+    // detachees, elles apparaitraient en « Seance 1 ... 6 » dans les taches sans
+    // matiere. On les supprime (sauf celles deja faites) au lieu de les detacher.
+    await deleteGeneratedSessions(user.id, id)
 
     // Mettre à null le subjectId des tâches liées avant de supprimer
     await prisma.task.updateMany({

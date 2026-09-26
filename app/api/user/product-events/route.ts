@@ -13,6 +13,21 @@ const ALLOWED_EVENTS = new Set([
   "study_plan_synced",
   "study_reminder_opened",
   "auto_block_scheduled",
+  // Onboarding 1.5 : entonnoir ecran par ecran. Regle fixee le 25 septembre :
+  // si plus de 30 % des 20 premiers comptes neufs abandonnent pendant le
+  // questionnaire, on le raccourcit. Meme liste cote app (lib/productEvents.ts).
+  "onboarding_step_viewed",
+  "onboarding_step_completed",
+  "onboarding_calendar_choice",
+  "onboarding_plan_built",
+  // Essai et paywall. paywall_skipped = placement absent du tableau de bord
+  // Superwall, qui renvoie « presented » sans rien afficher.
+  "trial_cta_tapped",
+  "paywall_skipped",
+  // Seances Mode Examen offertes (compteur serveur : /api/exam/start).
+  "exam_free_session_started",
+  "exam_free_session_completed",
+  "first_planned_block_started",
 ])
 
 function sanitizeParams(value: unknown): Record<string, string | number | boolean | null> | undefined {
