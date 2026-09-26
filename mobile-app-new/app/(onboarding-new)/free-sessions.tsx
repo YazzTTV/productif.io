@@ -157,22 +157,14 @@ export default function FreeSessionsScreen() {
     }, [goToSession])
   );
 
+  // On sort TOUJOURS de l'onboarding avant d'ouvrir le Mode Examen : le choix
+  // des applis ouvert d'ici laissait l'onboarding sous lui, et un retour y
+  // ramenait l'etudiant (retour de Noah, 26 septembre). L'ecran de reglage du
+  // Mode Examen demande lui-meme l'autorisation et les applis.
   const handlePrepare = async () => {
     if (preparing || leavingRef.current) return;
     setPreparing(true);
     try {
-      if (isAppBlockingSupported()) {
-        if (getAuthorizationStatus() !== 'approved') {
-          // Refus : on continue quand meme, l'ecran de reglage propose de
-          // lancer sans blocage ou de choisir les applis.
-          await requestAuthorization();
-        }
-        if (getAuthorizationStatus() === 'approved' && getBlockedSelectionCount() === 0) {
-          pendingSelectionRef.current = true;
-          router.push('/exam/blocked-apps');
-          return;
-        }
-      }
       await goToSession('direct');
     } finally {
       setPreparing(false);
@@ -230,12 +222,18 @@ export default function FreeSessionsScreen() {
       footer={
         canPrepare ? (
           <>
+            {/* Le planning d'abord : la plupart ne lancent pas une seance tout de
+                suite, la seance offerte reste accessible depuis l'accueil. */}
             <PrimaryButton
-              label={t('onbFreePrepare', undefined, 'Préparer ma séance')}
-              onPress={handlePrepare}
-              loading={preparing}
+              label={t('onbFreeGoPlanning', undefined, 'Aller à mon planning')}
+              onPress={() => void goHome('home')}
+              disabled={preparing}
             />
-            <SecondaryButton label={t('onbFreeLater', undefined, 'Plus tard')} onPress={() => void goHome('later')} disabled={preparing} />
+            <SecondaryButton
+              label={t('onbFreePrepareNow', undefined, 'Préparer une séance maintenant')}
+              onPress={handlePrepare}
+              disabled={preparing}
+            />
           </>
         ) : (
           <PrimaryButton label={t('onbFreeGoHome', undefined, "Aller à l'accueil")} onPress={() => void goHome('home')} />
