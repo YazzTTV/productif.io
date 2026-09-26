@@ -403,6 +403,12 @@ export async function createFromRequest(
 export const QUICK_PLAN_MS = 3000
 /** Budget du calcul complet en tache de fond (deux appels Google de 8 s au pire). */
 export const FULL_PLAN_MS = 40_000
+/**
+ * Budget du calcul AVEC Google que l'ecran attend quand Google est connecte.
+ * Google repond d'habitude en moins d'une seconde (26 septembre : les deux
+ * calculs a la meme seconde) ; au-dela, on rend la main en partial.
+ */
+export const GOOGLE_PLAN_MS = 6000
 
 export const TIMED_OUT = Symbol('timed_out')
 
@@ -415,6 +421,7 @@ export interface PlanDeps {
   /** after() de next/server en production : tenu par Vercel apres la reponse. */
   schedule: (task: () => Promise<void>) => void
   quickBudgetMs: number
+  googleBudgetMs: number
 }
 
 const defaultDeps: PlanDeps = {
@@ -423,6 +430,7 @@ const defaultDeps: PlanDeps = {
   isGoogleConnected: (userId) => googleCalendarService.isConnected(userId),
   schedule: (task) => after(task),
   quickBudgetMs: QUICK_PLAN_MS,
+  googleBudgetMs: GOOGLE_PLAN_MS,
 }
 
 export interface PlanOutcome {
@@ -450,6 +458,39 @@ export interface PlanOutcome {
 export async function planAndSchedule(userId: string, deps: Partial<PlanDeps> = {}): Promise<PlanOutcome> {
   const d: PlanDeps = { ...defaultDeps, ...deps }
   const startedAt = Date.now()
+
+  // Google connecte : on attend le calcul COMPLET avant de repondre. Sinon
+  // l'ecran du planning montrait le calcul rapide, sans Google, et donc des
+  // seances posees pendant les cours que l'etudiant venait de relier (test du
+  // 26 septembre : seances a 9h00 lundi sur « COURS 9h30-17h »), alors que la
+  // base, corrigee une seconde plus tard, etait juste. Le rapide ne sert plus
+  // que de repli si Google est en panne.
+  const googleConnected = await d.isGoogleConnected(userId).catch(() => false)
+  if (googleConnected) {
+    const full: Promise<ReplanResult | null> = d.fullReplan(userId).catch((error) => {
+      console.error(`[onboarding/plan] calcul complet echoue pour ${userId}`, error)
+      return null
+    })
+    let googleTimer: ReturnType<typeof setTimeout> | undefined
+    const fullOutcome = await Promise.race([
+      full,
+      new Promise<typeof TIMED_OUT>((resolve) => {
+        googleTimer = setTimeout(() => resolve(TIMED_OUT), d.googleBudgetMs)
+      }),
+    ])
+    clearTimeout(googleTimer)
+    if (fullOutcome === TIMED_OUT) {
+      // Google lent : on garde le calcul en vie apres la reponse (gel Vercel),
+      // et l'ecran relit les blocs une fois (partial).
+      d.schedule(async () => {
+        await full
+      })
+      return { partial: true, quick: TIMED_OUT, ms: Date.now() - startedAt }
+    }
+    if (fullOutcome) return { partial: false, quick: fullOutcome, ms: Date.now() - startedAt }
+    // Google en panne : repli sur le calcul rapide ci-dessous.
+  }
+
   const quick: Promise<ReplanResult | null> = d.quickReplan(userId).catch((error) => {
     console.error(`[onboarding/plan] calcul rapide echoue pour ${userId}`, error)
     return null
@@ -467,7 +508,9 @@ export async function planAndSchedule(userId: string, deps: Partial<PlanDeps> = 
   d.schedule(async () => {
     const quickResult = await quick
     try {
-      if (quickResult && !(await d.isGoogleConnected(userId))) return
+      // Google deja tente (et en panne) ou absent : le complet ne sert qu'a
+      // rattraper un calcul rapide qui n'a pas abouti.
+      if (quickResult) return
       const full = await d.fullReplan(userId)
       console.log(
         `[onboarding/plan] calcul complet pour ${userId} :`,

@@ -395,11 +395,12 @@ console.log('\n6. Calcul borne puis calcul complet apres la reponse')
   const result = (label: string): ReplanResult => ({ userId: 'u1', reason: 'onboarding', blocksWritten: 3, unscheduled: 0, unplaced: 0, catchUp: false, busySources: [label] })
   const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
-  function harness(opts: { quickMs: number; quickFails?: boolean; google: boolean }) {
+  function harness(opts: { quickMs: number; quickFails?: boolean; google: boolean; fullMs?: number }) {
     const log: string[] = []
     let scheduled: (() => Promise<void>) | null = null
     const deps = {
       quickBudgetMs: 60,
+      googleBudgetMs: 60,
       quickReplan: async () => {
         log.push('quick:start')
         await sleep(opts.quickMs)
@@ -409,7 +410,7 @@ console.log('\n6. Calcul borne puis calcul complet apres la reponse')
       },
       fullReplan: async () => {
         log.push('full:start')
-        await sleep(5)
+        await sleep(opts.fullMs ?? 5)
         log.push('full:end')
         return result('google')
       },
@@ -435,9 +436,20 @@ console.log('\n6. Calcul borne puis calcul complet apres la reponse')
   }
   {
     const h = harness({ quickMs: 5, google: true })
-    await planAndSchedule('u1', h.deps)
+    const out = await planAndSchedule('u1', h.deps)
+    check('avec Google : le calcul COMPLET est fait avant la reponse, sans le rapide',
+      h.log.join(',') === 'full:start,full:end' && out.partial === false && out.quick !== TIMED_OUT && out.quick !== null && (out.quick as ReplanResult).busySources.includes('google'), h.log)
     await h.run()
-    check('avec Google : calcul complet apres la reponse', h.log.join(',') === 'quick:start,quick:end,full:start,full:end', h.log)
+    check('avec Google : rien de plus apres la reponse', h.log.join(',') === 'full:start,full:end', h.log)
+  }
+  {
+    const h = harness({ quickMs: 5, google: true, fullMs: 150 })
+    const before = Date.now()
+    const out = await planAndSchedule('u1', h.deps)
+    const waited = Date.now() - before
+    check('Google lent : partial true, la route rend la main au budget Google', out.partial === true && waited < 140, { waited })
+    await h.run()
+    check('Google lent : le complet est garde en vie jusqu\'au bout, jamais le rapide', h.log.join(',') === 'full:start,full:end', h.log)
   }
   {
     const h = harness({ quickMs: 150, google: false })
@@ -450,13 +462,7 @@ console.log('\n6. Calcul borne puis calcul complet apres la reponse')
     check('rapide depasse sans Google : la tache de fond le garde en vie jusqu\'au bout, pas de complet',
       h.log.join(',') === 'quick:start,quick:end', h.log)
   }
-  {
-    const h = harness({ quickMs: 150, google: true })
-    await planAndSchedule('u1', h.deps)
-    await h.run()
-    check('rapide depasse avec Google : le complet ATTEND la fin du rapide',
-      h.log.join(',') === 'quick:start,quick:end,full:start,full:end', h.log)
-  }
+
   {
     const h = harness({ quickMs: 5, quickFails: true, google: false })
     const out = await planAndSchedule('u1', h.deps)
@@ -467,7 +473,8 @@ console.log('\n6. Calcul borne puis calcul complet apres la reponse')
   {
     const h = harness({ quickMs: 5, google: true })
     h.deps.fullReplan = async () => { throw new Error('Google HS') }
-    await planAndSchedule('u1', h.deps)
+    const out = await planAndSchedule('u1', h.deps)
+    check('Google en panne : repli sur le calcul rapide, rendu a l\'ecran', out.partial === false && h.log.includes('quick:end'), h.log)
     let threw = false
     try { await h.run() } catch { threw = true }
     check('complet en panne : la tache de fond ne leve pas', !threw)
