@@ -1,5 +1,8 @@
 # Dependencies
 node_modules/
+# Sans barre : couvre aussi un LIEN SYMBOLIQUE node_modules (un worktree en a
+# commite un le 26 septembre, qui a remplace le vrai dossier a la fusion).
+node_modules
 node_modules 2/
 node_modules 3/
 
