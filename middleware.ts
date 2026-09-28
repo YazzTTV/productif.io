@@ -53,6 +53,8 @@ const publicRoutes = [
   "/verify-email",
   // QR codes dynamiques imprimes : doivent rester accessibles sans compte.
   "/r/",
+  // Liens d'invitation partages depuis la Communaute de l'app, ouverts par des gens sans compte.
+  "/rejoindre/",
 ]
 
 export async function middleware(request: NextRequest) {

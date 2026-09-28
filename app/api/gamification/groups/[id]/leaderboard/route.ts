@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getAuthUserFromRequest } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { displayName } from "@/lib/community"
 
 export async function GET(
   request: NextRequest,
@@ -36,7 +37,9 @@ export async function GET(
       where: { groupId },
       include: {
         user: {
-          include: {
+          select: {
+            id: true,
+            name: true,
             gamification: true
           }
         }
@@ -47,7 +50,6 @@ export async function GET(
     type LeaderboardEntry = {
       userId: string
       userName: string
-      userEmail: string
       points: number
       totalPoints: number
       level: number
@@ -63,8 +65,7 @@ export async function GET(
 
         return {
           userId: member.user.id,
-          userName: member.user.name || member.user.email.split('@')[0],
-          userEmail: member.user.email,
+          userName: displayName(member.user.name),
           points: gamif.points,
           totalPoints: gamif.points,
           level: gamif.level,

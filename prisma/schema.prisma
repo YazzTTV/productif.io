@@ -23,6 +23,8 @@ model User {
   /// Fuseau IANA de l'appareil (ex. "America/Toronto"), envoye par l'app mobile dans l'en-tete
   /// `x-timezone` et enregistre par GET /api/auth/me. Null = inconnu, a traiter comme Europe/Paris.
   timezone         String?
+  /// Code ami personnel (6 caracteres, sans 0/O/1/I), cree au premier affichage de la Communaute.
+  friendCode       String?  @unique
   /// Dernier passage du planificateur automatique pour cet utilisateur.
   autoPlanRunAt    DateTime?
   calendarBusySnapshot CalendarBusySnapshot?
@@ -103,6 +105,8 @@ model User {
   createdGroups           LeaderboardGroup[]           @relation("GroupCreator")
   groupInvitations        LeaderboardGroupInvitation[] @relation("GroupInviter")
   LeaderboardGroupMember  LeaderboardGroupMember[]
+  friendships             Friendship[]                 @relation("FriendshipOwner")
+  friendOf                Friendship[]                 @relation("FriendshipFriend")
   agentInteractions       AgentInteraction[]
   onboardingData          OnboardingData?
   xpEvents                XpEvent[]
@@ -497,6 +501,21 @@ model LeaderboardGroupMember {
   @@unique([groupId, userId])
   @@index([groupId])
   @@index([userId])
+}
+
+/// Amitie mutuelle, stockee dans les deux sens (une ligne par cote) pour que
+/// « mes amis » soit une simple lecture par userId. Pas de demande a accepter :
+/// le code ne circule que parce que son proprietaire l'a partage.
+model Friendship {
+  id        String   @id @default(cuid())
+  userId    String
+  friendId  String
+  createdAt DateTime @default(now())
+  user      User     @relation("FriendshipOwner", fields: [userId], references: [id], onDelete: Cascade)
+  friend    User     @relation("FriendshipFriend", fields: [friendId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, friendId])
+  @@index([friendId])
 }
 
 model LeaderboardGroupInvitation {

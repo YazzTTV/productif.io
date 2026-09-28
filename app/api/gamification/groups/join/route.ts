@@ -1,10 +1,10 @@
-import { NextResponse } from "next/server"
-import { getAuthUser } from "@/lib/auth"
+import { NextRequest, NextResponse } from "next/server"
+import { getAuthUserFromRequest } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const user = await getAuthUser()
+    const user = await getAuthUserFromRequest(request)
     if (!user) {
       return NextResponse.json({ error: "Non authentifié" }, { status: 401 })
     }

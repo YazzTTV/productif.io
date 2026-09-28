@@ -20,19 +20,7 @@ export async function GET(request: NextRequest) {
             creator: {
               select: {
                 id: true,
-                name: true,
-                email: true
-              }
-            },
-            members: {
-              include: {
-                user: {
-                  select: {
-                    id: true,
-                    name: true,
-                    email: true
-                  }
-                }
+                name: true
               }
             },
             _count: {
@@ -53,8 +41,7 @@ export async function GET(request: NextRequest) {
       createdAt: ug.group.createdAt,
       createdBy: {
         id: ug.group.creator.id,
-        name: ug.group.creator.name,
-        email: ug.group.creator.email
+        name: ug.group.creator.name
       },
       memberCount: ug.group._count.members,
       isCreator: ug.group.createdBy === user.id,
@@ -109,8 +96,7 @@ export async function POST(request: NextRequest) {
         creator: {
           select: {
             id: true,
-            name: true,
-            email: true
+            name: true
           }
         },
         _count: {
@@ -130,8 +116,7 @@ export async function POST(request: NextRequest) {
         createdAt: group.createdAt,
         createdBy: {
           id: group.creator.id,
-          name: group.creator.name,
-          email: group.creator.email
+          name: group.creator.name
         },
         memberCount: group._count.members,
         isCreator: true,
