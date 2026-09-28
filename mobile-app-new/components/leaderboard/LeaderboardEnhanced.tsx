@@ -1,830 +1,628 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Modal, ActivityIndicator, TextInput, Alert, KeyboardAvoidingView, Platform } from 'react-native';
-import { useRouter , useFocusEffect } from 'expo-router';
-import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
+/**
+ * Onglet Communauté.
+ *
+ * Classement sur les minutes de révision des 7 derniers jours (séances Focus et
+ * Mode Examen déjà synchronisées par lib/studyAnalysis.ts), calculé côté serveur
+ * dans lib/community.ts. Trois vues :
+ *  - Amis : ajoutés par code ou par lien, amitié mutuelle, gratuit.
+ *  - Groupes : une promo, une classe, rejointe par code, gratuit.
+ *  - Global : Premium.
+ *
+ * Avant le 28 septembre, « Amis » lisait les collègues d'une ENTREPRISE (reste
+ * de la version entrepreneurs) et « Classe » ne se rejoignait pas : l'écran
+ * était vide pour 100 % des étudiants.
+ */
+
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  ScrollView,
+  Modal,
+  ActivityIndicator,
+  TextInput,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  Share,
+  RefreshControl,
+} from 'react-native';
+import { useFocusEffect, useRouter } from 'expo-router';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { gamificationService, authService } from '@/lib/api';
-import { useLanguage } from '@/contexts/LanguageContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import {
+  authService,
+  communityService,
+  type CommunityEntry,
+  type CommunityGroup,
+  type CommunityLeaderboard,
+} from '@/lib/api';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { useSuperwall } from '@/hooks/useSuperwall';
 import { SUPERWALL_EVENTS } from '@/lib/superwallEvents';
+import { takePendingCommunityCode } from '@/lib/communityPendingCode';
 
-type LeaderboardTab = 'friends' | 'class' | 'global';
+type Tab = 'friends' | 'groups' | 'global';
 
-interface LeaderboardUser {
-  id: string;
-  rank: number;
-  name: string;
-  points: number;
-  level: number;
-  streak: number;
-  focusSessions: number;
-  isCurrentUser?: boolean;
-}
+const SELECTED_GROUP_KEY = 'favorite_group_id';
+const GREEN = '#16A34A';
 
-interface Group {
-  id: string;
-  name: string;
-  description?: string;
-  memberCount?: number;
-  type?: string;
+function formatMinutes(minutes: number): string {
+  if (minutes < 60) return `${minutes} min`;
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return m === 0 ? `${h} h` : `${h} h ${m.toString().padStart(2, '0')}`;
 }
 
 export function LeaderboardEnhanced() {
   const { t } = useLanguage();
   const router = useRouter();
-  const { triggerEvent } = useSuperwall();
   const insets = useSafeAreaInsets();
-  const [activeTab, setActiveTab] = useState<LeaderboardTab>('friends');
-  const [selectedUser, setSelectedUser] = useState<LeaderboardUser | null>(null);
+  const { triggerEvent } = useSuperwall();
+
+  const [tab, setTab] = useState<Tab>('friends');
   const [isPremium, setIsPremium] = useState(false);
-  const [friendsData, setFriendsData] = useState<LeaderboardUser[]>([]);
-  const [loadingFriends, setLoadingFriends] = useState(false);
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const [groups, setGroups] = useState<Group[]>([]);
-  const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
-  const [classData, setClassData] = useState<LeaderboardUser[]>([]);
-  const [loadingGroups, setLoadingGroups] = useState(false);
-  const [loadingClassData, setLoadingClassData] = useState(false);
-  const [showCreateGroupModal, setShowCreateGroupModal] = useState(false);
+  const [me, setMe] = useState<{ friendCode: string; shareUrl: string } | null>(null);
+  const [board, setBoard] = useState<CommunityLeaderboard | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [loadError, setLoadError] = useState(false);
+  const [groups, setGroups] = useState<CommunityGroup[]>([]);
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
+  const [codeInput, setCodeInput] = useState('');
+  const [joining, setJoining] = useState(false);
+  const [showCreate, setShowCreate] = useState(false);
   const [newGroupName, setNewGroupName] = useState('');
-  const [newGroupDescription, setNewGroupDescription] = useState('');
-  const [availableFriends, setAvailableFriends] = useState<LeaderboardUser[]>([]);
-  const [selectedFriendIds, setSelectedFriendIds] = useState<string[]>([]);
-  const [isCreatingGroup, setIsCreatingGroup] = useState(false);
-  const [favoriteGroupId, setFavoriteGroupId] = useState<string | null>(null);
-  const [globalData, setGlobalData] = useState<LeaderboardUser[]>([]);
-  const [loadingGlobal, setLoadingGlobal] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [selectedEntry, setSelectedEntry] = useState<CommunityEntry | null>(null);
+  // Ignore la réponse d'un chargement dépassé par un changement d'onglet.
+  const requestId = useRef(0);
 
-  const FAVORITE_GROUP_KEY = 'favorite_group_id';
-  const LEVEL_BASE_POINTS = 100;
-  const LEVEL_MULTIPLIER = 1.5;
+  const selectedGroup = groups.find((g) => g.id === selectedGroupId) ?? null;
 
-  const getLevelFromPoints = (points: number) =>
-    Math.floor(Math.log(points / LEVEL_BASE_POINTS + 1) / Math.log(LEVEL_MULTIPLIER)) + 1;
-
-  const getLevelStartPoints = (level: number) =>
-    Math.floor(LEVEL_BASE_POINTS * (Math.pow(LEVEL_MULTIPLIER, level - 1) - 1));
-
-  const getNextLevelPoints = (level: number) =>
-    Math.floor(LEVEL_BASE_POINTS * (Math.pow(LEVEL_MULTIPLIER, level) - 1));
-
-  const getLevelProgress = (points: number, level?: number) => {
-    const resolvedLevel = level ?? getLevelFromPoints(points);
-    const start = getLevelStartPoints(resolvedLevel);
-    const next = getNextLevelPoints(resolvedLevel);
-    const denom = Math.max(1, next - start);
-    return Math.max(0, Math.min(1, (points - start) / denom));
-  };
-
-  useEffect(() => {
-    const loadPlan = async () => {
-      try {
-        const currentUserData = await authService.checkAuth();
-        setIsPremium(Boolean(currentUserData?.isPremium || currentUserData?.plan === 'premium'));
-        setCurrentUserId(currentUserData?.id || null);
-        const storedFavoriteGroupId = await AsyncStorage.getItem(FAVORITE_GROUP_KEY);
-        setFavoriteGroupId(storedFavoriteGroupId);
-      } catch (error) {
-        setIsPremium(false);
+  const loadBoard = useCallback(
+    async (nextTab: Tab, groupId: string | null) => {
+      const id = ++requestId.current;
+      setLoadError(false);
+      if (nextTab === 'groups' && !groupId) {
+        setBoard(null);
+        return;
       }
-    };
-    loadPlan();
-  }, []);
-
-  // Charger les amis depuis l'API
-  const loadFriends = async () => {
-    try {
-      setLoadingFriends(true);
-      const friendsLeaderboard = await gamificationService.getFriendsLeaderboard();
-      
-      // Récupérer l'ID de l'utilisateur actuel
-      const { authService } = await import('@/lib/api');
-      const currentUserData = await authService.checkAuth();
-      const userId = currentUserData?.id;
-      setCurrentUserId(userId || null);
-      
-      // Transformer les données de l'API en format LeaderboardUser
-      const transformedFriends: LeaderboardUser[] = friendsLeaderboard.map((entry, index) => ({
-        id: entry.userId,
-        rank: entry.rank || index + 1,
-        name: entry.userName || entry.userEmail?.split('@')[0] || 'User',
-        points: entry.totalPoints ?? entry.points ?? 0,
-        level: entry.level || 1,
-        streak: entry.currentStreak || 0,
-        focusSessions: entry.totalHabitsCompleted || 0,
-        isCurrentUser: entry.userId === userId,
-      }));
-      
-      // Trier par rang
-      transformedFriends.sort((a, b) => a.rank - b.rank);
-      
-      setFriendsData(transformedFriends);
-    } catch (error) {
-      console.error('❌ Erreur chargement amis:', error);
-      setFriendsData([]);
-    } finally {
-      setLoadingFriends(false);
-    }
-  };
-
-  // Charger les données au focus de l'écran
-  useFocusEffect(
-    useCallback(() => {
-    if (activeTab === 'friends') {
-      loadFriends();
-    } else if (activeTab === 'class') {
-      loadGroups();
-    } else if (activeTab === 'global') {
-      loadGlobal();
-    }
-  }, [activeTab])
+      setLoading(true);
+      try {
+        const scope = nextTab === 'friends' ? 'friends' : nextTab === 'groups' ? 'group' : 'global';
+        const result = await communityService.leaderboard(scope, groupId ?? undefined);
+        if (id === requestId.current) setBoard(result);
+      } catch (error) {
+        if (id === requestId.current) {
+          setBoard(null);
+          setLoadError(true);
+        }
+      } finally {
+        if (id === requestId.current) setLoading(false);
+      }
+    },
+    [],
   );
 
-  // Charger les groupes de l'utilisateur
-  const loadGroups = async () => {
+  const loadGroups = useCallback(async (): Promise<string | null> => {
     try {
-      setLoadingGroups(true);
-      const userGroups = await gamificationService.getUserGroups();
-      setGroups(userGroups);
-      // Si un groupe est sélectionné, charger son classement
-      if (userGroups.length > 0 && !selectedGroup) {
-        const preferredGroup =
-          userGroups.find((group) => group.id === favoriteGroupId) || userGroups[0];
-        setSelectedGroup(preferredGroup);
-        await loadGroupLeaderboard(preferredGroup.id);
-      }
-    } catch (error) {
-      console.error('❌ Erreur chargement groupes:', error);
+      const list = await communityService.groups();
+      setGroups(list);
+      const stored = await AsyncStorage.getItem(SELECTED_GROUP_KEY);
+      const pick = list.find((g) => g.id === stored)?.id ?? list[0]?.id ?? null;
+      setSelectedGroupId(pick);
+      return pick;
+    } catch {
       setGroups([]);
-    } finally {
-      setLoadingGroups(false);
+      return null;
     }
-  };
+  }, []);
 
-  // Charger le classement d'un groupe
-  const loadGroupLeaderboard = async (groupId: string) => {
-    try {
-      setLoadingClassData(true);
-      const groupLeaderboard = await gamificationService.getGroupLeaderboard(groupId);
-      
-      // Récupérer l'ID de l'utilisateur actuel
-      const { authService } = await import('@/lib/api');
-      const currentUserData = await authService.checkAuth();
-      const userId = currentUserData?.id;
-      
-      // Transformer les données de l'API en format LeaderboardUser
-      const transformedData: LeaderboardUser[] = groupLeaderboard.map((entry, index) => ({
-        id: entry.userId,
-        rank: entry.rank || index + 1,
-        name: entry.userName || entry.userEmail?.split('@')[0] || 'User',
-        points: entry.totalPoints ?? entry.points ?? 0,
-        level: entry.level || 1,
-        streak: entry.currentStreak || 0,
-        focusSessions: entry.totalHabitsCompleted || 0,
-        isCurrentUser: entry.userId === userId,
-      }));
-      
-      // Trier par rang
-      transformedData.sort((a, b) => a.rank - b.rank);
-      
-      setClassData(transformedData);
-    } catch (error) {
-      console.error('❌ Erreur chargement classement groupe:', error);
-      setClassData([]);
-    } finally {
-      setLoadingClassData(false);
-    }
-  };
-
-  const loadGlobal = async () => {
-    try {
-      setLoadingGlobal(true);
-      const globalLeaderboard = await gamificationService.getLeaderboard(20, true);
-      const leaderboardData = Array.isArray(globalLeaderboard)
-        ? globalLeaderboard
-        : globalLeaderboard?.leaderboard || [];
-      const transformedGlobal: LeaderboardUser[] = leaderboardData.map((entry: any, index: number) => ({
-        id: entry.userId,
-        rank: entry.rank || index + 1,
-        name: entry.userName || entry.userEmail?.split('@')[0] || 'User',
-        points: entry.totalPoints ?? entry.points ?? 0,
-        level: entry.level || 1,
-        streak: entry.currentStreak || 0,
-        focusSessions: entry.totalHabitsCompleted || 0,
-        isCurrentUser: entry.userId === currentUserId,
-      }));
-      transformedGlobal.sort((a, b) => a.rank - b.rank);
-      setGlobalData(transformedGlobal);
-    } catch (error) {
-      console.error('❌ Erreur chargement global:', error);
-      setGlobalData([]);
-    } finally {
-      setLoadingGlobal(false);
-    }
-  };
-
-  const getCurrentData = () => {
-    switch (activeTab) {
-      case 'friends': return friendsData;
-      case 'class': return classData;
-      case 'global': return globalData;
-      default: return classData;
-    }
-  };
-
-  const data = getCurrentData();
-  const currentUser = data.find(u => u.isCurrentUser);
-
-  const handleTabPress = (tab: LeaderboardTab) => {
-    if (!isPremium && tab === 'global') {
-      triggerEvent(SUPERWALL_EVENTS.FEATURE_LOCKED, {
-        params: { source: 'leaderboard_enhanced_global_tab' },
-      });
-      return;
-    }
-    setActiveTab(tab);
-    if (tab === 'friends') {
-      loadFriends();
-    } else if (tab === 'class') {
-      loadGroups();
-    } else if (tab === 'global') {
-      loadGlobal();
-    }
-  };
-
-  const handleGroupSelect = async (group: Group) => {
-    setSelectedGroup(group);
-    await loadGroupLeaderboard(group.id);
-  };
-
-  const handleFavoriteGroup = async (group: Group) => {
-    setFavoriteGroupId(group.id);
-    await AsyncStorage.setItem(FAVORITE_GROUP_KEY, group.id);
-  };
-
-  // Charger les amis disponibles pour inviter
-  const loadAvailableFriends = async () => {
-    try {
-      const friendsLeaderboard = await gamificationService.getFriendsLeaderboard();
-      const transformedFriends: LeaderboardUser[] = friendsLeaderboard.map((entry, index) => ({
-        id: entry.userId,
-        rank: entry.rank || index + 1,
-        name: entry.userName || entry.userEmail?.split('@')[0] || 'User',
-        points: entry.totalPoints ?? entry.points ?? 0,
-        level: entry.level || 1,
-        streak: entry.currentStreak || 0,
-        focusSessions: entry.totalHabitsCompleted || 0,
-      }));
-      setAvailableFriends(transformedFriends);
-    } catch (error) {
-      console.error('❌ Erreur chargement amis disponibles:', error);
-      setAvailableFriends([]);
-    }
-  };
-
-  // Ouvrir le modal de création de groupe
-  const handleCreateGroup = () => {
-    console.log('🔄 Ouverture du modal de création de groupe');
-    setShowCreateGroupModal(true);
-    setNewGroupName('');
-    setNewGroupDescription('');
-    setSelectedFriendIds([]);
-    loadAvailableFriends();
-  };
-
-  // Créer le groupe
-  const handleSubmitGroup = async () => {
-    if (!newGroupName.trim()) {
-      Alert.alert(t('error'), t('groupNameRequired'));
-      return;
-    }
-
-    try {
-      setIsCreatingGroup(true);
-      
-      // Récupérer l'ID de l'utilisateur actuel pour l'inclure dans les membres
-      const { authService } = await import('@/lib/api');
-      const currentUserData = await authService.checkAuth();
-      const currentUserId = currentUserData?.id;
-      
-      // Inclure l'utilisateur actuel dans la liste des membres
-      const allMemberIds = currentUserId 
-        ? [currentUserId, ...selectedFriendIds]
-        : selectedFriendIds;
-      
-      const newGroup = await gamificationService.createGroup({
-        name: newGroupName.trim(),
-        description: newGroupDescription.trim() || undefined,
-        memberIds: allMemberIds.length > 0 ? allMemberIds : undefined,
-      });
-
-      // Recharger les groupes
-      await loadGroups();
-      
-      // Attendre un peu avant de charger le classement pour que le backend traite la création
-      setTimeout(async () => {
-        try {
-          // Sélectionner le nouveau groupe
-          setSelectedGroup(newGroup);
-          await loadGroupLeaderboard(newGroup.id);
-        } catch (error) {
-          console.error('❌ Erreur chargement classement après création:', error);
-          // Ne pas bloquer si le classement ne charge pas immédiatement
+  const applyCode = useCallback(
+    async (raw: string, silentSuccess = false) => {
+      const code = raw.replace(/[\s-]/g, '').toUpperCase();
+      if (code.length < 4) {
+        Alert.alert(t('cmCodeInvalid'));
+        return;
+      }
+      setJoining(true);
+      try {
+        const result = await communityService.join(code);
+        setCodeInput('');
+        if (result.type === 'friend') {
+          const message = result.alreadyFriends
+            ? t('cmAlreadyFriends', { name: result.friend.name })
+            : t('cmFriendAdded', { name: result.friend.name });
+          if (!silentSuccess || !result.alreadyFriends) Alert.alert(message);
+          setTab('friends');
+          await loadBoard('friends', null);
+        } else {
+          const message = result.alreadyMember
+            ? t('cmAlreadyMember', { name: result.group.name })
+            : t('cmGroupJoined', { name: result.group.name });
+          if (!silentSuccess || !result.alreadyMember) Alert.alert(message);
+          await AsyncStorage.setItem(SELECTED_GROUP_KEY, result.group.id);
+          await loadGroups();
+          setSelectedGroupId(result.group.id);
+          setTab('groups');
+          await loadBoard('groups', result.group.id);
         }
-      }, 500);
+      } catch (error: any) {
+        const reason = error?.errorData?.error ?? error?.message;
+        Alert.alert(
+          reason === 'own_code'
+            ? t('cmOwnCode')
+            : reason === 'not_found'
+              ? t('cmCodeNotFound')
+              : reason === 'invalid_code'
+                ? t('cmCodeInvalid')
+                : t('cmLoadError'),
+        );
+      } finally {
+        setJoining(false);
+      }
+    },
+    [loadBoard, loadGroups, t],
+  );
 
-      // Fermer le modal
-      setShowCreateGroupModal(false);
-      setNewGroupName('');
-      setNewGroupDescription('');
-      setSelectedFriendIds([]);
+  useEffect(() => {
+    (async () => {
+      try {
+        const user = await authService.checkAuth();
+        setIsPremium(Boolean(user?.isPremium || user?.plan === 'premium'));
+      } catch {
+        setIsPremium(false);
+      }
+      try {
+        setMe(await communityService.me());
+      } catch {
+        setMe(null);
+      }
+    })();
+  }, []);
 
-      Alert.alert(t('success'), t('groupCreated'));
-    } catch (error: any) {
-      console.error('❌ Erreur création groupe:', error);
-      Alert.alert(t('error'), error.message || t('groupCreationError'));
-    } finally {
-      setIsCreatingGroup(false);
+  useFocusEffect(
+    useCallback(() => {
+      (async () => {
+        // Invitation ouverte par lien : elle passe avant tout le reste.
+        const pending = await takePendingCommunityCode();
+        if (pending) {
+          await applyCode(pending, true);
+          return;
+        }
+        if (tab === 'groups') {
+          const groupId = await loadGroups();
+          await loadBoard('groups', groupId);
+        } else {
+          if (tab === 'friends') void loadGroups();
+          await loadBoard(tab, null);
+        }
+      })();
+      // Rechargé à chaque retour sur l'onglet, sur l'onglet affiché.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [tab]),
+  );
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    const groupId = tab === 'groups' ? await loadGroups() : null;
+    await loadBoard(tab, groupId);
+    setRefreshing(false);
+  };
+
+  const onTabPress = (next: Tab) => {
+    if (next === 'global' && !isPremium) {
+      triggerEvent(SUPERWALL_EVENTS.FEATURE_LOCKED, { params: { source: 'community_global_tab' } });
+      return;
+    }
+    setBoard(null);
+    setTab(next);
+  };
+
+  const onSelectGroup = async (group: CommunityGroup) => {
+    setSelectedGroupId(group.id);
+    await AsyncStorage.setItem(SELECTED_GROUP_KEY, group.id);
+    await loadBoard('groups', group.id);
+  };
+
+  const shareFriendInvite = async () => {
+    if (!me) return;
+    try {
+      await Share.share({ message: t('cmShareMessage', { url: me.shareUrl, code: me.friendCode }) });
+    } catch {
+      // Feuille de partage fermée : rien à faire.
     }
   };
 
-  // Toggle sélection d'un ami
-  const toggleFriendSelection = (friendId: string) => {
-    setSelectedFriendIds(prev => 
-      prev.includes(friendId) 
-        ? prev.filter(id => id !== friendId)
-        : [...prev, friendId]
-    );
+  const shareGroupInvite = async (group: CommunityGroup) => {
+    try {
+      await Share.share({
+        message: t('cmShareGroupMessage', { name: group.name, url: group.shareUrl, code: group.code }),
+      });
+    } catch {
+      // Feuille de partage fermée.
+    }
+  };
+
+  const submitNewGroup = async () => {
+    const name = newGroupName.trim();
+    if (!name) return;
+    setCreating(true);
+    try {
+      const group = await communityService.createGroup(name);
+      setShowCreate(false);
+      setNewGroupName('');
+      await AsyncStorage.setItem(SELECTED_GROUP_KEY, group.id);
+      await loadGroups();
+      setSelectedGroupId(group.id);
+      await loadBoard('groups', group.id);
+      // Un groupe seul ne sert à rien : on propose l'invitation tout de suite.
+      await shareGroupInvite(group);
+    } catch {
+      Alert.alert(t('cmLoadError'));
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const confirmLeaveGroup = (group: CommunityGroup) => {
+    Alert.alert(group.name, t('cmLeaveGroupConfirm'), [
+      { text: t('cmCancel'), style: 'cancel' },
+      {
+        text: t('cmLeaveGroup'),
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await communityService.leaveGroup(group.id);
+          } catch {
+            Alert.alert(t('cmLoadError'));
+          }
+          const next = await loadGroups();
+          await loadBoard('groups', next);
+        },
+      },
+    ]);
+  };
+
+  const confirmRemoveFriend = (entry: CommunityEntry) => {
+    Alert.alert(entry.name, t('cmRemoveFriendConfirm', { name: entry.name }), [
+      { text: t('cmCancel'), style: 'cancel' },
+      {
+        text: t('cmRemoveFriend'),
+        style: 'destructive',
+        onPress: async () => {
+          setSelectedEntry(null);
+          try {
+            await communityService.removeFriend(entry.userId);
+          } catch {
+            Alert.alert(t('cmLoadError'));
+          }
+          await loadBoard(tab, selectedGroupId);
+        },
+      },
+    ]);
+  };
+
+  const entries = board?.entries ?? [];
+  const myEntry = board?.me ?? null;
+  const others = entries.filter((e) => !e.isMe);
+  const sessionsLabel = (n: number) => (n === 1 ? t('cmOneSession') : t('cmSessions', { n }));
+
+  const renderCodeRow = () => (
+    <View style={styles.codeRow}>
+      <TextInput
+        style={styles.codeInput}
+        value={codeInput}
+        onChangeText={setCodeInput}
+        placeholder={t('cmCodePlaceholder')}
+        placeholderTextColor="rgba(0, 0, 0, 0.35)"
+        autoCapitalize="characters"
+        autoCorrect={false}
+        returnKeyType="done"
+        onSubmitEditing={() => codeInput.trim() && applyCode(codeInput)}
+        maxLength={32}
+      />
+      <TouchableOpacity
+        style={[styles.codeButton, (!codeInput.trim() || joining) && styles.codeButtonDisabled]}
+        onPress={() => applyCode(codeInput)}
+        disabled={!codeInput.trim() || joining}
+        activeOpacity={0.8}
+      >
+        {joining ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.codeButtonText}>{t('cmAdd')}</Text>}
+      </TouchableOpacity>
+    </View>
+  );
+
+  const renderEntry = (entry: CommunityEntry, index: number) => (
+    <Animated.View key={entry.userId} entering={FadeInDown.delay(Math.min(index, 8) * 40).duration(300)}>
+      <TouchableOpacity
+        style={[styles.row, entry.isMe && styles.rowMe]}
+        onPress={() => !entry.isMe && setSelectedEntry(entry)}
+        activeOpacity={entry.isMe ? 1 : 0.7}
+      >
+        <Text style={[styles.rowRank, entry.rank <= 3 && styles.rowRankTop]}>{entry.rank}</Text>
+        <View style={[styles.avatar, entry.isMe && styles.avatarMe]}>
+          <Text style={[styles.avatarText, entry.isMe && styles.avatarTextMe]}>{entry.name.charAt(0)}</Text>
+        </View>
+        <View style={styles.rowInfo}>
+          <Text style={styles.rowName} numberOfLines={1}>
+            {entry.isMe ? t('cmMe') : entry.name}
+          </Text>
+          <Text style={styles.rowMeta}>
+            {sessionsLabel(entry.weekSessions)} · {t('cmLevel', { n: entry.level })}
+          </Text>
+        </View>
+        <Text style={[styles.rowMinutes, entry.weekMinutes === 0 && styles.rowMinutesZero]}>
+          {formatMinutes(entry.weekMinutes)}
+        </Text>
+      </TouchableOpacity>
+    </Animated.View>
+  );
+
+  const renderList = () => {
+    if (loading && !board) {
+      return (
+        <View style={styles.center}>
+          <ActivityIndicator color={GREEN} />
+        </View>
+      );
+    }
+    if (loadError) {
+      return (
+        <View style={styles.center}>
+          <Text style={styles.emptyBody}>{t('cmLoadError')}</Text>
+          <TouchableOpacity onPress={onRefresh} style={styles.linkButton}>
+            <Text style={styles.linkButtonText}>{t('cmRetry')}</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+    if (tab === 'friends' && others.length === 0) {
+      return (
+        <View style={styles.emptyCard}>
+          <Text style={styles.emptyTitle}>{t('cmNoFriendsTitle')}</Text>
+          <Text style={styles.emptyBody}>{t('cmNoFriendsBody')}</Text>
+        </View>
+      );
+    }
+    if (tab === 'groups' && groups.length === 0) {
+      return (
+        <View style={styles.emptyCard}>
+          <Text style={styles.emptyTitle}>{t('cmNoGroupsTitle')}</Text>
+          <Text style={styles.emptyBody}>{t('cmNoGroupsBody')}</Text>
+        </View>
+      );
+    }
+    if (tab === 'global' && entries.length === 0) {
+      return (
+        <View style={styles.center}>
+          <Text style={styles.emptyBody}>{t('cmGlobalEmpty')}</Text>
+        </View>
+      );
+    }
+    return <View style={styles.list}>{entries.map(renderEntry)}</View>;
   };
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <ScrollView
-        style={styles.scrollView}
+        style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={GREEN} />}
       >
-        {/* Header */}
-        <Animated.View entering={FadeInUp.delay(100).duration(400)} style={styles.header}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => router.back()}
-          >
-            <Ionicons name="arrow-back" size={22} color="#000" />
-          </TouchableOpacity>
+        <View style={styles.header}>
+          <Text style={styles.title}>{t('community')}</Text>
+          <Text style={styles.subtitle}>{t('cmSubtitle')}</Text>
+        </View>
 
-          <View style={styles.headerContent}>
-            <Text style={styles.headerTitle}>{t('community')}</Text>
-            <Text style={styles.headerSubtitle}>{t('othersShowingUp')}</Text>
-          </View>
-        </Animated.View>
-
-        {/* Tabs */}
-        <Animated.View entering={FadeInDown.delay(200).duration(400)} style={styles.tabsContainer}>
-          {(['friends', 'class', 'global'] as const).map((tab) => {
-            const isLocked = !isPremium && tab === 'global';
+        <View style={styles.tabs}>
+          {(['friends', 'groups', 'global'] as const).map((key) => {
+            const locked = key === 'global' && !isPremium;
             return (
               <TouchableOpacity
-                key={tab}
-                style={[
-                  styles.tab,
-                  activeTab === tab && styles.tabActive,
-                  isLocked && styles.tabLocked
-                ]}
-                onPress={() => handleTabPress(tab)}
+                key={key}
+                style={[styles.tab, tab === key && styles.tabActive]}
+                onPress={() => onTabPress(key)}
                 activeOpacity={0.7}
               >
-                <Text style={[
-                  styles.tabText,
-                  activeTab === tab && styles.tabTextActive
-                ]}>
-                  {tab === 'friends' ? t('friends') : tab === 'class' ? t('class') : t('global')}
+                <Text style={[styles.tabText, tab === key && styles.tabTextActive, locked && styles.tabTextLocked]}>
+                  {key === 'friends' ? t('friends') : key === 'groups' ? t('cmTabGroups') : t('global')}
                 </Text>
-                {isLocked && (
-                  <Ionicons name="lock-closed" size={12} color="rgba(0,0,0,0.4)" style={{ marginLeft: 4 }} />
-                )}
+                {locked && <Ionicons name="lock-closed" size={12} color="rgba(0,0,0,0.35)" style={{ marginLeft: 4 }} />}
               </TouchableOpacity>
             );
           })}
-        </Animated.View>
+        </View>
 
-        {/* Your Position Card */}
-        {currentUser && (
-          <Animated.View entering={FadeInDown.delay(300).duration(400)} style={styles.positionCard}>
-            <Text style={styles.positionLabel}>{t('yourPosition') || 'Your position'}</Text>
-            <View style={styles.positionContent}>
-              <View style={styles.positionAvatar}>
-                <Text style={styles.positionAvatarText}>{currentUser.name.charAt(0)}</Text>
-              </View>
-              <View style={styles.positionStats}>
-                <View style={styles.positionRankRow}>
-                  <Text style={styles.positionRank}>#{currentUser.rank}</Text>
-                  <Text style={styles.positionContext}>
-                    {activeTab === 'friends' ? (t('amongFriends') || 'among friends') : 
-                     activeTab === 'class' ? (t('inYourClass') || 'in your class') : 
-                     (t('globally') || 'globally')}
-                  </Text>
-                </View>
-                <View style={styles.positionMeta}>
-                  <Text style={styles.positionMetaText}>{currentUser.streak} {t('daysStreak')}</Text>
-                  <Text style={styles.positionMetaText}>•</Text>
-                  <Text style={styles.positionMetaText}>{currentUser.focusSessions} {t('sessions')}</Text>
-                </View>
-              </View>
+        {/* Ta semaine : toujours là, même seul, pour que l'écran ne soit jamais vide. */}
+        {myEntry && (
+          <View style={styles.weekCard}>
+            <Text style={styles.weekLabel}>{t('cmYourWeek')}</Text>
+            <View style={styles.weekRow}>
+              <Text style={styles.weekMinutes}>{formatMinutes(myEntry.weekMinutes)}</Text>
+              {entries.length > 1 && (
+                <Text style={styles.weekRank}>{t('cmRankAmong', { rank: myEntry.rank, total: board?.total ?? entries.length })}</Text>
+              )}
             </View>
-
-            {/* Progress bar */}
-            <View style={styles.progressBarContainer}>
-              <View style={styles.progressBarTrack}>
-                <Animated.View
-                  style={[
-                    styles.progressBarFill,
-                    { width: `${getLevelProgress(currentUser.points, currentUser.level) * 100}%` }
-                  ]}
-                />
-              </View>
-              <View style={styles.progressBarLabels}>
-                <Text style={styles.progressBarLabel}>Niv. {currentUser.level}</Text>
-                <Text style={styles.progressBarLabel}>Niv. {currentUser.level + 1}</Text>
-              </View>
-            </View>
-          </Animated.View>
+            <Text style={styles.weekMeta}>
+              {t('cmStudied')} · {sessionsLabel(myEntry.weekSessions)}
+            </Text>
+            {myEntry.weekMinutes === 0 && (
+              <TouchableOpacity onPress={() => router.push('/exam-mode')} style={styles.weekCta} activeOpacity={0.8}>
+                <Text style={styles.weekCtaText}>{t('cmStartSession')}</Text>
+                <Ionicons name="arrow-forward" size={16} color={GREEN} />
+              </TouchableOpacity>
+            )}
+          </View>
         )}
 
-        {/* Motivational Quote */}
-        <Animated.View entering={FadeInDown.delay(400).duration(400)} style={styles.quoteSection}>
-          <Text style={styles.quoteText}>{t('alignedWithGroup')}</Text>
-        </Animated.View>
+        {tab === 'friends' && (
+          <View style={styles.inviteCard}>
+            <Text style={styles.inviteTitle}>{t('cmInviteTitle')}</Text>
+            <Text style={styles.inviteBody}>{t('cmInviteBody')}</Text>
+            <TouchableOpacity
+              style={[styles.primaryButton, !me && styles.codeButtonDisabled]}
+              onPress={shareFriendInvite}
+              disabled={!me}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="share-outline" size={18} color="#FFFFFF" />
+              <Text style={styles.primaryButtonText}>{t('inviteFriend')}</Text>
+            </TouchableOpacity>
+            {me && (
+              <Text style={styles.myCode}>
+                {t('cmYourCode')} : <Text style={styles.myCodeValue}>{me.friendCode}</Text>
+              </Text>
+            )}
+            <Text style={styles.codeLabel}>{t('cmHaveCode')}</Text>
+            {renderCodeRow()}
+          </View>
+        )}
 
-        {/* Invite CTA */}
-        <Animated.View entering={FadeInDown.delay(500).duration(400)} style={styles.inviteSection}>
-          <TouchableOpacity 
-            style={styles.inviteCard} 
-            activeOpacity={0.7}
-            onPress={() => router.push('/invite')}
-          >
-            <Text style={styles.inviteText}>{t('inviteStayConsistent')}</Text>
-            <Text style={styles.inviteCTA}>{t('inviteFriend')} →</Text>
-          </TouchableOpacity>
-        </Animated.View>
-
-        {/* Group Selection (for Class tab) */}
-        {activeTab === 'class' && (
-          <Animated.View entering={FadeInDown.delay(300).duration(400)} style={styles.groupsContainer}>
-            <View style={styles.groupsHeader}>
-              <Text style={styles.groupsHeaderTitle}>Mes groupes</Text>
-              <TouchableOpacity
-                style={styles.createGroupButton}
-                onPress={handleCreateGroup}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="add" size={20} color="#16A34A" />
-                  <Text style={styles.createGroupButtonText}>{t('create')}</Text>
-              </TouchableOpacity>
-            </View>
-            {loadingGroups ? (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="small" color="#16A34A" />
-                <Text style={styles.loadingText}>{t('loadingGroups') || t('loading')}</Text>
-              </View>
-            ) : groups.length === 0 ? (
-              <View style={styles.emptyContainer}>
-                <Text style={styles.emptyText}>Aucun groupe trouvé</Text>
-                <Text style={styles.emptySubtext}>Créez un groupe pour commencer</Text>
-              </View>
-            ) : (
-              <ScrollView 
-                horizontal 
-                showsHorizontalScrollIndicator={false}
-                style={styles.groupsScrollView}
-                contentContainerStyle={styles.groupsScrollContent}
-              >
+        {tab === 'groups' && (
+          <View style={styles.groupsBlock}>
+            {groups.length > 0 && (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
                 {groups.map((group) => (
                   <TouchableOpacity
                     key={group.id}
-                    style={[
-                      styles.groupCard,
-                      selectedGroup?.id === group.id && styles.groupCardSelected
-                    ]}
-                    onPress={() => handleGroupSelect(group)}
+                    style={[styles.chip, selectedGroupId === group.id && styles.chipActive]}
+                    onPress={() => onSelectGroup(group)}
                     activeOpacity={0.7}
                   >
-                    <View style={styles.groupCardHeader}>
-                      <Text style={[
-                        styles.groupCardTitle,
-                        selectedGroup?.id === group.id && styles.groupCardTitleSelected
-                      ]}>
-                        {group.name}
-                      </Text>
-                      <TouchableOpacity
-                        style={styles.favoriteButton}
-                        onPress={() => handleFavoriteGroup(group)}
-                        activeOpacity={0.7}
-                      >
-                        <Ionicons
-                          name={favoriteGroupId === group.id ? 'star' : 'star-outline'}
-                          size={16}
-                          color={favoriteGroupId === group.id ? '#16A34A' : 'rgba(0, 0, 0, 0.4)'}
-                        />
-                      </TouchableOpacity>
-                    </View>
-                    {group.memberCount && (
-                      <Text style={styles.groupCardSubtitle}>
-                        {group.memberCount} membres
-                      </Text>
-                    )}
+                    <Text style={[styles.chipText, selectedGroupId === group.id && styles.chipTextActive]} numberOfLines={1}>
+                      {group.name}
+                    </Text>
                   </TouchableOpacity>
                 ))}
+                <TouchableOpacity style={styles.chipAdd} onPress={() => setShowCreate(true)} activeOpacity={0.7}>
+                  <Ionicons name="add" size={18} color={GREEN} />
+                </TouchableOpacity>
               </ScrollView>
             )}
-          </Animated.View>
-        )}
 
-        {/* Leaderboard List */}
-        <View style={styles.listContainer}>
-          {activeTab === 'friends' && loadingFriends ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="small" color="#16A34A" />
-                <Text style={styles.loadingText}>{t('loadingFriends') || t('loading')}</Text>
-            </View>
-          ) : activeTab === 'class' && loadingClassData ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="small" color="#16A34A" />
-                <Text style={styles.loadingText}>{t('loadingLeaderboard')}</Text>
-            </View>
-          ) : activeTab === 'global' && loadingGlobal ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="small" color="#16A34A" />
-                <Text style={styles.loadingText}>{t('loadingLeaderboard')}</Text>
-            </View>
-          ) : data.length === 0 && activeTab === 'friends' ? (
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>Aucun ami trouvé</Text>
-              <Text style={styles.emptySubtext}>Ajoutez des amis pour voir leur classement</Text>
-            </View>
-          ) : data.length === 0 && activeTab === 'class' ? (
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>Aucun classement disponible</Text>
-              <Text style={styles.emptySubtext}>Sélectionnez un groupe ci-dessus</Text>
-            </View>
-          ) : data.length === 0 && activeTab === 'global' ? (
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>Aucun classement disponible</Text>
-              <Text style={styles.emptySubtext}>Réessayez dans quelques instants</Text>
-            </View>
-          ) : (
-            data.map((user, index) => {
-              if (user.isCurrentUser) return null;
-
-            const progressPercent = getLevelProgress(user.points, user.level) * 100;
-
-            return (
-              <Animated.View
-                key={user.id}
-                entering={FadeInDown.delay(600 + index * 50).duration(400)}
-              >
-                <TouchableOpacity
-                  style={styles.userCard}
-                  onPress={() => setSelectedUser(user)}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.userCardContent}>
-                    <View style={styles.userCardLeft}>
-                      <Text style={styles.userRank}>{user.rank}</Text>
-                      <View style={styles.userAvatar}>
-                        <Text style={styles.userAvatarText}>{user.name.charAt(0)}</Text>
-                      </View>
-                      <View style={styles.userInfo}>
-                        <Text style={styles.userName}>{user.name}</Text>
-                        <View style={styles.userMeta}>
-                          <Text style={styles.userMetaText}>{user.streak}{t('daysStreak').charAt(0)}</Text>
-                          <Text style={styles.userMetaText}>•</Text>
-                          <Text style={styles.userMetaText}>{user.focusSessions} {t('sessions')}</Text>
-                        </View>
-                      </View>
-                    </View>
+            {selectedGroup && (
+              <View style={styles.groupCard}>
+                <View style={styles.groupHeader}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.groupName} numberOfLines={1}>{selectedGroup.name}</Text>
+                    <Text style={styles.groupMeta}>
+                      {selectedGroup.memberCount === 1 ? t('cmOneMember') : t('cmMembers', { n: selectedGroup.memberCount })}
+                      {' · '}
+                      {selectedGroup.code}
+                    </Text>
                   </View>
-
-                  {/* Progress bar */}
-                  <View style={styles.userProgressBar}>
-                    <View style={[styles.userProgressFill, { width: `${progressPercent}%` }]} />
-                  </View>
+                  <TouchableOpacity onPress={() => confirmLeaveGroup(selectedGroup)} hitSlop={10}>
+                    <Ionicons name="exit-outline" size={20} color="rgba(0,0,0,0.35)" />
+                  </TouchableOpacity>
+                </View>
+                <TouchableOpacity style={styles.primaryButton} onPress={() => shareGroupInvite(selectedGroup)} activeOpacity={0.85}>
+                  <Ionicons name="share-outline" size={18} color="#FFFFFF" />
+                  <Text style={styles.primaryButtonText}>{t('cmInviteToGroup')}</Text>
                 </TouchableOpacity>
-              </Animated.View>
-            );
-          }))}
-        </View>
+              </View>
+            )}
 
-        {/* Premium Upgrade Prompt (for Global tab) */}
-        {!isPremium && activeTab === 'global' && (
-          <Animated.View entering={FadeInDown.delay(800).duration(400)} style={styles.premiumPrompt}>
-            <View style={styles.premiumCard}>
-              <View style={styles.premiumIcon}>
-                <Ionicons name="lock-closed" size={32} color="#16A34A" />
-              </View>
-              <Text style={styles.premiumTitle}>Join the global leaderboard</Text>
-              <Text style={styles.premiumSubtitle}>
-                Compete with students worldwide and track long-term progress.
-              </Text>
-              <View style={styles.premiumFeatures}>
-                <View style={styles.premiumFeature}>
-                  <View style={styles.premiumFeatureDot} />
-                  <Text style={styles.premiumFeatureText}>Global rankings and insights</Text>
-                </View>
-                <View style={styles.premiumFeature}>
-                  <View style={styles.premiumFeatureDot} />
-                  <Text style={styles.premiumFeatureText}>Monthly and all-time views</Text>
-                </View>
-                <View style={styles.premiumFeature}>
-                  <View style={styles.premiumFeatureDot} />
-                  <Text style={styles.premiumFeatureText}>Advanced consistency metrics</Text>
-                </View>
-              </View>
-              <TouchableOpacity style={styles.premiumButton} activeOpacity={0.8}>
-                <Text style={styles.premiumButtonText}>Upgrade to Premium</Text>
+            {groups.length === 0 && (
+              <TouchableOpacity style={styles.primaryButton} onPress={() => setShowCreate(true)} activeOpacity={0.85}>
+                <Ionicons name="add" size={18} color="#FFFFFF" />
+                <Text style={styles.primaryButtonText}>{t('cmCreateGroup')}</Text>
               </TouchableOpacity>
-              <Text style={styles.premiumNote}>
-                Continue tracking with friends and class for free
-              </Text>
-            </View>
-          </Animated.View>
+            )}
+
+            <Text style={styles.codeLabel}>{t('cmHaveCode')}</Text>
+            {renderCodeRow()}
+          </View>
         )}
 
-        {/* Bottom spacing */}
+        {tab === 'global' && board?.locked && (
+          <View style={styles.emptyCard}>
+            <Text style={styles.emptyTitle}>{t('cmGlobalLockedTitle')}</Text>
+            <Text style={styles.emptyBody}>{t('cmGlobalLockedBody')}</Text>
+          </View>
+        )}
+
+        {!(tab === 'global' && board?.locked) && renderList()}
+
+        <Text style={styles.privacy}>{t('cmPrivacyNote')}</Text>
         <View style={{ height: 120 }} />
       </ScrollView>
 
-      {/* Create Group Modal */}
-      <Modal
-        visible={showCreateGroupModal}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={() => setShowCreateGroupModal(false)}
-      >
-        <KeyboardAvoidingView
-          style={styles.modalContainer}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        >
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{t('createGroup')}</Text>
+      {/* Création de groupe */}
+      <Modal visible={showCreate} transparent animationType="fade" onRequestClose={() => setShowCreate(false)}>
+        <KeyboardAvoidingView style={styles.overlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setShowCreate(false)} />
+          <View style={styles.sheet}>
+            <Text style={styles.sheetTitle}>{t('cmCreateGroup')}</Text>
+            <TextInput
+              style={styles.sheetInput}
+              value={newGroupName}
+              onChangeText={setNewGroupName}
+              placeholder={t('cmGroupNamePlaceholder')}
+              placeholderTextColor="rgba(0, 0, 0, 0.35)"
+              autoFocus
+              maxLength={60}
+              returnKeyType="done"
+              onSubmitEditing={submitNewGroup}
+            />
+            <View style={styles.sheetActions}>
+              <TouchableOpacity style={styles.secondaryButton} onPress={() => setShowCreate(false)} activeOpacity={0.7}>
+                <Text style={styles.secondaryButtonText}>{t('cmCancel')}</Text>
+              </TouchableOpacity>
               <TouchableOpacity
-                style={styles.modalCloseButton}
-                onPress={() => setShowCreateGroupModal(false)}
+                style={[styles.primaryButton, styles.sheetPrimary, (!newGroupName.trim() || creating) && styles.codeButtonDisabled]}
+                onPress={submitNewGroup}
+                disabled={!newGroupName.trim() || creating}
+                activeOpacity={0.85}
               >
-                <Ionicons name="close" size={24} color="#000" />
+                {creating ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.primaryButtonText}>{t('cmCreate')}</Text>}
               </TouchableOpacity>
             </View>
-
-            <ScrollView 
-              style={styles.modalScrollView} 
-              contentContainerStyle={styles.modalScrollContent}
-              showsVerticalScrollIndicator={false}
-            >
-              {/* Group Name */}
-              <View style={styles.modalField}>
-                <Text style={styles.modalLabel}>{t('groupName')} *</Text>
-                <TextInput
-                  style={styles.modalInput}
-                  value={newGroupName}
-                  onChangeText={setNewGroupName}
-                  placeholder={t('groupNamePlaceholder') || 'Ex: Ma classe de Mathématiques'}
-                  placeholderTextColor="rgba(0, 0, 0, 0.4)"
-                />
-              </View>
-
-              {/* Group Description */}
-              <View style={styles.modalField}>
-                <Text style={styles.modalLabel}>{t('groupDescription')} ({t('optional') || 'optionnel'})</Text>
-                <TextInput
-                  style={[styles.modalInput, styles.modalTextArea]}
-                  value={newGroupDescription}
-                  onChangeText={setNewGroupDescription}
-                  placeholder={t('describeGroup') || 'Décrivez votre groupe...'}
-                  placeholderTextColor="rgba(0, 0, 0, 0.4)"
-                  multiline
-                  numberOfLines={3}
-                  textAlignVertical="top"
-                />
-              </View>
-
-              {/* Invite Friends */}
-              <View style={styles.modalField}>
-                <Text style={styles.modalLabel}>{t('inviteFriends')}</Text>
-                {availableFriends.length === 0 ? (
-                  <Text style={styles.modalHint}>{t('noFriendsAvailable') || 'Aucun ami disponible'}</Text>
-                ) : (
-                  <View style={styles.friendsList}>
-                    {availableFriends.map((friend) => (
-                      <TouchableOpacity
-                        key={friend.id}
-                        style={[
-                          styles.friendItem,
-                          selectedFriendIds.includes(friend.id) && styles.friendItemSelected
-                        ]}
-                        onPress={() => toggleFriendSelection(friend.id)}
-                        activeOpacity={0.7}
-                      >
-                        <View style={styles.friendItemContent}>
-                          <View style={styles.friendAvatar}>
-                            <Text style={styles.friendAvatarText}>{friend.name.charAt(0)}</Text>
-                          </View>
-                          <Text style={styles.friendName}>{friend.name}</Text>
-                        </View>
-                        {selectedFriendIds.includes(friend.id) && (
-                          <Ionicons name="checkmark-circle" size={24} color="#16A34A" />
-                        )}
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                )}
-              </View>
-
-              {/* Submit Button */}
-              <TouchableOpacity
-                style={[styles.modalSubmitButton, isCreatingGroup && styles.modalSubmitButtonDisabled]}
-                onPress={handleSubmitGroup}
-                activeOpacity={0.8}
-                disabled={isCreatingGroup}
-              >
-                {isCreatingGroup ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <Text style={styles.modalSubmitButtonText}>{t('createGroup')}</Text>
-                )}
-              </TouchableOpacity>
-            </ScrollView>
           </View>
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* User Profile Modal */}
-      <Modal
-        visible={selectedUser !== null}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setSelectedUser(null)}
-      >
-        {selectedUser && (
-          <View style={styles.modalOverlay}>
-            <TouchableOpacity
-              style={styles.modalBackdrop}
-              activeOpacity={1}
-              onPress={() => setSelectedUser(null)}
-            />
-            <View style={styles.modalContent}>
-              <View style={styles.modalHeader}>
-                <TouchableOpacity
-                  style={styles.modalCloseButton}
-                  onPress={() => setSelectedUser(null)}
-                >
-                  <Ionicons name="close" size={24} color="#000" />
+      {/* Fiche d'un membre */}
+      <Modal visible={selectedEntry !== null} transparent animationType="fade" onRequestClose={() => setSelectedEntry(null)}>
+        {selectedEntry && (
+          <View style={styles.overlay}>
+            <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setSelectedEntry(null)} />
+            <View style={styles.sheet}>
+              <View style={styles.profileHeader}>
+                <View style={[styles.avatar, styles.avatarLarge]}>
+                  <Text style={[styles.avatarText, styles.avatarTextLarge]}>{selectedEntry.name.charAt(0)}</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.sheetTitle}>{selectedEntry.name}</Text>
+                  <Text style={styles.groupMeta}>#{selectedEntry.rank}</Text>
+                </View>
+              </View>
+              <View style={styles.stats}>
+                <View style={styles.stat}>
+                  <Text style={styles.statValue}>{formatMinutes(selectedEntry.weekMinutes)}</Text>
+                  <Text style={styles.statLabel}>{t('cmWeekLabel')}</Text>
+                </View>
+                <View style={styles.stat}>
+                  <Text style={styles.statValue}>{selectedEntry.weekSessions}</Text>
+                  <Text style={styles.statLabel}>{sessionsLabel(selectedEntry.weekSessions).replace(/^\d+\s*/, '')}</Text>
+                </View>
+                <View style={styles.stat}>
+                  <Text style={styles.statValue}>{selectedEntry.level}</Text>
+                  <Text style={styles.statLabel}>{t('cmLevel', { n: '' }).trim()}</Text>
+                </View>
+              </View>
+              {selectedEntry.isFriend && (
+                <TouchableOpacity onPress={() => confirmRemoveFriend(selectedEntry)} style={styles.linkButton}>
+                  <Text style={styles.removeText}>{t('cmRemoveFriend')}</Text>
                 </TouchableOpacity>
-              </View>
-
-              <View style={styles.modalUserHeader}>
-                <View style={styles.modalAvatar}>
-                  <Text style={styles.modalAvatarText}>{selectedUser.name.charAt(0)}</Text>
-                </View>
-                <View>
-                  <Text style={styles.modalUserName}>{selectedUser.name}</Text>
-                  <Text style={styles.modalUserRank}>Rank #{selectedUser.rank}</Text>
-                </View>
-              </View>
-
-              <View style={styles.modalStats}>
-                <View style={styles.modalStatCard}>
-                  <Text style={styles.modalStatLabel}>Current streak</Text>
-                  <View style={styles.modalStatValue}>
-                    <Text style={styles.modalStatNumber}>{selectedUser.streak}</Text>
-                    <Text style={styles.modalStatUnit}>days</Text>
-                  </View>
-                </View>
-
-                <View style={styles.modalStatCard}>
-                  <Text style={styles.modalStatLabel}>Niveau</Text>
-                  <View style={styles.modalStatValue}>
-                    <Text style={styles.modalStatNumber}>{selectedUser.level}</Text>
-                    <Text style={styles.modalStatUnit}>lvl</Text>
-                  </View>
-                </View>
-
-                <View style={styles.modalStatCard}>
-                  <Text style={styles.modalStatLabel}>Focus sessions</Text>
-                  <View style={styles.modalStatValue}>
-                    <Text style={styles.modalStatNumber}>{selectedUser.focusSessions}</Text>
-                    <Text style={styles.modalStatUnit}>this week</Text>
-                  </View>
-                </View>
-              </View>
-
-              <View style={styles.modalNote}>
-                <Text style={styles.modalNoteText}>
-                  Stats are private. No messaging available.
-                </Text>
-              </View>
+              )}
             </View>
           </View>
         )}
@@ -834,712 +632,118 @@ export function LeaderboardEnhanced() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingHorizontal: 24,
-    paddingTop: 16,
-  },
-  header: {
-    marginBottom: 24,
-    gap: 16,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.05)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  headerContent: {
-    flex: 1,
-  },
-  headerTitle: {
-    fontSize: 32,
-    fontWeight: '600',
-    letterSpacing: -1.2,
-    color: '#000000',
-    marginBottom: 4,
-  },
-  headerSubtitle: {
-    fontSize: 16,
-    color: 'rgba(0, 0, 0, 0.6)',
-  },
-  tabsContainer: {
-    flexDirection: 'row',
-    backgroundColor: 'rgba(0, 0, 0, 0.05)',
-    borderRadius: 16,
-    padding: 4,
-    marginBottom: 24,
-    gap: 4,
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  container: { flex: 1, backgroundColor: '#FFFFFF' },
+  scroll: { flex: 1 },
+  scrollContent: { paddingHorizontal: 24, paddingTop: 24 },
+  header: { marginBottom: 24 },
+  title: { fontSize: 32, fontWeight: '600', letterSpacing: -1.2, color: '#000000', marginBottom: 4 },
+  subtitle: { fontSize: 16, color: 'rgba(0, 0, 0, 0.55)' },
+
+  tabs: { flexDirection: 'row', backgroundColor: 'rgba(0, 0, 0, 0.04)', borderRadius: 20, padding: 4, marginBottom: 20 },
+  tab: { flex: 1, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingVertical: 10, borderRadius: 16 },
   tabActive: {
     backgroundColor: '#FFFFFF',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
     elevation: 2,
   },
-  tabLocked: {
-    opacity: 0.5,
-  },
-  tabText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: 'rgba(0, 0, 0, 0.6)',
-    textTransform: 'capitalize',
-  },
-  tabTextActive: {
-    color: '#000000',
-  },
-  positionCard: {
-    padding: 24,
-    borderRadius: 24,
-    borderWidth: 2,
-    borderColor: 'rgba(22, 163, 74, 0.2)',
-    backgroundColor: 'rgba(22, 163, 74, 0.05)',
-    marginBottom: 24,
-  },
-  positionLabel: {
-    fontSize: 14,
-    color: 'rgba(0, 0, 0, 0.4)',
-    marginBottom: 16,
-  },
-  positionContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-    marginBottom: 16,
-  },
-  positionAvatar: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: 'rgba(22, 163, 74, 0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  positionAvatarText: {
-    fontSize: 20,
-    fontWeight: '500',
-    color: '#16A34A',
-  },
-  positionStats: {
+  tabText: { fontSize: 15, fontWeight: '500', color: 'rgba(0, 0, 0, 0.55)' },
+  tabTextActive: { color: '#000000', fontWeight: '600' },
+  tabTextLocked: { color: 'rgba(0, 0, 0, 0.35)' },
+
+  weekCard: { borderRadius: 24, backgroundColor: 'rgba(22, 163, 74, 0.08)', padding: 20, marginBottom: 16 },
+  weekLabel: { fontSize: 12, fontWeight: '600', color: GREEN, textTransform: 'uppercase', letterSpacing: 1 },
+  weekRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginTop: 8 },
+  weekMinutes: { fontSize: 36, fontWeight: '700', letterSpacing: -1, color: '#000000' },
+  weekRank: { fontSize: 16, fontWeight: '600', color: GREEN },
+  weekMeta: { fontSize: 14, color: 'rgba(0, 0, 0, 0.5)', marginTop: 2 },
+  weekCta: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 14 },
+  weekCtaText: { fontSize: 15, fontWeight: '600', color: GREEN },
+
+  inviteCard: { borderRadius: 24, borderWidth: 1, borderColor: 'rgba(0, 0, 0, 0.06)', padding: 20, marginBottom: 20 },
+  inviteTitle: { fontSize: 18, fontWeight: '600', color: '#000000' },
+  inviteBody: { fontSize: 14, color: 'rgba(0, 0, 0, 0.55)', marginTop: 4, marginBottom: 16, lineHeight: 20 },
+  myCode: { fontSize: 14, color: 'rgba(0, 0, 0, 0.5)', textAlign: 'center', marginTop: 12 },
+  myCodeValue: { fontWeight: '700', color: '#000000', letterSpacing: 2 },
+  codeLabel: { fontSize: 12, fontWeight: '600', color: 'rgba(0, 0, 0, 0.4)', textTransform: 'uppercase', letterSpacing: 1, marginTop: 20, marginBottom: 8 },
+  codeRow: { flexDirection: 'row', gap: 8 },
+  codeInput: {
     flex: 1,
-  },
-  positionRankRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 8,
-    marginBottom: 4,
-  },
-  positionRank: {
-    fontSize: 24,
-    fontWeight: '600',
-    letterSpacing: -0.5,
-    color: '#16A34A',
-  },
-  positionContext: {
-    fontSize: 16,
-    color: 'rgba(0, 0, 0, 0.6)',
-  },
-  positionMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  positionMetaText: {
-    fontSize: 14,
-    color: 'rgba(0, 0, 0, 0.6)',
-  },
-  progressBarContainer: {
-    gap: 8,
-  },
-  progressBarTrack: {
-    width: '100%',
-    height: 8,
-    backgroundColor: 'rgba(0, 0, 0, 0.1)',
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  progressBarFill: {
-    height: '100%',
-    backgroundColor: '#16A34A',
-    borderRadius: 4,
-  },
-  progressBarLabels: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  progressBarLabel: {
-    fontSize: 12,
-    color: 'rgba(0, 0, 0, 0.4)',
-  },
-  quoteSection: {
-    marginBottom: 24,
-  },
-  quoteText: {
-    fontSize: 14,
-    color: 'rgba(0, 0, 0, 0.4)',
-    textAlign: 'center',
-  },
-  inviteSection: {
-    marginBottom: 24,
-  },
-  inviteCard: {
-    padding: 24,
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: 'rgba(22, 163, 74, 0.2)',
-    backgroundColor: 'rgba(22, 163, 74, 0.05)',
-    alignItems: 'center',
-    gap: 8,
-  },
-  inviteText: {
-    fontSize: 16,
-    color: 'rgba(0, 0, 0, 0.6)',
-    textAlign: 'center',
-  },
-  inviteCTA: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#16A34A',
-  },
-  listContainer: {
-    gap: 12,
-    marginBottom: 24,
-  },
-  userCard: {
-    padding: 20,
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.05)',
-    backgroundColor: '#FFFFFF',
-  },
-  userCardContent: {
-    marginBottom: 12,
-  },
-  userCardLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-  },
-  userRank: {
-    width: 32,
-    fontSize: 18,
-    fontWeight: '500',
-    color: 'rgba(0, 0, 0, 0.4)',
-  },
-  userAvatar: {
-    width: 48,
     height: 48,
-    borderRadius: 24,
-    backgroundColor: 'rgba(0, 0, 0, 0.05)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  userAvatarText: {
-    fontSize: 18,
-    fontWeight: '500',
-    color: 'rgba(0, 0, 0, 0.6)',
-  },
-  userInfo: {
-    flex: 1,
-  },
-  userName: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#000000',
-    marginBottom: 4,
-  },
-  userMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  userMetaText: {
-    fontSize: 14,
-    color: 'rgba(0, 0, 0, 0.6)',
-  },
-  userProgressBar: {
-    width: '100%',
-    height: 6,
-    backgroundColor: 'rgba(0, 0, 0, 0.05)',
-    borderRadius: 3,
-    overflow: 'hidden',
-  },
-  userProgressFill: {
-    height: '100%',
-    backgroundColor: 'rgba(0, 0, 0, 0.1)',
-    borderRadius: 3,
-  },
-  premiumPrompt: {
-    marginBottom: 24,
-  },
-  premiumCard: {
-    padding: 32,
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: 'rgba(22, 163, 74, 0.2)',
-    backgroundColor: 'rgba(22, 163, 74, 0.05)',
-    alignItems: 'center',
-    gap: 24,
-  },
-  premiumIcon: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: 'rgba(22, 163, 74, 0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  premiumTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    letterSpacing: -0.5,
-    color: '#000000',
-    textAlign: 'center',
-  },
-  premiumSubtitle: {
-    fontSize: 16,
-    color: 'rgba(0, 0, 0, 0.6)',
-    textAlign: 'center',
-  },
-  premiumFeatures: {
-    width: '100%',
-    gap: 12,
-  },
-  premiumFeature: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  premiumFeatureDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#16A34A',
-  },
-  premiumFeatureText: {
-    fontSize: 14,
-    color: 'rgba(0, 0, 0, 0.6)',
-  },
-  premiumButton: {
-    width: '100%',
-    backgroundColor: '#16A34A',
-    paddingVertical: 16,
-    borderRadius: 24,
-    alignItems: 'center',
-    shadowColor: '#16A34A',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  premiumButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  premiumNote: {
-    fontSize: 12,
-    color: 'rgba(0, 0, 0, 0.4)',
-    textAlign: 'center',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.2)',
-    justifyContent: 'flex-end',
-  },
-  modalBackdrop: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  modalContent: {
-    flex: 1,
-    padding: 24,
-    paddingTop: 16,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  modalTitle: {
-    fontSize: 24,
-    fontWeight: '600',
-    letterSpacing: -0.5,
-    color: '#000000',
-  },
-  modalCloseButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(0, 0, 0, 0.05)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalScrollView: {
-    flex: 1,
-  },
-  modalField: {
-    marginBottom: 24,
-  },
-  modalLabel: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#000000',
-    marginBottom: 8,
-  },
-  modalInput: {
-    width: '100%',
-    padding: 16,
     borderRadius: 16,
     borderWidth: 1,
     borderColor: 'rgba(0, 0, 0, 0.1)',
-    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 14,
     fontSize: 16,
     color: '#000000',
+    letterSpacing: 1,
   },
-  modalTextArea: {
-    minHeight: 100,
-    textAlignVertical: 'top',
-  },
-  modalHint: {
-    fontSize: 14,
-    color: 'rgba(0, 0, 0, 0.4)',
-    fontStyle: 'italic',
-  },
-  friendsList: {
-    gap: 12,
-  },
-  friendItem: {
+  codeButton: { height: 48, borderRadius: 16, backgroundColor: '#000000', paddingHorizontal: 18, justifyContent: 'center', alignItems: 'center' },
+  codeButtonDisabled: { opacity: 0.4 },
+  codeButtonText: { color: '#FFFFFF', fontSize: 15, fontWeight: '600' },
+
+  primaryButton: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 16,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.05)',
-    backgroundColor: '#FFFFFF',
-  },
-  friendItemSelected: {
-    borderColor: '#16A34A',
-    backgroundColor: 'rgba(22, 163, 74, 0.05)',
-  },
-  friendItemContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  friendAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(0, 0, 0, 0.05)',
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  friendAvatarText: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: 'rgba(0, 0, 0, 0.6)',
-  },
-  friendName: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#000000',
-  },
-  modalSubmitButton: {
-    width: '100%',
-    backgroundColor: '#16A34A',
-    paddingVertical: 16,
-    borderRadius: 24,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  modalSubmitButtonDisabled: {
-    opacity: 0.6,
-  },
-  modalSubmitButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  modalUserHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-    marginBottom: 32,
-  },
-  modalAvatar: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: 'rgba(0, 0, 0, 0.05)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalAvatarText: {
-    fontSize: 24,
-    fontWeight: '500',
-    color: 'rgba(0, 0, 0, 0.6)',
-  },
-  modalUserName: {
-    fontSize: 24,
-    fontWeight: '600',
-    letterSpacing: -0.5,
-    color: '#000000',
-    marginBottom: 4,
-  },
-  modalUserRank: {
-    fontSize: 16,
-    color: 'rgba(0, 0, 0, 0.6)',
-  },
-  modalStats: {
-    gap: 12,
-    marginBottom: 32,
-  },
-  modalStatCard: {
-    padding: 24,
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.05)',
-    backgroundColor: '#FFFFFF',
-  },
-  modalStatLabel: {
-    fontSize: 14,
-    color: 'rgba(0, 0, 0, 0.4)',
-    marginBottom: 8,
-  },
-  modalStatValue: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
     gap: 8,
-  },
-  modalStatNumber: {
-    fontSize: 32,
-    fontWeight: '600',
-    letterSpacing: -1,
-    color: '#000000',
-  },
-  modalStatUnit: {
-    fontSize: 16,
-    color: 'rgba(0, 0, 0, 0.6)',
-  },
-  modalNote: {
-    padding: 16,
-    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+    backgroundColor: GREEN,
     borderRadius: 16,
+    paddingVertical: 14,
   },
-  modalNoteText: {
-    fontSize: 14,
-    color: 'rgba(0, 0, 0, 0.6)',
-    textAlign: 'center',
-  },
-  loadingContainer: {
-    paddingVertical: 48,
-    alignItems: 'center',
-    gap: 12,
-  },
-  loadingText: {
-    fontSize: 14,
-    color: 'rgba(0, 0, 0, 0.4)',
-  },
-  emptyContainer: {
-    paddingVertical: 48,
-    alignItems: 'center',
-    gap: 8,
-  },
-  emptyText: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: 'rgba(0, 0, 0, 0.6)',
-  },
-  emptySubtext: {
-    fontSize: 14,
-    color: 'rgba(0, 0, 0, 0.4)',
-  },
-  groupsContainer: {
-    marginBottom: 24,
-  },
-  groupsScrollView: {
-    marginHorizontal: -24,
-  },
-  groupsScrollContent: {
-    paddingHorizontal: 24,
-    gap: 12,
-  },
-  groupCard: {
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.05)',
-    backgroundColor: '#FFFFFF',
-    marginRight: 12,
-    minWidth: 120,
-  },
-  groupCardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 8,
-  },
-  favoriteButton: {
-    padding: 4,
-  },
-  groupCardSelected: {
-    borderColor: '#16A34A',
-    backgroundColor: 'rgba(22, 163, 74, 0.05)',
-  },
-  groupCardTitle: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#000000',
-    marginBottom: 4,
-  },
-  groupCardTitleSelected: {
-    color: '#16A34A',
-  },
-  groupCardSubtitle: {
-    fontSize: 12,
-    color: 'rgba(0, 0, 0, 0.4)',
-  },
-  groupsHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  groupsHeaderTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#000000',
-  },
-  createGroupButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#16A34A',
-    backgroundColor: 'rgba(22, 163, 74, 0.05)',
-  },
-  createGroupButtonText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#16A34A',
-  },
-  modalContainer: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-  },
-  modalScrollContent: {
-    paddingBottom: 24,
-  },
-  modalField: {
-    marginBottom: 24,
-  },
-  modalLabel: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#000000',
-    marginBottom: 8,
-  },
-  modalInput: {
-    width: '100%',
-    padding: 16,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.1)',
-    backgroundColor: '#FFFFFF',
-    fontSize: 16,
-    color: '#000000',
-  },
-  modalTextArea: {
-    minHeight: 100,
-    textAlignVertical: 'top',
-  },
-  modalHint: {
-    fontSize: 14,
-    color: 'rgba(0, 0, 0, 0.4)',
-    fontStyle: 'italic',
-  },
-  friendsList: {
-    gap: 12,
-  },
-  friendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 16,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.05)',
-    backgroundColor: '#FFFFFF',
-  },
-  friendItemSelected: {
-    borderColor: '#16A34A',
-    backgroundColor: 'rgba(22, 163, 74, 0.05)',
-  },
-  friendItemContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  friendAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(0, 0, 0, 0.05)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  friendAvatarText: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: 'rgba(0, 0, 0, 0.6)',
-  },
-  friendName: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#000000',
-  },
-  modalSubmitButton: {
-    width: '100%',
-    backgroundColor: '#16A34A',
-    paddingVertical: 16,
-    borderRadius: 24,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  modalSubmitButtonDisabled: {
-    opacity: 0.6,
-  },
-  modalSubmitButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
+  primaryButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
+  secondaryButton: { flex: 1, borderRadius: 16, paddingVertical: 14, alignItems: 'center', backgroundColor: 'rgba(0, 0, 0, 0.05)' },
+  secondaryButtonText: { fontSize: 16, fontWeight: '600', color: '#000000' },
+
+  groupsBlock: { marginBottom: 20 },
+  chips: { gap: 8, paddingBottom: 12 },
+  chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 14, borderWidth: 1, borderColor: 'rgba(0, 0, 0, 0.1)', maxWidth: 200 },
+  chipActive: { borderColor: GREEN, backgroundColor: 'rgba(22, 163, 74, 0.08)' },
+  chipText: { fontSize: 14, fontWeight: '500', color: 'rgba(0, 0, 0, 0.6)' },
+  chipTextActive: { color: GREEN, fontWeight: '600' },
+  chipAdd: { width: 38, height: 38, borderRadius: 14, borderWidth: 1, borderColor: 'rgba(22, 163, 74, 0.4)', justifyContent: 'center', alignItems: 'center' },
+  groupCard: { borderRadius: 24, borderWidth: 1, borderColor: 'rgba(0, 0, 0, 0.06)', padding: 20, gap: 14 },
+  groupHeader: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  groupName: { fontSize: 18, fontWeight: '600', color: '#000000' },
+  groupMeta: { fontSize: 14, color: 'rgba(0, 0, 0, 0.5)', marginTop: 2 },
+
+  list: { gap: 8 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 18, borderWidth: 1, borderColor: 'rgba(0, 0, 0, 0.05)' },
+  rowMe: { borderColor: 'rgba(22, 163, 74, 0.35)', backgroundColor: 'rgba(22, 163, 74, 0.04)' },
+  rowRank: { width: 22, fontSize: 15, fontWeight: '600', color: 'rgba(0, 0, 0, 0.4)', textAlign: 'center' },
+  rowRankTop: { color: GREEN },
+  avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(0, 0, 0, 0.05)', justifyContent: 'center', alignItems: 'center' },
+  avatarMe: { backgroundColor: 'rgba(22, 163, 74, 0.15)' },
+  avatarText: { fontSize: 16, fontWeight: '600', color: 'rgba(0, 0, 0, 0.6)' },
+  avatarTextMe: { color: GREEN },
+  avatarLarge: { width: 56, height: 56, borderRadius: 28 },
+  avatarTextLarge: { fontSize: 22 },
+  rowInfo: { flex: 1 },
+  rowName: { fontSize: 16, fontWeight: '600', color: '#000000' },
+  rowMeta: { fontSize: 13, color: 'rgba(0, 0, 0, 0.45)', marginTop: 2 },
+  rowMinutes: { fontSize: 16, fontWeight: '700', color: '#000000' },
+  rowMinutesZero: { color: 'rgba(0, 0, 0, 0.3)' },
+
+  center: { alignItems: 'center', paddingVertical: 32, gap: 12 },
+  emptyCard: { borderRadius: 24, backgroundColor: 'rgba(0, 0, 0, 0.03)', padding: 20, marginBottom: 12 },
+  emptyTitle: { fontSize: 16, fontWeight: '600', color: '#000000', marginBottom: 4 },
+  emptyBody: { fontSize: 14, color: 'rgba(0, 0, 0, 0.55)', lineHeight: 20, textAlign: 'left' },
+  linkButton: { paddingVertical: 8, alignItems: 'center' },
+  linkButtonText: { fontSize: 15, fontWeight: '600', color: GREEN },
+  removeText: { fontSize: 15, fontWeight: '600', color: '#DC2626' },
+  privacy: { fontSize: 12, color: 'rgba(0, 0, 0, 0.35)', textAlign: 'center', marginTop: 24 },
+
+  overlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.35)', justifyContent: 'flex-end' },
+  sheet: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingBottom: 40, gap: 16 },
+  sheetTitle: { fontSize: 20, fontWeight: '600', color: '#000000' },
+  sheetInput: { height: 52, borderRadius: 16, borderWidth: 1, borderColor: 'rgba(0, 0, 0, 0.1)', paddingHorizontal: 16, fontSize: 16, color: '#000000' },
+  sheetActions: { flexDirection: 'row', gap: 12 },
+  sheetPrimary: { flex: 1 },
+  profileHeader: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  stats: { flexDirection: 'row', gap: 10 },
+  stat: { flex: 1, borderRadius: 18, backgroundColor: 'rgba(0, 0, 0, 0.03)', paddingVertical: 14, alignItems: 'center' },
+  statValue: { fontSize: 18, fontWeight: '700', color: '#000000' },
+  statLabel: { fontSize: 12, color: 'rgba(0, 0, 0, 0.45)', marginTop: 2 },
 });

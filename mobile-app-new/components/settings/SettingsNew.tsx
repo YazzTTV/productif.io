@@ -23,6 +23,15 @@ type SettingsView = 'main' | 'editProfile' | 'dailyStructure' | 'notifications';
 type FocusDuration = 25 | 45 | 60 | 90;
 type WorkloadIntensity = 'light' | 'balanced' | 'intensive';
 
+// Mêmes valeurs que l'écran identité de l'onboarding : on stocke le code, on affiche le libellé traduit.
+const STUDENT_TYPES = [
+  { value: 'highschool', labelKey: 'highSchool' },
+  { value: 'university', labelKey: 'university' },
+  { value: 'medlawprepa', labelKey: 'medLawPrepa' },
+  { value: 'engineering', labelKey: 'engineeringBusiness' },
+  { value: 'other', labelKey: 'other' },
+] as const;
+
 export function SettingsNew() {
   const { t } = useLanguage();
   const router = useRouter();
@@ -566,12 +575,26 @@ export function SettingsNew() {
 
             <View style={styles.formGroup}>
               <Text style={styles.formLabel}>{t('academicField') || 'Academic field'}</Text>
-              <TextInput
-                style={styles.formInput}
-                value={academicField}
-                onChangeText={setAcademicField}
-                placeholder={t('academicField') || 'Academic field'}
-              />
+              <View style={styles.fieldSelector}>
+                {STUDENT_TYPES.map((type) => (
+                  <TouchableOpacity
+                    key={type.value}
+                    style={[
+                      styles.fieldButton,
+                      academicField === type.value && styles.yearButtonSelected,
+                    ]}
+                    onPress={() => setAcademicField(type.value)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[
+                      styles.fieldButtonText,
+                      academicField === type.value && styles.yearButtonTextSelected,
+                    ]}>
+                      {t(type.labelKey)}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
             </View>
 
             <View style={styles.formGroup}>
@@ -975,11 +998,17 @@ export function SettingsNew() {
           >
             <Ionicons name="arrow-back" size={22} color="#000" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>{t('settings')}</Text>
+          <Text style={styles.headerTitle} numberOfLines={1} adjustsFontSizeToFit>
+            {t('settings')}
+          </Text>
+        </Animated.View>
+
+        {/* Le badge vit sous le titre : à côté, il coupait « Paramètres » en deux lignes */}
+        <Animated.View entering={FadeInUp.delay(100).duration(400)} style={styles.headerBadgeRow}>
           {savedFeedback ? (
             <View style={styles.savedBadge}>
               <Ionicons name="checkmark" size={16} color="#16A34A" />
-              <Text style={styles.savedText}>Saved</Text>
+              <Text style={styles.savedText}>{t('saved')}</Text>
             </View>
           ) : emailVerificationRequired ? (
             <TouchableOpacity
@@ -988,12 +1017,12 @@ export function SettingsNew() {
               activeOpacity={0.8}
             >
               <Ionicons name="alert-circle" size={16} color="#B45309" />
-              <Text style={styles.unverifiedText}>Email non vérifié</Text>
+              <Text style={styles.unverifiedText}>{t('emailNotVerified')}</Text>
             </TouchableOpacity>
           ) : (
             <View style={styles.verifiedBadge}>
               <Ionicons name="checkmark-circle" size={16} color="#16A34A" />
-              <Text style={styles.verifiedText}>Email vérifié</Text>
+              <Text style={styles.verifiedText}>{t('emailVerified')}</Text>
             </View>
           )}
         </Animated.View>
@@ -1009,7 +1038,13 @@ export function SettingsNew() {
             <View style={styles.accountDivider} />
             <View style={styles.accountRow}>
               <Text style={styles.accountLabel}>{t('academicField') || 'Academic field'}</Text>
-              <Text style={styles.accountValue}>{academicField}</Text>
+              <Text style={styles.accountValue} numberOfLines={1}>
+                {(() => {
+                  const type = STUDENT_TYPES.find((s) => s.value === academicField);
+                  // Anciens comptes : texte libre saisi avant le sélecteur, affiché tel quel.
+                  return type ? t(type.labelKey) : academicField;
+                })()}
+              </Text>
             </View>
             <View style={styles.accountDivider} />
             <View style={styles.accountRow}>
@@ -1380,8 +1415,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 32,
+    marginBottom: 12,
     gap: 16,
+  },
+  headerBadgeRow: {
+    flexDirection: 'row',
+    marginLeft: 56,
+    marginBottom: 32,
   },
   backButton: {
     width: 40,
@@ -1477,6 +1517,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
     color: '#000000',
+    flexShrink: 1,
+    marginLeft: 16,
+    textAlign: 'right',
   },
   accountDivider: {
     height: 1,
@@ -1748,6 +1791,23 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 8,
     marginTop: 8,
+  },
+  fieldSelector: {
+    gap: 8,
+    marginTop: 8,
+  },
+  fieldButton: {
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.1)',
+    backgroundColor: '#FFFFFF',
+  },
+  fieldButtonText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: 'rgba(0, 0, 0, 0.6)',
   },
   yearButton: {
     width: 56,

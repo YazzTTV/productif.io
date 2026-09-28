@@ -1719,6 +1719,73 @@ export const gamificationService = {
   },
 };
 
+// ─── Communauté (serveur : app/api/community/*) ─────────────────────────────
+// Classement sur les minutes de révision des 7 derniers jours, amis et groupes
+// rejoints par code. Aucun email ne revient du serveur.
+export type CommunityScope = 'friends' | 'group' | 'global';
+
+export interface CommunityEntry {
+  userId: string;
+  name: string;
+  rank: number;
+  weekMinutes: number;
+  weekSessions: number;
+  level: number;
+  isMe: boolean;
+  isFriend: boolean;
+}
+
+export interface CommunityLeaderboard {
+  scope: CommunityScope;
+  entries: CommunityEntry[];
+  me: CommunityEntry | null;
+  total: number;
+  locked?: boolean;
+}
+
+export interface CommunityGroup {
+  id: string;
+  name: string;
+  code: string;
+  shareUrl: string;
+  memberCount: number;
+  isCreator: boolean;
+}
+
+export type CommunityJoinResult =
+  | { type: 'friend'; friend: { userId: string; name: string }; alreadyFriends: boolean }
+  | { type: 'group'; group: { id: string; name: string; memberCount: number }; alreadyMember: boolean };
+
+export const communityService = {
+  me(): Promise<{ friendCode: string; shareUrl: string; name: string }> {
+    return apiCall('/community/me');
+  },
+  leaderboard(scope: CommunityScope, groupId?: string): Promise<CommunityLeaderboard> {
+    const query = scope === 'group' && groupId ? `scope=group&groupId=${encodeURIComponent(groupId)}` : `scope=${scope}`;
+    return apiCall(`/community/leaderboard?${query}`);
+  },
+  join(code: string): Promise<CommunityJoinResult> {
+    return apiCall('/community/join', { method: 'POST', body: JSON.stringify({ code }) });
+  },
+  removeFriend(friendId: string): Promise<{ removed: boolean }> {
+    return apiCall(`/community/friends/${encodeURIComponent(friendId)}`, { method: 'DELETE' });
+  },
+  async groups(): Promise<CommunityGroup[]> {
+    const result = await apiCall<{ groups: CommunityGroup[] }>('/community/groups');
+    return result?.groups ?? [];
+  },
+  async createGroup(name: string): Promise<CommunityGroup> {
+    const result = await apiCall<{ group: CommunityGroup }>('/community/groups', {
+      method: 'POST',
+      body: JSON.stringify({ name }),
+    });
+    return result.group;
+  },
+  leaveGroup(groupId: string): Promise<{ left: boolean; deleted: boolean }> {
+    return apiCall(`/community/groups/${encodeURIComponent(groupId)}`, { method: 'DELETE' });
+  },
+};
+
 // Service pour l'assistant IA
 export const assistantService = {
   // Récupérer la session Deep Work active (s'il y en a une)

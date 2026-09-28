@@ -301,6 +301,10 @@ function AppContent() {
                 gestureEnabled: true,
               }} 
             />
+            <Stack.Screen
+              name="rejoindre/[code]"
+              options={{ headerShown: false, gestureEnabled: false }}
+            />
             <Stack.Screen 
               name="verify-email" 
               options={{ 
