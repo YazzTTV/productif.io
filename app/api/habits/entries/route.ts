@@ -105,7 +105,9 @@ export async function POST(req: NextRequest) {
 
     // Traitement de la gamification si l'habitude est complétée
     let gamificationResult = null;
-    if (completed) {
+    // Seulement au passage non cochée -> cochée. Le service dédoublonne aussi
+    // (une fois par habitude et par jour), cette garde évite l'appel inutile.
+    if (completed && !existingEntry?.completed) {
       try {
         const gamificationService = new GamificationService();
         gamificationResult = await gamificationService.processHabitCompletion(

@@ -1,4 +1,14 @@
 import { prisma } from "@/lib/prisma"
+import { displayName } from "@/lib/community"
+import { formatInTimeZone } from "date-fns-tz"
+import { validTimezone } from "@/lib/study-analysis/validation"
+
+// Décale une date "yyyy-MM-dd" d'un nombre de jours, sans fuseau.
+function shiftDayKey(key: string, days: number): string {
+  const d = new Date(`${key}T12:00:00Z`)
+  d.setUTCDate(d.getUTCDate() + days)
+  return d.toISOString().slice(0, 10)
+}
 import { startOfDay, subDays, isAfter, isBefore, differenceInDays } from "date-fns"
 
 export interface GamificationStats {
@@ -26,7 +36,6 @@ export interface Achievement {
 export interface LeaderboardEntry {
   userId: string
   userName: string
-  userEmail: string
   points: number
   totalPoints?: number // Alias pour points (compatibilité)
   level: number
@@ -48,6 +57,10 @@ export class GamificationService {
     PERFECT_DAY_BONUS: 20,
     ACHIEVEMENT_BONUS: 50
   }
+
+  // Série : fenêtre de lecture, et durée minimale d'une séance qui compte.
+  private static readonly STREAK_WINDOW_DAYS = 120
+  private static readonly MIN_STUDY_SECONDS = 5 * 60
 
   // Formule pour calculer le niveau basé sur les points
   private static readonly LEVEL_FORMULA = {
@@ -103,294 +116,202 @@ export class GamificationService {
     return Math.max(0, nextLevelPoints - currentPoints)
   }
 
-  // Calculer le streak actuel d'un utilisateur
-  async calculateCurrentStreak(userId: string): Promise<number> {
-    // OPTIMISATION: Vérification rapide si l'utilisateur a des habitudes
-    const habitCount = await prisma.habit.count({ where: { userId } })
-    if (habitCount === 0) {
-      console.log(`🧮 Aucune habitude pour userId ${userId}, streak = 0`)
-      return 0
+  // ─── Série (streak) ───────────────────────────────────────────────────────
+  // Une journée compte dès qu'il s'y passe une révision réelle : une séance
+  // Mode Examen ou Focus d'au moins 5 minutes, une tâche terminée, ou une
+  // habitude cochée. Les jours sont ceux du FUSEAU de l'utilisateur (repli
+  // Europe/Paris) : avant, c'était l'heure du serveur, en UTC, et la série ne
+  // portait que sur les habitudes, un reste de la version entrepreneurs.
+  // Aujourd'hui sans activité ne casse pas la série : on part d'hier.
+  async calculateCurrentStreak(userId: string, now: Date = new Date()): Promise<number> {
+    const since = subDays(now, GamificationService.STREAK_WINDOW_DAYS)
+    const [user, sessions, tasks, habits] = await Promise.all([
+      prisma.user.findUnique({ where: { id: userId }, select: { timezone: true } }),
+      prisma.studySession.findMany({
+        where: { userId, source: { in: ["exam", "focus"] }, startedAt: { gte: since } },
+        select: { startedAt: true, segments: true },
+      }),
+      prisma.task.findMany({
+        where: { userId, completed: true, completedAt: { gte: since } },
+        select: { completedAt: true },
+      }),
+      prisma.habitEntry.findMany({
+        where: { habit: { userId }, completed: true, date: { gte: since } },
+        select: { date: true },
+      }),
+    ])
+    let timezone = "Europe/Paris"
+    try {
+      timezone = validTimezone(user?.timezone || "Europe/Paris")
+    } catch {
+      // Fuseau enregistré invalide : repli sur Paris.
     }
+    const dayKey = (d: Date) => formatInTimeZone(d, timezone, "yyyy-MM-dd")
 
-    const today = GamificationService.getTodayAsStored()
+    const active = new Set<string>()
+    for (const s of sessions) {
+      const segments = Array.isArray(s.segments) ? (s.segments as { start: number; end: number }[]) : []
+      const seconds = segments.reduce((n, x) => n + Math.max(0, x.end - x.start), 0) / 1000
+      if (seconds >= GamificationService.MIN_STUDY_SECONDS) active.add(dayKey(s.startedAt))
+    }
+    for (const t of tasks) if (t.completedAt) active.add(dayKey(t.completedAt))
+    // Les entrées d'habitude sont stockées à midi de leur jour : la date seule suffit.
+    for (const h of habits) active.add(h.date.toISOString().slice(0, 10))
+
+    let cursor = dayKey(now)
+    if (!active.has(cursor)) cursor = shiftDayKey(cursor, -1)
     let streak = 0
-    let checkDate = today
-
-    console.log(`🧮 Calcul du streak - Date de référence: ${checkDate.toISOString()}`)
-
-    // Vérifier jour par jour en remontant dans le temps (limité à 30 jours pour éviter les timeouts)
-    let daysChecked = 0
-    const maxDaysToCheck = 30
-    while (daysChecked < maxDaysToCheck) {
-      const dayName = checkDate.toLocaleDateString("en-US", { weekday: "long" }).toLowerCase()
-      
-      console.log(`📅 Vérification du ${checkDate.toISOString().split('T')[0]} (${dayName})`)
-      
-      const dayHabits = await prisma.habit.findMany({
-        where: {
-          userId,
-          daysOfWeek: {
-            has: dayName
-          }
-        },
-        include: {
-          entries: {
-            where: {
-              date: checkDate,
-              completed: true
-            }
-          }
-        }
-      })
-
-      console.log(`  - Habitudes prévues: ${dayHabits.length}`)
-
-      // Si aucune habitude prévue ce jour, on passe au jour précédent
-      if (dayHabits.length === 0) {
-        console.log(`  - Aucune habitude prévue, on continue...`)
-        checkDate = subDays(checkDate, 1)
-        continue
-      }
-
-      // Vérifier si toutes les habitudes du jour ont été complétées
-      const completedHabits = dayHabits.filter(habit => habit.entries.length > 0)
-      console.log(`  - Habitudes complétées: ${completedHabits.length}`)
-      
-      if (completedHabits.length === dayHabits.length) {
-        streak++
-        console.log(`  - ✅ Jour parfait ! Streak = ${streak}`)
-        checkDate = subDays(checkDate, 1)
-      } else {
-        console.log(`  - ❌ Jour incomplet. Streak s'arrête.`)
-        break
-      }
-
-      daysChecked++
-      
-      // Limite de sécurité pour éviter les boucles infinies
-      if (streak > 365) {
-        console.log('⚠️  Limite de sécurité atteinte (365 jours)')
-        break
-      }
+    while (active.has(cursor) && streak < GamificationService.STREAK_WINDOW_DAYS) {
+      streak++
+      cursor = shiftDayKey(cursor, -1)
     }
-
-    console.log(`🎯 Streak final calculé: ${streak}`)
     return streak
   }
 
-  // Traiter la complétion d'une habitude
+  // ─── Attribution des points ───────────────────────────────────────────────
+  // Toute attribution passe par ici. `key` identifie l'action (une tâche, une
+  // séance, une habitude un jour donné) et sert d'identifiant à la ligne
+  // XpEvent : la même action ne rapporte donc qu'UNE fois, même rejouée.
+  // Avant, cocher/décocher une tâche, renvoyer une habitude déjà cochée ou
+  // terminer deux fois une séance Focus redonnait des points à chaque fois.
+  private async award(
+    userId: string,
+    key: string,
+    type: string,
+    pointsEarned: number,
+    options: { date?: Date; perfectDay?: boolean; metadata?: Record<string, unknown> } = {},
+  ): Promise<{ pointsEarned: number; newAchievements: Achievement[]; levelUp: boolean }> {
+    const none = { pointsEarned: 0, newAchievements: [] as Achievement[], levelUp: false }
+    if (pointsEarned <= 0) return none
+
+    await this.initializeUserGamification(userId)
+    try {
+      await prisma.xpEvent.create({
+        data: { id: key, userId, type, xpAwarded: pointsEarned, metadata: (options.metadata ?? {}) as object },
+      })
+    } catch (error: any) {
+      if (error?.code === "P2002") return none // déjà récompensée
+      throw error
+    }
+
+    const date = options.date ?? new Date()
+    const [current, streak] = await Promise.all([
+      prisma.userGamification.findUnique({ where: { userId } }),
+      this.calculateCurrentStreak(userId, date),
+    ])
+    if (!current) throw new Error("Impossible de récupérer les données de gamification")
+
+    // Incrément atomique : deux actions simultanées ne s'écrasent pas.
+    const updated = await prisma.userGamification.update({
+      where: { userId },
+      data: {
+        points: { increment: pointsEarned },
+        currentStreak: streak,
+        longestStreak: Math.max(current.longestStreak, streak),
+        lastActivityDate: date,
+        ...(type === "habit" ? { totalHabitsCompleted: { increment: 1 } } : {}),
+      },
+    })
+
+    const newAchievements = await this.checkAchievements(userId, {
+      streak,
+      oldStreak: current.currentStreak,
+      points: updated.points,
+      levelUp: false,
+      perfectDay: !!options.perfectDay,
+      habitsCompleted: updated.totalHabitsCompleted,
+    })
+    const bonus = newAchievements.reduce((total, a) => total + a.points, 0)
+    const finalPoints = updated.points + bonus
+    const newLevel = this.calculateLevel(finalPoints)
+    await prisma.userGamification.update({
+      where: { userId },
+      data: { level: newLevel, ...(bonus > 0 ? { points: { increment: bonus } } : {}) },
+    })
+
+    return { pointsEarned, newAchievements, levelUp: newLevel > current.level }
+  }
+
+  // Traiter la complétion d'une habitude (une fois par habitude et par jour)
   async processHabitCompletion(userId: string, habitId: string, date: Date): Promise<{
     pointsEarned: number
     newAchievements: Achievement[]
     levelUp: boolean
   }> {
-    await this.initializeUserGamification(userId)
-
-    // Normaliser la date comme le frontend
     const normalizedDate = GamificationService.normalizeDate(date)
-
-    // Récupérer les données actuelles de gamification
-    const userGamification = await prisma.userGamification.findUnique({
-      where: { userId }
-    })
-
-    if (!userGamification) {
-      throw new Error("Impossible de récupérer les données de gamification")
-    }
-
-    // Calculer les habitudes du jour et celles complétées
     const todayHabits = await this.getTodayHabits(userId, normalizedDate)
     const completedTodayHabits = await this.getCompletedTodayHabits(userId, normalizedDate)
-
-    // Calculer le nouveau streak
-    const oldStreak = userGamification.currentStreak
-    const newStreak = await this.calculateCurrentStreak(userId)
-
-    // Calculer les points
-    let pointsEarned = GamificationService.POINTS.HABIT_COMPLETED
-
-    // Bonus de streak (10% par jour de streak)
-    if (newStreak > 0) {
-      pointsEarned += Math.floor(pointsEarned * GamificationService.POINTS.STREAK_BONUS_MULTIPLIER * newStreak)
-    }
-
-    // Bonus de jour parfait
     const isPerfectDay = completedTodayHabits.length === todayHabits.length && todayHabits.length > 0
-    if (isPerfectDay) {
-      pointsEarned += GamificationService.POINTS.PERFECT_DAY_BONUS
-    }
 
-    // Calculer le nouveau total de points et niveau
-    const newPoints = userGamification.points + pointsEarned
-    const oldLevel = userGamification.level
-    const newLevel = this.calculateLevel(newPoints)
+    let pointsEarned = GamificationService.POINTS.HABIT_COMPLETED
+    if (isPerfectDay) pointsEarned += GamificationService.POINTS.PERFECT_DAY_BONUS
 
-    // Mettre à jour les données de gamification
-    await prisma.userGamification.update({
-      where: { userId },
-      data: {
-        points: newPoints,
-        level: newLevel,
-        currentStreak: newStreak,
-        longestStreak: Math.max(userGamification.longestStreak, newStreak),
-        lastActivityDate: new Date()
-      }
+    const dayKey = normalizedDate.toISOString().slice(0, 10)
+    return this.award(userId, `habit:${habitId}:${dayKey}`, "habit", pointsEarned, {
+      perfectDay: isPerfectDay,
+      metadata: { habitId, day: dayKey },
     })
-
-    // Vérifier les nouveaux succès
-    const newAchievements = await this.checkAchievements(userId, {
-      streak: newStreak,
-      oldStreak,
-      points: newPoints,
-      levelUp: newLevel > oldLevel,
-      perfectDay: isPerfectDay
-    })
-
-    // Ajouter les points des succès
-    if (newAchievements.length > 0) {
-      const achievementPoints = newAchievements.reduce((total, achievement) => total + achievement.points, 0)
-      await prisma.userGamification.update({
-        where: { userId },
-        data: {
-          points: {
-            increment: achievementPoints
-          }
-        }
-      })
-    }
-
-    return {
-      pointsEarned,
-      newAchievements,
-      levelUp: newLevel > oldLevel
-    }
   }
 
-  // Traiter la complétion d'une tâche (points simples, sans streak ni "perfect day")
-  async processTaskCompletion(userId: string, date: Date = new Date()): Promise<{
+  // Traiter la complétion d'une tâche : une seule fois par tâche, même si on
+  // la décoche puis la recoche. Sans taskId (ancien appelant), pas de points :
+  // rien ne permettrait de dédoublonner.
+  async processTaskCompletion(userId: string, date: Date = new Date(), taskId?: string): Promise<{
     pointsEarned: number
     newAchievements: Achievement[]
     levelUp: boolean
   }> {
-    await this.initializeUserGamification(userId)
-
-    const userGamification = await prisma.userGamification.findUnique({
-      where: { userId }
+    if (!taskId) return { pointsEarned: 0, newAchievements: [], levelUp: false }
+    return this.award(userId, `task:${taskId}`, "task", GamificationService.POINTS.TASK_COMPLETED, {
+      date,
+      metadata: { taskId },
     })
-
-    if (!userGamification) {
-      throw new Error("Impossible de récupérer les données de gamification")
-    }
-
-    // Pour l’instant : points fixes par tâche, sans logique de streak
-    let pointsEarned = GamificationService.POINTS.TASK_COMPLETED
-
-    const newPoints = userGamification.points + pointsEarned
-    const oldLevel = userGamification.level
-    const newLevel = this.calculateLevel(newPoints)
-
-    await prisma.userGamification.update({
-      where: { userId },
-      data: {
-        points: newPoints,
-        level: newLevel,
-        lastActivityDate: date
-      }
-    })
-
-    // Vérifier les achievements liés au niveau / points
-    const newAchievements = await this.checkAchievements(userId, {
-      streak: userGamification.currentStreak,
-      oldStreak: userGamification.currentStreak,
-      points: newPoints,
-      levelUp: newLevel > oldLevel,
-      perfectDay: false
-    })
-
-    if (newAchievements.length > 0) {
-      const achievementPoints = newAchievements.reduce((total, achievement) => total + achievement.points, 0)
-      await prisma.userGamification.update({
-        where: { userId },
-        data: {
-          points: {
-            increment: achievementPoints
-          }
-        }
-      })
-    }
-
-    return {
-      pointsEarned,
-      newAchievements,
-      levelUp: newLevel > oldLevel
-    }
   }
 
-  // Traiter la complétion d'une session de deep work / focus / examen
-  async processDeepWorkCompletion(userId: string, durationMinutes: number, sessionType?: string, completedAt: Date = new Date()): Promise<{
+  // Séance Focus terminée (route deepwork/agent). Une fois par séance.
+  async processDeepWorkCompletion(
+    userId: string,
+    durationMinutes: number,
+    sessionType?: string,
+    completedAt: Date = new Date(),
+    sessionId?: string,
+  ): Promise<{
     pointsEarned: number
     newAchievements: Achievement[]
     levelUp: boolean
   }> {
-    await this.initializeUserGamification(userId)
-
-    const userGamification = await prisma.userGamification.findUnique({
-      where: { userId }
+    if (!sessionId) return { pointsEarned: 0, newAchievements: [], levelUp: false }
+    const exam = sessionType === "exam" || sessionType === "exam_mode"
+    return this.award(userId, `deepwork:${sessionId}`, "deepwork", this.studyPoints(durationMinutes, exam), {
+      date: completedAt,
+      metadata: { sessionId, minutes: durationMinutes, sessionType: sessionType ?? null },
     })
+  }
 
-    if (!userGamification) {
-      throw new Error("Impossible de récupérer les données de gamification")
-    }
-
-    // Base: 1 point par 5 minutes de focus effectif
-    let rawPoints = durationMinutes * GamificationService.POINTS.DEEPWORK_POINTS_PER_MINUTE
-
-    // Bonus léger pour les sessions d'examen si un type spécifique est utilisé
-    if (sessionType && (sessionType === 'exam' || sessionType === 'exam_mode')) {
-      rawPoints *= 1.5
-    }
-
-    const pointsEarned = Math.max(1, Math.round(rawPoints))
-
-    const newPoints = userGamification.points + pointsEarned
-    const oldLevel = userGamification.level
-    const newLevel = this.calculateLevel(newPoints)
-
-    await prisma.userGamification.update({
-      where: { userId },
-      data: {
-        points: newPoints,
-        level: newLevel,
-        lastActivityDate: completedAt
-      }
+  // Séance Mode Examen synchronisée par l'app (route study-analysis/sessions),
+  // une fois terminée. Le Focus n'est PAS récompensé ici : il l'est déjà par
+  // processDeepWorkCompletion, le compter aussi le paierait deux fois.
+  async processStudySession(
+    userId: string,
+    session: { clientId: string; source: string; endedAt: Date | null; segments: { start: number; end: number }[] },
+  ): Promise<{ pointsEarned: number; newAchievements: Achievement[]; levelUp: boolean }> {
+    const none = { pointsEarned: 0, newAchievements: [] as Achievement[], levelUp: false }
+    if (session.source !== "exam" || !session.endedAt) return none
+    const seconds = session.segments.reduce((n, x) => n + Math.max(0, x.end - x.start), 0) / 1000
+    if (seconds < GamificationService.MIN_STUDY_SECONDS) return none
+    const minutes = Math.floor(seconds / 60)
+    return this.award(userId, `study:${userId}:${session.clientId}`, "exam_session", this.studyPoints(minutes, true), {
+      date: session.endedAt,
+      metadata: { clientId: session.clientId, minutes },
     })
+  }
 
-    // Vérifier les achievements liés au niveau / points
-    const newAchievements = await this.checkAchievements(userId, {
-      streak: userGamification.currentStreak,
-      oldStreak: userGamification.currentStreak,
-      points: newPoints,
-      levelUp: newLevel > oldLevel,
-      perfectDay: false
-    })
-
-    if (newAchievements.length > 0) {
-      const achievementPoints = newAchievements.reduce((total, achievement) => total + achievement.points, 0)
-      await prisma.userGamification.update({
-        where: { userId },
-        data: {
-          points: {
-            increment: achievementPoints
-          }
-        }
-      })
-    }
-
-    return {
-      pointsEarned,
-      newAchievements,
-      levelUp: newLevel > oldLevel
-    }
+  // 1 point par tranche de 5 minutes, x1,5 en Mode Examen : 25 min = 8 points,
+  // plus qu'une tâche cochée (5), parce que c'est le cœur du produit.
+  private studyPoints(minutes: number, exam: boolean): number {
+    if (minutes <= 0) return 0
+    const raw = minutes * GamificationService.POINTS.DEEPWORK_POINTS_PER_MINUTE * (exam ? 1.5 : 1)
+    return Math.max(1, Math.round(raw))
   }
 
   // Obtenir les habitudes du jour
@@ -430,6 +351,7 @@ export class GamificationService {
     points: number
     levelUp: boolean
     perfectDay: boolean
+    habitsCompleted?: number
   }): Promise<Achievement[]> {
     const achievements = await prisma.achievement.findMany()
     const newAchievements: Achievement[] = []
@@ -461,6 +383,14 @@ export class GamificationService {
           break
         case 'perfect_day':
           shouldUnlock = context.perfectDay
+          break
+        // Ces deux types existent en base depuis le début (7 succès sur 12) et
+        // n'étaient traités nulle part : ils ne se débloquaient jamais.
+        case 'points':
+          shouldUnlock = context.points >= achievement.threshold
+          break
+        case 'habits':
+          shouldUnlock = (context.habitsCompleted ?? 0) >= achievement.threshold
           break
       }
 
@@ -585,8 +515,7 @@ export class GamificationService {
         user: {
           select: {
             id: true,
-            name: true,
-            email: true
+            name: true
           }
         }
       },
@@ -600,8 +529,8 @@ export class GamificationService {
 
     const leaderboard: LeaderboardEntry[] = allUserGamification.map((userGamif, index) => ({
       userId: userGamif.userId,
-      userName: userGamif.user.name || userGamif.user.email.split('@')[0],
-      userEmail: userGamif.user.email,
+      // Jamais d'email dans un classement : il part vers d'autres utilisateurs.
+      userName: displayName(userGamif.user.name),
       points: userGamif.points,
       totalPoints: userGamif.points,
       level: userGamif.level,

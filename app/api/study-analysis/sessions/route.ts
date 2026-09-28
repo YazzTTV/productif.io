@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAuthUserFromRequest } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { sessionSchema } from "@/lib/study-analysis/validation";
+import { GamificationService } from "@/services/gamification";
 export async function POST(req: NextRequest) {
   try {
     const user = await getAuthUserFromRequest(req);
@@ -60,6 +61,27 @@ export async function POST(req: NextRequest) {
         data,
       });
     });
+    // Points de la séance Mode Examen, une fois terminée. Lus sur la ligne
+    // ENREGISTRÉE (une révision plus ancienne rejouée ne compte pas), et une
+    // seule fois par séance (clé d'attribution dans le service). Attendu avant
+    // de répondre : une promesse non attendue est coupée par le gel de la
+    // fonction Vercel. Un échec ne fait jamais échouer la synchronisation.
+    try {
+      const stored = await prisma.studySession.findUnique({
+        where: { userId_clientId: { userId: user.id, clientId: s.clientId } },
+        select: { clientId: true, source: true, endedAt: true, segments: true },
+      });
+      if (stored?.endedAt) {
+        await new GamificationService().processStudySession(user.id, {
+          clientId: stored.clientId,
+          source: stored.source,
+          endedAt: stored.endedAt,
+          segments: Array.isArray(stored.segments) ? (stored.segments as { start: number; end: number }[]) : [],
+        });
+      }
+    } catch (error) {
+      console.error("[study-analysis] gamification failed", { userId: user.id, clientId: s.clientId, error });
+    }
     return NextResponse.json({ saved: true });
   } catch (error) {
     console.error("[study-analysis] session save failed", error);

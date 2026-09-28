@@ -57,6 +57,11 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
 
     switch (action) {
       case 'complete': {
+        // Une séance déjà terminée ou annulée ne se termine pas une 2e fois :
+        // la durée était recalculée depuis maintenant et redonnait des points.
+        if (session.status === 'completed' || session.status === 'cancelled') {
+          return NextResponse.json({ error: 'La session est déjà terminée' }, { status: 400 })
+        }
         updateData = { status: 'completed', notes }
         timeEntryUpdate = { endTime: now }
         break
@@ -109,12 +114,15 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
     let actualDuration: number | null = null
     if (action === 'complete') {
       actualDuration = Math.floor((now.getTime() - session.timeEntry.startTime.getTime()) / 60000)
+      // Les points ne dépassent pas la durée prévue : une séance oubliée ouverte
+      // toute la nuit ne vaut pas 8 heures de révision.
+      const pointsMinutes = session.plannedDuration > 0 ? Math.min(actualDuration, session.plannedDuration) : actualDuration
 
       // Gamification: ajouter des points en fonction de la durée réelle de la session
       try {
-        if (actualDuration > 0) {
+        if (pointsMinutes > 0) {
           const gamificationService = new GamificationService()
-          await gamificationService.processDeepWorkCompletion(userId, actualDuration, session.type, now)
+          await gamificationService.processDeepWorkCompletion(userId, pointsMinutes, session.type, now, session.id)
         }
       } catch (error) {
         console.error('[DEEPWORK_AGENT_PATCH] Erreur gamification lors de la complétion de session:', error)

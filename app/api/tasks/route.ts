@@ -596,7 +596,7 @@ export async function PATCH(req: Request) {
     if (!wasCompleted && updatedTask.completed === true) {
       try {
         const gamificationService = new GamificationService()
-        await gamificationService.processTaskCompletion(task.userId, new Date())
+        await gamificationService.processTaskCompletion(task.userId, new Date(), task.id)
       } catch (error) {
         console.error("[TASKS_PATCH] Erreur gamification lors de la complétion de tâche:", error)
         // On ne bloque pas la réponse pour une erreur de gamification
