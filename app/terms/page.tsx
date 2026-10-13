@@ -126,7 +126,7 @@ export default function Terms() {
         </p>
         <p className="mb-4">
           Email: productifio@gmail.com<br />
-          Adresse: 397 bis route de montpellier, 34730 Prade-le-Lez, France
+          Adresse: 397 bis route de Montpellier, 34730 Prades-le-Lez, France
         </p>
       </section>
 

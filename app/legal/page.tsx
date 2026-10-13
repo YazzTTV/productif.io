@@ -10,7 +10,7 @@ export default function LegalNotice() {
       <section className="mb-10">
         <h2 className="text-2xl font-semibold mb-4">1. Website publisher</h2>
         <p className="mb-4">
-          The website productif.io is published by Noah Lugagne, a sole proprietor under the micro‑enterprise regime, with registered office at 397 bis route de montpellier, 34730 Prade‑le‑Lez, France.
+          The website productif.io is published by Noah Lugagne EI (entrepreneur individuel), a sole proprietor under the micro‑enterprise regime, with registered office at 397 bis route de Montpellier, 34730 Prades‑le‑Lez, France. SIRET 953 796 323 00012, RCS Montpellier 953 796 323, EU VAT number FR46953796323.
         </p>
         <p className="mb-4">
           Publication director: Noah Lugagne
@@ -33,10 +33,10 @@ export default function LegalNotice() {
       <section className="mb-10">
         <h2 className="text-2xl font-semibold mb-4">3. Intellectual property</h2>
         <p className="mb-4">
-          All content of productif.io (architecture, texts, logos, images, photographs, illustrations, etc.) is the exclusive property of [Your company name] or its partners and is protected by French and international intellectual property laws.
+          All content of productif.io (architecture, texts, logos, images, photographs, illustrations, etc.) is the exclusive property of Noah Lugagne or its partners and is protected by French and international intellectual property laws.
         </p>
         <p className="mb-4">
-          Any reproduction, representation, distribution, or redistribution, in whole or in part, of the content of this site by any process whatsoever, without the prior express authorization of [Your company name], is prohibited and would constitute infringement under Articles L.335‑2 et seq. of the French Intellectual Property Code.
+          Any reproduction, representation, distribution, or redistribution, in whole or in part, of the content of this site by any process whatsoever, without the prior express authorization of Noah Lugagne, is prohibited and would constitute infringement under Articles L.335‑2 et seq. of the French Intellectual Property Code.
         </p>
       </section>
 
@@ -49,7 +49,7 @@ export default function LegalNotice() {
           In accordance with the French Data Protection Act of January 6, 1978 as amended, the General Data Protection Regulation (GDPR), and the Digital Republic Act of October 7, 2016, you have the right to access, rectify, delete, limit, port, and object to the processing of your personal data.
         </p>
         <p className="mb-4">
-          To exercise these rights, you can contact us at: [contact email address] or by mail at [company postal address].
+          To exercise these rights, you can contact us at: productifio@gmail.com or by mail at 397 bis route de Montpellier, 34730 Prades‑le‑Lez, France.
         </p>
         <p className="mb-4">
           For more information on how we process your data, please see our <Link href="/privacy-policy" className="text-blue-600 hover:underline">Privacy Policy</Link>.
@@ -80,7 +80,7 @@ export default function LegalNotice() {
         </p>
         <p className="mb-4">
           Email: productifio@gmail.com<br />
-          Address: 397 bis route de montpellier, 34730 Prade‑le‑Lez, France
+          Address: 397 bis route de Montpellier, 34730 Prades‑le‑Lez, France
         </p>
       </section>
 

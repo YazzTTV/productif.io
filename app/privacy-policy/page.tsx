@@ -15,7 +15,7 @@ export default function PrivacyPolicy() {
         </p>
         <p className="mb-4">
           The data controller is Noah Lugagne, sole proprietor under the micro‑enterprise regime, 
-          residing at 397 bis route de montpellier, 34730 Prade‑le‑Lez, France.
+          residing at 397 bis route de Montpellier, 34730 Prades‑le‑Lez, France.
         </p>
       </section>
 
@@ -105,7 +105,7 @@ export default function PrivacyPolicy() {
         </p>
         <p className="mb-4">
           Email: productifio@gmail.com<br />
-          Address: 397 bis route de montpellier, 34730 Prade‑le‑Lez, France
+          Address: 397 bis route de Montpellier, 34730 Prades‑le‑Lez, France
         </p>
       </section>
 
