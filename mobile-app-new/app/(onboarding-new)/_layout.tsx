@@ -120,20 +120,6 @@ export default function OnboardingNewLayout() {
       }}
     >
       <Stack.Screen 
-        name="intro" 
-        options={{
-          gestureEnabled: false,
-          animation: 'none',
-        }}
-      />
-      <Stack.Screen 
-        name="language" 
-        options={{
-          gestureEnabled: false,
-          animation: 'none',
-        }}
-      />
-      <Stack.Screen 
         name="connection" 
         options={{
           gestureEnabled: false,
@@ -141,42 +127,7 @@ export default function OnboardingNewLayout() {
         }}
       />
       <Stack.Screen 
-        name="question" 
-        options={{
-          gestureEnabled: false,
-          animation: 'none',
-        }}
-      />
-      <Stack.Screen 
         name="building-plan" 
-        options={{
-          gestureEnabled: false,
-          animation: 'none',
-        }}
-      />
-      <Stack.Screen 
-        name="symptoms" 
-        options={{
-          gestureEnabled: false,
-          animation: 'none',
-        }}
-      />
-      <Stack.Screen 
-        name="analyzing-symptoms" 
-        options={{
-          gestureEnabled: false,
-          animation: 'none',
-        }}
-      />
-      <Stack.Screen 
-        name="social-proof" 
-        options={{
-          gestureEnabled: false,
-          animation: 'none',
-        }}
-      />
-      <Stack.Screen 
-        name="profile-reveal" 
         options={{
           gestureEnabled: false,
           animation: 'none',

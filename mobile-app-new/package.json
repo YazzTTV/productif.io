@@ -22,7 +22,6 @@
     "@react-navigation/elements": "^2.3.8",
     "@react-navigation/native": "^7.1.6",
     "@react-navigation/native-stack": "^7.3.10",
-    "@stripe/stripe-react-native": "0.45.0",
     "connect": "^3.7.0",
     "date-fns": "^4.1.0",
     "expo": "~53.0.25",
@@ -69,7 +68,6 @@
     "react-native-screens": "~4.11.1",
     "react-native-svg": "^15.11.2",
     "react-native-web": "~0.20.0",
-    "react-native-webview": "13.13.5",
     "resolve": "^1.22.10"
   },
   "overrides": {

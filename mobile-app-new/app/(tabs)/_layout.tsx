@@ -101,12 +101,6 @@ export default function TabLayout() {
       />
 
       {/* Hidden tabs */}
-      <Tabs.Screen name="tasks" options={{ href: null }} />
-      <Tabs.Screen name="mood" options={{ href: null }} />
-      <Tabs.Screen name="projects" options={{ href: null }} />
-      <Tabs.Screen name="timer" options={{ href: null }} />
-      <Tabs.Screen name="habits" options={{ href: null }} />
-      <Tabs.Screen name="more" options={{ href: null }} />
       <Tabs.Screen name="analytics" options={{ href: null }} />
     </Tabs>
   );

@@ -109,20 +109,6 @@ function AppContent() {
       <Stack>
               <Stack.Screen name="index" options={{ headerShown: false }} />
               <Stack.Screen 
-                name="login" 
-                options={{ 
-                  headerShown: false,
-                  gestureEnabled: false, // Empêcher le retour depuis login
-                }} 
-              />
-              <Stack.Screen 
-                name="signup" 
-                options={{ 
-                  headerShown: false,
-                  gestureEnabled: false, // Empêcher le retour depuis signup
-                }} 
-              />
-              <Stack.Screen 
                 name="(tabs)" 
                 options={{ 
                   headerShown: false,
@@ -137,65 +123,8 @@ function AppContent() {
                 gestureEnabled: false, // Désactiver le swipe pour revenir à l'onboarding
               }} 
             />
-            <Stack.Screen name="onboarding" options={{ headerShown: false }} />
-            <Stack.Screen 
-              name="mon-espace" 
-              options={{ 
-                headerShown: false,
-                gestureEnabled: true, // Permettre le retour vers (tabs)
-              }} 
-            />
-            <Stack.Screen 
-              name="achievements" 
-              options={{ 
-                headerShown: false,
-                gestureEnabled: true, // Permettre le retour vers (tabs)
-              }} 
-            />
-            <Stack.Screen 
-              name="leaderboard" 
-              options={{ 
-                headerShown: false,
-                gestureEnabled: true, // Permettre le retour vers (tabs)
-              }} 
-            />
-            <Stack.Screen 
-              name="assistant-ia" 
-              options={{ 
-                headerShown: false,
-                gestureEnabled: true, // Permettre le retour vers (tabs)
-              }} 
-            />
-            <Stack.Screen 
-              name="notifications" 
-              options={{ 
-                headerShown: false,
-                gestureEnabled: true, // Permettre le retour vers (tabs)
-              }} 
-            />
             <Stack.Screen 
               name="parametres" 
-              options={{ 
-                headerShown: false,
-                gestureEnabled: true, // Permettre le retour vers (tabs)
-              }} 
-            />
-            <Stack.Screen 
-              name="mon-entreprise" 
-              options={{ 
-                headerShown: false,
-                gestureEnabled: true, // Permettre le retour vers (tabs)
-              }} 
-            />
-            <Stack.Screen 
-              name="support" 
-              options={{ 
-                headerShown: false,
-                gestureEnabled: true, // Permettre le retour vers (tabs)
-              }} 
-            />
-            <Stack.Screen 
-              name="about" 
               options={{ 
                 headerShown: false,
                 gestureEnabled: true, // Permettre le retour vers (tabs)
@@ -209,53 +138,10 @@ function AppContent() {
               }} 
             />
             <Stack.Screen 
-              name="paywall" 
-              options={{ 
-                headerShown: false,
-                gestureEnabled: true,
-                presentation: 'modal',
-              }} 
-            />
-            <Stack.Screen 
-              name="time-history" 
-              options={{ 
-                headerShown: false,
-                gestureEnabled: true, // Permettre le retour vers (tabs)
-              }} 
-            />
-            <Stack.Screen 
-              name="objectifs" 
-              options={{ 
-                headerShown: false,
-                gestureEnabled: true, // Permettre le retour vers (tabs)
-              }} 
-            />
-            <Stack.Screen 
-              name="analytics" 
-              options={{ 
-                headerShown: false,
-                gestureEnabled: true, // Permettre le retour vers (tabs)
-              }} 
-            />
-            <Stack.Screen 
-              name="ent-webview" 
-              options={{ 
-                headerShown: false,
-                gestureEnabled: true,
-              }} 
-            />
-            <Stack.Screen 
               name="habits-manager" 
               options={{ 
                 headerShown: false,
                 gestureEnabled: true, // Permettre le retour vers (tabs)
-              }} 
-            />
-            <Stack.Screen 
-              name="(onboarding)" 
-              options={{ 
-                headerShown: false,
-                gestureEnabled: false, // Désactiver le swipe pendant l'onboarding
               }} 
             />
             <Stack.Screen 
@@ -289,13 +175,6 @@ function AppContent() {
             />
             <Stack.Screen 
               name="plan-my-day" 
-              options={{ 
-                headerShown: false,
-                gestureEnabled: true,
-              }} 
-            />
-            <Stack.Screen 
-              name="invite" 
               options={{ 
                 headerShown: false,
                 gestureEnabled: true,
