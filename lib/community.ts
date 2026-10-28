@@ -16,6 +16,7 @@
 import { randomInt } from "crypto"
 import { prisma } from "@/lib/prisma"
 import { unionMilliseconds, type Segment } from "@/lib/study-analysis/engine"
+import { isObjectionable } from "@/lib/moderation"
 
 export const WEEK_MS = 7 * 24 * 60 * 60 * 1000
 /** Une seance compte a partir de 5 minutes enregistrees. */
@@ -86,9 +87,18 @@ export async function ensureFriendCode(userId: string): Promise<string> {
 
 export function displayName(name: string | null | undefined): string {
   const parts = (name ?? "").trim().split(/\s+/).filter(Boolean)
-  if (parts.length === 0) return "Étudiant"
+  if (parts.length === 0 || isObjectionable(name)) return "Étudiant"
   const first = parts[0].charAt(0).toUpperCase() + parts[0].slice(1)
   return parts.length > 1 ? `${first} ${parts[1].charAt(0).toUpperCase()}.` : first
+}
+
+/** Comptes masques pour cet utilisateur : ceux qu'il a bloques et ceux qui l'ont bloque. */
+export async function getHiddenIds(userId: string): Promise<Set<string>> {
+  const rows = await prisma.userBlock.findMany({
+    where: { OR: [{ blockerId: userId }, { blockedId: userId }] },
+    select: { blockerId: true, blockedId: true },
+  })
+  return new Set(rows.map((r) => (r.blockerId === userId ? r.blockedId : r.blockerId)))
 }
 
 export async function getFriendIds(userId: string): Promise<string[]> {
@@ -144,8 +154,9 @@ export async function rankUsers(
   userIds: string[],
   meId: string,
   friendIds: Set<string>,
+  hiddenIds: Set<string> = new Set(),
 ): Promise<CommunityEntry[]> {
-  const ids = [...new Set(userIds)]
+  const ids = [...new Set(userIds)].filter((id) => id === meId || !hiddenIds.has(id))
   const [users, stats] = await Promise.all([
     prisma.user.findMany({
       where: { id: { in: ids } },
@@ -178,14 +189,14 @@ export async function rankUsers(
 }
 
 /** Top de la semaine parmi tous les comptes qui ont revise, plus la ligne de l'utilisateur. */
-export async function globalRanking(meId: string, friendIds: Set<string>) {
+export async function globalRanking(meId: string, friendIds: Set<string>, hiddenIds: Set<string> = new Set()) {
   const start = new Date(Date.now() - WEEK_MS - 24 * 60 * 60 * 1000)
   const active = await prisma.studySession.findMany({
     where: { startedAt: { gte: start }, source: { in: REAL_SOURCES } },
     select: { userId: true },
     distinct: ["userId"],
   })
-  const ranked = await rankUsers([...active.map((a) => a.userId), meId], meId, friendIds)
+  const ranked = await rankUsers([...active.map((a) => a.userId), meId], meId, friendIds, hiddenIds)
   const withTime = ranked
     .filter((e) => e.weekMinutes > 0 || e.isMe)
     .map((e, i) => ({ ...e, rank: i + 1 }))

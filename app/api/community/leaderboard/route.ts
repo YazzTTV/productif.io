@@ -11,7 +11,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { getAuthUserFromRequest } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { getPlanInfo } from "@/lib/plans"
-import { getFriendIds, globalRanking, rankUsers } from "@/lib/community"
+import { getFriendIds, getHiddenIds, globalRanking, rankUsers } from "@/lib/community"
 
 export const dynamic = "force-dynamic"
 
@@ -21,10 +21,11 @@ export async function GET(req: NextRequest) {
     if (!user) return NextResponse.json({ error: "Non authentifié" }, { status: 401 })
 
     const scope = req.nextUrl.searchParams.get("scope") ?? "friends"
-    const friendIds = new Set(await getFriendIds(user.id))
+    const [friendList, hiddenIds] = await Promise.all([getFriendIds(user.id), getHiddenIds(user.id)])
+    const friendIds = new Set(friendList)
 
     if (scope === "friends") {
-      const entries = await rankUsers([user.id, ...friendIds], user.id, friendIds)
+      const entries = await rankUsers([user.id, ...friendIds], user.id, friendIds, hiddenIds)
       return NextResponse.json({ scope, entries, me: entries.find((e) => e.isMe) ?? null, total: entries.length })
     }
 
@@ -35,7 +36,7 @@ export async function GET(req: NextRequest) {
       if (!members.some((m) => m.userId === user.id)) {
         return NextResponse.json({ error: "Tu n'es pas membre de ce groupe" }, { status: 403 })
       }
-      const entries = await rankUsers(members.map((m) => m.userId), user.id, friendIds)
+      const entries = await rankUsers(members.map((m) => m.userId), user.id, friendIds, hiddenIds)
       return NextResponse.json({ scope, entries, me: entries.find((e) => e.isMe) ?? null, total: entries.length })
     }
 
@@ -43,7 +44,7 @@ export async function GET(req: NextRequest) {
       if (!getPlanInfo(user).limits.allowGlobalLeaderboard) {
         return NextResponse.json({ scope, entries: [], me: null, total: 0, locked: true })
       }
-      const { entries, me, total } = await globalRanking(user.id, friendIds)
+      const { entries, me, total } = await globalRanking(user.id, friendIds, hiddenIds)
       return NextResponse.json({ scope, entries, me, total })
     }
 

@@ -6,6 +6,7 @@ import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Application from 'expo-application';
 import { authService, onboardingService, apiCall } from '@/lib/api';
 import { connectGoogleCalendar, isGoogleCalendarConnected } from '@/lib/calendarAuth';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -423,7 +424,9 @@ export function SettingsNew() {
           style: 'destructive',
           onPress: async () => {
             try {
-              // TODO: Implémenter la déconnexion côté backend si nécessaire
+              // Supprime le jeton Google cote serveur : sans lui, plus aucune lecture ni
+              // ecriture dans l'agenda Google.
+              await apiCall('/google-calendar/disconnect', { method: 'POST' });
               setCalendarConnected(false);
               showSavedFeedback();
             } catch (error) {
@@ -1389,7 +1392,9 @@ export function SettingsNew() {
         {/* Footer */}
         <Animated.View entering={FadeInDown.delay(900).duration(400)} style={styles.footer}>
           <Text style={styles.footerText}>Productif.io — built for serious students.</Text>
-          <Text style={styles.footerVersion}>Version 1.0.0</Text>
+          <Text style={styles.footerVersion}>
+            Version {Application.nativeApplicationVersion ?? ''} ({Application.nativeBuildVersion ?? ''})
+          </Text>
         </Animated.View>
 
         {/* Bottom spacing */}

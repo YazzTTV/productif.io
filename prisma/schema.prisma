@@ -107,6 +107,9 @@ model User {
   LeaderboardGroupMember  LeaderboardGroupMember[]
   friendships             Friendship[]                 @relation("FriendshipOwner")
   friendOf                Friendship[]                 @relation("FriendshipFriend")
+  blocksMade              UserBlock[]                  @relation("BlockOwner")
+  blockedBy               UserBlock[]                  @relation("BlockTarget")
+  communityReports        CommunityReport[]            @relation("ReportAuthor")
   agentInteractions       AgentInteraction[]
   onboardingData          OnboardingData?
   xpEvents                XpEvent[]
@@ -516,6 +519,37 @@ model Friendship {
 
   @@unique([userId, friendId])
   @@index([friendId])
+}
+
+/// Blocage d'un membre de la Communaute. Il est symetrique a l'affichage : ni l'un ni
+/// l'autre ne voit plus l'autre dans aucun classement, et l'amitie est retiree.
+model UserBlock {
+  id        String   @id @default(cuid())
+  blockerId String
+  blockedId String
+  createdAt DateTime @default(now())
+  blocker   User     @relation("BlockOwner", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked   User     @relation("BlockTarget", fields: [blockedId], references: [id], onDelete: Cascade)
+
+  @@unique([blockerId, blockedId])
+  @@index([blockedId])
+}
+
+/// Signalement d'un membre ou d'un groupe. Chaque signalement envoie une alerte par
+/// email (lib/moderation.ts) ; le traitement se fait a la main sous 24 h.
+model CommunityReport {
+  id           String   @id @default(cuid())
+  reporterId   String
+  targetUserId String?
+  groupId      String?
+  reason       String
+  status       String   @default("open") // open, resolved
+  createdAt    DateTime @default(now())
+  reporter     User     @relation("ReportAuthor", fields: [reporterId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([targetUserId])
+  @@index([groupId])
 }
 
 model LeaderboardGroupInvitation {

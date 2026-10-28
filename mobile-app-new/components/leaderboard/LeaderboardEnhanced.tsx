@@ -40,6 +40,7 @@ import {
   type CommunityEntry,
   type CommunityGroup,
   type CommunityLeaderboard,
+  type CommunityReportReason,
 } from '@/lib/api';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useSuperwall } from '@/hooks/useSuperwall';
@@ -263,8 +264,8 @@ export function LeaderboardEnhanced() {
       await loadBoard('groups', group.id);
       // Un groupe seul ne sert à rien : on propose l'invitation tout de suite.
       await shareGroupInvite(group);
-    } catch {
-      Alert.alert(t('cmLoadError'));
+    } catch (error) {
+      Alert.alert(error instanceof Error && error.message === 'name_not_allowed' ? t('cmNameNotAllowed') : t('cmLoadError'));
     } finally {
       setCreating(false);
     }
@@ -284,6 +285,45 @@ export function LeaderboardEnhanced() {
           }
           const next = await loadGroups();
           await loadBoard('groups', next);
+        },
+      },
+    ]);
+  };
+
+  // Signalement d'un membre ou d'un groupe : enregistre cote serveur, alerte la
+  // moderation par email, traite sous 24 h (app/api/community/report).
+  const reportTarget = (target: { userId?: string; groupId?: string }, label: string) => {
+    const send = async (reason: CommunityReportReason) => {
+      try {
+        await communityService.report(target, reason);
+        Alert.alert(t('cmReportSentTitle'), t('cmReportSentBody'));
+      } catch {
+        Alert.alert(t('cmLoadError'));
+      }
+    };
+    Alert.alert(t('cmReportTitle', { name: label }), t('cmReportBody'), [
+      { text: t('cmReasonName'), onPress: () => send('inappropriate_name') },
+      { text: t('cmReasonHarassment'), onPress: () => send('harassment') },
+      { text: t('cmReasonSpam'), onPress: () => send('spam') },
+      { text: t('cmReasonOther'), onPress: () => send('other') },
+      { text: t('cmCancel'), style: 'cancel' },
+    ]);
+  };
+
+  const confirmBlock = (entry: CommunityEntry) => {
+    Alert.alert(entry.name, t('cmBlockConfirm', { name: entry.name }), [
+      { text: t('cmCancel'), style: 'cancel' },
+      {
+        text: t('cmBlock'),
+        style: 'destructive',
+        onPress: async () => {
+          setSelectedEntry(null);
+          try {
+            await communityService.blockUser(entry.userId);
+          } catch {
+            Alert.alert(t('cmLoadError'));
+          }
+          await loadBoard(tab, selectedGroupId);
         },
       },
     ]);
@@ -519,6 +559,14 @@ export function LeaderboardEnhanced() {
                       {selectedGroup.code}
                     </Text>
                   </View>
+                  <TouchableOpacity
+                    onPress={() => reportTarget({ groupId: selectedGroup.id }, selectedGroup.name)}
+                    hitSlop={10}
+                    style={{ marginRight: 16 }}
+                    accessibilityLabel={t('cmReportGroup')}
+                  >
+                    <Ionicons name="flag-outline" size={20} color="rgba(0,0,0,0.35)" />
+                  </TouchableOpacity>
                   <TouchableOpacity onPress={() => confirmLeaveGroup(selectedGroup)} hitSlop={10}>
                     <Ionicons name="exit-outline" size={20} color="rgba(0,0,0,0.35)" />
                   </TouchableOpacity>
@@ -623,6 +671,14 @@ export function LeaderboardEnhanced() {
                   <Text style={styles.removeText}>{t('cmRemoveFriend')}</Text>
                 </TouchableOpacity>
               )}
+              <View style={styles.moderationRow}>
+                <TouchableOpacity onPress={() => reportTarget({ userId: selectedEntry.userId }, selectedEntry.name)} style={styles.linkButton}>
+                  <Text style={styles.moderationText}>{t('cmReport')}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => confirmBlock(selectedEntry)} style={styles.linkButton}>
+                  <Text style={styles.removeText}>{t('cmBlock')}</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
         )}
@@ -733,6 +789,8 @@ const styles = StyleSheet.create({
   linkButton: { paddingVertical: 8, alignItems: 'center' },
   linkButtonText: { fontSize: 15, fontWeight: '600', color: GREEN },
   removeText: { fontSize: 15, fontWeight: '600', color: '#DC2626' },
+  moderationRow: { flexDirection: 'row', justifyContent: 'space-around', marginTop: 4 },
+  moderationText: { fontSize: 15, fontWeight: '600', color: 'rgba(0,0,0,0.55)' },
   privacy: { fontSize: 12, color: 'rgba(0, 0, 0, 0.35)', textAlign: 'center', marginTop: 24 },
 
   overlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.35)', justifyContent: 'flex-end' },

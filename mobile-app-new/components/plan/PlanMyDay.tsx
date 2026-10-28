@@ -814,8 +814,6 @@ export function PlanMyDay() {
       let alertMessage = 'Impossible de créer les événements. Réessayez.';
       if (errorMessage.includes('Google Calendar non connecté')) {
         alertMessage = 'Connectez votre Google Calendar dans les paramètres.';
-      } else if (errorMessage.includes('pas encore disponible') || errorMessage.includes('à jour')) {
-        alertMessage = 'Cette fonctionnalité nécessite une mise à jour du serveur. Elle sera bientôt disponible.';
       } else if (errorMessage.toLowerCase().includes('plan my day') || errorMessage.toLowerCase().includes('premium') || errorMessage.toLowerCase().includes('limite')) {
         alertMessage = errorMessage;
       }

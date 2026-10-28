@@ -366,7 +366,7 @@ export async function apiCall<T>(
       // 405 Method Not Allowed - souvent signifie que la route n'est pas déployée ou pas à jour
       if (response.status === 405) {
         console.error('❌ apiCall - Method Not Allowed (405):', `${API_BASE_URL}${endpoint}`);
-        throw new Error('Cette fonctionnalité n\'est pas encore disponible. Assurez-vous que l\'application est à jour.');
+        throw new Error('L\'action n\'a pas abouti. Réessaie dans un instant.');
       }
 
       const message =
@@ -415,7 +415,7 @@ export async function apiCall<T>(
           
           // Vérifier si c'est un problème d'endpoint non trouvé
           if (endpoint.includes('/subjects')) {
-            throw new Error(`L'endpoint ${endpoint} n'est peut-être pas encore déployé en production. Veuillez contacter le support.`);
+            throw new Error('Le serveur ne répond pas. Réessaie dans un instant.');
           }
           
           throw new Error('Erreur de réseau. Vérifiez votre connexion internet et réessayez.');
@@ -1756,6 +1756,8 @@ export type CommunityJoinResult =
   | { type: 'friend'; friend: { userId: string; name: string }; alreadyFriends: boolean }
   | { type: 'group'; group: { id: string; name: string; memberCount: number }; alreadyMember: boolean };
 
+export type CommunityReportReason = 'inappropriate_name' | 'harassment' | 'spam' | 'other';
+
 export const communityService = {
   me(): Promise<{ friendCode: string; shareUrl: string; name: string }> {
     return apiCall('/community/me');
@@ -1783,6 +1785,12 @@ export const communityService = {
   },
   leaveGroup(groupId: string): Promise<{ left: boolean; deleted: boolean }> {
     return apiCall(`/community/groups/${encodeURIComponent(groupId)}`, { method: 'DELETE' });
+  },
+  blockUser(userId: string): Promise<{ blocked: boolean }> {
+    return apiCall('/community/block', { method: 'POST', body: JSON.stringify({ userId }) });
+  },
+  report(target: { userId?: string; groupId?: string }, reason: CommunityReportReason): Promise<{ reported: boolean }> {
+    return apiCall('/community/report', { method: 'POST', body: JSON.stringify({ ...target, reason }) });
   },
 };
 

@@ -12,16 +12,16 @@
       "bundleIdentifier": "io.productif.app",
       "appleTeamId": "NGAU42SNSX",
       "googleServicesFile": "./firebase/GoogleService-Info.plist",
-      "buildNumber": "26",
+      "buildNumber": "28",
       "infoPlist": {
         "CFBundleLocalizations": ["fr", "en", "es"],
-        "NSCameraUsageDescription": "We need access to your camera to allow you to take photos for your tasks and journal entries.",
-        "NSPhotoLibraryUsageDescription": "We need access to your photo library to let you select images for your tasks and journal entries.",
-        "NSPhotoLibraryAddUsageDescription": "We need permission to save images to your photo library.",
+        "NSCameraUsageDescription": "Nous avons besoin d'accéder à votre appareil photo pour photographier vos listes de matières.",
+        "NSPhotoLibraryUsageDescription": "Nous avons besoin d'accéder à vos photos pour analyser les images de matières.",
+        "NSPhotoLibraryAddUsageDescription": "Productif n'enregistre rien dans tes photos sans que tu le demandes.",
         "NSUserNotificationsUsageDescription": "Nous avons besoin de votre permission pour vous envoyer des notifications importantes concernant vos tâches, habitudes et rappels.",
         "NSCalendarsUsageDescription": "Productif lit les horaires de ton agenda, emploi du temps compris, pour placer tes révisions autour de tes cours, et ajoute tes séances dans un calendrier « Productif ». Seules les heures sont envoyées à nos serveurs, jamais les titres ni les lieux.",
         "NSCalendarsFullAccessUsageDescription": "Productif lit les horaires de ton agenda, emploi du temps compris, pour placer tes révisions autour de tes cours, et ajoute tes séances dans un calendrier « Productif ». Seules les heures sont envoyées à nos serveurs, jamais les titres ni les lieux.",
-        "NSRemindersUsageDescription": "Nous avons besoin d'accéder à vos rappels pour synchroniser vos tâches.",
+        "NSRemindersUsageDescription": "Productif n'utilise pas tes rappels. Cet accès n'est jamais demandé dans l'app.",
         "ITSAppUsesNonExemptEncryption": false
       },
       "usesAppleSignIn": true
